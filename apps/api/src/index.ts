@@ -41,12 +41,11 @@ function buildAdapters(env: AppEnv): Adapters {
 }
 
 export default {
-  async fetch(request: Request, env: AppEnv, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: AppEnv, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    const adapters = buildAdapters(env);
+    const _adapters = buildAdapters(env);
 
     if (url.pathname === '/health') {
-      const dbAlive = false; // will call adapters.db.ping() in Phase 2
       return Response.json({
         status: 'ok',
         version: '0.1.0',

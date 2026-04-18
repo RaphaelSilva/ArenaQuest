@@ -17,15 +17,12 @@
 	/**
 	 * D1 Databases
 	 * https://developers.cloudflare.com/d1/get-started/
-	 *
-	 * Create the production DB:  wrangler d1 create arenaquest-db
-	 * Apply migrations locally:  wrangler d1 execute arenaquest-db --local --file ./migrations/0001_create_users.sql
 	 */
 	"d1_databases": [
 		{
 			"binding": "DB",
 			"database_name": "arenaquest-db",
-			"database_id": "replace-with-output-of-wrangler-d1-create-arenaquest-db",
+			"database_id": "148eaf0b-b615-4e0d-83c0-8d8c681061e4",
 			"migrations_dir": "migrations"
 		}
 	],
@@ -43,38 +40,10 @@
 				{
 					"binding": "DB",
 					"database_name": "arenaquest-db-staging",
-					"database_id": "replace-with-output-of-wrangler-d1-create-arenaquest-db-staging",
+					"database_id": "6a2f5784-c57e-46ae-a858-27ca876f1dfe",
 					"migrations_dir": "migrations"
 				}
 			]
 		}
 	}
-	/**
-	 * Smart Placement
-	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
-	 */
-	// "placement": {  "mode": "smart" }
-	/**
-	 * Bindings
-	 * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
-	 * databases, object storage, AI inference, real-time communication and more.
-	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/
-	 */
-	/**
-	 * Environment Variables
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
-	 * Note: Use secrets to store sensitive data.
-	 * https://developers.cloudflare.com/workers/configuration/secrets/
-	 */
-	// "vars": {  "MY_VARIABLE": "production_value" }
-	/**
-	 * Static Assets
-	 * https://developers.cloudflare.com/workers/static-assets/binding/
-	 */
-	// "assets": {  "directory": "./public/",  "binding": "ASSETS" }
-	/**
-	 * Service Bindings (communicate between multiple Workers)
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
-	 */
-	// "services": [  {   "binding": "MY_SERVICE",   "service": "my-service"  } ]
 }
