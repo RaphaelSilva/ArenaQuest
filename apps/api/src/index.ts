@@ -17,6 +17,8 @@ import { D1RefreshTokenRepository } from '@api/adapters/db/d1-refresh-token-repo
 import { AuthService } from '@api/core/auth/auth-service';
 import { buildAuthRouter } from '@api/routes/auth.router';
 import { getHealth } from '@api/controllers/health.controller';
+import { authGuard } from '@api/middleware/auth-guard';
+import '@api/types/hono-env';
 
 export interface AppEnv extends Env {
   /** HS256 signing secret for JWTs. Set with: wrangler secret put JWT_SECRET */
@@ -37,11 +39,19 @@ function buildApp(env: AppEnv): Hono {
 
   const app = new Hono();
 
+  // Inject the auth adapter into every request context so middleware can use it.
+  app.use('*', (c, next) => { c.set('auth', auth); return next(); });
+
   app.get('/health', (c) =>
     c.json(getHealth({ auth: 'jwt_pbkdf2', database: 'd1', storage: 'not_wired' })),
   );
 
   app.route('/auth', buildAuthRouter(authService));
+
+  // Sanity demo — development only, can be removed post-milestone.
+  app.get('/protected/ping', authGuard, (c) =>
+    c.json({ message: 'pong', email: c.get('user').email }),
+  );
 
   return app;
 }

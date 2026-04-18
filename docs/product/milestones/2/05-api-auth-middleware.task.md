@@ -1,7 +1,7 @@
 # Task 05: Auth Middleware — API Route Protection
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Complete
 - **Complexity:** Low
 - **Milestone:** 2 — Authentication & User Management
 - **Dependencies:** `docs/product/milestones/2/04-expose-auth-http-endpoints.task.md`
@@ -69,13 +69,13 @@ This is a development sanity check — not a production feature — and can be r
 
 ## Acceptance Criteria
 
-- [ ] `GET /protected/ping` without a token returns `401 Unauthorized`.
-- [ ] With an expired or tampered token, returns `401 Unauthorized`.
-- [ ] With a valid token but wrong role, `requireRole('admin')` returns `403 Forbidden`.
-- [ ] With a valid token and correct role, the route proceeds normally.
-- [ ] Unit tests in `apps/api/test/middleware/auth-guard.spec.ts` cover all four cases
+- [x] `GET /protected/ping` without a token returns `401 Unauthorized`.
+- [x] With an expired or tampered token, returns `401 Unauthorized`.
+- [x] With a valid token but wrong role, `requireRole('admin')` returns `403 Forbidden`.
+- [x] With a valid token and correct role, the route proceeds normally.
+- [x] Unit tests in `apps/api/test/middleware/auth-guard.spec.ts` cover all four cases
   using a mock `IAuthAdapter`.
-- [ ] `pnpm --filter api test` — green.
+- [x] `pnpm --filter api test` — green.
 
 ---
 
