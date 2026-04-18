@@ -9,30 +9,34 @@
  *     module-level singletons (Workers have no shared memory between requests).
  */
 
-import type { IAuthAdapter } from '@arenaquest/shared/ports';
+import type { D1Database } from '@cloudflare/workers-types';
+import type { IAuthAdapter, IUserRepository } from '@arenaquest/shared/ports';
 import { JwtAuthAdapter } from './adapters/auth';
+import { D1UserRepository } from './adapters/db/d1-user-repository';
 
-/**
- * Worker environment bindings.
- * Add Cloudflare bindings (KV, D1, R2, etc.) here as Phase 2 adapters land.
- * Secrets are set via: `wrangler secret put <NAME>`
- */
 export interface AppEnv extends Env {
   /** HS256 signing secret for JWTs. Set with: wrangler secret put JWT_SECRET */
   JWT_SECRET: string;
-
-  // Phase 2 — uncomment as implementations are added:
-  // DB: D1Database;         // or Hyperdrive for Postgres
-  // STORAGE: R2Bucket;
+  /** Cloudflare D1 database binding. Declared in wrangler.jsonc as "DB". */
+  DB: D1Database;
+  // STORAGE: R2Bucket;   // Phase 3
 }
 
+type Adapters = {
+  auth: IAuthAdapter;
+  db: { users: IUserRepository };
+};
+
 /** Build the adapter instances for a single request. */
-function buildAdapters(env: AppEnv): { auth: IAuthAdapter } {
+function buildAdapters(env: AppEnv): Adapters {
   return {
     auth: new JwtAuthAdapter({
       secret: env.JWT_SECRET,
       accessTokenExpiresInSeconds: 900,  // 15 min
     }),
+    db: {
+      users: new D1UserRepository(env.DB),
+    },
   };
 }
 

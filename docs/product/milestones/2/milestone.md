@@ -35,7 +35,7 @@ The success of this phase is defined by:
 
 | # | Task File | Status |
 |---|-----------|--------|
-| 01 | [User Repository (Port + D1 Adapter)](./01-implement-user-repository.task.md) | ⬜ Pending |
+| 01 | [User Repository (Port + D1 Adapter)](./01-implement-user-repository.task.md) | ✅ Done |
 | 02 | [Seed Roles & RBAC Constants](./02-seed-roles-and-rbac-constants.task.md) | ⬜ Pending |
 | 03 | [Auth Service (Login / Logout / Refresh)](./03-implement-auth-service.task.md) | ⬜ Pending |
 | 04 | [Auth HTTP Endpoints (Hono Router)](./04-expose-auth-http-endpoints.task.md) | ⬜ Pending |

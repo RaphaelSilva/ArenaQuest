@@ -1,7 +1,7 @@
 # Task 01: Implement User Repository (Port + D1 Adapter)
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 2 — Authentication & User Management
 - **Dependencies:** None (foundational for this milestone)
@@ -69,16 +69,16 @@ Add `DB: D1Database` to `AppEnv` and include a `db` adapter instance in `buildAd
 
 ## Acceptance Criteria
 
-- [ ] `IUserRepository` interface exported from `packages/shared/ports/index.ts`.
-- [ ] `D1UserRepository` implements every method of the interface with no TypeScript errors.
-- [ ] SQL migration file exists at `apps/api/migrations/0001_create_users.sql`.
-- [ ] `wrangler.jsonc` declares the D1 binding (`database_name`, `database_id`).
-- [ ] `AppEnv` in `apps/api/src/index.ts` exposes `DB: D1Database`.
-- [ ] Unit test (`apps/api/test/db/d1-user-repository.spec.ts`) covers:
+- [x] `IUserRepository` interface exported from `packages/shared/ports/index.ts`.
+- [x] `D1UserRepository` implements every method of the interface with no TypeScript errors.
+- [x] SQL migration file exists at `apps/api/migrations/0001_create_users.sql`.
+- [x] `wrangler.jsonc` declares the D1 binding (`database_name`, `database_id`).
+- [x] `AppEnv` in `apps/api/src/index.ts` exposes `DB: D1Database`.
+- [x] Unit test (`apps/api/test/db/d1-user-repository.spec.ts`) covers:
   - `create` + `findByEmail` round-trip.
   - `findById` returns `null` for unknown id.
   - `delete` removes the record.
-- [ ] All tests pass: `pnpm --filter api test`.
+- [x] All tests pass: `pnpm --filter api test`.
 
 ---
 
