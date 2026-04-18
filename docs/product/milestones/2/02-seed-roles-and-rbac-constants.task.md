@@ -59,9 +59,9 @@ Add re-export of `ROLES` and `RoleName` so consumers import cleanly from `@arena
 
 ## Acceptance Criteria
 
-- [ ] `ROLES` constant and `RoleName` type exported from `@arenaquest/shared`.
-- [ ] Seed migration file exists at `apps/api/migrations/0002_seed_roles.sql`.
-- [ ] Applying the migration twice produces no error and no duplicate rows.
+- [x] `ROLES` constant and `RoleName` type exported from `@arenaquest/shared`.
+- [x] Seed migration file exists at `apps/api/migrations/0002_seed_roles.sql`.
+- [x] Applying the migration twice produces no error and no duplicate rows.
 - [ ] Unit test verifies that `ROLES` contains exactly 4 entries.
 - [ ] No string literals like `"admin"` appear in any `apps/api` source file — only
   `ROLES.ADMIN` references are allowed.

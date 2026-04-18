@@ -27,6 +27,9 @@ dist/
 .env.*
 !.env.example
 !.env.*.example
+# Cloudflare Workers local secrets (wrangler dev / vitest)
+.dev.vars
+!.dev.vars.example
 
 # ── Logs ───────────────────────────────────────────────────────────────────────
 *.log

@@ -6,6 +6,7 @@
 		"deploy": "wrangler deploy",
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
+		"lint": "eslint .",
 		"test": "vitest",
 		"cf-typegen": "wrangler types"
 	},
@@ -16,6 +17,7 @@
 		"@cloudflare/vitest-pool-workers": "^0.12.4",
 		"@types/node": "^20",
 		"typescript": "^5.5.2",
+		"typescript-eslint": "^8.0.0",
 		"vitest": "~3.2.0",
 		"wrangler": "^4.82.2"
 	}

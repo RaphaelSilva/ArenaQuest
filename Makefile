@@ -6,7 +6,9 @@
 .DEFAULT_GOAL := help
 .PHONY: help install dev dev-web dev-api build build-web build-api \
         lint lint-web lint-shared test test-api \
-        cf-typegen deploy-api deploy-web \
+        cf-typegen \
+        db-migrate-local db-migrate-local-staging \
+        deploy-api deploy-web \
         clean clean-cache clean-all
 
 # ── Colours ────────────────────────────────────────────────────────────────────
@@ -82,6 +84,15 @@ test-api: ## Run apps/api tests (Vitest + Cloudflare Workers pool)
 cf-typegen: ## Regenerate Cloudflare Worker types (wrangler types)
 	pnpm --filter api cf-typegen
 
+db-migrate-local: ## Apply all D1 migrations locally (arenaquest-db)
+	pnpm --filter api exec wrangler d1 migrations apply arenaquest-db --local
+
+db-migrate-local-staging: ## Apply all D1 migrations to local staging DB (arenaquest-db-staging)
+	pnpm --filter api exec wrangler d1 migrations apply arenaquest-db-staging --local --env staging
+
+db-migrate-staging: ## Apply all D1 migrations to remote staging DB (arenaquest-db-staging)
+	pnpm --filter api exec wrangler d1 migrations apply arenaquest-db-staging --remote --env staging
+
 # ==============================================================================
 # 🚢 DEPLOY
 # ==============================================================================
@@ -94,10 +105,20 @@ deploy-web-staging: ## Build and deploy apps/web to Cloudflare Pages (Staging)
 	pnpm --filter web exec wrangler pages deploy .vercel/output/static --project-name=arenaquest-web-staging
 
 deploy-api: ## Deploy apps/api to Cloudflare Workers (Production)
-	pnpm --filter api deploy
+	pnpm --filter api run deploy
 
 deploy-api-staging: ## Deploy apps/api to Cloudflare Workers (Staging)
-	pnpm --filter api deploy --env staging
+	pnpm --filter api run deploy --env staging
+
+create-db: ## Create a new D1 database
+	pnpm --filter api exec wrangler d1 create arenaquest-db
+
+create-db-staging: ## Create a new D1 database (Staging)
+	pnpm --filter api exec wrangler d1 create arenaquest-db-staging --env staging
+
+deploy: deploy-web deploy-api
+
+deploy-staging: deploy-web-staging deploy-api-staging
 
 # ==============================================================================
 # 🧹 CLEAN
