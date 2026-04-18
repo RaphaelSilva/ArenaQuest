@@ -16,6 +16,7 @@ import { D1UserRepository } from '@api/adapters/db/d1-user-repository';
 import { D1RefreshTokenRepository } from '@api/adapters/db/d1-refresh-token-repository';
 import { AuthService } from '@api/core/auth/auth-service';
 import { buildAuthRouter } from '@api/routes/auth.router';
+import { buildAdminUsersRouter } from '@api/routes/admin-users.router';
 import { getHealth } from '@api/controllers/health.controller';
 import { authGuard } from '@api/middleware/auth-guard';
 import '@api/types/hono-env';
@@ -47,6 +48,7 @@ function buildApp(env: AppEnv): Hono {
   );
 
   app.route('/auth', buildAuthRouter(authService));
+  app.route('/admin/users', buildAdminUsersRouter(users, auth));
 
   // Sanity demo — development only, can be removed post-milestone.
   app.get('/protected/ping', authGuard, (c) =>

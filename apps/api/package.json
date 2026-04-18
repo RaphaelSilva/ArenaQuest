@@ -12,7 +12,8 @@
 	},
 	"dependencies": {
 		"@arenaquest/shared": "workspace:*",
-		"hono": "^4"
+		"hono": "^4",
+		"zod": "^3"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20250224.0",

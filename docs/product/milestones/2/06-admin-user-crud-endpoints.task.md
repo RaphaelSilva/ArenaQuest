@@ -1,7 +1,7 @@
 # Task 06: Admin — User CRUD Endpoints
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Complete
 - **Complexity:** Medium
 - **Milestone:** 2 — Authentication & User Management
 - **Dependencies:**
@@ -75,17 +75,17 @@ export function buildAdminUsersRouter(
 
 ## Acceptance Criteria
 
-- [ ] All five endpoints return `401` when called without a token.
-- [ ] All five endpoints return `403` when called with a non-admin token.
-- [ ] `POST /admin/users` with valid body creates a user and returns the new `User` entity
+- [x] All five endpoints return `401` when called without a token.
+- [x] All five endpoints return `403` when called with a non-admin token.
+- [x] `POST /admin/users` with valid body creates a user and returns the new `User` entity
   (no `passwordHash` in the response).
-- [ ] `POST /admin/users` with an existing email returns `409 Conflict`.
-- [ ] `PATCH /admin/users/:id` with `{ roles: ['student'] }` updates roles correctly.
-- [ ] `DELETE /admin/users/:id` sets `status` to `inactive` (not a hard delete).
-- [ ] `GET /admin/users` returns a paginated list (`{ data: User[], total: number }`).
-- [ ] Integration tests in `apps/api/test/routes/admin-users.router.spec.ts` cover all
+- [x] `POST /admin/users` with an existing email returns `409 Conflict`.
+- [x] `PATCH /admin/users/:id` with `{ roles: ['student'] }` updates roles correctly.
+- [x] `DELETE /admin/users/:id` sets `status` to `inactive` (not a hard delete).
+- [x] `GET /admin/users` returns a paginated list (`{ data: User[], total: number }`).
+- [x] Integration tests in `apps/api/test/routes/admin-users.router.spec.ts` cover all
   acceptance criteria using `@cloudflare/vitest-pool-workers`.
-- [ ] `pnpm --filter api test` — green.
+- [x] `pnpm --filter api test` — green.
 
 ---
 

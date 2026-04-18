@@ -57,6 +57,26 @@ export class D1UserRepository implements IUserRepository {
     };
   }
 
+  /** Replace a user's roles with the given role names. Clears all roles if empty array. */
+  private async assignRoles(userId: string, roleNames: string[]): Promise<void> {
+    await this.db.prepare('DELETE FROM user_roles WHERE user_id = ?').bind(userId).run();
+
+    if (roleNames.length === 0) return;
+
+    const placeholders = roleNames.map(() => '?').join(', ');
+    const { results } = await this.db
+      .prepare(`SELECT id FROM roles WHERE name IN (${placeholders})`)
+      .bind(...roleNames)
+      .all<{ id: string }>();
+
+    for (const { id: roleId } of results) {
+      await this.db
+        .prepare('INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)')
+        .bind(userId, roleId)
+        .run();
+    }
+  }
+
   async findById(id: string): Promise<Entities.Identity.User | null> {
     const row = await this.db
       .prepare('SELECT id, name, email, password_hash, status, created_at FROM users WHERE id = ?')
@@ -90,6 +110,10 @@ export class D1UserRepository implements IUserRepository {
       .bind(id, data.name, data.email, data.passwordHash, status)
       .run();
 
+    if (data.roleNames && data.roleNames.length > 0) {
+      await this.assignRoles(id, data.roleNames);
+    }
+
     const user = await this.findById(id);
     if (!user) throw new Error(`D1UserRepository: failed to fetch user after create (id=${id})`);
     return user;
@@ -108,6 +132,10 @@ export class D1UserRepository implements IUserRepository {
         .prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`)
         .bind(...values)
         .run();
+    }
+
+    if (data.roleNames !== undefined) {
+      await this.assignRoles(id, data.roleNames);
     }
 
     const user = await this.findById(id);
@@ -136,5 +164,12 @@ export class D1UserRepository implements IUserRepository {
         return this.rowToUser(row, roles);
       }),
     );
+  }
+
+  async count(): Promise<number> {
+    const { results } = await this.db
+      .prepare('SELECT COUNT(*) as cnt FROM users')
+      .all<{ cnt: number }>();
+    return Number(results[0]?.cnt ?? 0);
   }
 }
