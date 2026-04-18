@@ -11,7 +11,8 @@
 		"cf-typegen": "wrangler types"
 	},
 	"dependencies": {
-		"@arenaquest/shared": "workspace:*"
+		"@arenaquest/shared": "workspace:*",
+		"hono": "^4"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20250224.0",

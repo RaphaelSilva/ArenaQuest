@@ -1,7 +1,7 @@
 # Task 04: Expose Auth HTTP Endpoints (Hono Router)
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Complete
 - **Complexity:** Medium
 - **Milestone:** 2 — Authentication & User Management
 - **Dependencies:** `docs/product/milestones/2/03-implement-auth-service.task.md`
@@ -80,16 +80,16 @@ Mount the Hono app as the Worker's fetch handler using `app.fetch`.
 
 ## Acceptance Criteria
 
-- [ ] `POST /auth/login` with valid credentials returns HTTP 200 with `accessToken` and sets
+- [x] `POST /auth/login` with valid credentials returns HTTP 200 with `accessToken` and sets
   the `refresh_token` HttpOnly cookie.
-- [ ] `POST /auth/login` with wrong password returns HTTP 401 with `{ error: 'InvalidCredentials' }`.
-- [ ] `POST /auth/logout` clears the `refresh_token` cookie and returns HTTP 204.
-- [ ] `POST /auth/refresh` with a valid cookie returns a new `accessToken` (200) and rotates
+- [x] `POST /auth/login` with wrong password returns HTTP 401 with `{ error: 'InvalidCredentials' }`.
+- [x] `POST /auth/logout` clears the `refresh_token` cookie and returns HTTP 204.
+- [x] `POST /auth/refresh` with a valid cookie returns a new `accessToken` (200) and rotates
   the cookie.
-- [ ] `POST /auth/refresh` with an expired/revoked cookie returns HTTP 401.
-- [ ] Integration tests in `apps/api/test/routes/auth.router.spec.ts` cover all cases above
+- [x] `POST /auth/refresh` with an expired/revoked cookie returns HTTP 401.
+- [x] Integration tests in `apps/api/test/routes/auth.router.spec.ts` cover all cases above
   using `@cloudflare/vitest-pool-workers` (no mocking of the Hono app itself).
-- [ ] `GET /health` still returns the adapter status object (regression check).
+- [x] `GET /health` still returns the adapter status object (regression check).
 
 ---
 

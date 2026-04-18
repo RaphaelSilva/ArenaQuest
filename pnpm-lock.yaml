@@ -29,6 +29,9 @@ importers:
       '@arenaquest/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      hono:
+        specifier: ^4
+        version: 4.12.14
     devDependencies:
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.12.4
@@ -3246,6 +3249,10 @@ packages:
 
   highlight.js@10.7.3:
     resolution: {integrity: sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A==}
+
+  hono@4.12.14:
+    resolution: {integrity: sha512-am5zfg3yu6sqn5yjKBNqhnTX7Cv+m00ox+7jbaKkrLMRJ4rAdldd1xPd/JzbBWspqaQv6RSTrgFN95EsfhC+7w==}
+    engines: {node: '>=16.9.0'}
 
   html-to-image@1.11.13:
     resolution: {integrity: sha512-cuOPoI7WApyhBElTTb9oqsawRvZ0rHhaHwghRLlTuffoD1B2aDemlCruLeZrUIIdvG7gs9xeELEPm6PhuASqrg==}
@@ -8216,6 +8223,8 @@ snapshots:
       hermes-estree: 0.25.1
 
   highlight.js@10.7.3: {}
+
+  hono@4.12.14: {}
 
   html-to-image@1.11.13: {}
 
