@@ -15,7 +15,7 @@
  *   const user = await db.users.findById('usr_123');
  */
 
-import { Entities } from '@/types/Entities';
+import { Entities } from '@arenaquest/shared/types/entities';
 
 // ---------------------------------------------------------------------------
 // Generic query primitives

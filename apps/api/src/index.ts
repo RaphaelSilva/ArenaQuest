@@ -1,34 +1,56 @@
 /**
  * ArenaQuest — Cloudflare Worker entry point
  *
- * Phase 1: foundation scaffolding.
- * The ports (IStorageAdapter, IDatabaseAdapter) are defined but concrete
- * adapter implementations will be wired in Phase 2 via dependency injection.
+ * Adapter wiring pattern:
+ *   - Ports (interfaces) live in @arenaquest/shared — imported here as types only.
+ *   - Concrete adapters live in ./adapters — instantiated once per request
+ *     using secrets/bindings from the Worker `env` object.
+ *   - Route handlers receive adapters via parameter injection, never via
+ *     module-level singletons (Workers have no shared memory between requests).
  */
 
-import type { IDatabaseAdapter, IStorageAdapter } from '@arenaquest/shared/ports';
+import type { IAuthAdapter } from '@arenaquest/shared/ports';
+import { JwtAuthAdapter } from './adapters/auth';
 
-// Extend the Cloudflare Worker Env with the adapter bindings.
-// Concrete implementations will be injected here once Phase 2 adapters exist.
+/**
+ * Worker environment bindings.
+ * Add Cloudflare bindings (KV, D1, R2, etc.) here as Phase 2 adapters land.
+ * Secrets are set via: `wrangler secret put <NAME>`
+ */
 export interface AppEnv extends Env {
-  // Will be populated after Phase 2 adapter implementations are built.
-  // DB?: IDatabaseAdapter;
-  // STORAGE?: IStorageAdapter;
+  /** HS256 signing secret for JWTs. Set with: wrangler secret put JWT_SECRET */
+  JWT_SECRET: string;
+
+  // Phase 2 — uncomment as implementations are added:
+  // DB: D1Database;         // or Hyperdrive for Postgres
+  // STORAGE: R2Bucket;
+}
+
+/** Build the adapter instances for a single request. */
+function buildAdapters(env: AppEnv): { auth: IAuthAdapter } {
+  return {
+    auth: new JwtAuthAdapter({
+      secret: env.JWT_SECRET,
+      accessTokenExpiresInSeconds: 900,  // 15 min
+    }),
+  };
 }
 
 export default {
   async fetch(request: Request, env: AppEnv, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const adapters = buildAdapters(env);
 
     if (url.pathname === '/health') {
+      const dbAlive = false; // will call adapters.db.ping() in Phase 2
       return Response.json({
         status: 'ok',
-        phase: 1,
         version: '0.1.0',
         timestamp: new Date().toISOString(),
         adapters: {
-          database: 'not_wired',  // pending Phase 2
-          storage: 'not_wired',   // pending Phase 2
+          auth: 'jwt_pbkdf2',
+          database: 'not_wired',  // Phase 2
+          storage: 'not_wired',   // Phase 2
         },
       });
     }
