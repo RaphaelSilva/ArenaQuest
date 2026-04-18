@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { buildAuthRouter } from './auth.router';
 import { buildAdminUsersRouter } from './admin-users.router';
 import { getHealth } from '@api/controllers/health.controller';
@@ -23,9 +24,21 @@ export class AppRouter {
       auth: IAuthAdapter;
       users: IUserRepository;
       authService: AuthService;
+      allowedOrigin?: string;
     },
   ): void {
-    const { auth, users, authService } = deps;
+    const { auth, users, authService, allowedOrigin } = deps;
+
+    // Enable CORS for frontend interaction
+    app.use(
+      '*',
+      cors({
+        origin: allowedOrigin ?? 'http://localhost:3000',
+        allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowHeaders: ['Content-Type', 'Authorization'],
+        credentials: true,
+      }),
+    );
 
     // Inject the auth adapter into every request context so middleware can use it.
     app.use('*', (c, next) => {

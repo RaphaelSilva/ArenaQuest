@@ -1,0 +1,10 @@
+{
+    "sqltools.useNodeRuntime": true,
+    "sqltools.connections": [
+        {
+            "name": "ArenaQuest DB",
+            "driver": "sqlite",
+            "path": "${workspaceFolder}/apps/api/data/arenaquest.db"
+        }
+    ]
+}

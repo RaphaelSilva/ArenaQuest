@@ -23,6 +23,8 @@ export interface AppEnv extends Env {
   JWT_SECRET: string;
   /** Cloudflare D1 database binding. Declared in wrangler.jsonc as "DB". */
   DB: D1Database;
+  /** Allowed origin for CORS (e.g. http://localhost:3000). */
+  ALLOWED_ORIGIN?: string;
   // STORAGE: R2Bucket;   // Phase 3
 }
 
@@ -37,7 +39,7 @@ function buildApp(env: AppEnv): Hono {
 
   const app = new Hono();
 
-  AppRouter.register(app, { auth, users, authService });
+  AppRouter.register(app, { auth, users, authService, allowedOrigin: env.ALLOWED_ORIGIN });
 
   return app;
 }
