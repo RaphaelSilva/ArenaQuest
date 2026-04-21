@@ -1,6 +1,7 @@
 import type { IAuthAdapter, IUserRepository, IRefreshTokenRepository } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
 import { AuthError } from '@api/core/auth/auth-error';
+import { JwtAuthAdapter } from '@api/adapters/auth/jwt-auth-adapter';
 
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -11,7 +12,7 @@ const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 // branches converge on the same CPU cost.
 // Regenerate with `pnpm --filter api run gen-hash` if the iteration target changes.
 const DUMMY_PASSWORD_HASH =
-  'pbkdf2:100000:ba904c14cba9520e3a05b0d00517578b:3d97c7ed7c33202d720b3e9fe93821090dcc4f3e1985831f71e0f0390332349e';
+  'pbkdf2:210000:0d3ecb5409e544016abf7074fd808e29:1d1f8ced782339c770ba4c4318f15fd9b5193ad5e60c034889b3491407409658';
 
 export interface LoginResult {
   accessToken: string;
@@ -41,6 +42,18 @@ export class AuthService {
 
     if (record.status !== Entities.Config.UserStatus.ACTIVE) {
       throw new AuthError('ACCOUNT_INACTIVE', 'Account is not active');
+    }
+
+    // S-06: transparent PBKDF2 rehash — upgrade stale hashes on successful
+    // login so the fleet migrates to the current iteration target without any
+    // forced password-reset flow. A rehash failure must never break the login.
+    const currentIter = this.auth.currentPbkdf2Iterations;
+    const storedIter = JwtAuthAdapter.readIterationsFromHash(record.passwordHash);
+    if (storedIter !== null && storedIter < currentIter) {
+      const newHash = await this.auth.hashPassword(password);
+      await this.users.updatePasswordHash(record.id, newHash).catch((e) => {
+        console.warn('[auth] rehash failed, login proceeds', e);
+      });
     }
 
     const { passwordHash: _, ...user } = record;

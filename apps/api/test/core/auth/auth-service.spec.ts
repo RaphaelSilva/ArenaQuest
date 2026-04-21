@@ -25,9 +25,10 @@ const STORED_HASH = 'hashed:correct-password';
 // Mock factories
 // ---------------------------------------------------------------------------
 
-function makeMockAuth(): IAuthAdapter {
+function makeMockAuth(currentIterations = 210_000): IAuthAdapter {
   let counter = 0;
   return {
+    currentPbkdf2Iterations: currentIterations,
     hashPassword: async (plain) => `hashed:${plain}`,
     verifyPassword: async (plain, stored) => stored === `hashed:${plain}`,
     signAccessToken: async (payload) => `access.${payload.sub}`,
@@ -47,6 +48,9 @@ function makeMockUserRepo(overrides: Partial<Entities.Identity.User> = {}): IUse
     update: async () => user,
     delete: async () => {},
     list: async () => [user],
+    count: async () => 1,
+    countActiveAdmins: async () => 1,
+    updatePasswordHash: async () => {},
   };
 }
 
@@ -137,6 +141,7 @@ describe('AuthService', () => {
       // comparable chunk of work before login decides to reject.
       const VERIFY_WORK_MS = 30;
       const timingAuth: IAuthAdapter = {
+        currentPbkdf2Iterations: 210_000,
         hashPassword: async (plain) => `hashed:${plain}`,
         verifyPassword: async (plain, stored) => {
           const end = Date.now() + VERIFY_WORK_MS;
@@ -231,6 +236,108 @@ describe('AuthService', () => {
       await expect(
         service.refreshTokens('expired-token'),
       ).rejects.toMatchObject({ code: 'INVALID_REFRESH_TOKEN' });
+    });
+  });
+
+  // ── S-06: transparent PBKDF2 rehash ──────────────────────────────────────
+
+  describe('PBKDF2 transparent rehash (S-06)', () => {
+    function makeRehashScenario(storedIter: number, currentIter: number) {
+      // Stored hash format mirrors the adapter's real format so
+      // readIterationsFromHash can parse it. The verify mock accepts any stored
+      // hash that ends with the plain password.
+      const storedHash = `pbkdf2:${storedIter}:fakesalt12345678fakesalt12345678:correct-password`;
+      const user = { ...BASE_USER };
+      const record = { ...user, passwordHash: storedHash };
+
+      let capturedHash: string | undefined;
+      let updateCalled = false;
+
+      const authMock: IAuthAdapter = {
+        currentPbkdf2Iterations: currentIter,
+        hashPassword: async (plain) => `pbkdf2:${currentIter}:newsalt:${plain}`,
+        verifyPassword: async (plain, stored) => stored.endsWith(`:${plain}`),
+        signAccessToken: async (payload) => `access.${payload.sub}`,
+        verifyAccessToken: async () => null,
+        generateRefreshToken: async () => 'refresh-token',
+      };
+
+      const usersMock: IUserRepository = {
+        findByEmail: async (email) => (email === user.email ? record : null),
+        findById: async (id) => (id === user.id ? user : null),
+        create: async () => user,
+        update: async () => user,
+        delete: async () => {},
+        list: async () => [user],
+        count: async () => 1,
+        countActiveAdmins: async () => 1,
+        updatePasswordHash: async (_id, hash) => {
+          updateCalled = true;
+          capturedHash = hash;
+        },
+      };
+
+      const svc = new AuthService(authMock, usersMock, makeMockTokenRepo());
+      return { svc, getUpdatedHash: () => capturedHash, wasUpdateCalled: () => updateCalled };
+    }
+
+    it('upgrades a stale hash (100k → 210k) on successful login', async () => {
+      const { svc, getUpdatedHash, wasUpdateCalled } = makeRehashScenario(100_000, 210_000);
+
+      const result = await svc.login('alice@example.com', 'correct-password');
+
+      expect(result.user.id).toBe('user-1');
+      expect(wasUpdateCalled()).toBe(true);
+      expect(getUpdatedHash()).toBe('pbkdf2:210000:newsalt:correct-password');
+    });
+
+    it('does NOT rehash when stored iterations already match current', async () => {
+      const { svc, wasUpdateCalled } = makeRehashScenario(210_000, 210_000);
+
+      await svc.login('alice@example.com', 'correct-password');
+
+      expect(wasUpdateCalled()).toBe(false);
+    });
+
+    it('does NOT rehash on a failed login (wrong password)', async () => {
+      const { svc, wasUpdateCalled } = makeRehashScenario(100_000, 210_000);
+
+      await expect(
+        svc.login('alice@example.com', 'wrong-password'),
+      ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
+
+      expect(wasUpdateCalled()).toBe(false);
+    });
+
+    it('login still succeeds when updatePasswordHash throws', async () => {
+      const storedHash = `pbkdf2:100000:fakesalt12345678fakesalt12345678:correct-password`;
+      const user = { ...BASE_USER };
+      const record = { ...user, passwordHash: storedHash };
+
+      const authMock: IAuthAdapter = {
+        currentPbkdf2Iterations: 210_000,
+        hashPassword: async (plain) => `pbkdf2:210000:newsalt:${plain}`,
+        verifyPassword: async (plain, stored) => stored.endsWith(`:${plain}`),
+        signAccessToken: async (payload) => `access.${payload.sub}`,
+        verifyAccessToken: async () => null,
+        generateRefreshToken: async () => 'refresh-token',
+      };
+
+      const usersMock: IUserRepository = {
+        findByEmail: async (email) => (email === user.email ? record : null),
+        findById: async (id) => (id === user.id ? user : null),
+        create: async () => user,
+        update: async () => user,
+        delete: async () => {},
+        list: async () => [user],
+        count: async () => 1,
+        countActiveAdmins: async () => 1,
+        updatePasswordHash: async () => { throw new Error('DB is down'); },
+      };
+
+      const svc = new AuthService(authMock, usersMock, makeMockTokenRepo());
+      const result = await svc.login('alice@example.com', 'correct-password');
+      expect(result.user.id).toBe('user-1');
     });
   });
 });

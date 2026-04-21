@@ -49,6 +49,15 @@ export interface VerifiedToken extends TokenPayload {
 // ---------------------------------------------------------------------------
 
 export interface IAuthAdapter {
+  // ── Key-derivation metadata ───────────────────────────────────────────────
+
+  /**
+   * The PBKDF2 iteration count the adapter will use for **new** hashes.
+   * Callers compare this against the count encoded in a stored hash to decide
+   * whether a transparent rehash is needed.
+   */
+  readonly currentPbkdf2Iterations: number;
+
   // ── Password hashing ──────────────────────────────────────────────────────
 
   /**

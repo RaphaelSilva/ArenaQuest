@@ -34,4 +34,10 @@ export interface IUserRepository {
    * Used to prevent mutations that would leave the platform with no admins.
    */
   countActiveAdmins(): Promise<number>;
+  /**
+   * Update only the password hash column for a user.
+   * Used by the transparent PBKDF2 rehash path — isolated from the general
+   * `update` method to avoid accidentally overwriting other fields.
+   */
+  updatePasswordHash(id: string, hash: string): Promise<void>;
 }

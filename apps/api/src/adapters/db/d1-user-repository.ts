@@ -173,6 +173,13 @@ export class D1UserRepository implements IUserRepository {
     return Number(results[0]?.cnt ?? 0);
   }
 
+  async updatePasswordHash(id: string, hash: string): Promise<void> {
+    await this.db
+      .prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+      .bind(hash, id)
+      .run();
+  }
+
   async countActiveAdmins(): Promise<number> {
     const { results } = await this.db
       .prepare(

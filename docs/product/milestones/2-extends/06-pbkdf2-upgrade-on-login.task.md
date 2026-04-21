@@ -1,7 +1,7 @@
 # Task 06: PBKDF2 Iteration Upgrade with Transparent Rehash
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Low
 - **Severity closed:** S-06 (Low)
 - **Story:** [`auth-hardening.story.md`](./auth-hardening.story.md)
@@ -97,13 +97,13 @@ Unit tests in `auth-service.spec.ts`:
 
 ## Acceptance Criteria
 
-- [ ] `JwtAuthAdapter` default iterations = 210 000.
-- [ ] `readIterationsFromHash` static helper exists and is covered.
-- [ ] `IUserRepository.updatePasswordHash` implemented in D1 and tested.
-- [ ] Successful login upgrades stale hashes; failed login does not.
-- [ ] Rehash failure is swallowed with a `console.warn`; login still succeeds.
-- [ ] Existing dev seed users still log in (old 100 000-iteration hashes).
-- [ ] `make lint` clean; all tests pass.
+- [x] `JwtAuthAdapter` default iterations = 210 000.
+- [x] `readIterationsFromHash` static helper exists and is covered.
+- [x] `IUserRepository.updatePasswordHash` implemented in D1 and tested.
+- [x] Successful login upgrades stale hashes; failed login does not.
+- [x] Rehash failure is swallowed with a `console.warn`; login still succeeds.
+- [x] Existing dev seed users still log in (old 100 000-iteration hashes).
+- [x] `make lint` clean; all tests pass.
 
 ---
 

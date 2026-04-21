@@ -3,7 +3,7 @@ import { JwtAuthAdapter } from '../src/adapters/auth/jwt-auth-adapter';
 async function main() {
   const auth = new JwtAuthAdapter({
     secret: 'dummy-secret-at-least-32-chars-long-dummy',
-    pbkdf2Iterations: 100000,
+    pbkdf2Iterations: 210000,
   });
 
   // Default demo: hash the seed password.
