@@ -172,4 +172,17 @@ export class D1UserRepository implements IUserRepository {
       .all<{ cnt: number }>();
     return Number(results[0]?.cnt ?? 0);
   }
+
+  async countActiveAdmins(): Promise<number> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT COUNT(DISTINCT u.id) AS cnt
+         FROM users u
+         INNER JOIN user_roles ur ON u.id = ur.user_id
+         INNER JOIN roles r        ON r.id = ur.role_id
+         WHERE r.name = 'admin' AND u.status = 'active'`,
+      )
+      .all<{ cnt: number }>();
+    return Number(results[0]?.cnt ?? 0);
+  }
 }

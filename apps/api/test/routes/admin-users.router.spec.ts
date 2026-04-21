@@ -472,6 +472,204 @@ describe('Session revocation on admin mutations (S-02)', () => {
     expect(refreshRes.status).toBe(401);
   });
 
+  it.skip('placeholder', async () => {});
+});
+
+// ---------------------------------------------------------------------------
+// S-05: admin lockout guards (last-admin + self-lockout)
+// ---------------------------------------------------------------------------
+
+describe('Admin lockout guards (S-05)', () => {
+  // Seed the actor user row so self-lockout tests can PATCH the actor itself.
+  // The JWT's `sub` is ADMIN_USER_ID; we need a DB row with that id and the
+  // admin role so the last-admin check can see a peer when expected.
+  beforeAll(async () => {
+    await env.DB
+      .prepare(
+        `INSERT OR IGNORE INTO users (id, name, email, password_hash, status)
+         VALUES (?, 'Acting Admin', 's05-actor@example.com', 'h', 'active')`,
+      )
+      .bind(ADMIN_USER_ID)
+      .run();
+    await env.DB
+      .prepare(
+        `INSERT OR IGNORE INTO user_roles (user_id, role_id)
+         VALUES (?, 'bace0701-15e3-5144-97c5-47487d543032')`,
+      )
+      .bind(ADMIN_USER_ID)
+      .run();
+  });
+
+  async function createAdmin(email: string, name = 'Peer Admin'): Promise<string> {
+    const res = await req('POST', '/admin/users', {
+      token: adminToken,
+      body: { name, email, password: 'password123', roles: ['admin'] },
+    });
+    expect(res.status).toBe(201);
+    const { id } = await res.json<{ id: string }>();
+    return id;
+  }
+
+  async function demoteToNonAdmin(userId: string): Promise<void> {
+    // Directly mutate DB to avoid the guards that the router would trigger.
+    await env.DB
+      .prepare(`DELETE FROM user_roles WHERE user_id = ?`)
+      .bind(userId)
+      .run();
+    await env.DB
+      .prepare(
+        `INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, 'bf3d0f1d-7d77-5151-922e-b87dff0fa7ad')`,
+      )
+      .bind(userId)
+      .run();
+  }
+
+  it('blocks PATCH that would drop the last active admin (deactivation)', async () => {
+    // Isolate: strip every other admin so the peer we create is the only one.
+    await env.DB
+      .prepare(
+        `DELETE FROM user_roles
+         WHERE role_id = 'bace0701-15e3-5144-97c5-47487d543032'`,
+      )
+      .run();
+    const peerId = await createAdmin('s05-only-admin@example.com', 'Only Admin');
+
+    const res = await req('PATCH', `/admin/users/${peerId}`, {
+      token: adminToken,
+      body: { status: 'inactive' },
+    });
+
+    expect(res.status).toBe(409);
+    const body = await res.json<{ error: string }>();
+    expect(body.error).toBe('WOULD_LOCK_OUT_ADMINS');
+
+    // Cleanup: demote so subsequent tests don't see an unexpected admin.
+    await demoteToNonAdmin(peerId);
+  });
+
+  it('blocks PATCH that would strip the last admin of the admin role', async () => {
+    await env.DB
+      .prepare(
+        `DELETE FROM user_roles
+         WHERE role_id = 'bace0701-15e3-5144-97c5-47487d543032'`,
+      )
+      .run();
+    const peerId = await createAdmin('s05-strip-role@example.com', 'Only Admin 2');
+
+    const res = await req('PATCH', `/admin/users/${peerId}`, {
+      token: adminToken,
+      body: { roles: ['tutor'] },
+    });
+
+    expect(res.status).toBe(409);
+    const body = await res.json<{ error: string }>();
+    expect(body.error).toBe('WOULD_LOCK_OUT_ADMINS');
+
+    await demoteToNonAdmin(peerId);
+  });
+
+  it('allows deactivating an admin when a peer admin remains', async () => {
+    await env.DB
+      .prepare(
+        `DELETE FROM user_roles
+         WHERE role_id = 'bace0701-15e3-5144-97c5-47487d543032'`,
+      )
+      .run();
+    const keeperId = await createAdmin('s05-keeper@example.com', 'Keeper Admin');
+    const victimId = await createAdmin('s05-victim@example.com', 'Victim Admin');
+
+    const res = await req('PATCH', `/admin/users/${victimId}`, {
+      token: adminToken,
+      body: { status: 'inactive' },
+    });
+
+    expect(res.status).toBe(200);
+
+    await demoteToNonAdmin(keeperId);
+    await demoteToNonAdmin(victimId);
+  });
+
+  it('allows demoting a peer admin when another admin remains', async () => {
+    await env.DB
+      .prepare(
+        `DELETE FROM user_roles
+         WHERE role_id = 'bace0701-15e3-5144-97c5-47487d543032'`,
+      )
+      .run();
+    const keeperId = await createAdmin('s05-demote-keeper@example.com', 'Keeper');
+    const demoteeId = await createAdmin('s05-demotee@example.com', 'Demotee');
+
+    const res = await req('PATCH', `/admin/users/${demoteeId}`, {
+      token: adminToken,
+      body: { roles: ['tutor'] },
+    });
+
+    expect(res.status).toBe(200);
+
+    await demoteToNonAdmin(keeperId);
+  });
+
+  it('rejects self-deactivation with SELF_LOCKOUT', async () => {
+    const res = await req('PATCH', `/admin/users/${ADMIN_USER_ID}`, {
+      token: adminToken,
+      body: { status: 'inactive' },
+    });
+    expect(res.status).toBe(409);
+    const body = await res.json<{ error: string }>();
+    expect(body.error).toBe('SELF_LOCKOUT');
+  });
+
+  it('rejects self-demotion (removing own admin role) with SELF_LOCKOUT', async () => {
+    const res = await req('PATCH', `/admin/users/${ADMIN_USER_ID}`, {
+      token: adminToken,
+      body: { roles: ['tutor'] },
+    });
+    expect(res.status).toBe(409);
+    const body = await res.json<{ error: string }>();
+    expect(body.error).toBe('SELF_LOCKOUT');
+  });
+
+  it('rejects DELETE on self with SELF_LOCKOUT', async () => {
+    const res = await req('DELETE', `/admin/users/${ADMIN_USER_ID}`, {
+      token: adminToken,
+    });
+    expect(res.status).toBe(409);
+    const body = await res.json<{ error: string }>();
+    expect(body.error).toBe('SELF_LOCKOUT');
+  });
+
+  it('blocks DELETE that would drop the last active admin', async () => {
+    await env.DB
+      .prepare(
+        `DELETE FROM user_roles
+         WHERE role_id = 'bace0701-15e3-5144-97c5-47487d543032'`,
+      )
+      .run();
+    const peerId = await createAdmin('s05-delete-last@example.com', 'Last Admin');
+
+    const res = await req('DELETE', `/admin/users/${peerId}`, { token: adminToken });
+
+    expect(res.status).toBe(409);
+    const body = await res.json<{ error: string }>();
+    expect(body.error).toBe('WOULD_LOCK_OUT_ADMINS');
+
+    await demoteToNonAdmin(peerId);
+  });
+
+  it('allows name-only self-PATCH (not a lockout)', async () => {
+    const res = await req('PATCH', `/admin/users/${ADMIN_USER_ID}`, {
+      token: adminToken,
+      body: { name: 'Still Me, Renamed' },
+    });
+    expect(res.status).toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Audit log (kept after S-05 so earlier lockout tests do not interfere)
+// ---------------------------------------------------------------------------
+
+describe('Admin audit log', () => {
   it('emits an audit log line with { event, userId, actor, at } on revocation', async () => {
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
 

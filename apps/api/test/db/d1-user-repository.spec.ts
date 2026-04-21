@@ -103,4 +103,47 @@ describe('D1UserRepository', () => {
     const all = await repo.list({ limit: 100, offset: 0 });
     expect(all.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('countActiveAdmins counts only active users with the admin role', async () => {
+    // Ensure the admin role row exists for this isolated test DB.
+    await env.DB
+      .prepare(
+        `INSERT OR IGNORE INTO roles (id, name, description) VALUES (?, 'admin', 'Full platform access')`,
+      )
+      .bind('bace0701-15e3-5144-97c5-47487d543032')
+      .run();
+
+    const before = await repo.countActiveAdmins();
+
+    const activeAdmin = await repo.create({
+      name: 'Active Admin',
+      email: 'active-admin@example.com',
+      passwordHash: 'h',
+      roleNames: ['admin'],
+    });
+    const inactiveAdmin = await repo.create({
+      name: 'Inactive Admin',
+      email: 'inactive-admin@example.com',
+      passwordHash: 'h',
+      status: Entities.Config.UserStatus.INACTIVE,
+      roleNames: ['admin'],
+    });
+    // Non-admin user — must not be counted.
+    await repo.create({
+      name: 'Not Admin',
+      email: 'not-admin@example.com',
+      passwordHash: 'h',
+    });
+
+    const after = await repo.countActiveAdmins();
+    expect(after).toBe(before + 1);
+
+    // Demoting the active admin should drop the count again.
+    await repo.update(activeAdmin.id, { roleNames: [] });
+    expect(await repo.countActiveAdmins()).toBe(before);
+
+    // Re-activating the inactive admin should raise it back.
+    await repo.update(inactiveAdmin.id, { status: Entities.Config.UserStatus.ACTIVE });
+    expect(await repo.countActiveAdmins()).toBe(before + 1);
+  });
 });

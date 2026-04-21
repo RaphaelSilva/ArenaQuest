@@ -1,7 +1,7 @@
 # Task 05: Admin Lockout Guards (Last-Admin + Self-Deactivation)
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Low
 - **Severity closed:** S-05 (Low)
 - **Story:** [`auth-hardening.story.md`](./auth-hardening.story.md)
@@ -83,14 +83,14 @@ Same checks, as DELETE is a soft-delete (status → inactive).
 
 ## Acceptance Criteria
 
-- [ ] `IUserRepository.countActiveAdmins` is implemented and unit-tested.
-- [ ] `PATCH` that would leave 0 active admins → `409 WOULD_LOCK_OUT_ADMINS`.
-- [ ] `DELETE` that would leave 0 active admins → `409 WOULD_LOCK_OUT_ADMINS`.
-- [ ] `PATCH { status: 'inactive' }` on self → `409 SELF_LOCKOUT`.
-- [ ] `PATCH { roles: [...without admin...] }` on self → `409 SELF_LOCKOUT`.
-- [ ] `DELETE` on self → `409 SELF_LOCKOUT`.
-- [ ] Legitimate mutations (≥ 2 admins, not self) still succeed.
-- [ ] All tests pass; `make lint` clean.
+- [x] `IUserRepository.countActiveAdmins` is implemented and unit-tested.
+- [x] `PATCH` that would leave 0 active admins → `409 WOULD_LOCK_OUT_ADMINS`.
+- [x] `DELETE` that would leave 0 active admins → `409 WOULD_LOCK_OUT_ADMINS`.
+- [x] `PATCH { status: 'inactive' }` on self → `409 SELF_LOCKOUT`.
+- [x] `PATCH { roles: [...without admin...] }` on self → `409 SELF_LOCKOUT`.
+- [x] `DELETE` on self → `409 SELF_LOCKOUT`.
+- [x] Legitimate mutations (≥ 2 admins, not self) still succeed.
+- [x] All tests pass; `make lint` clean.
 
 ---
 
