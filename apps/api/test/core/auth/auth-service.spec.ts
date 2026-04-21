@@ -131,6 +131,46 @@ describe('AuthService', () => {
         service.login('alice@example.com', 'correct-password'),
       ).rejects.toMatchObject({ code: 'ACCOUNT_INACTIVE' });
     });
+
+    it('keeps missing-email and wrong-password branches within ±20% CPU time (S-03)', async () => {
+      // Simulate a real PBKDF2-style verify: both branches must consume a
+      // comparable chunk of work before login decides to reject.
+      const VERIFY_WORK_MS = 30;
+      const timingAuth: IAuthAdapter = {
+        hashPassword: async (plain) => `hashed:${plain}`,
+        verifyPassword: async (plain, stored) => {
+          const end = Date.now() + VERIFY_WORK_MS;
+          while (Date.now() < end) { /* busy-wait to emulate PBKDF2 */ }
+          return stored === `hashed:${plain}`;
+        },
+        signAccessToken: async (payload) => `access.${payload.sub}`,
+        verifyAccessToken: async () => null,
+        generateRefreshToken: async () => 'refresh-token',
+      };
+      const timingService = new AuthService(timingAuth, makeMockUserRepo(), makeMockTokenRepo());
+
+      const N = 5;
+      async function avg(fn: () => Promise<unknown>): Promise<number> {
+        // Warm-up — discard the first iteration.
+        await fn().catch(() => {});
+        let total = 0;
+        for (let i = 0; i < N; i++) {
+          const start = performance.now();
+          await fn().catch(() => {});
+          total += performance.now() - start;
+        }
+        return total / N;
+      }
+
+      const missing = await avg(() => timingService.login('unknown@example.com', 'whatever'));
+      const wrong = await avg(() => timingService.login('alice@example.com', 'wrong'));
+
+      const delta = Math.abs(missing - wrong) / Math.max(wrong, 1);
+      console.info(
+        `[timing] missing=${missing.toFixed(2)}ms wrong=${wrong.toFixed(2)}ms delta=${(delta * 100).toFixed(1)}%`,
+      );
+      expect(delta).toBeLessThan(0.2);
+    });
   });
 
   // ── logout ───────────────────────────────────────────────────────────────

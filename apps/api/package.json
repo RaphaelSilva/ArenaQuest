@@ -9,6 +9,7 @@
 		"lint": "eslint .",
 		"test": "vitest run",
 		"test:watch": "vitest",
+		"gen-hash": "tsx scripts/gen-hash.ts",
 		"cf-typegen": "wrangler types"
 	},
 	"dependencies": {
