@@ -1,8 +1,9 @@
 import type { IAuthAdapter, IUserRepository, IRefreshTokenRepository } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
 import { AuthError } from '@api/core/auth/auth-error';
+import { toMilliseconds } from '@arenaquest/shared';
 
-const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const REFRESH_TOKEN_TTL_MS = toMilliseconds(7, 'days');
 
 export interface LoginResult {
   accessToken: string;
