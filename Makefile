@@ -8,7 +8,7 @@
         lint lint-web lint-shared test test-api \
         cf-typegen \
         db-migrate-local db-migrate-local-staging \
-        deploy-api deploy-web \
+        deploy-api deploy-web bootstrap-admin \
         clean clean-cache clean-all
 
 # ── Colours ────────────────────────────────────────────────────────────────────
@@ -124,6 +124,9 @@ create-db: ## Create a new D1 database
 
 create-db-staging: ## Create a new D1 database (Staging)
 	pnpm --filter api exec wrangler d1 create arenaquest-db-staging --env staging
+
+bootstrap-admin: ## Interactively create the first admin account (local / staging / production)
+	@bash scripts/bootstrap-first-admin.sh
 
 deploy: deploy-web deploy-api
 
