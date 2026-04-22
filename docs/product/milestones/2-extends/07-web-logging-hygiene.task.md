@@ -1,7 +1,7 @@
 # Task 07: Web Logging Hygiene (remove `console.log`, add lint rule)
 
 ## Metadata
-- **Status:** Completed
+- **Status:** Done — commit `1acf836`
 - **Complexity:** Low
 - **Severity closed:** S-07 (Low)
 - **Story:** [`auth-hardening.story.md`](./auth-hardening.story.md)

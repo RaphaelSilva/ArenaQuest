@@ -1,7 +1,7 @@
 # Task 03: Constant-Time Login (Close User-Enumeration Timing Leak)
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done — commit `fe3cf09`
 - **Complexity:** Low
 - **Severity closed:** S-03 (Medium)
 - **Story:** [`auth-hardening.story.md`](./auth-hardening.story.md)

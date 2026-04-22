@@ -1,7 +1,7 @@
 # Task 08: Production Seed Guard + First-Admin Bootstrap Doc
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done — commit `012d7b7`
 - **Complexity:** Medium
 - **Severity closed:** S-08 (Low)
 - **Story:** [`auth-hardening.story.md`](./auth-hardening.story.md)

@@ -1,7 +1,7 @@
 # Task 06: PBKDF2 Iteration Upgrade with Transparent Rehash
 
 ## Metadata
-- **Status:** Completed
+- **Status:** Done — commit `feda632`
 - **Complexity:** Low
 - **Severity closed:** S-06 (Low)
 - **Story:** [`auth-hardening.story.md`](./auth-hardening.story.md)

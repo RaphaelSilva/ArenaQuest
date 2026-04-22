@@ -1,7 +1,7 @@
 # Task 02: Revoke Sessions on Admin Deactivation / Role Change
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done — commit `5697266`
 - **Complexity:** Low
 - **Severity closed:** S-02 (Medium)
 - **Story:** [`auth-hardening.story.md`](./auth-hardening.story.md)

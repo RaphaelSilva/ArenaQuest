@@ -1,7 +1,7 @@
 # Task 04: `/auth/login` Rate Limiting & Lockout
 
 ## Metadata
-- **Status:** Completed
+- **Status:** Done — commit `64d7208`
 - **Complexity:** Medium
 - **Severity closed:** S-04 (Medium)
 - **Story:** [`auth-hardening.story.md`](./auth-hardening.story.md)

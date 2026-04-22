@@ -171,19 +171,18 @@ Ranked by exploitability; CVSS-style severity is approximate.
 
 | # | Severity | Finding | Location | Mitigation |
 |---|----------|---------|----------|------------|
-| S-01 | **High** | Refresh tokens stored in plaintext in D1 | `apps/api/src/adapters/db/d1-refresh-token-repository.ts` | Hash with SHA-256 on `save`; hash+lookup on `findByToken`. Rotate existing rows on deploy. |
-| S-02 | **Medium** | Deactivating / role-changing a user does not revoke their active sessions | `apps/api/src/routes/admin-users.router.ts:83,105` | Call `tokens.deleteAllForUser(id)` inside both handlers. |
-| S-03 | **Medium** | User-enumeration timing side-channel in login | `apps/api/src/core/auth/auth-service.ts:21` | Always run `verifyPassword` against a dummy hash when the user is absent. |
-| S-04 | **Medium** | No rate-limit / lockout on `/auth/login` | `apps/api/src/routes/auth.router.ts:13` | Cloudflare Rate-Limiting binding or per-IP/per-email sliding window in KV; consider a lock-out counter column. |
-| S-05 | Low | No "last-admin" guard; an admin can lock the backoffice out | `apps/api/src/routes/admin-users.router.ts` | Reject PATCH/DELETE when result would leave zero active admins and/or when actor is deactivating self. |
-| S-06 | Low | PBKDF2 iteration count (100 000) below current OWASP recommendation (210 000) | `apps/api/src/adapters/auth/jwt-auth-adapter.ts:148` | Raise once P99 login latency is measured; the `pbkdf2:<n>:...` format already supports graceful per-hash upgrades. |
-| S-07 | Low | `console.log('API_URL', ...)` leaks config to browser console | `apps/web/src/lib/auth-api.ts:12` | Remove. |
-| S-08 | Low | Dev seed commits a known password hash (`password123`) | `apps/api/scripts/0004_seed_dev_users.sql` | Keep out of prod migrations (it already is); document in README; add a pre-deploy guard that rejects the seed hash in prod. |
-| S-09 | Info | Edge middleware only checks cookie *presence*, not validity | `apps/web/src/middleware.ts` | Documented trade-off; API rejects invalid cookies. No action required, keep noted. |
-| S-10 | Info | Hand-rolled JWT implementation — not externally audited | `apps/api/src/adapters/auth/jwt-auth-adapter.ts` | Acceptable at MVP (covered by unit tests); revisit if we add asymmetric keys / multiple issuers. |
+| S-01 | **High** | Refresh tokens stored in plaintext in D1 | `apps/api/src/adapters/db/d1-refresh-token-repository.ts` | Hash with SHA-256 on `save`; hash+lookup on `findByToken`. Rotate existing rows on deploy. | ✅ **Closed** — commit `8dde48b` |
+| S-02 | **Medium** | Deactivating / role-changing a user does not revoke their active sessions | `apps/api/src/routes/admin-users.router.ts:83,105` | Call `tokens.deleteAllForUser(id)` inside both handlers. | ✅ **Closed** — commit `5697266` |
+| S-03 | **Medium** | User-enumeration timing side-channel in login | `apps/api/src/core/auth/auth-service.ts:21` | Always run `verifyPassword` against a dummy hash when the user is absent. | ✅ **Closed** — commit `fe3cf09` |
+| S-04 | **Medium** | No rate-limit / lockout on `/auth/login` | `apps/api/src/routes/auth.router.ts:13` | Cloudflare Rate-Limiting binding or per-IP/per-email sliding window in KV; consider a lock-out counter column. | ✅ **Closed** — commit `64d7208` |
+| S-05 | Low | No "last-admin" guard; an admin can lock the backoffice out | `apps/api/src/routes/admin-users.router.ts` | Reject PATCH/DELETE when result would leave zero active admins and/or when actor is deactivating self. | ✅ **Closed** — commit `9ba9c44` |
+| S-06 | Low | PBKDF2 iteration count (100 000) below current OWASP recommendation (210 000) | `apps/api/src/adapters/auth/jwt-auth-adapter.ts:148` | Raise once P99 login latency is measured; the `pbkdf2:<n>:...` format already supports graceful per-hash upgrades. | ✅ **Closed** — commit `feda632` |
+| S-07 | Low | `console.log('API_URL', ...)` leaks config to browser console | `apps/web/src/lib/auth-api.ts:12` | Remove. | ✅ **Closed** — commit `1acf836` |
+| S-08 | Low | Dev seed commits a known password hash (`password123`) | `apps/api/scripts/0004_seed_dev_users.sql` | Keep out of prod migrations (it already is); document in README; add a pre-deploy guard that rejects the seed hash in prod. | ✅ **Closed** — commit `012d7b7` |
+| S-09 | Info | Edge middleware only checks cookie *presence*, not validity | `apps/web/src/middleware.ts` | Documented trade-off; API rejects invalid cookies. No action required, keep noted. | ✅ **Accepted as designed** |
+| S-10 | Info | Hand-rolled JWT implementation — not externally audited | `apps/api/src/adapters/auth/jwt-auth-adapter.ts` | Acceptable at MVP (covered by unit tests); revisit if we add asymmetric keys / multiple issuers. | ✅ **Closed** — adversarial suite added commit `feda632` |
 
-No high-severity finding blocks advancing to M3 **if S-01 and S-02 are fixed** — they are
-small, local, and fully covered by the existing test harness.
+All high-severity findings are closed. The hardening epic (S-01 → S-10) is complete.
 
 ---
 
@@ -194,7 +193,7 @@ small, local, and fully covered by the existing test harness.
 | All Milestone 2 tasks closed | ✅ |
 | All acceptance criteria met | ✅ |
 | Test suites green | ✅ |
-| No high-severity security debt left open | ⚠️ blocked on S-01, S-02, S-03 |
+| No high-severity security debt left open | ✅ S-01–S-10 all closed (hardening epic complete) |
 | First-login journey designed | ❌ — not required by M2 scope, but M3 should open with it |
 
 **Decision:** **GO**, contingent on closing S-01/S-02/S-03 (a ~1-day scope) and creating a

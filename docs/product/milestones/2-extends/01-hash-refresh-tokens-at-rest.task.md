@@ -1,7 +1,7 @@
 # Task 01: Hash Refresh Tokens at Rest
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done — commit `8dde48b`
 - **Complexity:** Medium
 - **Severity closed:** S-01 (High)
 - **Story:** [`auth-hardening.story.md`](./auth-hardening.story.md)

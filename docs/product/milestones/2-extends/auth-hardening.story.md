@@ -126,32 +126,32 @@ documented; no task is created for it.
 
 ## 3. Acceptance Criteria
 
-- [ ] **AC-1 (O-1).** Dumping `refresh_tokens` and replaying any row as a cookie returns
+- [x] **AC-1 (O-1).** Dumping `refresh_tokens` and replaying any row as a cookie returns
       `401 Unauthorized`.
-- [ ] **AC-2 (O-2).** Integration test: deactivate a logged-in user → their
+- [x] **AC-2 (O-2).** Integration test: deactivate a logged-in user → their
       `/auth/refresh` attempt returns `401` on the very next call.
-- [ ] **AC-3 (O-2).** Integration test: removing the `admin` role from a logged-in admin
+- [x] **AC-3 (O-2).** Integration test: removing the `admin` role from a logged-in admin
       invalidates all their refresh tokens.
-- [ ] **AC-4 (O-3).** Timing assertion: `login("nonexistent@…")` and
+- [x] **AC-4 (O-3).** Timing assertion: `login("nonexistent@…")` and
       `login("valid@…", "wrong")` differ by less than 20 % of the valid-login duration.
-- [ ] **AC-5 (O-4).** After 5 `401`s within 10 min for the same `(email, ip)`, the 6th
+- [x] **AC-5 (O-4).** After 5 `401`s within 10 min for the same `(email, ip)`, the 6th
       attempt returns `429` with `Retry-After`.
-- [ ] **AC-6 (O-4).** A successful login resets the counter.
-- [ ] **AC-7 (O-5).** `PATCH` that would leave zero active admins returns `409` with code
+- [x] **AC-6 (O-4).** A successful login resets the counter.
+- [x] **AC-7 (O-5).** `PATCH` that would leave zero active admins returns `409` with code
       `WOULD_LOCK_OUT_ADMINS`.
-- [ ] **AC-8 (O-5).** Actor cannot deactivate themselves — returns `409` `SELF_LOCKOUT`.
-- [ ] **AC-9 (O-6).** A user whose hash was created at 100 000 iterations is
+- [x] **AC-8 (O-5).** Actor cannot deactivate themselves — returns `409` `SELF_LOCKOUT`.
+- [x] **AC-9 (O-6).** A user whose hash was created at 100 000 iterations is
       transparently upgraded to 210 000 on their next successful login.
-- [ ] **AC-10 (O-7).** `grep -R "console.log" apps/web/src` returns 0 matches; ESLint
+- [x] **AC-10 (O-7).** `grep -R "console.log" apps/web/src` returns 0 matches; ESLint
       warns on new occurrences.
-- [ ] **AC-11 (O-8).** The deploy script aborts when the target DB contains the known dev
+- [x] **AC-11 (O-8).** The deploy script aborts when the target DB contains the known dev
       password hash; running it against a clean DB succeeds.
-- [ ] **AC-12 (O-8).** `docs/product/api/bootstrap-first-admin.md` exists and walks a new
+- [x] **AC-12 (O-8).** `docs/product/api/bootstrap-first-admin.md` exists and walks a new
       operator through initial admin creation in ≤ 5 minutes.
-- [ ] **AC-13 (O-9).** `jwt-auth-adapter.spec.ts` exists and covers every malformed-input
+- [x] **AC-13 (O-9).** `jwt-auth-adapter.spec.ts` exists and covers every malformed-input
       category listed in §2.9; all tests pass.
-- [ ] **AC-14.** All existing suites remain green (`make test`).
-- [ ] **AC-15.** `make lint` is clean across the monorepo.
+- [x] **AC-14.** All existing suites remain green (`make test`).
+- [x] **AC-15.** `make lint` is clean across the monorepo.
 
 ---
 
@@ -161,15 +161,15 @@ Each task is sized for **1–2 coding sessions** and lives as its own file in th
 
 | # | Task | Severity → | Files | Status |
 |---|------|:---:|-------|:------:|
-| 01 | [Hash refresh tokens at rest (SHA-256)](./01-hash-refresh-tokens-at-rest.task.md) | 🔴 High *(S-01)* | `d1-refresh-token-repository.ts`, migration `0004_hash_refresh_tokens.sql` | ⬜ Pending |
-| 02 | [Revoke sessions on deactivation and role change](./02-revoke-sessions-on-admin-mutation.task.md) | 🟠 Medium *(S-02)* | `admin-users.router.ts`, tests | ⬜ Pending |
-| 03 | [Constant-time login (dummy-hash verify)](./03-constant-time-login.task.md) | 🟠 Medium *(S-03)* | `auth-service.ts`, tests | ⬜ Pending |
-| 04 | [`/auth/login` rate-limit + lockout (IRateLimiter port + KV adapter)](./04-login-rate-limit-and-lockout.task.md) | 🟠 Medium *(S-04)* | `packages/shared/ports/i-rate-limiter.ts`, `apps/api/src/adapters/rate-limit/kv-rate-limiter.ts`, `auth.router.ts`, tests | ⬜ Pending |
-| 05 | [Admin lockout guards (last-admin + self-deactivation)](./05-admin-lockout-guards.task.md) | 🟡 Low *(S-05)* | `admin-users.router.ts`, tests | ⬜ Pending |
-| 06 | [PBKDF2 iteration upgrade with transparent rehash on login](./06-pbkdf2-upgrade-on-login.task.md) | 🟡 Low *(S-06)* | `jwt-auth-adapter.ts`, `auth-service.ts`, `d1-user-repository.ts`, tests | ⬜ Pending |
-| 07 | [Remove stray `console.log` + add `no-console` ESLint rule](./07-web-logging-hygiene.task.md) | 🟡 Low *(S-07)* | `auth-api.ts`, `apps/web/eslint.config.mjs` | ⬜ Pending |
-| 08 | [Production seed guard + bootstrap-first-admin doc](./08-production-seed-guard.task.md) | 🟡 Low *(S-08)* | `apps/api/scripts/check-no-dev-seed.ts`, Makefile/CI, docs | ⬜ Pending |
-| 09 | [Adversarial test suite for `JwtAuthAdapter`](./09-jwt-adapter-adversarial-tests.task.md) | ℹ️ Info *(S-10)* | `apps/api/test/adapters/auth/jwt-auth-adapter.spec.ts` | ⬜ Pending |
+| 01 | [Hash refresh tokens at rest (SHA-256)](./01-hash-refresh-tokens-at-rest.task.md) | 🔴 High *(S-01)* | `d1-refresh-token-repository.ts`, migration `0004_hash_refresh_tokens.sql` | ✅ Done |
+| 02 | [Revoke sessions on deactivation and role change](./02-revoke-sessions-on-admin-mutation.task.md) | 🟠 Medium *(S-02)* | `admin-users.router.ts`, tests | ✅ Done |
+| 03 | [Constant-time login (dummy-hash verify)](./03-constant-time-login.task.md) | 🟠 Medium *(S-03)* | `auth-service.ts`, tests | ✅ Done |
+| 04 | [`/auth/login` rate-limit + lockout (IRateLimiter port + KV adapter)](./04-login-rate-limit-and-lockout.task.md) | 🟠 Medium *(S-04)* | `packages/shared/ports/i-rate-limiter.ts`, `apps/api/src/adapters/rate-limit/kv-rate-limiter.ts`, `auth.router.ts`, tests | ✅ Done |
+| 05 | [Admin lockout guards (last-admin + self-deactivation)](./05-admin-lockout-guards.task.md) | 🟡 Low *(S-05)* | `admin-users.router.ts`, tests | ✅ Done |
+| 06 | [PBKDF2 iteration upgrade with transparent rehash on login](./06-pbkdf2-upgrade-on-login.task.md) | 🟡 Low *(S-06)* | `jwt-auth-adapter.ts`, `auth-service.ts`, `d1-user-repository.ts`, tests | ✅ Done |
+| 07 | [Remove stray `console.log` + add `no-console` ESLint rule](./07-web-logging-hygiene.task.md) | 🟡 Low *(S-07)* | `auth-api.ts`, `apps/web/eslint.config.mjs` | ✅ Done |
+| 08 | [Production seed guard + bootstrap-first-admin doc](./08-production-seed-guard.task.md) | 🟡 Low *(S-08)* | `apps/api/scripts/check-no-dev-seed.ts`, Makefile/CI, docs | ✅ Done |
+| 09 | [Adversarial test suite for `JwtAuthAdapter`](./09-jwt-adapter-adversarial-tests.task.md) | ℹ️ Info *(S-10)* | `apps/api/test/adapters/auth/jwt-auth-adapter.spec.ts` | ✅ Done |
 
 Dependency graph (strict prerequisites only):
 

@@ -1,7 +1,7 @@
 # Task 09: Adversarial Test Suite for `JwtAuthAdapter`
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done — commit `feda632`
 - **Complexity:** Low
 - **Severity closed:** S-10 (Info) + coverage gap
 - **Story:** [`auth-hardening.story.md`](./auth-hardening.story.md)
