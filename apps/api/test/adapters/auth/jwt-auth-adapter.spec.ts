@@ -293,10 +293,10 @@ describe('currentPbkdf2Iterations getter', () => {
     expect(adapter.currentPbkdf2Iterations).toBe(1_000);
   });
 
-  it('returns 210 000 when using the default', () => {
+  it('returns 100 000 when using the default', () => {
     const defaultAdapter = new JwtAuthAdapter({
       secret: SECRET,
     });
-    expect(defaultAdapter.currentPbkdf2Iterations).toBe(210_000);
+    expect(defaultAdapter.currentPbkdf2Iterations).toBe(100_000);
   });
 });

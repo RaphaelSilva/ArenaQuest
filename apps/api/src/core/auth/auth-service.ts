@@ -12,7 +12,7 @@ const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 // branches converge on the same CPU cost.
 // Regenerate with `pnpm --filter api run gen-hash` if the iteration target changes.
 const DUMMY_PASSWORD_HASH =
-  'pbkdf2:210000:0d3ecb5409e544016abf7074fd808e29:1d1f8ced782339c770ba4c4318f15fd9b5193ad5e60c034889b3491407409658';
+  'pbkdf2:100000:dc8c64a8f5fef10858c4e8e21727f0c5:7816d289ea2195b4b2d25c1fdfb78c0d67e9cdf2b9178aaf22606eda394a2ebb';
 
 export interface LoginResult {
   accessToken: string;

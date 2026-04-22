@@ -2,7 +2,7 @@ import { JwtAuthAdapter } from '../src/adapters/auth/jwt-auth-adapter';
 
 const auth = new JwtAuthAdapter({
   secret: 'dummy-secret-at-least-32-chars-long-dummy',
-  pbkdf2Iterations: 210000,
+  pbkdf2Iterations: 100_000,
 });
 
 async function main() {

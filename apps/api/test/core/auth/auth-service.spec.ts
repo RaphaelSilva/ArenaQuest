@@ -25,7 +25,7 @@ const STORED_HASH = 'hashed:correct-password';
 // Mock factories
 // ---------------------------------------------------------------------------
 
-function makeMockAuth(currentIterations = 210_000): IAuthAdapter {
+function makeMockAuth(currentIterations = 100_000): IAuthAdapter {
   let counter = 0;
   return {
     currentPbkdf2Iterations: currentIterations,
@@ -141,7 +141,7 @@ describe('AuthService', () => {
       // comparable chunk of work before login decides to reject.
       const VERIFY_WORK_MS = 30;
       const timingAuth: IAuthAdapter = {
-        currentPbkdf2Iterations: 210_000,
+        currentPbkdf2Iterations: 100_000,
         hashPassword: async (plain) => `hashed:${plain}`,
         verifyPassword: async (plain, stored) => {
           const end = Date.now() + VERIFY_WORK_MS;
@@ -281,18 +281,18 @@ describe('AuthService', () => {
       return { svc, getUpdatedHash: () => capturedHash, wasUpdateCalled: () => updateCalled };
     }
 
-    it('upgrades a stale hash (100k → 210k) on successful login', async () => {
-      const { svc, getUpdatedHash, wasUpdateCalled } = makeRehashScenario(100_000, 210_000);
+    it('upgrades a stale hash (50k → 100k) on successful login', async () => {
+      const { svc, getUpdatedHash, wasUpdateCalled } = makeRehashScenario(50_000, 100_000);
 
       const result = await svc.login('alice@example.com', 'correct-password');
 
       expect(result.user.id).toBe('user-1');
       expect(wasUpdateCalled()).toBe(true);
-      expect(getUpdatedHash()).toBe('pbkdf2:210000:newsalt:correct-password');
+      expect(getUpdatedHash()).toBe('pbkdf2:100000:newsalt:correct-password');
     });
 
     it('does NOT rehash when stored iterations already match current', async () => {
-      const { svc, wasUpdateCalled } = makeRehashScenario(210_000, 210_000);
+      const { svc, wasUpdateCalled } = makeRehashScenario(100_000, 100_000);
 
       await svc.login('alice@example.com', 'correct-password');
 
@@ -300,7 +300,7 @@ describe('AuthService', () => {
     });
 
     it('does NOT rehash on a failed login (wrong password)', async () => {
-      const { svc, wasUpdateCalled } = makeRehashScenario(100_000, 210_000);
+      const { svc, wasUpdateCalled } = makeRehashScenario(50_000, 100_000);
 
       await expect(
         svc.login('alice@example.com', 'wrong-password'),
@@ -315,8 +315,8 @@ describe('AuthService', () => {
       const record = { ...user, passwordHash: storedHash };
 
       const authMock: IAuthAdapter = {
-        currentPbkdf2Iterations: 210_000,
-        hashPassword: async (plain) => `pbkdf2:210000:newsalt:${plain}`,
+        currentPbkdf2Iterations: 100_000,
+        hashPassword: async (plain) => `pbkdf2:100000:newsalt:${plain}`,
         verifyPassword: async (plain, stored) => stored.endsWith(`:${plain}`),
         signAccessToken: async (payload) => `access.${payload.sub}`,
         verifyAccessToken: async () => null,

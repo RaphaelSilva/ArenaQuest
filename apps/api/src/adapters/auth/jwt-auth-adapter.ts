@@ -42,10 +42,12 @@ export interface JwtAuthAdapterConfig {
 
   /**
    * PBKDF2 iteration count.
-   * Defaults to 210_000 (OWASP 2023 SHA-256 baseline).
-   * Lower values can be set in tests (`pbkdf2Iterations: 1_000`) or when CPU
-   * budget is severely constrained; the stored-hash format encodes the count
-   * per row, so old hashes remain verifiable even after a default change.
+   * Defaults to 100_000 — the maximum supported by the Cloudflare Workers
+   * Web Crypto API runtime. OWASP 2023 recommends 600_000 for SHA-256, but
+   * the Workers runtime caps `deriveBits` at 100_000 iterations.
+   * Lower values can be set in tests (`pbkdf2Iterations: 1_000`); the
+   * stored-hash format encodes the count per row, so old hashes remain
+   * verifiable even after a default change.
    */
   pbkdf2Iterations?: number;
 }
@@ -145,7 +147,7 @@ export class JwtAuthAdapter implements IAuthAdapter {
     }
     this.secret = config.secret;
     this.accessTokenTtl = config.accessTokenExpiresInSeconds ?? 900;
-    this.iterations = config.pbkdf2Iterations ?? 210_000;
+    this.iterations = config.pbkdf2Iterations ?? 100_000;
   }
 
   // ── Key-derivation metadata ───────────────────────────────────────────────
