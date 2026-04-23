@@ -1,4 +1,4 @@
-# Task 09: Frontend — Admin Media Uploader (Presigned Flow + Progress)
+# Task 09: Frontend — Admin Media Uploader
 
 ## Metadata
 - **Status:** Pending
@@ -10,112 +10,57 @@
 
 ## Summary
 
-Add a media section to the admin topic detail pane. Drag-drop files, upload directly to
-R2 via presigned URLs, show live progress per file, then list the resulting READY media
-alongside each topic.
+Integrate media upload capabilities into the Admin Topic Tree dashboard. This allows content creators to attach files (PDFs, videos, images) directly to topics using a performant direct-to-R2 upload strategy with real-time feedback.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Direct-to-storage:** the upload request goes to the presigned URL, NEVER through
-  the Worker. Verified in a test by asserting the `fetch` URL target.
-- **Progress:** use `XMLHttpRequest` with `upload.onprogress` to drive a progress bar.
-  (`fetch` does not expose upload progress in browsers yet.)
-- **Concurrency cap:** at most **3 concurrent uploads** per topic to keep the UI
-  responsive.
-- **Client-side size check:** file size is validated before asking for a presigned URL
-  (spare a round-trip).
-- **Cancellation:** each in-flight upload has a cancel button. Cancel aborts the XHR
-  and calls `DELETE /admin/topics/:id/media/:mediaId` so the PENDING row is cleaned up.
+- **Placement:** Topic detail pane (Authoring interface).
+- **Upload Strategy:** Direct client-to-storage (R2) via presigned URLs.
+- **State Tracking:** Manage upload lifecycle (Presign → Upload → Finalize) with local UI state.
+- **Concurrency:** Implement efficient queue management for multiple file uploads.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. API client — `apps/web/src/lib/admin-media-api.ts`
+### 1. Media Upload Experience
 
-```ts
-export const adminMediaApi = {
-  presign(token, topicId, input: { filename, type, sizeBytes }): Promise<{ mediaId, uploadUrl, storageKey, expiresIn }>;
-  finalize(token, topicId, mediaId): Promise<MediaRecord>;
-  delete(token, topicId, mediaId): Promise<void>;
-};
-```
+- **Drag-and-Drop:** Intuitive file selection via drop zone or file browser.
+- **Real-time Progress:** Visual progress bars for every active upload.
+- **Queue Management:** Support for multiple uploads with reasonable concurrency limits to maintain UI responsiveness.
+- **Validation:** Enforce file type and size constraints on the client-side before starting the upload process.
+- **Cancellation:** Allow users to cancel in-flight uploads, ensuring server-side cleanup of partial records.
 
-### 2. Upload helper — `apps/web/src/lib/upload.ts`
+### 2. Media List & Management
 
-```ts
-export function uploadWithProgress(
-  url: string,
-  file: File,
-  onProgress: (pct: number) => void,
-  signal?: AbortSignal,
-): Promise<void>;
-```
-
-Wraps `XMLHttpRequest`, resolves on `2xx`, rejects on `abort` / non-2xx.
-
-### 3. Uploader component — `apps/web/src/components/topics/media-uploader.tsx`
-
-Props: `{ topicId, accessToken, onUploaded }`.
-
-Features:
-- Drop zone + hidden file input.
-- Queue list with per-file status (`queued` / `uploading` / `finalizing` / `done` /
-  `failed` / `cancelled`) and a progress bar.
-- Up to 3 concurrent uploads; the rest wait in `queued`.
-- On `done`, append to the media list via `onUploaded(media)`.
-
-### 4. Media list — `apps/web/src/components/topics/media-list.tsx`
-
-Displays each READY media row with:
-- Type-specific icon (PDF / video / image).
-- Original filename.
-- Size (human-readable).
-- `Delete` button → confirm dialog → `adminMediaApi.delete` → remove from list.
-
-### 5. Integration into the topic detail pane
-
-Inside the detail pane from Task 08, mount:
-```tsx
-<MediaUploader topicId={selected.id} accessToken={token} onUploaded={appendMedia} />
-<MediaList items={selected.media} onDelete={handleDelete} />
-```
-
-### 6. Component tests
-
-Mock `fetch` and `XMLHttpRequest`:
-- Drop a 1 MB PDF → presign called once → upload called with the presigned URL →
-  finalize called → `onUploaded` fires.
-- Drop a 200 MB MP4 → rejected client-side with a "too large" message; presign is
-  NEVER called.
-- Cancel an in-flight upload → XHR aborted + `DELETE` called.
-- 3-concurrent cap: drop 5 files simultaneously → exactly 3 have status `uploading`,
-  the rest `queued`.
+- **Attached Media View:** Display a list of all media associated with a topic, including metadata (type icon, filename, size).
+- **Media Deletion:** Ability to remove media from a topic, triggering both database and storage cleanup.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Drop a PDF or MP4 → upload bypasses the Worker (target URL is R2, not the API).
-- [ ] Progress bar updates in real time.
-- [ ] Per-type size limits enforced client-side; oversized files never get a presigned
-      URL.
-- [ ] Failed upload shows an error row; the topic detail pane is not blocked.
-- [ ] Cancel removes the row locally and cleans up the PENDING DB row.
-- [ ] Deleting a READY media row removes it from the list; no orphaned storage object.
-- [ ] Component tests in §6 pass.
-- [ ] `make lint` clean; `pnpm --filter web test` green.
+- [ ] Users can upload media directly to storage without overloading the API Worker.
+- [ ] Upload progress is accurately reflected in the UI.
+- [ ] Client-side validation prevents oversized or unsupported file uploads.
+- [ ] Uploaded media is immediately listed and accessible within the topic detail pane.
+- [ ] Deletion of media is synchronous and cleans up both the UI and backend records.
+- [ ] Component tests cover the upload state machine, including success, failure, and cancellation scenarios.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter web test` — green.
-2. Manual (dev env with a real local R2 binding):
-   - Upload a 5 MB PDF and a 50 MB MP4 to a topic — both land as READY.
-   - Reload — both still listed.
-   - Delete one — bucket listing shows the object gone.
-3. DevTools Network tab: confirm the large upload request target starts with the R2
-   presigned URL, not the Worker domain.
+### Automated Tests
+- Component tests for the `MediaUploader` and `MediaList` components: `pnpm --filter web test`.
+- Verify that upload requests are directed to the storage provider (mocked).
+
+### Manual Verification
+- In the admin dashboard:
+    1. Attach a PDF and a video to a topic.
+    2. Monitor the progress bar and confirm completion.
+    3. Cancel an upload mid-way and verify it doesn't appear in the final list.
+    4. Delete a file and verify it is removed from the view.

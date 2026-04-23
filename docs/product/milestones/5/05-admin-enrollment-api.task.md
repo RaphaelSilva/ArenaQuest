@@ -10,76 +10,59 @@
 
 ## Summary
 
-Admin-only endpoints to grant and revoke topic access for individual users and
-for user groups.
+Expose the administrative endpoints for managing student access to topic content. Administrators can grant and revoke topic access for individual users or entire user groups.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Guards:** `authGuard + requireRole('admin', 'content_creator')`.
-- **Idempotent grants:** granting the same `(user, topic)` twice returns 200
-  with the existing row; only the first call returns 201.
-- **Cascade flag on revoke:** `DELETE ...?cascade=true` removes grants on
-  descendants belonging to the same subject.
-- **Audit breadcrumbs:** every grant and revoke emits a structured log line
-  (`enrollment.grant` / `enrollment.revoke`) with `actorId`, `subjectId`,
-  `topicId`, `cascade?`. Lightweight — no new audit table in M5.
+- **Router:** `apps/api/src/routes/admin-enrollment.router.ts`.
+- **Service:** `apps/api/src/core/enrollment/enrollment-service.ts`.
+- **Security:** Guarded by `authGuard + requireRole(ADMIN, CONTENT_CREATOR)`.
+- **Audit:** Every grant and revoke must emit a structured log entry (no new DB table in M5).
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Service — `apps/api/src/core/enrollment/enrollment-service.ts`
+### 1. User Enrollment Endpoints
 
-```ts
-class EnrollmentService {
-  constructor(private enrollments: IEnrollmentRepository) {}
+| Method   | Path                                          | Description                                     |
+|----------|-----------------------------------------------|-------------------------------------------------|
+| `GET`    | `/admin/users/:userId/enrollments`            | List direct topic grants for a user.            |
+| `POST`   | `/admin/users/:userId/enrollments`            | Grant a topic (and its subtree) to a user.      |
+| `DELETE` | `/admin/users/:userId/enrollments/:topicId`   | Revoke a topic grant from a user.               |
 
-  listUserGrants(userId): Promise<EnrollmentRecord[]>;
-  grantUser(actorId, userId, topicId): Promise<{ record; created }>;
-  revokeUser(userId, topicId, opts?): Promise<void>;
+### 2. Group Enrollment Endpoints
 
-  listGroupGrants(groupId): Promise<EnrollmentRecord[]>;
-  grantGroup(actorId, groupId, topicId): Promise<{ record; created }>;
-  revokeGroup(groupId, topicId, opts?): Promise<void>;
-}
-```
+| Method   | Path                                          | Description                                     |
+|----------|-----------------------------------------------|-------------------------------------------------|
+| `GET`    | `/admin/groups/:groupId/enrollments`          | List direct topic grants for a group.           |
+| `POST`   | `/admin/groups/:groupId/enrollments`          | Grant a topic to a group.                       |
+| `DELETE` | `/admin/groups/:groupId/enrollments/:topicId` | Revoke a topic grant from a group.              |
 
-### 2. Router — `apps/api/src/routes/admin-enrollment.router.ts`
+### 3. Business Rules
 
-```ts
-router.get   ('/admin/users/:userId/enrollments',               listUserHandler);
-router.post  ('/admin/users/:userId/enrollments',               grantUserHandler);
-router.delete('/admin/users/:userId/enrollments/:topicId',      revokeUserHandler);
-
-router.get   ('/admin/groups/:groupId/enrollments',             listGroupHandler);
-router.post  ('/admin/groups/:groupId/enrollments',             grantGroupHandler);
-router.delete('/admin/groups/:groupId/enrollments/:topicId',    revokeGroupHandler);
-```
-
-### 3. Tests — `apps/api/test/routes/admin-enrollment.spec.ts`
-
-- Grant user → 201; regrant → 200 (idempotent).
-- List user grants → returns direct grants only (not expanded).
-- Revoke without cascade → only the explicit row gone.
-- Revoke with `cascade=true` → descendants with explicit rows also gone.
-- Grant group → member's effective-access set expands on next lookup.
-- Non-admin role → 403 on every route.
+- **Idempotent Grants:** Granting the same `(user/group, topic)` twice is a no-op, returning `200 OK` with the existing record (first call returns `201 Created`).
+- **Cascade Revoke:** The revoke endpoints accept a `?cascade=true` query parameter that also removes explicit descendant grants for the same subject.
+- **Audit Logging:** Every grant and revoke action emits a structured log entry with the actor, subject, topic, and cascade flag.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] All six routes implemented, tested, and wired in `AppRouter`.
-- [ ] Idempotency + cascade semantics covered by tests.
-- [ ] Structured log lines emitted on grant and revoke.
-- [ ] `make lint` clean. `make test-api` green.
+- [ ] All six endpoints are implemented, tested, and registered in the router.
+- [ ] Idempotency and cascade semantics are covered by integration tests.
+- [ ] Structured log entries are emitted for every grant and revoke action.
+- [ ] Non-admin roles receive `403` on all routes.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter api test` green.
-2. Curl as admin: grant topic "Futebol" to Alice, read effective access via
-   `/me/progress/topics` as Alice — subtree visible.
+### Automated Tests
+- `pnpm --filter api test` — integration suite for `admin-enrollment.spec.ts`.
+
+### Manual Verification
+- As an admin: grant a topic subtree to a student, then view the student's effective access to confirm subtree expansion. Revoke with and without cascade and verify correct behavior.

@@ -10,95 +10,50 @@
 
 ## Summary
 
-Endpoints that **replace** the topic link set for a task and for each individual
-stage. Uses the `ITaskLinkingRepository.setTaskTopics` / `setStageTopics` methods
-wired in Task 02.
+Implement the HTTP endpoints that manage the topic associations for a Task and its individual Stages. These "replace-set" endpoints allow content authors to define exactly which parts of the content catalogue are covered by a given task or stage.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **PUT-style semantics for "replace a set":** the request body is the complete
-  desired set; the server mirrors it exactly. We expose `POST` (not `PUT`) because
-  the path is action-flavoured (`/topics` is not the resource — `task` is) and it
-  mirrors the Rails-style nested-action convention already used elsewhere in this
-  codebase.
-- **Validation:** each `topicIds` entry must be a valid UUID format and must
-  correspond to an existing `topic_node` row. Missing ids → `400
-  UNKNOWN_TOPIC_IDS` with the offending list.
-- **Stage subset enforcement:** the adapter throws `StageTopicNotInTaskError` (from
-  Task 02); the route maps it to `409 STAGE_TOPIC_NOT_IN_TASK`.
-- **Publish consistency:** if the task is `published`, every new topic id must also
-  be `published` (same check as Task 03's publish gate). Otherwise `409
-  LINKED_TOPIC_NOT_PUBLISHED`. Drafts can link to drafts freely.
+- **Router:** Extends `apps/api/src/routes/admin-tasks.router.ts`.
+- **Service:** Extends `apps/api/src/core/engagement/task-service.ts`.
+- **Semantics:** Replace-style operations — each request provides the complete desired set, which the server mirrors exactly.
+- **Security:** Inherits `authGuard + requireRole(ADMIN, CONTENT_CREATOR)`.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Extend `TaskService`
+### 1. Topic Linking Endpoints
 
-```ts
-setTaskTopics(taskId, topicIds: string[]): Promise<string[]>;
-setStageTopics(taskId, stageId, topicIds: string[]): Promise<string[]>;
-```
+| Method | Path                                          | Body                     | Description                         |
+|--------|-----------------------------------------------|--------------------------|-------------------------------------|
+| `POST` | `/admin/tasks/:id/topics`                     | `{ topicIds: string[] }` | Replaces the full task-level topic link set.  |
+| `POST` | `/admin/tasks/:id/stages/:stageId/topics`     | `{ topicIds: string[] }` | Replaces the stage-level topic link set. |
 
-Both return the persisted id set (sorted) so the client can diff.
+### 2. Validation & Consistency Rules
 
-### 2. Router — extend `admin-tasks.router.ts`
-
-```ts
-router.post('/admin/tasks/:id/topics',                     setTaskTopicsHandler);
-router.post('/admin/tasks/:id/stages/:stageId/topics',     setStageTopicsHandler);
-```
-
-Request body: `{ topicIds: string[] }`.
-
-### 3. Consistency on shrink: when the task-level set shrinks, the service MUST also
-    shrink every stage's set to stay a subset. Implement as:
-
-```ts
-async setTaskTopics(taskId, topicIds) {
-  await linking.setTaskTopics(taskId, topicIds);
-  const stages = await stageRepo.listByTask(taskId);
-  for (const s of stages) {
-    const current = await linking.listStageTopics(s.id);
-    const pruned  = current.filter(id => topicIds.includes(id));
-    if (pruned.length !== current.length) {
-      await linking.setStageTopics(s.id, pruned);
-    }
-  }
-  return topicIds;
-}
-```
-
-(Batched inside a single D1 transaction at the adapter level if the adapter allows
-it; otherwise sequential is acceptable for M4.)
-
-### 4. Tests — `apps/api/test/routes/admin-task-linking.spec.ts`
-
-- Set `[T1, T2]` on a draft task → 200; `hydrate` confirms the set.
-- Set `[T1]` when a stage had `[T1, T2]` → stage set shrinks to `[T1]`
-  automatically.
-- Set `[T1, T2]` on a stage when the task has `[T1]` → 409
-  `STAGE_TOPIC_NOT_IN_TASK`; DB unchanged.
-- Set topics with an unknown id → 400 `UNKNOWN_TOPIC_IDS`.
-- On a published task, set topics containing a draft id → 409
-  `LINKED_TOPIC_NOT_PUBLISHED`.
-- Empty array resets the set to empty (200).
+- **Topic Existence:** All provided `topicIds` must correspond to existing Topic Nodes (`400 UNKNOWN_TOPIC_IDS` with the list of offending IDs).
+- **Stage Subset:** Stage-level topics must be a subset of the parent Task's topic set. Violations are rejected with `409 STAGE_TOPIC_NOT_IN_TASK`.
+- **Publish Consistency:** When the parent Task is `published`, any newly linked topic must also be `published` (`409 LINKED_TOPIC_NOT_PUBLISHED`). Draft tasks can link to draft topics freely.
+- **Cascade Shrink:** When the task-level topic set is reduced, any stage-level topic sets that reference removed IDs must be automatically pruned to maintain the subset invariant.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Both routes implemented and tested.
-- [ ] The shrink-cascade invariant has an explicit test.
-- [ ] `make lint` clean. `make test-api` green.
+- [ ] Both endpoints are implemented and tested.
+- [ ] The cascade-shrink behavior (task-level shrink automatically prunes stage-level sets) is covered by an explicit test.
+- [ ] All validation rules return the correct error codes.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter api test` green.
-2. Curl sequence: create task, link 2 topics, add stage, link stage to both, shrink
-   task to one, GET stage → shrinks automatically.
+### Automated Tests
+- `pnpm --filter api test` — integration suite for `admin-task-linking.spec.ts`.
+
+### Manual Verification
+- Create a task, link two topics, add a stage, link the stage to both topics, then shrink the task's topic set to one, and verify the stage's set is automatically pruned.

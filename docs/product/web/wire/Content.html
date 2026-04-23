@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ArenaQuest — Conteúdos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; }
+  body { font-family: 'DM Sans', sans-serif; overflow: hidden; }
+
+  /* DARK THEME */
+  .theme-dark {
+    --bg: #0B0E17;
+    --bg2: #131825;
+    --bg3: #1C2235;
+    --bg4: #232B40;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #E8EAF0;
+    --text2: #8B92A8;
+    --text3: #5C6480;
+    --accent: oklch(0.74 0.19 52);
+    --accent2: oklch(0.65 0.16 240);
+    --accent3: oklch(0.68 0.17 150);
+    --accent-glow: oklch(0.74 0.19 52 / 0.2);
+    --accent2-glow: oklch(0.65 0.16 240 / 0.15);
+    --card-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    --sidebar-glow: inset -1px 0 0 rgba(255,255,255,0.05);
+  }
+
+  /* LIGHT THEME */
+  .theme-light {
+    --bg: #F0EEE8;
+    --bg2: #FAFAF8;
+    --bg3: #F5F3EF;
+    --bg4: #EAE8E0;
+    --border: rgba(0,0,0,0.08);
+    --border2: rgba(0,0,0,0.14);
+    --text: #1A1C26;
+    --text2: #5C6070;
+    --text3: #9298A8;
+    --accent: oklch(0.60 0.19 52);
+    --accent2: oklch(0.45 0.16 240);
+    --accent3: oklch(0.48 0.17 150);
+    --accent-glow: oklch(0.60 0.19 52 / 0.15);
+    --accent2-glow: oklch(0.45 0.16 240 / 0.1);
+    --card-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    --sidebar-glow: inset -1px 0 0 rgba(0,0,0,0.06);
+  }
+
+  .app { display: flex; flex-direction: column; height: 100%; background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
+
+  /* TOPBAR */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 56px; min-height: 56px;
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    position: relative; z-index: 10;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-mark {
+    width: 28px; height: 28px; border-radius: 6px;
+    background: var(--accent); display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; color: #0B0E17;
+  }
+  .logo-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: -0.3px; }
+  .logo-name span { color: var(--accent); }
+  .topbar-center { display: flex; align-items: center; gap: 6px; }
+  .role-pill {
+    display: flex; background: var(--bg3); border-radius: 20px;
+    padding: 3px; border: 1px solid var(--border);
+  }
+  .role-btn {
+    padding: 5px 14px; border-radius: 16px; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+    transition: all 0.2s; background: transparent; color: var(--text2);
+  }
+  .role-btn.active { background: var(--accent); color: #0B0E17; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .theme-toggle {
+    width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border2);
+    background: var(--bg3); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 15px; transition: all 0.2s; color: var(--text2);
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: white;
+    cursor: pointer;
+  }
+  .xp-pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 10px; background: var(--bg3); border-radius: 20px;
+    border: 1px solid var(--border2); font-size: 12px; color: var(--accent); font-weight: 600;
+  }
+  .xp-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+  /* BODY LAYOUT */
+  .body-layout { display: flex; flex: 1; overflow: hidden; }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 280px; min-width: 280px; background: var(--bg2);
+    box-shadow: var(--sidebar-glow); display: flex; flex-direction: column;
+    overflow: hidden; transition: background 0.3s;
+  }
+  .sidebar-header {
+    padding: 20px 20px 12px; border-bottom: 1px solid var(--border);
+  }
+  .sidebar-title { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600;
+    letter-spacing: 1.2px; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+  .global-progress-wrap { }
+  .gp-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+  .gp-label strong { color: var(--accent); }
+  .progress-bar-outer { height: 6px; background: var(--bg4); border-radius: 6px; overflow: hidden; }
+  .progress-bar-inner { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.6s ease; }
+
+  .sidebar-search {
+    margin: 12px 16px 0; display: flex; align-items: center; gap: 8px;
+    background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px;
+    padding: 7px 12px;
+  }
+  .sidebar-search input {
+    background: transparent; border: none; outline: none;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text);
+    width: 100%; caret-color: var(--accent);
+  }
+  .sidebar-search input::placeholder { color: var(--text3); }
+  .search-icon { color: var(--text3); font-size: 13px; }
+
+  .topics-list { flex: 1; overflow-y: auto; padding: 12px 0; }
+  .topics-list::-webkit-scrollbar { width: 4px; }
+  .topics-list::-webkit-scrollbar-track { background: transparent; }
+  .topics-list::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 4px; }
+
+  .topic-item { }
+  .topic-row {
+    display: flex; align-items: center; gap: 0; padding: 0 16px;
+    cursor: pointer; transition: background 0.15s; position: relative;
+  }
+  .topic-row:hover { background: var(--bg3); }
+  .topic-row.active { background: var(--accent-glow); }
+  .topic-row.active::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--accent); border-radius: 0 2px 2px 0;
+  }
+  .topic-chevron {
+    width: 20px; height: 36px; display: flex; align-items: center; justify-content: center;
+    color: var(--text3); font-size: 10px; transition: transform 0.2s; flex-shrink: 0;
+  }
+  .topic-chevron.open { transform: rotate(90deg); }
+  .topic-icon { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-right: 10px; }
+  .topic-info { flex: 1; padding: 8px 0; min-width: 0; }
+  .topic-name { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topic-meta { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+  .topic-progress-mini { flex: 1; height: 3px; background: var(--bg4); border-radius: 3px; overflow: hidden; }
+  .topic-progress-fill { height: 100%; border-radius: 3px; }
+  .topic-pct { font-size: 10px; color: var(--text3); font-weight: 600; flex-shrink: 0; }
+  .topic-badge-count { font-size: 10px; padding: 1px 6px; border-radius: 10px; background: var(--bg4); color: var(--text2); font-weight: 600; }
+
+  /* SUBTOPIC ROWS in sidebar */
+  .subtopic-sidebar-list { overflow: hidden; }
+  .subtopic-sidebar-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 16px 7px 54px;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .subtopic-sidebar-item:hover { background: var(--bg3); }
+  .subtopic-sidebar-item.active { background: var(--accent-glow); }
+  .sub-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .sub-label { font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .sub-status { font-size: 10px; }
+
+  /* INSTRUCTOR ADD BUTTON in sidebar */
+  .sidebar-add-btn {
+    margin: 8px 16px 0; padding: 8px 12px; border-radius: 8px;
+    border: 1px dashed var(--border2); background: transparent; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; color: var(--text3);
+    display: flex; align-items: center; gap: 8px; transition: all 0.2s; width: calc(100% - 32px);
+  }
+  .sidebar-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* MAIN CONTENT */
+  .main { flex: 1; overflow-y: auto; padding: 32px 40px; }
+  .main::-webkit-scrollbar { width: 5px; }
+  .main::-webkit-scrollbar-track { background: transparent; }
+  .main::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 4px; }
+
+  /* BREADCRUMB */
+  .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text3); margin-bottom: 24px; }
+  .breadcrumb a { color: var(--text3); text-decoration: none; }
+  .breadcrumb a:hover { color: var(--accent); }
+  .bc-sep { color: var(--text3); }
+
+  /* TOPIC HEADER */
+  .topic-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px; }
+  .topic-header-left { display: flex; align-items: flex-start; gap: 20px; }
+  .topic-header-icon { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; }
+  .topic-header-text h1 { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
+  .topic-header-text p { font-size: 14px; color: var(--text2); margin-top: 4px; max-width: 500px; line-height: 1.5; text-wrap: pretty; }
+  .topic-header-stats { display: flex; gap: 16px; }
+  .stat-box { text-align: right; }
+  .stat-box .num { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: var(--accent); }
+  .stat-box .lbl { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  /* TOPIC PROGRESS BAR */
+  .topic-progress-section { margin-bottom: 32px; }
+  .tp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .tp-header span { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 600; color: var(--text2); }
+  .tp-header strong { color: var(--accent); }
+  .tp-bar { height: 10px; background: var(--bg3); border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+  .tp-bar-fill { height: 100%; border-radius: 10px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.8s ease; position: relative; }
+  .tp-bar-fill::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 3px; background: white; opacity: 0.4; border-radius: 0 10px 10px 0; }
+
+  /* BADGES STRIP */
+  .badges-strip { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 32px; }
+  .badge-chip {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--border2); background: var(--bg2);
+    transition: all 0.2s;
+  }
+  .badge-chip.earned { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+  .badge-chip.locked { opacity: 0.5; }
+  .badge-chip .badge-icon { font-size: 14px; }
+
+  /* SECTION HEADER */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .section-title { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 600;
+    letter-spacing: 1px; text-transform: uppercase; color: var(--text3); }
+  .add-subtopic-btn {
+    display: flex; align-items: center; gap: 6px; padding: 6px 14px;
+    border-radius: 8px; border: 1px solid var(--accent); background: var(--accent-glow);
+    color: var(--accent); font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .add-subtopic-btn:hover { background: var(--accent); color: #0B0E17; }
+
+  /* SUBTOPIC CARDS */
+  .subtopics-grid { display: flex; flex-direction: column; gap: 12px; }
+  .subtopic-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px 24px;
+    display: flex; align-items: center; gap: 20px;
+    cursor: pointer; transition: all 0.22s;
+    box-shadow: var(--card-shadow);
+    position: relative; overflow: hidden;
+  }
+  .subtopic-card::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    border-radius: 4px 0 0 4px; opacity: 0; transition: opacity 0.2s;
+  }
+  .subtopic-card:hover { border-color: var(--border2); transform: translateX(3px); }
+  .subtopic-card:hover::before { opacity: 1; }
+  .subtopic-card.done { background: var(--bg2); }
+  .subtopic-card.done::before { opacity: 1; background: var(--accent3); }
+  .subtopic-card.active-card { border-color: var(--accent); }
+  .subtopic-card.active-card::before { opacity: 1; background: var(--accent); }
+
+  .sc-number {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 700;
+    flex-shrink: 0; background: var(--bg3); color: var(--text3); border: 1px solid var(--border2);
+  }
+  .sc-number.done { background: var(--accent3); color: white; border-color: transparent; }
+  .sc-number.in-progress { background: var(--accent); color: #0B0E17; border-color: transparent; }
+
+  .sc-info { flex: 1; min-width: 0; }
+  .sc-name { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 600; color: var(--text); }
+  .sc-desc { font-size: 13px; color: var(--text2); margin-top: 3px; text-wrap: pretty; }
+  .sc-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .sc-tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: var(--bg4); color: var(--text3); font-weight: 500; }
+
+  .sc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; min-width: 100px; }
+  .sc-progress-wrap { width: 100%; }
+  .sc-pct { font-family: 'Space Grotesk', sans-serif; font-size: 11px; color: var(--text3); margin-bottom: 4px; text-align: right; }
+  .sc-bar { height: 5px; background: var(--bg4); border-radius: 5px; overflow: hidden; }
+  .sc-bar-fill { height: 100%; border-radius: 5px; transition: width 0.6s ease; }
+
+  .sc-status { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 10px; }
+  .sc-status.done { background: oklch(0.68 0.17 150 / 0.15); color: var(--accent3); }
+  .sc-status.inprog { background: var(--accent-glow); color: var(--accent); }
+  .sc-status.locked { background: var(--bg4); color: var(--text3); }
+
+  /* INSTRUCTOR ACTION BUTTONS */
+  .sc-actions { display: flex; gap: 6px; }
+  .sc-action-btn {
+    width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border2);
+    background: var(--bg3); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: var(--text3); transition: all 0.2s;
+  }
+  .sc-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .sc-action-btn.del:hover { border-color: oklch(0.65 0.22 15); color: oklch(0.65 0.22 15); }
+
+  /* EMPTY STATE */
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 60px 0; gap: 12px; color: var(--text3); }
+  .empty-icon { font-size: 40px; opacity: 0.4; }
+  .empty-text { font-family: 'Space Grotesk', sans-serif; font-size: 15px; }
+
+  /* TWEAKS PANEL */
+  .tweaks-panel {
+    position: fixed; bottom: 24px; right: 24px; z-index: 1000;
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 14px; padding: 16px; width: 240px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    display: none;
+  }
+  .tweaks-panel.visible { display: block; }
+  .tweaks-title { font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  .tweak-row { margin-bottom: 12px; }
+  .tweak-label { font-size: 11px; color: var(--text3); margin-bottom: 6px; font-weight: 500; }
+  .tweak-select { width: 100%; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--border2);
+    background: var(--bg3); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 12px; outline: none; }
+  .tweak-toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .tw-switch { width: 34px; height: 20px; border-radius: 10px; background: var(--bg4); cursor: pointer;
+    position: relative; transition: background 0.2s; border: 1px solid var(--border2); }
+  .tw-switch.on { background: var(--accent); border-color: var(--accent); }
+  .tw-thumb { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: white;
+    top: 2px; left: 2px; transition: left 0.2s; }
+  .tw-switch.on .tw-thumb { left: 16px; }
+
+  /* ANIMATIONS */
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-in { animation: fadeSlideIn 0.3s ease forwards; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accentHue": "52",
+  "cardDensity": "comfortable",
+  "showDescriptions": true
+}/*EDITMODE-END*/;
+
+// ---- DATA ----
+const TOPICS = [
+  {
+    id: 1, emoji: "🏋️", label: "Fundamentos do Movimento", color: "oklch(0.74 0.19 52)",
+    description: "Base biomecânica para execução correta dos movimentos funcionais.",
+    subtopics: [
+      { id: 101, name: "Postura e alinhamento", desc: "Princípios de posicionamento corporal e carga axial.", progress: 100, tags: ["Biomecânica", "Básico"], status: "done" },
+      { id: 102, name: "Padrão de respiração", desc: "Técnicas de respiração diafragmática aplicadas ao treino.", progress: 60, tags: ["Fisiologia"], status: "inprog" },
+      { id: 103, name: "Controle motor básico", desc: "Coordenação neuromuscular e ativação correta.", progress: 30, tags: ["Neuromotor"], status: "inprog" },
+      { id: 104, name: "Mobilidade articular", desc: "Amplitude de movimento e preparação das articulações.", progress: 0, tags: ["Mobilidade", "Avançado"], status: "locked" },
+    ],
+    badges: [
+      { id: "b1", name: "Alicerce Sólido", emoji: "🏆", earned: true },
+      { id: "b2", name: "Respirador Elite", emoji: "💨", earned: false },
+      { id: "b3", name: "Mobilidade Pro", emoji: "🦾", earned: false },
+    ]
+  },
+  {
+    id: 2, emoji: "⚡", label: "Força e Potência", color: "oklch(0.65 0.16 240)",
+    description: "Desenvolvimento de capacidades neuromusculares para performance máxima.",
+    subtopics: [
+      { id: 201, name: "Força máxima — squat", desc: "Protocolos de periodização para agachamento.", progress: 100, tags: ["Força", "Lower Body"], status: "done" },
+      { id: 202, name: "Força máxima — deadlift", desc: "Técnica e programação para levantamento terra.", progress: 80, tags: ["Força", "Posterior"], status: "inprog" },
+      { id: 203, name: "Potência explosiva", desc: "Pliometria e transferência de força.", progress: 0, tags: ["Potência"], status: "locked" },
+    ],
+    badges: [
+      { id: "b4", name: "Levantador Bronze", emoji: "🥉", earned: true },
+      { id: "b5", name: "Levantador Prata", emoji: "🥈", earned: false },
+    ]
+  },
+  {
+    id: 3, emoji: "🫀", label: "Condicionamento Aeróbico", color: "oklch(0.68 0.17 150)",
+    description: "Construção de base cardiovascular e resistência metabólica.",
+    subtopics: [
+      { id: 301, name: "Zona 2 — treinamento base", desc: "Limiares aeróbicos e adaptações cardíacas.", progress: 45, tags: ["Aeróbico", "Endurance"], status: "inprog" },
+      { id: 302, name: "Intervalado HIIT", desc: "Protocolos de alta intensidade e recuperação.", progress: 0, tags: ["HIIT", "Avançado"], status: "locked" },
+    ],
+    badges: [
+      { id: "b6", name: "Coração de Ferro", emoji: "❤️‍🔥", earned: false },
+    ]
+  },
+  {
+    id: 4, emoji: "🎯", label: "Habilidades Técnicas", color: "oklch(0.74 0.18 320)",
+    description: "Domínio de movimentos específicos do esporte ou modalidade.",
+    subtopics: [
+      { id: 401, name: "Coordenação e agilidade", desc: "Ladder drills e mudança de direção.", progress: 20, tags: ["Agilidade"], status: "inprog" },
+      { id: 402, name: "Equilíbrio e propriocepção", desc: "Treinamento propioceptivo e estabilidade.", progress: 0, tags: ["Equilíbrio"], status: "locked" },
+      { id: 403, name: "Velocidade de reação", desc: "Estímulos visuais e tempo de resposta.", progress: 0, tags: ["Velocidade"], status: "locked" },
+    ],
+    badges: [
+      { id: "b7", name: "Técnica Afiada", emoji: "🎯", earned: false },
+    ]
+  },
+];
+
+const globalProgress = Math.round(
+  TOPICS.flatMap(t => t.subtopics).reduce((a, s) => a + s.progress, 0) /
+  TOPICS.flatMap(t => t.subtopics).length
+);
+
+// ---- ICONS ----
+const ChevronRight = () => <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2L6.5 5L3.5 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const PlusIcon = () => <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1V11M1 6H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
+const SearchIcon = () => <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2"/><path d="M10 10L12.5 12.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>;
+const SunIcon = () => <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 1.5V3M7.5 12V13.5M1.5 7.5H3M12 7.5H13.5M3.5 3.5L4.5 4.5M10.5 10.5L11.5 11.5M3.5 11.5L4.5 10.5M10.5 4.5L11.5 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>;
+const MoonIcon = () => <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12.5 9.5A6 6 0 014.5 1.5a6 6 0 000 11h1a6 6 0 007-3z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>;
+const EditIcon = () => <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M8 1.5l1.5 1.5L3.5 9H2V7.5L8 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const TrashIcon = () => <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1.5 3h8M4.5 3V2h2v1M2.5 3l.5 6.5h5L9 3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const LockIcon = () => <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="2" y="5" width="7" height="5.5" rx="1.5" stroke="currentColor" strokeWidth="1.1"/><path d="M3.5 5V3.5a2 2 0 014 0V5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>;
+
+// ---- COMPONENTS ----
+function ProgressBar({ value, color, height = 5 }) {
+  return (
+    <div className="sc-bar" style={{ height }}>
+      <div className="sc-bar-fill" style={{ width: `${value}%`, background: color || 'var(--accent)' }} />
+    </div>
+  );
+}
+
+function SubtopicCard({ sub, index, isInstructor, topicColor }) {
+  const statusLabel = { done: "Concluído", inprog: "Em andamento", locked: "Bloqueado" };
+  return (
+    <div
+      className={`subtopic-card ${sub.status} animate-in`}
+      style={{ animationDelay: `${index * 60}ms`, '--accent': topicColor }}
+    >
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, borderRadius: '4px 0 0 4px',
+        background: sub.status === 'done' ? 'var(--accent3)' : sub.status === 'inprog' ? topicColor : 'transparent' }} />
+
+      <div className={`sc-number ${sub.status === 'done' ? 'done' : sub.status === 'inprog' ? 'in-progress' : ''}`}>
+        {sub.status === 'done' ? '✓' : sub.status === 'locked' ? <LockIcon /> : index + 1}
+      </div>
+
+      <div className="sc-info">
+        <div className="sc-name">{sub.name}</div>
+        <div className="sc-desc">{sub.desc}</div>
+        <div className="sc-tags">
+          {sub.tags.map(t => <span key={t} className="sc-tag">{t}</span>)}
+        </div>
+      </div>
+
+      <div className="sc-right">
+        {isInstructor ? (
+          <div className="sc-actions">
+            <button className="sc-action-btn" title="Editar"><EditIcon /></button>
+            <button className="sc-action-btn del" title="Excluir"><TrashIcon /></button>
+          </div>
+        ) : null}
+        <div className="sc-progress-wrap">
+          <div className="sc-pct">{sub.progress}%</div>
+          <ProgressBar value={sub.progress} color={topicColor} />
+        </div>
+        <div className={`sc-status ${sub.status}`}>{statusLabel[sub.status]}</div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('aq_theme') || 'dark');
+  const [role, setRole] = useState(() => localStorage.getItem('aq_role') || 'participant');
+  const [selectedTopic, setSelectedTopic] = useState(() => parseInt(localStorage.getItem('aq_topic') || '1'));
+  const [openTopics, setOpenTopics] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('aq_open') || '[1]'); } catch { return [1]; }
+  });
+  const [search, setSearch] = useState('');
+  const [tweaksVisible, setTweaksVisible] = useState(false);
+  const [tweaks, setTweaks] = useState(TWEAK_DEFAULTS);
+
+  useEffect(() => {
+    localStorage.setItem('aq_theme', theme);
+    localStorage.setItem('aq_role', role);
+    localStorage.setItem('aq_topic', selectedTopic);
+    localStorage.setItem('aq_open', JSON.stringify(openTopics));
+  }, [theme, role, selectedTopic, openTopics]);
+
+  useEffect(() => {
+    window.addEventListener('message', e => {
+      if (e.data?.type === '__activate_edit_mode') setTweaksVisible(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaksVisible(false);
+    });
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+  }, []);
+
+  const toggleTopic = (id) => {
+    setOpenTopics(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const topic = TOPICS.find(t => t.id === selectedTopic) || TOPICS[0];
+  const isInstructor = role === 'instructor';
+
+  const filteredSubtopics = topic.subtopics.filter(s =>
+    !search || s.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const updateTweak = (key, val) => {
+    const next = { ...tweaks, [key]: val };
+    setTweaks(next);
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: next }, '*');
+  };
+
+  const cardDensityPad = tweaks.cardDensity === 'compact' ? '12px 18px' : tweaks.cardDensity === 'spacious' ? '28px 32px' : '20px 24px';
+
+  return (
+    <div className={`app theme-${theme}`}>
+      {/* TOPBAR */}
+      <div className="topbar">
+        <div className="logo">
+          <div className="logo-mark">AQ</div>
+          <div className="logo-name">Arena<span>Quest</span></div>
+        </div>
+        <div className="topbar-center">
+          <div className="role-pill">
+            <button className={`role-btn ${role === 'participant' ? 'active' : ''}`} onClick={() => setRole('participant')}>Participante</button>
+            <button className={`role-btn ${role === 'instructor' ? 'active' : ''}`} onClick={() => setRole('instructor')}>Instrutor</button>
+          </div>
+        </div>
+        <div className="topbar-right">
+          {!isInstructor && (
+            <div className="xp-pill">
+              <div className="xp-dot" />
+              1.240 XP
+            </div>
+          )}
+          <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          </button>
+          <div className="avatar">JS</div>
+        </div>
+      </div>
+
+      <div className="body-layout">
+        {/* SIDEBAR */}
+        <div className="sidebar">
+          <div className="sidebar-header">
+            <div className="sidebar-title">Trilhas de Conteúdo</div>
+            <div className="global-progress-wrap">
+              <div className="gp-label">
+                <span>Progresso Geral</span>
+                <strong>{globalProgress}%</strong>
+              </div>
+              <div className="progress-bar-outer">
+                <div className="progress-bar-inner" style={{ width: `${globalProgress}%` }} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: '12px 16px 0' }}>
+            <div className="sidebar-search">
+              <span className="search-icon"><SearchIcon /></span>
+              <input
+                placeholder="Buscar conteúdo…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="topics-list">
+            {TOPICS.map(t => {
+              const topicPct = Math.round(t.subtopics.reduce((a, s) => a + s.progress, 0) / t.subtopics.length);
+              const isOpen = openTopics.includes(t.id);
+              const isActive = selectedTopic === t.id;
+              return (
+                <div className="topic-item" key={t.id}>
+                  <div
+                    className={`topic-row ${isActive ? 'active' : ''}`}
+                    onClick={() => { setSelectedTopic(t.id); if (!isOpen) toggleTopic(t.id); }}
+                  >
+                    <div className={`topic-chevron ${isOpen ? 'open' : ''}`} onClick={(e) => { e.stopPropagation(); toggleTopic(t.id); }}>
+                      <ChevronRight />
+                    </div>
+                    <div className="topic-icon" style={{ background: t.color + '22' }}>{t.emoji}</div>
+                    <div className="topic-info">
+                      <div className="topic-name">{t.label}</div>
+                      <div className="topic-meta">
+                        <div className="topic-progress-mini">
+                          <div style={{ height: '100%', borderRadius: 3, background: t.color, width: `${topicPct}%`, transition: 'width 0.6s' }} />
+                        </div>
+                        <span className="topic-pct">{topicPct}%</span>
+                        <span className="topic-badge-count">{t.badges.filter(b => b.earned).length}/{t.badges.length} 🏅</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Subtopics in sidebar */}
+                  {isOpen && (
+                    <div className="subtopic-sidebar-list">
+                      {t.subtopics.map(s => (
+                        <div key={s.id} className={`subtopic-sidebar-item ${isActive && selectedTopic === t.id ? '' : ''}`}
+                          onClick={() => setSelectedTopic(t.id)}>
+                          <div className="sub-dot" style={{
+                            background: s.status === 'done' ? 'var(--accent3)' : s.status === 'inprog' ? t.color : 'var(--bg4)'
+                          }} />
+                          <span className="sub-label">{s.name}</span>
+                          <span className="sub-status">
+                            {s.status === 'done' ? '✓' : s.status === 'locked' ? '🔒' : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {isInstructor && isOpen && (
+                    <button className="sidebar-add-btn" onClick={() => alert('Adicionar subtópico')}>
+                      <PlusIcon /> Novo Subtópico
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
+            {isInstructor && (
+              <div style={{ padding: '12px 16px' }}>
+                <button className="sidebar-add-btn" style={{ width: '100%' }} onClick={() => alert('Adicionar tópico')}>
+                  <PlusIcon /> Novo Tópico
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* MAIN */}
+        <div className="main" key={selectedTopic}>
+          <div className="breadcrumb">
+            <a href="#">Início</a>
+            <span className="bc-sep">›</span>
+            <a href="#">Conteúdos</a>
+            <span className="bc-sep">›</span>
+            <span style={{ color: 'var(--text2)' }}>{topic.label}</span>
+          </div>
+
+          <div className="topic-header">
+            <div className="topic-header-left">
+              <div className="topic-header-icon" style={{ background: topic.color + '22', fontSize: 28 }}>{topic.emoji}</div>
+              <div className="topic-header-text">
+                <h1>{topic.label}</h1>
+                <p>{topic.description}</p>
+              </div>
+            </div>
+            <div className="topic-header-stats">
+              <div className="stat-box">
+                <div className="num">{topic.subtopics.length}</div>
+                <div className="lbl">Subtópicos</div>
+              </div>
+              <div className="stat-box">
+                <div className="num">{topic.subtopics.filter(s => s.status === 'done').length}</div>
+                <div className="lbl">Concluídos</div>
+              </div>
+              <div className="stat-box">
+                <div className="num" style={{ color: topic.color }}>
+                  {Math.round(topic.subtopics.reduce((a, s) => a + s.progress, 0) / topic.subtopics.length)}%
+                </div>
+                <div className="lbl">Progresso</div>
+              </div>
+            </div>
+          </div>
+
+          {/* PROGRESS BAR */}
+          <div className="topic-progress-section">
+            <div className="tp-header">
+              <span>Progresso do tópico</span>
+              <strong style={{ color: topic.color }}>
+                {Math.round(topic.subtopics.reduce((a, s) => a + s.progress, 0) / topic.subtopics.length)}%
+              </strong>
+            </div>
+            <div className="tp-bar">
+              <div className="tp-bar-fill" style={{
+                width: `${Math.round(topic.subtopics.reduce((a, s) => a + s.progress, 0) / topic.subtopics.length)}%`,
+                background: `linear-gradient(90deg, ${topic.color}, var(--accent2))`
+              }} />
+            </div>
+          </div>
+
+          {/* BADGES */}
+          <div className="badges-strip">
+            {topic.badges.map(b => (
+              <div key={b.id} className={`badge-chip ${b.earned ? 'earned' : 'locked'}`} style={b.earned ? { '--accent': topic.color, borderColor: topic.color, color: topic.color, background: topic.color + '22' } : {}}>
+                <span className="badge-icon">{b.emoji}</span>
+                {b.name}
+                {!b.earned && <span style={{ fontSize: 10, opacity: 0.7 }}>🔒</span>}
+              </div>
+            ))}
+          </div>
+
+          {/* SUBTOPICS */}
+          <div className="section-header">
+            <div className="section-title">Subtópicos</div>
+            {isInstructor && (
+              <button className="add-subtopic-btn" style={{ '--accent': topic.color, '--accent-glow': topic.color + '22', borderColor: topic.color, color: topic.color }}>
+                <PlusIcon /> Adicionar Subtópico
+              </button>
+            )}
+          </div>
+
+          <div className="subtopics-grid">
+            {filteredSubtopics.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">🔍</div>
+                <div className="empty-text">Nenhum subtópico encontrado</div>
+              </div>
+            ) : filteredSubtopics.map((sub, i) => (
+              <div key={sub.id} style={{ '--pad': cardDensityPad }}>
+                <SubtopicCard
+                  sub={sub} index={i}
+                  isInstructor={isInstructor}
+                  topicColor={topic.color}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* TWEAKS PANEL */}
+      <div className={`tweaks-panel ${tweaksVisible ? 'visible' : ''}`}>
+        <div className="tweaks-title">Tweaks</div>
+
+        <div className="tweak-row">
+          <div className="tweak-label">Densidade dos cards</div>
+          <select className="tweak-select" value={tweaks.cardDensity} onChange={e => updateTweak('cardDensity', e.target.value)}>
+            <option value="compact">Compacto</option>
+            <option value="comfortable">Confortável</option>
+            <option value="spacious">Espaçoso</option>
+          </select>
+        </div>
+
+        <div className="tweak-row">
+          <div className="tweak-label">Cor de destaque (matiz)</div>
+          <select className="tweak-select" value={tweaks.accentHue} onChange={e => updateTweak('accentHue', e.target.value)}>
+            <option value="52">Âmbar (padrão)</option>
+            <option value="30">Laranja</option>
+            <option value="270">Roxo</option>
+            <option value="200">Ciano</option>
+          </select>
+        </div>
+
+        <div className="tweak-row">
+          <div className="tweak-toggle-row">
+            <div className="tweak-label" style={{ margin: 0 }}>Mostrar descrições</div>
+            <div className={`tw-switch ${tweaks.showDescriptions ? 'on' : ''}`}
+              onClick={() => updateTweak('showDescriptions', !tweaks.showDescriptions)}>
+              <div className="tw-thumb" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

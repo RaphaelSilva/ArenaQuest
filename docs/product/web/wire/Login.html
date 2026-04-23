@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ArenaQuest — Entrar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body { font-family: 'DM Sans', sans-serif; }
+
+:root {
+  --bg: #0B0E17;
+  --bg2: #131825;
+  --bg3: #1C2235;
+  --bg4: #232B40;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --border3: rgba(255,255,255,0.22);
+  --text: #E8EAF0;
+  --text2: #8B92A8;
+  --text3: #5C6480;
+  --accent: oklch(0.74 0.19 52);
+  --accent2: oklch(0.65 0.16 240);
+  --accent3: oklch(0.68 0.17 150);
+  --accent-glow: oklch(0.74 0.19 52 / 0.18);
+  --error: oklch(0.65 0.22 15);
+  --error-bg: oklch(0.65 0.22 15 / 0.12);
+}
+
+.page {
+  min-height: 100%;
+  display: flex;
+  background: var(--bg);
+  color: var(--text);
+  position: relative;
+  overflow: hidden;
+}
+
+/* BACKGROUND GEOMETRY */
+.bg-geo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+}
+.bg-orb1 {
+  position: absolute;
+  width: 600px; height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.74 0.19 52 / 0.12) 0%, transparent 70%);
+  top: -200px; right: -100px;
+}
+.bg-orb2 {
+  position: absolute;
+  width: 400px; height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.65 0.16 240 / 0.10) 0%, transparent 70%);
+  bottom: -100px; left: 200px;
+}
+.bg-lines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 60px,
+    rgba(255,255,255,0.012) 60px,
+    rgba(255,255,255,0.012) 61px
+  );
+}
+
+/* LEFT PANEL */
+.left-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 64px;
+  position: relative;
+  z-index: 1;
+  max-width: 520px;
+}
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 56px; }
+.brand-mark {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px; color: #0B0E17;
+  box-shadow: 0 0 24px oklch(0.74 0.19 52 / 0.4);
+}
+.brand-name {
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: -0.4px;
+}
+.brand-name span { color: var(--accent); }
+
+.left-headline { margin-bottom: 48px; }
+.left-headline h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 38px; font-weight: 700; letter-spacing: -1px; line-height: 1.1;
+  margin-bottom: 14px;
+}
+.left-headline h1 em { font-style: normal; color: var(--accent); }
+.left-headline p { font-size: 15px; color: var(--text2); line-height: 1.6; max-width: 340px; text-wrap: pretty; }
+
+.features { display: flex; flex-direction: column; gap: 18px; }
+.feature { display: flex; align-items: flex-start; gap: 14px; }
+.feature-icon {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  border: 1px solid var(--border2);
+}
+.feature-text h3 { font-size: 14px; font-weight: 600; color: var(--text); }
+.feature-text p { font-size: 12px; color: var(--text3); margin-top: 2px; line-height: 1.4; }
+
+/* RIGHT PANEL — FORM */
+.right-panel {
+  width: 480px;
+  min-width: 480px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 40px 48px;
+  background: var(--bg2);
+  border-left: 1px solid var(--border);
+  position: relative;
+  z-index: 1;
+  overflow-y: auto;
+}
+.right-panel::-webkit-scrollbar { width: 4px; }
+.right-panel::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 4px; }
+
+/* FORM TABS */
+.form-tabs {
+  display: flex; gap: 0;
+  background: var(--bg3); border-radius: 12px; padding: 4px;
+  border: 1px solid var(--border); margin-bottom: 32px;
+}
+.form-tab {
+  flex: 1; padding: 9px; border-radius: 9px; border: none;
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: all 0.22s; background: transparent; color: var(--text3);
+}
+.form-tab.active {
+  background: var(--bg2); color: var(--text);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* FORM HEADER */
+.form-heading { margin-bottom: 28px; }
+.form-heading h2 {
+  font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700;
+  letter-spacing: -0.3px; margin-bottom: 6px;
+}
+.form-heading p { font-size: 13px; color: var(--text2); line-height: 1.5; }
+
+/* INPUT GROUP */
+.input-group { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field label {
+  font-size: 12px; font-weight: 600; color: var(--text2);
+  letter-spacing: 0.3px;
+}
+.input-wrap {
+  position: relative; display: flex; align-items: center;
+}
+.input-wrap input {
+  width: 100%; padding: 11px 16px 11px 40px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 10px; outline: none;
+  font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text);
+  transition: border-color 0.2s, box-shadow 0.2s; caret-color: var(--accent);
+}
+.input-wrap input::placeholder { color: var(--text3); }
+.input-wrap input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px oklch(0.74 0.19 52 / 0.12);
+}
+.input-wrap input.error {
+  border-color: var(--error);
+  box-shadow: 0 0 0 3px var(--error-bg);
+}
+.input-icon {
+  position: absolute; left: 13px; color: var(--text3); display: flex; align-items: center;
+  pointer-events: none; transition: color 0.2s;
+}
+.input-wrap:focus-within .input-icon { color: var(--accent); }
+.input-suffix {
+  position: absolute; right: 12px; cursor: pointer; color: var(--text3);
+  display: flex; align-items: center; transition: color 0.2s;
+}
+.input-suffix:hover { color: var(--text2); }
+.field-error { font-size: 11px; color: var(--error); display: flex; align-items: center; gap: 4px; }
+
+/* ROLE SELECT */
+.role-select { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.role-option {
+  padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border2);
+  background: var(--bg3); cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; gap: 10px;
+}
+.role-option:hover { border-color: var(--border3); }
+.role-option.selected { border-color: var(--accent); background: var(--accent-glow); }
+.role-emoji { font-size: 18px; }
+.role-info h4 { font-size: 13px; font-weight: 600; color: var(--text); }
+.role-info p { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.role-radio {
+  width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border2);
+  margin-left: auto; flex-shrink: 0; transition: all 0.2s; position: relative;
+}
+.role-option.selected .role-radio {
+  border-color: var(--accent); background: var(--accent);
+}
+.role-option.selected .role-radio::after {
+  content: ''; position: absolute; inset: 3px;
+  border-radius: 50%; background: #0B0E17;
+}
+
+/* STRENGTH METER */
+.strength-meter { display: flex; gap: 4px; margin-top: 6px; }
+.strength-bar { flex: 1; height: 3px; border-radius: 3px; background: var(--bg4); transition: background 0.3s; }
+.strength-label { font-size: 11px; margin-top: 4px; }
+
+/* CHECKBOX */
+.checkbox-row { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: var(--text3); cursor: pointer; }
+.checkbox-box {
+  width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--border2);
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; margin-top: 1px; background: var(--bg3);
+}
+.checkbox-box.checked { background: var(--accent); border-color: var(--accent); }
+.checkbox-row a { color: var(--accent); text-decoration: none; }
+.checkbox-row a:hover { text-decoration: underline; }
+
+/* SUBMIT BTN */
+.submit-btn {
+  width: 100%; padding: 13px; border-radius: 10px; border: none;
+  font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700;
+  cursor: pointer; transition: all 0.22s; position: relative; overflow: hidden;
+  background: var(--accent); color: #0B0E17;
+  box-shadow: 0 4px 20px oklch(0.74 0.19 52 / 0.35);
+  letter-spacing: 0.2px;
+}
+.submit-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 6px 28px oklch(0.74 0.19 52 / 0.45); }
+.submit-btn:active { transform: translateY(0); }
+.submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.submit-btn.loading::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+/* DIVIDER */
+.or-divider {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 12px; color: var(--text3); margin: 20px 0;
+}
+.or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* SOCIAL BTN */
+.social-btn {
+  width: 100%; padding: 11px; border-radius: 10px;
+  border: 1px solid var(--border2); background: var(--bg3);
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--text2);
+  cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.social-btn:hover { border-color: var(--border3); color: var(--text); background: var(--bg4); }
+
+/* BOTTOM LINK */
+.bottom-link { text-align: center; font-size: 13px; color: var(--text3); margin-top: 24px; }
+.bottom-link button { color: var(--accent); background: none; border: none; cursor: pointer; font-size: 13px; font-weight: 600; font-family: 'DM Sans', sans-serif; }
+.bottom-link button:hover { text-decoration: underline; }
+
+/* SUCCESS STATE */
+.success-state {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 16px;
+  padding: 20px 0;
+}
+.success-icon {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: oklch(0.68 0.17 150 / 0.15); border: 2px solid var(--accent3);
+  display: flex; align-items: center; justify-content: center; font-size: 32px;
+  animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.success-state h2 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; }
+.success-state p { font-size: 13px; color: var(--text2); line-height: 1.6; max-width: 280px; }
+
+/* ANIMATIONS */
+@keyframes fadeSlide { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+.anim { animation: fadeSlide 0.4s ease forwards; }
+</style>
+
+<template id="__bundler_thumbnail" data-bg-color="#0B0E17">
+  <svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg">
+    <rect width="400" height="260" fill="#0B0E17"/>
+    <!-- grid lines -->
+    <line x1="0" y1="52" x2="400" y2="52" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+    <line x1="0" y1="104" x2="400" y2="104" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+    <line x1="0" y1="156" x2="400" y2="156" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+    <line x1="0" y1="208" x2="400" y2="208" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+    <!-- left panel -->
+    <rect x="24" y="28" width="36" height="36" rx="9" fill="#E8A020"/>
+    <text x="42" y="51" font-family="monospace" font-size="14" font-weight="700" fill="#0B0E17" text-anchor="middle">AQ</text>
+    <rect x="24" y="80" width="160" height="12" rx="4" fill="rgba(255,255,255,0.12)"/>
+    <rect x="24" y="98" width="120" height="10" rx="3" fill="rgba(255,255,255,0.07)"/>
+    <rect x="24" y="118" width="140" height="8" rx="3" fill="rgba(255,255,255,0.05)"/>
+    <rect x="24" y="148" width="30" height="30" rx="8" fill="rgba(232,160,32,0.12)"/>
+    <rect x="62" y="154" width="100" height="7" rx="3" fill="rgba(255,255,255,0.08)"/>
+    <rect x="62" y="165" width="70" height="5" rx="2" fill="rgba(255,255,255,0.05)"/>
+    <rect x="24" y="188" width="30" height="30" rx="8" fill="rgba(100,120,220,0.12)"/>
+    <rect x="62" y="194" width="110" height="7" rx="3" fill="rgba(255,255,255,0.08)"/>
+    <rect x="62" y="205" width="80" height="5" rx="2" fill="rgba(255,255,255,0.05)"/>
+    <!-- right panel -->
+    <rect x="220" y="0" width="180" height="260" fill="#131825"/>
+    <rect x="230" y="20" width="160" height="36" rx="10" fill="#1C2235"/>
+    <rect x="234" y="26" width="74" height="24" rx="8" fill="#232B40"/>
+    <rect x="312" y="26" width="74" height="24" rx="8" fill="transparent"/>
+    <text x="271" y="43" font-family="sans-serif" font-size="10" fill="rgba(255,255,255,0.8)" text-anchor="middle">Entrar</text>
+    <text x="349" y="43" font-family="sans-serif" font-size="10" fill="rgba(255,255,255,0.35)" text-anchor="middle">Criar</text>
+    <!-- inputs -->
+    <rect x="230" y="72" width="160" height="28" rx="8" fill="#1C2235" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+    <rect x="230" y="108" width="160" height="28" rx="8" fill="#1C2235" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+    <!-- submit -->
+    <rect x="230" y="156" width="160" height="34" rx="9" fill="#E8A020"/>
+    <text x="310" y="178" font-family="sans-serif" font-size="11" font-weight="700" fill="#0B0E17" text-anchor="middle">Entrar na Arena</text>
+    <!-- divider -->
+    <line x1="245" y1="203" x2="295" y2="203" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+    <text x="310" y="207" font-family="sans-serif" font-size="8" fill="rgba(255,255,255,0.2)" text-anchor="middle">ou continue com</text>
+    <line x1="325" y1="203" x2="375" y2="203" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+    <rect x="230" y="215" width="160" height="28" rx="8" fill="#1C2235" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+  </svg>
+</template>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+// ---- ICONS ----
+const MailIcon = () => <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1.5" y="3" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 5l6 4 6-4" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>;
+const LockIcon = () => <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="3" y="6.5" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5 6.5V4.5a2.5 2.5 0 015 0V6.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>;
+const UserIcon = () => <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="5" r="3" stroke="currentColor" strokeWidth="1.2"/><path d="M2 13c0-3.5 2.5-5.5 5.5-5.5S13 9.5 13 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>;
+const EyeIcon = ({off}) => off
+  ? <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M6.3 6.4A2 2 0 009.6 9.7M4 4.5C2.5 5.7 1.5 7.5 1.5 7.5S4 12 7.5 12c1.2 0 2.3-.4 3.2-1M6 3.2C6.5 3.1 7 3 7.5 3c3.5 0 6 4.5 6 4.5s-.5 1-1.5 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+  : <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M1.5 7.5S4 3 7.5 3 13.5 7.5 13.5 7.5 11 12 7.5 12 1.5 7.5 1.5 7.5z" stroke="currentColor" strokeWidth="1.2"/><circle cx="7.5" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.2"/></svg>;
+const PhoneIcon = () => <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 2h3l1.5 3.5-1.5 1a7.5 7.5 0 004 4l1-1.5L14 10.5V13.5a1 1 0 01-1 1C5.5 14.5 1 9 1 3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>;
+const CheckIcon = () => <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const AlertIcon = () => <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.1"/><path d="M5.5 3.5v2.5M5.5 7.5v.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>;
+
+const GoogleIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 48 48" fill="none">
+    <path d="M44.5 20H24v8.5h11.8C34.5 33 29.8 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.1 8 3l6-6C34.2 6.2 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-9 20-20 0-1.3-.2-2.7-.5-4z" fill="#FFC107"/>
+    <path d="M6.3 14.7l7 5.1C15.2 16 19.3 13 24 13c3.1 0 5.9 1.1 8 3l6-6C34.2 6.2 29.4 4 24 4 16.1 4 9.3 8.4 6.3 14.7z" fill="#FF3D00"/>
+    <path d="M24 44c5.2 0 10-2 13.5-5.2l-6.2-5.3C29.3 35.5 26.8 36 24 36c-5.7 0-10.5-3.8-12.2-9.1l-7 5.4C8.5 39.3 15.7 44 24 44z" fill="#4CAF50"/>
+    <path d="M44.5 20H24v8.5h11.8c-.8 2.3-2.3 4.2-4.3 5.5l6.2 5.3C41.5 36 44 30.5 44 24c0-1.3-.2-2.7-.5-4z" fill="#1976D2"/>
+  </svg>
+);
+
+// ---- PASSWORD STRENGTH ----
+function getStrength(pw) {
+  if (!pw) return 0;
+  let s = 0;
+  if (pw.length >= 8) s++;
+  if (/[A-Z]/.test(pw)) s++;
+  if (/[0-9]/.test(pw)) s++;
+  if (/[^A-Za-z0-9]/.test(pw)) s++;
+  return s;
+}
+const strengthColors = ['var(--error)', 'oklch(0.74 0.19 52)', 'oklch(0.65 0.16 240)', 'var(--accent3)'];
+const strengthLabels = ['Fraca', 'Razoável', 'Boa', 'Forte'];
+
+// ---- LOGIN FORM ----
+function LoginForm({ onSwitch }) {
+  const [email, setEmail] = useState('');
+  const [pw, setPw] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!email) { setError('Informe seu e-mail.'); return; }
+    if (!pw) { setError('Informe sua senha.'); return; }
+    setError('');
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      window.location.href = 'ArenaQuest Dashboard.html';
+    }, 1400);
+  };
+
+  return (
+    <div className="anim">
+      <div className="form-heading">
+        <h2>Bem-vindo de volta</h2>
+        <p>Entre na sua conta para continuar sua jornada.</p>
+      </div>
+
+      {error && (
+        <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',borderRadius:9,background:'var(--error-bg)',border:'1px solid oklch(0.65 0.22 15 / 0.3)',marginBottom:18,fontSize:13,color:'var(--error)'}}>
+          <AlertIcon /> {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit}>
+        <div className="input-group">
+          <div className="field">
+            <label>E-mail</label>
+            <div className="input-wrap">
+              <span className="input-icon"><MailIcon /></span>
+              <input type="email" placeholder="seu@email.com" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/>
+            </div>
+          </div>
+          <div className="field">
+            <label>Senha</label>
+            <div className="input-wrap">
+              <span className="input-icon"><LockIcon /></span>
+              <input type={showPw ? 'text' : 'password'} placeholder="••••••••" value={pw} onChange={e=>setPw(e.target.value)} autoComplete="current-password"/>
+              <span className="input-suffix" onClick={()=>setShowPw(!showPw)}><EyeIcon off={showPw}/></span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:22}}>
+          <label className="checkbox-row">
+            <div className="checkbox-box checked"><CheckIcon/></div>
+            Lembrar de mim
+          </label>
+          <a href="#" style={{fontSize:12,color:'var(--accent)',textDecoration:'none',fontWeight:500}}>Esqueci a senha</a>
+        </div>
+
+        <button type="submit" className={`submit-btn ${loading ? 'loading' : ''}`} disabled={loading}>
+          {loading ? 'Entrando…' : 'Entrar na Arena'}
+        </button>
+      </form>
+
+      <div className="or-divider">ou continue com</div>
+      <button className="social-btn" onClick={()=>{}}>
+        <GoogleIcon /> Entrar com Google
+      </button>
+
+      <div className="bottom-link">
+        Não tem conta? <button onClick={onSwitch}>Criar conta grátis</button>
+      </div>
+    </div>
+  );
+}
+
+// ---- REGISTER FORM ----
+function RegisterForm({ onSwitch, onSuccess }) {
+  const [step, setStep] = useState(1); // 1 = dados, 2 = perfil
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [pw, setPw] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [role, setRole] = useState('participant');
+  const [terms, setTerms] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const strength = getStrength(pw);
+
+  const validateStep1 = () => {
+    const e = {};
+    if (!firstName.trim()) e.firstName = 'Campo obrigatório';
+    if (!email.trim()) e.email = 'Campo obrigatório';
+    else if (!/\S+@\S+\.\S+/.test(email)) e.email = 'E-mail inválido';
+    if (!pw) e.pw = 'Campo obrigatório';
+    else if (pw.length < 8) e.pw = 'Mínimo 8 caracteres';
+    if (pw !== pwConfirm) e.pwConfirm = 'Senhas não coincidem';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleStep1 = (e) => {
+    e.preventDefault();
+    if (validateStep1()) setStep(2);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!terms) { setErrors({ terms: 'Aceite os termos para continuar' }); return; }
+    setErrors({});
+    setLoading(true);
+    setTimeout(() => { setLoading(false); onSuccess(); }, 1600);
+  };
+
+  return (
+    <div className="anim">
+      {/* STEP INDICATOR */}
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:28}}>
+        {[1,2].map(s => (
+          <React.Fragment key={s}>
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: step >= s ? 'var(--accent)' : 'var(--bg4)',
+              border: `2px solid ${step >= s ? 'var(--accent)' : 'var(--border2)'}`,
+              display:'flex',alignItems:'center',justifyContent:'center',
+              fontFamily:'Space Grotesk',fontSize:12,fontWeight:700,
+              color: step >= s ? '#0B0E17' : 'var(--text3)',
+              transition: 'all 0.3s', flexShrink:0
+            }}>
+              {step > s ? <CheckIcon /> : s}
+            </div>
+            <div style={{fontSize:12,color: step>=s ? 'var(--text2)' : 'var(--text3)',fontWeight: step===s ? 600 : 400}}>
+              {s === 1 ? 'Suas informações' : 'Tipo de conta'}
+            </div>
+            {s < 2 && <div style={{flex:1,height:1,background: step>s ? 'var(--accent)' : 'var(--border2)',transition:'background 0.4s'}}/>}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {step === 1 && (
+        <div className="anim">
+          <div className="form-heading">
+            <h2>Criar sua conta</h2>
+            <p>Comece sua jornada de alta performance hoje.</p>
+          </div>
+          <form onSubmit={handleStep1}>
+            <div className="input-group">
+              <div className="field-row">
+                <div className="field">
+                  <label>Nome</label>
+                  <div className="input-wrap">
+                    <span className="input-icon"><UserIcon /></span>
+                    <input type="text" placeholder="João" value={firstName} onChange={e=>setFirstName(e.target.value)} className={errors.firstName ? 'error' : ''}/>
+                  </div>
+                  {errors.firstName && <div className="field-error"><AlertIcon/>{errors.firstName}</div>}
+                </div>
+                <div className="field">
+                  <label>Sobrenome</label>
+                  <div className="input-wrap">
+                    <span className="input-icon"><UserIcon /></span>
+                    <input type="text" placeholder="Silva" value={lastName} onChange={e=>setLastName(e.target.value)}/>
+                  </div>
+                </div>
+              </div>
+
+              <div className="field">
+                <label>E-mail</label>
+                <div className="input-wrap">
+                  <span className="input-icon"><MailIcon /></span>
+                  <input type="email" placeholder="seu@email.com" value={email} onChange={e=>setEmail(e.target.value)} className={errors.email ? 'error' : ''}/>
+                </div>
+                {errors.email && <div className="field-error"><AlertIcon/>{errors.email}</div>}
+              </div>
+
+              <div className="field">
+                <label>Telefone <span style={{color:'var(--text3)',fontWeight:400}}>(opcional)</span></label>
+                <div className="input-wrap">
+                  <span className="input-icon"><PhoneIcon /></span>
+                  <input type="tel" placeholder="+55 (11) 9 0000-0000" value={phone} onChange={e=>setPhone(e.target.value)}/>
+                </div>
+              </div>
+
+              <div className="field">
+                <label>Senha</label>
+                <div className="input-wrap">
+                  <span className="input-icon"><LockIcon /></span>
+                  <input type={showPw ? 'text' : 'password'} placeholder="Mínimo 8 caracteres" value={pw} onChange={e=>setPw(e.target.value)} className={errors.pw ? 'error' : ''}/>
+                  <span className="input-suffix" onClick={()=>setShowPw(!showPw)}><EyeIcon off={showPw}/></span>
+                </div>
+                {pw && (
+                  <>
+                    <div className="strength-meter">
+                      {[0,1,2,3].map(i => (
+                        <div key={i} className="strength-bar" style={{background: i < strength ? strengthColors[strength-1] : 'var(--bg4)'}}/>
+                      ))}
+                    </div>
+                    <div className="strength-label" style={{color: strengthColors[strength-1] || 'var(--text3)'}}>
+                      Força: {strengthLabels[strength-1] || '—'}
+                    </div>
+                  </>
+                )}
+                {errors.pw && <div className="field-error"><AlertIcon/>{errors.pw}</div>}
+              </div>
+
+              <div className="field">
+                <label>Confirmar senha</label>
+                <div className="input-wrap">
+                  <span className="input-icon"><LockIcon /></span>
+                  <input type={showPw ? 'text' : 'password'} placeholder="Repita a senha" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} className={errors.pwConfirm ? 'error' : ''}/>
+                </div>
+                {errors.pwConfirm && <div className="field-error"><AlertIcon/>{errors.pwConfirm}</div>}
+              </div>
+            </div>
+
+            <button type="submit" className="submit-btn">Continuar →</button>
+          </form>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="anim">
+          <div className="form-heading">
+            <h2>Como você vai usar?</h2>
+            <p>Isso personaliza sua experiência na plataforma.</p>
+          </div>
+          <form onSubmit={handleSubmit}>
+            <div className="input-group">
+              <div className="field">
+                <label>Tipo de conta</label>
+                <div className="role-select">
+                  {[
+                    { key: 'participant', emoji: '🏋️', title: 'Participante', sub: 'Aprender e evoluir' },
+                    { key: 'instructor', emoji: '🎯', title: 'Instrutor', sub: 'Criar e gerenciar' },
+                  ].map(r => (
+                    <div key={r.key} className={`role-option ${role === r.key ? 'selected' : ''}`} onClick={() => setRole(r.key)}>
+                      <span className="role-emoji">{r.emoji}</span>
+                      <div className="role-info">
+                        <h4>{r.title}</h4>
+                        <p>{r.sub}</p>
+                      </div>
+                      <div className="role-radio"/>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{padding:'14px 16px',borderRadius:12,background:'var(--bg3)',border:'1px solid var(--border)',fontSize:12,color:'var(--text2)',lineHeight:1.6}}>
+                {role === 'participant'
+                  ? '🏋️ Como participante, você terá acesso aos módulos de treinamento, poderá acompanhar seu progresso, ganhar XP, subir de nível e competir no ranking.'
+                  : '🎯 Como instrutor, você poderá criar tópicos e subtópicos, fazer upload de materiais, acompanhar o progresso dos alunos e gerenciar as trilhas de conteúdo.'}
+              </div>
+
+              <label className="checkbox-row" onClick={() => setTerms(!terms)}>
+                <div className={`checkbox-box ${terms ? 'checked' : ''}`}>{terms && <CheckIcon/>}</div>
+                <span>Concordo com os <a href="#">Termos de Uso</a> e a <a href="#">Política de Privacidade</a> do ArenaQuest.</span>
+              </label>
+              {errors.terms && <div className="field-error" style={{marginTop:-8}}><AlertIcon/>{errors.terms}</div>}
+            </div>
+
+            <div style={{display:'flex',gap:10}}>
+              <button type="button" onClick={()=>setStep(1)} style={{flex:'0 0 auto',padding:'13px 18px',borderRadius:10,border:'1px solid var(--border2)',background:'var(--bg3)',color:'var(--text2)',fontFamily:'DM Sans',fontSize:14,fontWeight:500,cursor:'pointer',transition:'all 0.2s'}}>
+                ← Voltar
+              </button>
+              <button type="submit" className={`submit-btn ${loading ? 'loading' : ''}`} disabled={loading} style={{flex:1}}>
+                {loading ? 'Criando conta…' : 'Criar conta'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="bottom-link">
+        Já tem conta? <button onClick={onSwitch}>Entrar</button>
+      </div>
+    </div>
+  );
+}
+
+// ---- SUCCESS ----
+function SuccessState() {
+  useEffect(() => {
+    const t = setTimeout(() => { window.location.href = 'ArenaQuest Dashboard.html'; }, 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div className="success-state anim">
+      <div className="success-icon">🏆</div>
+      <h2>Arena desbloqueada!</h2>
+      <p>Sua conta foi criada com sucesso. Preparando sua experiência…</p>
+      <div style={{width:'100%',height:4,background:'var(--bg4)',borderRadius:4,overflow:'hidden',marginTop:8}}>
+        <div style={{height:'100%',background:'linear-gradient(90deg,var(--accent),var(--accent3))',borderRadius:4,animation:'progress 3s linear forwards'}}/>
+      </div>
+      <style>{`@keyframes progress { from{width:0} to{width:100%} }`}</style>
+    </div>
+  );
+}
+
+// ---- APP ----
+function App() {
+  const [mode, setMode] = useState('login'); // login | register | success
+
+  return (
+    <div className="page">
+      <div className="bg-geo">
+        <div className="bg-grid"/>
+        <div className="bg-lines"/>
+        <div className="bg-orb1"/>
+        <div className="bg-orb2"/>
+      </div>
+
+      {/* LEFT */}
+      <div className="left-panel">
+        <div className="brand">
+          <div className="brand-mark">AQ</div>
+          <div className="brand-name">Arena<span>Quest</span></div>
+        </div>
+
+        <div className="left-headline">
+          <h1>Treine com<br/>propósito.<br/><em>Evolua com dados.</em></h1>
+          <p>Plataforma de aprendizado para atletas e instrutores que levam a performance a sério.</p>
+        </div>
+
+        <div className="features">
+          {[
+            { icon: '⚡', bg: 'oklch(0.74 0.19 52 / 0.12)', title: 'Trilhas de Conteúdo', desc: 'Módulos estruturados com vídeos, PDFs e fotos em hierarquia clara.' },
+            { icon: '🏆', bg: 'oklch(0.65 0.16 240 / 0.12)', title: 'Gamificação Completa', desc: 'XP, níveis, badges, missões diárias e ranking entre participantes.' },
+            { icon: '📊', bg: 'oklch(0.68 0.17 150 / 0.12)', title: 'Progresso em Tempo Real', desc: 'Dashboards detalhados para acompanhar sua evolução contínua.' },
+          ].map((f,i) => (
+            <div className="feature" key={i}>
+              <div className="feature-icon" style={{background:f.bg}}>{f.icon}</div>
+              <div className="feature-text">
+                <h3>{f.title}</h3>
+                <p>{f.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* RIGHT */}
+      <div className="right-panel">
+        {mode === 'success' ? (
+          <SuccessState />
+        ) : (
+          <>
+            <div className="form-tabs">
+              <button className={`form-tab ${mode === 'login' ? 'active' : ''}`} onClick={() => setMode('login')}>Entrar</button>
+              <button className={`form-tab ${mode === 'register' ? 'active' : ''}`} onClick={() => setMode('register')}>Criar conta</button>
+            </div>
+            {mode === 'login'
+              ? <LoginForm onSwitch={() => setMode('register')} />
+              : <RegisterForm onSwitch={() => setMode('login')} onSuccess={() => setMode('success')} />
+            }
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

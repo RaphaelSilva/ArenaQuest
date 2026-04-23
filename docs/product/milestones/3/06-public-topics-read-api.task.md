@@ -1,4 +1,4 @@
-# Task 06: Public Topics Read API (Published-Only Catalogue)
+# Task 06: Public Topics Read API
 
 ## Metadata
 - **Status:** Pending
@@ -10,79 +10,58 @@
 
 ## Summary
 
-Expose the student-facing read API. It returns only `published` topics and only READY
-media. Draft / archived content and PENDING / DELETED media are strictly invisible here.
+Implement the public-facing API for the student catalogue. This API provides read-only access to published content and media, ensuring that internal drafts and archived content remain strictly confidential.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Separate router:** lives in `apps/api/src/routes/topics.router.ts` (not `admin-*`).
-  This keeps the RBAC surface obvious — `/topics` is authed for any signed-in user,
-  `/admin/topics` is curator-only.
-- **Presigned download URLs:** for each READY media row, the handler generates a
-  short-lived (`expiresInSeconds: 900`) download URL. URLs are NOT cached to preserve
-  expiry semantics.
-- **Payload shape:** identical to `GET /admin/topics/:id` plus the `downloadUrl` field
-  on each media item, MINUS any draft/archived children.
+- **Router:** `apps/api/src/routes/topics.router.ts`
+- **Security:** Guarded by `authGuard` (any authenticated user can read).
+- **Access Control:** Strictly limited to `published` nodes and `ready` media.
+- **Performance:** Implements client-side caching for efficient browsing.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Router
+### 1. Catalogue Endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `GET` | `/topics`            | Flat array of published nodes sorted by `(parent_id NULLS FIRST, sort_order)`. |
-| `GET` | `/topics/:id`        | Single node + published children + READY media (each with `downloadUrl`). |
+| Method | Path         | Description                                                                 |
+|--------|--------------|-----------------------------------------------------------------------------|
+| `GET`  | `/topics`    | Returns the full catalogue tree (published only), ordered by parent and sort order. |
+| `GET`  | `/topics/:id`| Returns details for a specific published topic, including its published children and ready media. |
 
-Both protected by `authGuard` only.
+### 2. Media Access
 
-### 2. Query helper in the repository
+- **Secure Downloads:** For every `ready` media item, the API must generate a short-lived presigned download URL.
+- **State Filtering:** Media in `pending` or `deleted` states must be excluded from public responses.
 
-Add `listPublished()` to `ITopicNodeRepository` — `listAll({ status: 'published' })`
-already exists from Task 01; use it.
+### 3. Caching & Performance
 
-For `GET /topics/:id`, call:
-- `findById` → 404 if not found or if `status !== 'published'`.
-- `listChildren(id)` → filter to `status === 'published'`.
-- `media.listByTopic(id, includePending = false)` → attach `downloadUrl` via
-  `storage.getPresignedDownloadUrl(m.storageKey)`.
-
-### 3. Caching header
-
-Set `Cache-Control: private, max-age=30` on both endpoints. The 30-second TTL balances
-freshness with the repeat-read pattern of a student browsing the tree.
-
-### 4. Integration tests
-
-- Both endpoints return 401 without a token.
-- A student token CAN access both endpoints (any active user can read the catalogue).
-- A node in `draft` → `GET /topics/:id` returns 404.
-- A node in `archived` → 404.
-- A PENDING media row is absent from the response.
-- A DELETED media row is absent from the response.
-- `downloadUrl` points to the expected storage key (string-match on the prefix).
+- Set `Cache-Control: private, max-age=30` to optimize repeated reads while ensuring relatively fresh content for students.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] `GET /topics` and `GET /topics/:id` exist, authGuard-protected.
-- [ ] Draft/archived nodes invisible; PENDING/DELETED media invisible.
-- [ ] Each READY media row carries a `downloadUrl` generated via the storage adapter.
-- [ ] `Cache-Control: private, max-age=30` is set.
-- [ ] Integration tests cover every case.
-- [ ] `make lint` clean; all tests pass.
+- [ ] Endpoints are correctly implemented and accessible to authenticated users.
+- [ ] Content filtering is verified: `draft` and `archived` content is unreachable (404).
+- [ ] Media filtering is verified: Only `ready` media is returned with valid download URLs.
+- [ ] Response headers include correct caching directives.
+- [ ] Integration tests verify security boundaries and content visibility.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter api test` — green.
-2. Manual `wrangler dev`:
-   - Create a draft topic via admin; `GET /topics/<id>` → 404.
-   - Publish it; the next `GET /topics/<id>` → 200.
-   - Add a PENDING media row by calling `/presign` without finalizing; verify the
-     student response does not include it.
+### Automated Tests
+- Run integration tests in `topics.router.spec.ts` covering visibility and RBAC.
+- `pnpm --filter api test`
+
+### Manual Verification
+- Verify visibility via a student account:
+    1. Confirm `draft` topics do not appear in the catalogue.
+    2. Confirm `published` topics and their media are accessible.
+    3. Verify that `pending` media does not appear even if the parent topic is published.

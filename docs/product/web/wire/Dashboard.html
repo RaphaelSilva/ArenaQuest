@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ArenaQuest — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body { font-family: 'DM Sans', sans-serif; overflow: hidden; }
+
+.theme-dark {
+  --bg: #0B0E17; --bg2: #131825; --bg3: #1C2235; --bg4: #232B40; --bg5: #2A3350;
+  --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+  --text: #E8EAF0; --text2: #8B92A8; --text3: #5C6480;
+  --accent: oklch(0.74 0.19 52);
+  --accent2: oklch(0.65 0.16 240);
+  --accent3: oklch(0.68 0.17 150);
+  --accent4: oklch(0.68 0.17 320);
+  --accent-glow: oklch(0.74 0.19 52 / 0.18);
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+}
+.theme-light {
+  --bg: #F0EEE8; --bg2: #FAFAF8; --bg3: #F5F3EF; --bg4: #EAE8E0; --bg5: #E0DDD5;
+  --border: rgba(0,0,0,0.08); --border2: rgba(0,0,0,0.14);
+  --text: #1A1C26; --text2: #5C6070; --text3: #9298A8;
+  --accent: oklch(0.60 0.19 52);
+  --accent2: oklch(0.45 0.16 240);
+  --accent3: oklch(0.48 0.17 150);
+  --accent4: oklch(0.50 0.17 320);
+  --accent-glow: oklch(0.60 0.19 52 / 0.12);
+  --shadow: 0 2px 16px rgba(0,0,0,0.08);
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.app { display: flex; flex-direction: column; height: 100%; background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
+
+/* TOPBAR */
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 56px; min-height: 56px; background: var(--bg2); border-bottom: 1px solid var(--border); z-index: 10; flex-shrink: 0; }
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.logo-mark { width: 28px; height: 28px; border-radius: 6px; background: var(--accent); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 13px; color: #0B0E17; }
+.logo-name { font-family: 'Space Grotesk',sans-serif; font-weight: 700; font-size: 16px; letter-spacing: -0.3px; color: var(--text); }
+.logo-name span { color: var(--accent); }
+.topbar-nav { display: flex; align-items: center; gap: 2px; }
+.nav-link { padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text3); text-decoration: none; transition: all 0.15s; cursor: pointer; border: none; background: none; font-family: 'DM Sans',sans-serif; }
+.nav-link:hover { color: var(--text2); background: var(--bg3); }
+.nav-link.active { color: var(--accent); background: var(--accent-glow); }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.theme-toggle { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border2); background: var(--bg3); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text2); transition: all 0.2s; }
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk',sans-serif; font-size: 12px; font-weight: 700; color: white; cursor: pointer; }
+.notif-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border2); background: var(--bg3); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text2); transition: all 0.2s; position: relative; }
+.notif-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg2); }
+
+/* BODY */
+.body-scroll { flex: 1; overflow-y: auto; padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 24px; }
+.body-scroll::-webkit-scrollbar { width: 4px; }
+.body-scroll::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 4px; }
+
+/* HERO GREETING */
+.greeting-row { display: flex; align-items: center; justify-content: space-between; }
+.greeting-text h2 { font-family: 'Space Grotesk',sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+.greeting-text p { font-size: 13px; color: var(--text2); margin-top: 3px; }
+.greeting-date { font-size: 12px; color: var(--text3); text-align: right; }
+
+/* STAT CARDS ROW */
+.stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+.stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow-sm); position: relative; overflow: hidden; transition: border-color 0.2s; }
+.stat-card:hover { border-color: var(--border2); }
+.stat-card-accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 16px 16px 0 0; }
+.stat-card-glow { position: absolute; top: -40px; right: -40px; width: 120px; height: 120px; border-radius: 50%; opacity: 0.07; filter: blur(30px); }
+
+.sc-header { display: flex; align-items: center; justify-content: space-between; }
+.sc-label { font-family: 'Space Grotesk',sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text3); }
+.sc-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+
+/* LEVEL CARD */
+.level-num { font-family: 'Space Grotesk',sans-serif; font-size: 36px; font-weight: 700; line-height: 1; color: var(--text); }
+.level-num span { font-size: 14px; font-weight: 500; color: var(--text3); margin-left: 4px; }
+.xp-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+.xp-row strong { color: var(--accent); }
+.xp-bar { height: 8px; background: var(--bg4); border-radius: 8px; overflow: hidden; }
+.xp-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 8px; transition: width 0.8s ease; }
+.next-level { font-size: 11px; color: var(--text3); margin-top: 6px; }
+.next-level strong { color: var(--accent2); }
+
+/* STREAK CARD */
+.streak-display { display: flex; align-items: flex-end; gap: 10px; }
+.streak-num { font-family: 'Space Grotesk',sans-serif; font-size: 42px; font-weight: 700; line-height: 1; color: var(--text); }
+.streak-label { font-size: 12px; color: var(--text3); padding-bottom: 6px; }
+.streak-days { display: flex; gap: 5px; }
+.day-pip { width: 28px; height: 5px; border-radius: 5px; background: var(--bg4); }
+.day-pip.done { background: var(--accent); }
+.day-pip.today { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.streak-caption { font-size: 11px; color: var(--text3); }
+.streak-caption span { color: var(--accent3); font-weight: 600; }
+
+/* RANKING CARD */
+.ranking-position { font-family: 'Space Grotesk',sans-serif; font-size: 36px; font-weight: 700; color: var(--text); line-height: 1; }
+.ranking-position span { font-size: 14px; color: var(--text3); margin-left: 2px; }
+.ranking-list { display: flex; flex-direction: column; gap: 7px; }
+.ranking-item { display: flex; align-items: center; gap: 8px; }
+.rank-pos { font-family: 'Space Grotesk',sans-serif; font-size: 11px; font-weight: 700; color: var(--text3); width: 16px; flex-shrink: 0; }
+.rank-avatar { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: white; flex-shrink: 0; }
+.rank-name { font-size: 12px; color: var(--text2); flex: 1; }
+.rank-xp { font-size: 11px; color: var(--accent); font-weight: 600; }
+.rank-bar-wrap { flex: 1; height: 3px; background: var(--bg4); border-radius: 3px; overflow: hidden; }
+.rank-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+.rank-you { color: var(--accent) !important; font-weight: 600 !important; }
+
+/* MAIN GRID */
+.main-grid { display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
+
+/* SECTION CARD */
+.section-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-sm); }
+.section-card-header { padding: 18px 22px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.section-title { font-family: 'Space Grotesk',sans-serif; font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.section-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: var(--accent-glow); color: var(--accent); font-weight: 600; }
+.section-link { font-size: 12px; color: var(--accent); text-decoration: none; font-weight: 500; }
+.section-card-body { padding: 16px 22px; }
+
+/* TASKS */
+.tasks-col { display: flex; flex-direction: column; gap: 10px; }
+.task-item { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg3); transition: all 0.2s; cursor: pointer; }
+.task-item:hover { border-color: var(--border2); }
+.task-item.completed { opacity: 0.6; }
+.task-check { width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--border2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.task-check.checked { background: var(--accent3); border-color: var(--accent3); }
+.task-info { flex: 1; min-width: 0; }
+.task-name { font-size: 13px; font-weight: 500; color: var(--text); }
+.task-name.done { text-decoration: line-through; color: var(--text3); }
+.task-sub { font-size: 11px; color: var(--text3); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+.task-xp { font-size: 11px; font-weight: 700; color: var(--accent); padding: 2px 8px; border-radius: 8px; background: var(--accent-glow); flex-shrink: 0; }
+.task-type-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+/* WEEKLY TASKS */
+.week-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.week-progress-txt { font-size: 12px; color: var(--text3); }
+.week-progress-txt strong { color: var(--accent); }
+.week-bar { height: 5px; background: var(--bg4); border-radius: 5px; overflow: hidden; margin-bottom: 16px; }
+.week-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent3)); border-radius: 5px; transition: width 0.8s; }
+.weekly-task { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.weekly-task:last-child { border-bottom: none; }
+.wt-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.wt-info { flex: 1; min-width: 0; }
+.wt-name { font-size: 12px; font-weight: 500; color: var(--text); }
+.wt-prog { font-size: 11px; color: var(--text3); margin-top: 3px; }
+.wt-bar { height: 4px; background: var(--bg4); border-radius: 4px; margin-top: 5px; overflow: hidden; }
+.wt-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s; }
+.wt-xp { font-size: 11px; font-weight: 700; color: var(--accent2); padding: 2px 7px; border-radius: 7px; background: oklch(0.65 0.16 240 / 0.12); flex-shrink: 0; }
+
+/* MISSIONS */
+.mission-card { border-radius: 12px; overflow: hidden; border: 1px solid var(--border2); margin-bottom: 10px; position: relative; }
+.mission-card:last-child { margin-bottom: 0; }
+.mission-bg { padding: 14px 16px; display: flex; gap: 14px; align-items: center; }
+.mission-icon { font-size: 24px; flex-shrink: 0; }
+.mission-info { flex: 1; }
+.mission-name { font-family: 'Space Grotesk',sans-serif; font-size: 13px; font-weight: 600; }
+.mission-desc { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.mission-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.mission-deadline { font-size: 10px; color: var(--text3); display: flex; align-items: center; gap: 4px; }
+.mission-reward { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; }
+.mission-prog-bar { height: 4px; background: rgba(255,255,255,0.1); }
+.mission-prog-fill { height: 100%; transition: width 0.6s; }
+.mission-tag { position: absolute; top: 10px; right: 10px; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; }
+
+/* ROADMAP */
+.roadmap-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-sm); }
+.roadmap-header { padding: 18px 22px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.roadmap-body { padding: 28px 32px; overflow-x: auto; }
+.roadmap-body::-webkit-scrollbar { height: 4px; }
+.roadmap-body::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 4px; }
+
+.roadmap { display: flex; align-items: flex-start; gap: 0; position: relative; min-width: max-content; }
+.roadmap-connector { position: absolute; top: 28px; left: 0; right: 0; height: 2px; background: var(--border2); z-index: 0; }
+.roadmap-connector-fill { position: absolute; top: 28px; left: 0; height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); z-index: 0; transition: width 1s ease; }
+
+.roadmap-topic { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 160px; flex-shrink: 0; position: relative; z-index: 1; }
+.rt-node { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 2px solid var(--border2); background: var(--bg3); transition: all 0.3s; cursor: pointer; position: relative; }
+.rt-node.done { border-color: var(--accent3); background: oklch(0.68 0.17 150 / 0.15); box-shadow: 0 0 0 6px oklch(0.68 0.17 150 / 0.08); }
+.rt-node.active { border-color: var(--accent); background: var(--accent-glow); box-shadow: 0 0 0 8px oklch(0.74 0.19 52 / 0.1); }
+.rt-node.locked { opacity: 0.4; cursor: default; filter: grayscale(0.5); }
+.rt-check { position: absolute; top: -5px; right: -5px; width: 18px; height: 18px; border-radius: 50%; background: var(--accent3); display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg2); }
+.rt-info { text-align: center; }
+.rt-name { font-size: 11px; font-weight: 600; color: var(--text); line-height: 1.3; }
+.rt-pct { font-size: 10px; color: var(--text3); margin-top: 3px; }
+.rt-subtopics { display: flex; gap: 4px; margin-top: 4px; justify-content: center; }
+.rt-sub-pip { width: 14px; height: 4px; border-radius: 4px; }
+.rt-sub-pip.done { background: var(--accent3); }
+.rt-sub-pip.active { background: var(--accent); }
+.rt-sub-pip.locked { background: var(--bg4); }
+
+/* BADGES */
+.badges-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; }
+.badge-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; cursor: pointer; transition: all 0.2s; }
+.badge-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+.badge-card.locked { opacity: 0.4; filter: grayscale(1); }
+.badge-card.earned { border-color: var(--accent); background: var(--accent-glow); }
+.badge-emoji { font-size: 28px; }
+.badge-name { font-size: 10px; font-weight: 600; color: var(--text2); line-height: 1.3; }
+.badge-xp { font-size: 10px; color: var(--accent); font-weight: 700; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.anim { animation: fadeUp 0.4s ease forwards; }
+.anim-2 { animation: fadeUp 0.4s ease 0.08s both; }
+.anim-3 { animation: fadeUp 0.4s ease 0.16s both; }
+.anim-4 { animation: fadeUp 0.4s ease 0.24s both; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+// ---- ICONS ----
+const CheckSm = () => <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const Sun = () => <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 1.5V3M7.5 12V13.5M1.5 7.5H3M12 7.5H13.5M3.5 3.5L4.5 4.5M10.5 10.5L11.5 11.5M3.5 11.5L4.5 10.5M10.5 4.5L11.5 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>;
+const Moon = () => <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12.5 9.5A6 6 0 014.5 1.5a6 6 0 000 11h1a6 6 0 007-3z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>;
+const Bell = () => <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2a4 4 0 014 4v3l1 1.5H2L3 9V6a4 4 0 014-4zM5.5 11.5a1.5 1.5 0 003 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const LockSm = () => <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="2" y="4.5" width="6" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.1"/><path d="M3.5 4.5V3A1.5 1.5 0 016.5 3V4.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>;
+const Timer = () => <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.1"/><path d="M5 3v2l1.5 1" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>;
+
+// ---- DATA ----
+const DAILY_TASKS = [
+  { id: 1, name: "Assistir 1 vídeo do módulo atual", sub: "Fundamentos do Movimento", xp: "+50 XP", type: "video", color: "var(--accent2)", done: true },
+  { id: 2, name: "Completar 1 subtópico", sub: "Qualquer módulo", xp: "+80 XP", type: "topic", color: "var(--accent)", done: false },
+  { id: 3, name: "Deixar 1 comentário", sub: "Em qualquer conteúdo", xp: "+30 XP", type: "social", color: "var(--accent3)", done: false },
+  { id: 4, name: "Fazer login no app", sub: "Manter sequência ativa", xp: "+10 XP", type: "streak", color: "oklch(0.68 0.17 320)", done: true },
+];
+
+const WEEKLY_TASKS = [
+  { id: 1, name: "Assistir 10 vídeos na semana", prog: 7, total: 10, xp: "+300 XP", color: "var(--accent2)", bg: "oklch(0.65 0.16 240 / 0.12)", icon: "🎬" },
+  { id: 2, name: "Concluir 2 subtópicos completos", prog: 1, total: 2, xp: "+500 XP", color: "var(--accent)", bg: "var(--accent-glow)", icon: "✅" },
+  { id: 3, name: "Participar de 3 discussões", prog: 2, total: 3, xp: "+150 XP", color: "var(--accent3)", bg: "oklch(0.68 0.17 150 / 0.12)", icon: "💬" },
+];
+
+const MISSIONS = [
+  {
+    id: 1, name: "Semana do Movimento", icon: "⚡",
+    desc: "Complete o módulo Fundamentos em 7 dias",
+    prog: 65, deadline: "3 dias restantes",
+    rewardXP: "+1.000 XP", rewardBadge: "🏆",
+    color: "oklch(0.74 0.19 52)", bgGrad: "linear-gradient(135deg, #1a1a0a 0%, #2a2510 100%)",
+    tag: "Em andamento", tagColor: "var(--accent)", tagBg: "var(--accent-glow)"
+  },
+  {
+    id: 2, name: "Maratona de Força", icon: "🔥",
+    desc: "Assista todos os vídeos de Força & Potência",
+    prog: 0, deadline: "Começa em 2 dias",
+    rewardXP: "+2.000 XP", rewardBadge: "🥇",
+    color: "oklch(0.65 0.22 30)", bgGrad: "linear-gradient(135deg, #1a0d0a 0%, #2a1510 100%)",
+    tag: "Em breve", tagColor: "oklch(0.65 0.22 30)", tagBg: "oklch(0.65 0.22 30 / 0.12)"
+  },
+];
+
+const ROADMAP_TOPICS = [
+  { id: 1, emoji: "🏋️", name: "Fundamentos do Movimento", pct: 67, status: "active", subs: ["done","active","active","locked"] },
+  { id: 2, emoji: "⚡", name: "Força e Potência", pct: 60, status: "done", subs: ["done","active","locked"] },
+  { id: 3, emoji: "🫀", name: "Condicionamento Aeróbico", pct: 22, status: "active", subs: ["active","locked"] },
+  { id: 4, emoji: "🎯", name: "Habilidades Técnicas", pct: 0, status: "locked", subs: ["locked","locked","locked"] },
+  { id: 5, emoji: "🧠", name: "Estratégia & Mental", pct: 0, status: "locked", subs: ["locked","locked"] },
+];
+
+const BADGES = [
+  { emoji: "🏆", name: "Alicerce Sólido", xp: "250 XP", earned: true },
+  { emoji: "🥉", name: "Levantador Bronze", xp: "300 XP", earned: true },
+  { emoji: "⚡", name: "Semana Perfeita", xp: "500 XP", earned: true },
+  { emoji: "💨", name: "Respirador Elite", xp: "200 XP", earned: false },
+  { emoji: "🥈", name: "Levantador Prata", xp: "600 XP", earned: false },
+  { emoji: "❤️‍🔥", name: "Coração de Ferro", xp: "800 XP", earned: false },
+  { emoji: "🦾", name: "Mobilidade Pro", xp: "350 XP", earned: false },
+  { emoji: "🎯", name: "Técnica Afiada", xp: "400 XP", earned: false },
+];
+
+const RANKING = [
+  { pos: 1, initials: "MC", name: "Mariana C.", xp: "4.820", color: "#E8A020", pct: 100 },
+  { pos: 2, initials: "RM", name: "Rafael M.", xp: "4.100", color: "#8B7DE8", pct: 85 },
+  { pos: 3, initials: "AT", name: "Aline T.", xp: "3.750", color: "#E87070", pct: 78 },
+  { pos: 4, initials: "JS", name: "João S. (você)", xp: "1.240", color: null, pct: 26, isYou: true },
+];
+
+// ---- APP ----
+function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('aq_theme') || 'dark');
+  const [tasks, setTasks] = useState(DAILY_TASKS);
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  const toggleTask = (id) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  };
+
+  const doneTasks = tasks.filter(t => t.done).length;
+  const weekDone = WEEKLY_TASKS.reduce((a, t) => a + t.prog, 0);
+  const weekTotal = WEEKLY_TASKS.reduce((a, t) => a + t.total, 0);
+
+  // Roadmap connector fill width approx
+  const roadmapFillPct = 38;
+
+  const days = ['S','T','Q','Q','S','S','D'];
+  const doneDay = [true, true, true, true, true, false, false]; // today = index 4
+
+  return (
+    <div className={`app theme-${theme}`}>
+      {/* TOPBAR */}
+      <div className="topbar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          <a className="logo" href="ArenaQuest Content.html">
+            <div className="logo-mark">AQ</div>
+            <div className="logo-name">Arena<span>Quest</span></div>
+          </a>
+          <nav className="topbar-nav">
+            {[
+              { key: 'dashboard', label: 'Dashboard' },
+              { key: 'content', label: 'Conteúdos', href: 'ArenaQuest Content.html' },
+            ].map(n => (
+              n.href
+                ? <a key={n.key} className="nav-link" href={n.href}>{n.label}</a>
+                : <button key={n.key} className={`nav-link ${activeTab === n.key ? 'active' : ''}`} onClick={() => setActiveTab(n.key)}>{n.label}</button>
+            ))}
+          </nav>
+        </div>
+        <div className="topbar-right">
+          <div className="notif-btn"><Bell /><div className="notif-dot"/></div>
+          <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
+            {theme === 'dark' ? <Sun /> : <Moon />}
+          </button>
+          <div className="avatar">JS</div>
+        </div>
+      </div>
+
+      <div className="body-scroll">
+
+        {/* GREETING */}
+        <div className="greeting-row anim">
+          <div className="greeting-text">
+            <h2>Bom dia, João 👋</h2>
+            <p>Você está a <strong style={{color:'var(--accent)'}}>3 dias</strong> da próxima conquista — continue assim!</p>
+          </div>
+          <div className="greeting-date">
+            <div style={{fontSize:13,color:'var(--text2)',fontWeight:500}}>Sábado, 19 Abr</div>
+            <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>Semana 16 · 2026</div>
+          </div>
+        </div>
+
+        {/* STATS ROW */}
+        <div className="stats-row anim-2">
+          {/* LEVEL */}
+          <div className="stat-card">
+            <div className="stat-card-accent" style={{background:'linear-gradient(90deg, var(--accent), var(--accent2))'}}/>
+            <div className="stat-card-glow" style={{background:'var(--accent)'}}/>
+            <div className="sc-header">
+              <span className="sc-label">Nível & XP</span>
+              <div className="sc-icon" style={{background:'var(--accent-glow)'}}>⭐</div>
+            </div>
+            <div>
+              <div className="level-num">12 <span>/ Aspirante</span></div>
+              <div style={{marginTop:12}}>
+                <div className="xp-row"><span>1.240 XP</span><strong>2.000 XP para Nível 13</strong></div>
+                <div className="xp-bar"><div className="xp-bar-fill" style={{width:'62%'}}/></div>
+                <div className="next-level">Próximo: <strong>Treinador Júnior</strong></div>
+              </div>
+            </div>
+          </div>
+
+          {/* STREAK */}
+          <div className="stat-card">
+            <div className="stat-card-accent" style={{background:'linear-gradient(90deg, oklch(0.74 0.18 320), oklch(0.68 0.17 52))'}}/>
+            <div className="stat-card-glow" style={{background:'oklch(0.74 0.18 320)'}}/>
+            <div className="sc-header">
+              <span className="sc-label">Sequência</span>
+              <div className="sc-icon" style={{background:'oklch(0.74 0.18 320 / 0.15)'}}>🔥</div>
+            </div>
+            <div>
+              <div className="streak-display">
+                <div className="streak-num">5</div>
+                <div className="streak-label">dias seguidos</div>
+              </div>
+              <div style={{marginTop:12}}>
+                <div style={{display:'flex',gap:4,alignItems:'center',marginBottom:8}}>
+                  {days.map((d,i)=>(
+                    <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                      <div className={`day-pip ${doneDay[i] ? (i===4?'today':'done') : ''}`}/>
+                      <span style={{fontSize:9,color:'var(--text3)'}}>{d}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="streak-caption">Recorde pessoal: <span>12 dias</span></div>
+              </div>
+            </div>
+          </div>
+
+          {/* RANKING */}
+          <div className="stat-card">
+            <div className="stat-card-accent" style={{background:'linear-gradient(90deg, var(--accent2), var(--accent3))'}}/>
+            <div className="stat-card-glow" style={{background:'var(--accent2)'}}/>
+            <div className="sc-header">
+              <span className="sc-label">Ranking</span>
+              <div className="sc-icon" style={{background:'oklch(0.65 0.16 240 / 0.15)'}}>🏅</div>
+            </div>
+            <div style={{display:'flex',alignItems:'baseline',gap:6,marginBottom:12}}>
+              <div className="ranking-position">4º <span>de 38</span></div>
+            </div>
+            <div className="ranking-list">
+              {RANKING.map(r => (
+                <div className="ranking-item" key={r.pos}>
+                  <span className="rank-pos">#{r.pos}</span>
+                  <div className="rank-avatar" style={{background: r.color || 'linear-gradient(135deg, var(--accent), var(--accent2))'}}>
+                    {r.initials}
+                  </div>
+                  <div className="rank-bar-wrap">
+                    <div className="rank-bar-fill" style={{width:`${r.pct}%`, background: r.isYou ? 'var(--accent)' : r.color || 'var(--accent)'}} />
+                  </div>
+                  <span className={`rank-name ${r.isYou ? 'rank-you' : ''}`} style={{minWidth:0,fontSize:10}}>{r.isYou ? 'Você' : r.name.split(' ')[0]}</span>
+                  <span className="rank-xp" style={{color: r.isYou ? 'var(--accent)' : 'var(--text3)'}}>{r.xp}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* MAIN GRID */}
+        <div className="main-grid anim-3">
+
+          {/* LEFT — TASKS */}
+          <div style={{display:'flex', flexDirection:'column', gap:16}}>
+
+            {/* DAILY */}
+            <div className="section-card">
+              <div className="section-card-header">
+                <div className="section-title">
+                  Tarefas de Hoje
+                  <span className="section-badge">{doneTasks}/{tasks.length}</span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <div style={{fontSize:11,color:'var(--text3)'}}>Reset em <strong style={{color:'var(--text2)'}}>18h</strong></div>
+                </div>
+              </div>
+              <div className="section-card-body">
+                <div style={{height:4,background:'var(--bg4)',borderRadius:4,overflow:'hidden',marginBottom:14}}>
+                  <div style={{height:'100%',width:`${(doneTasks/tasks.length)*100}%`,background:'linear-gradient(90deg,var(--accent),var(--accent2))',borderRadius:4,transition:'width 0.6s'}}/>
+                </div>
+                <div className="tasks-col">
+                  {tasks.map(t => (
+                    <div key={t.id} className={`task-item ${t.done ? 'completed' : ''}`} onClick={() => toggleTask(t.id)}>
+                      <div className={`task-check ${t.done ? 'checked' : ''}`}>
+                        {t.done && <CheckSm />}
+                      </div>
+                      <div className="task-type-dot" style={{background: t.color}} />
+                      <div className="task-info">
+                        <div className={`task-name ${t.done ? 'done' : ''}`}>{t.name}</div>
+                        <div className="task-sub">{t.sub}</div>
+                      </div>
+                      <div className="task-xp" style={{opacity: t.done ? 0.5 : 1}}>{t.done ? '✓' : t.xp}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* MISSIONS */}
+            <div className="section-card">
+              <div className="section-card-header">
+                <div className="section-title">Missões Especiais</div>
+              </div>
+              <div className="section-card-body" style={{display:'flex',flexDirection:'column',gap:10}}>
+                {MISSIONS.map(m => (
+                  <div key={m.id} className="mission-card" style={{cursor:'pointer'}}>
+                    <div className="mission-bg" style={{background: m.bgGrad}}>
+                      <div className="mission-icon">{m.icon}</div>
+                      <div className="mission-info">
+                        <div className="mission-name" style={{color:'#E8EAF0'}}>{m.name}</div>
+                        <div className="mission-desc">{m.desc}</div>
+                        <div className="mission-footer">
+                          <div className="mission-deadline" style={{color:'rgba(255,255,255,0.4)'}}>
+                            <Timer /> {m.deadline}
+                          </div>
+                          <div className="mission-reward">
+                            <span style={{color: m.color, fontWeight:700}}>{m.rewardXP}</span>
+                            <span>{m.rewardBadge}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mission-prog-bar">
+                      <div className="mission-prog-fill" style={{width:`${m.prog}%`,background:m.color}}/>
+                    </div>
+                    <div className="mission-tag" style={{color:m.tagColor, background:m.tagBg}}>{m.tag}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT — WEEKLY + BADGES */}
+          <div style={{display:'flex', flexDirection:'column', gap:16}}>
+            {/* WEEKLY */}
+            <div className="section-card">
+              <div className="section-card-header">
+                <div className="section-title">Desafios da Semana</div>
+                <span style={{fontSize:11,color:'var(--accent2)',fontWeight:700}}>{weekDone}/{weekTotal}</span>
+              </div>
+              <div className="section-card-body">
+                <div className="week-header">
+                  <span className="week-progress-txt">Progresso: <strong>{Math.round((weekDone/weekTotal)*100)}%</strong></span>
+                  <span style={{fontSize:11,color:'var(--text3)'}}>3 dias restantes</span>
+                </div>
+                <div className="week-bar">
+                  <div className="week-bar-fill" style={{width:`${(weekDone/weekTotal)*100}%`}}/>
+                </div>
+                {WEEKLY_TASKS.map(t => (
+                  <div className="weekly-task" key={t.id}>
+                    <div className="wt-icon" style={{background:t.bg}}>{t.icon}</div>
+                    <div className="wt-info">
+                      <div className="wt-name">{t.name}</div>
+                      <div className="wt-prog">{t.prog} / {t.total}</div>
+                      <div className="wt-bar">
+                        <div className="wt-bar-fill" style={{width:`${(t.prog/t.total)*100}%`,background:t.color}}/>
+                      </div>
+                    </div>
+                    <div className="wt-xp">{t.xp}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* BADGES */}
+            <div className="section-card">
+              <div className="section-card-header">
+                <div className="section-title">
+                  Conquistas
+                  <span className="section-badge">{BADGES.filter(b=>b.earned).length}/{BADGES.length}</span>
+                </div>
+              </div>
+              <div className="section-card-body">
+                <div className="badges-grid">
+                  {BADGES.map((b,i) => (
+                    <div key={i} className={`badge-card ${b.earned ? 'earned' : 'locked'}`}>
+                      <div className="badge-emoji">{b.emoji}</div>
+                      <div className="badge-name">{b.name}</div>
+                      {b.earned
+                        ? <div className="badge-xp">{b.xp}</div>
+                        : <div style={{fontSize:10,color:'var(--text3)'}}><LockSm /></div>
+                      }
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ROADMAP */}
+        <div className="roadmap-card anim-4">
+          <div className="roadmap-header">
+            <div className="section-title">Trilha de Aprendizado</div>
+            <span style={{fontSize:12,color:'var(--text3)'}}>
+              {ROADMAP_TOPICS.filter(t=>t.status==='done').length} de {ROADMAP_TOPICS.length} módulos concluídos
+            </span>
+          </div>
+          <div className="roadmap-body">
+            <div className="roadmap" style={{paddingBottom:8}}>
+              <div className="roadmap-connector"/>
+              <div className="roadmap-connector-fill" style={{width:`${roadmapFillPct}%`}}/>
+              {ROADMAP_TOPICS.map((t,i) => (
+                <div className="roadmap-topic" key={t.id}>
+                  <a href={t.status !== 'locked' ? 'ArenaQuest Content.html' : undefined} style={{textDecoration:'none'}}>
+                    <div className={`rt-node ${t.status}`}>
+                      {t.emoji}
+                      {t.status === 'done' && (
+                        <div className="rt-check"><CheckSm /></div>
+                      )}
+                    </div>
+                  </a>
+                  <div className="rt-info">
+                    <div className="rt-name">{t.name}</div>
+                    <div className="rt-pct">
+                      {t.status === 'locked'
+                        ? <span style={{display:'flex',alignItems:'center',gap:3,justifyContent:'center'}}><LockSm /> Bloqueado</span>
+                        : `${t.pct}% concluído`
+                      }
+                    </div>
+                    <div className="rt-subtopics">
+                      {t.subs.map((s,j) => (
+                        <div key={j} className={`rt-sub-pip ${s}`}/>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

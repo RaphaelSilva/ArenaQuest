@@ -1,4 +1,4 @@
-# Task 06: Progress Aggregation Service + `/me/progress/*`
+# Task 06: Progress Aggregation Service & `/me/progress/*` API
 
 ## Metadata
 - **Status:** Pending
@@ -10,80 +10,59 @@
 
 ## Summary
 
-Read endpoints the student dashboard lives on. All three routes scope their
-answer to the caller's effective-access set so percentages are meaningful
-(completion of "what the student can see", not of the global catalogue).
+Implement the read-only progress API that powers the student dashboard. All responses are automatically scoped to the student's effective access, ensuring percentages reflect completion of content the student can actually see — not the global catalogue.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Everything is computed:** no denormalised counters in M5. Each request runs
-  small, indexed queries; if p95 > 500 ms under the 1000-topic fixture, add
-  caching in a follow-up task rather than inline.
-- **Caller scoping:** the "denominator" for percentages is the intersection of
-  `effectiveAccessTopicIds` with `topic_nodes.status = 'published'` (topics),
-  and analogously for tasks (published AND every linked topic in the user's
-  effective access).
-- **Response shapes are committed** via `packages/shared/types/api.ts` so the
-  web client and future mobile clients share them.
-- **Cache-Control:** `private, max-age=15` on all three routes (the dashboard
-  refreshes visibly on navigation but doesn't hammer the API).
+- **Router:** Extends `apps/api/src/routes/progress.router.ts`.
+- **Service:** Extends `apps/api/src/core/progress/progress-service.ts`.
+- **Security:** `authGuard` (any authenticated student).
+- **Shared Types:** Response shapes must be defined in `packages/shared/types/api.ts` for cross-client use.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Service — extend `ProgressService`
+### 1. Progress Summary Endpoint (`GET /me/progress/summary`)
 
-```ts
-getMySummary(userId): Promise<ProgressSummary>;
-listMyTopicProgress(userId): Promise<TopicProgressEntry[]>;
-listMyTaskProgress(userId): Promise<TaskProgressEntry[]>;
-```
+Returns a high-level overview of the student's overall progress:
+- **Topics:** Total accessible, completed, in-progress, and completion percentage.
+- **Tasks:** Total accessible, completed, in-progress, and completion percentage.
+- **Last Activity:** Timestamp of the most recent progress update.
 
-Where `ProgressSummary`:
+### 2. Topic Progress List (`GET /me/progress/topics`)
 
-```ts
-interface ProgressSummary {
-  topics:  { total: number; completed: number; inProgress: number; percent: number };
-  tasks:   { total: number; completed: number; inProgress: number; percent: number };
-  lastActivityAt: string | null;
-}
-```
+Returns the student's individual progress record for each topic within their effective access. Topics outside the access set must never appear.
 
-### 2. Router — extend `progress.router.ts`
+### 3. Task Progress List (`GET /me/progress/tasks`)
 
-```ts
-router.get('/me/progress/summary', summaryHandler);
-router.get('/me/progress/topics',  topicsHandler);
-router.get('/me/progress/tasks',   tasksHandler);
-```
+Returns the student's individual progress record for each accessible task (published tasks whose linked topics are within the student's access set).
 
-### 3. Percentage rounding: `Math.round(completed / total * 100)` with a defined
-    `total === 0 ⇒ percent = 0` branch (no NaN).
+### 4. Calculation Rules
 
-### 4. Tests — `apps/api/test/routes/me-progress.spec.ts`
-
-- 10 topics accessible, 4 completed → `topicsPercent === 40`.
-- 0 accessible tasks → `tasks.percent === 0` (not NaN).
-- `listMyTopicProgress` only returns rows for accessible topics (no leaks).
-- `lastActivityAt` equals the max of topic/task progress `updated_at`.
-- Cache-Control header present on all three routes.
+- **Denominator:** The "total" for percentages is the count of accessible, published content items — not all content globally.
+- **Division by Zero:** When total is 0, percentage must be 0 (never `NaN` or an error).
+- **Caching:** `Cache-Control: private, max-age=15` on all three routes.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] All three routes implemented behind `authGuard`.
-- [ ] Percentages are deterministic and cover the `total === 0` branch.
-- [ ] Responses match the shared types; `packages/shared` exports them.
-- [ ] `make lint` clean. `make test-api` green.
+- [ ] All three endpoints are implemented and guarded by `authGuard`.
+- [ ] Percentages are deterministic and handle the zero-total edge case.
+- [ ] Response shapes match the shared types in `packages/shared`.
+- [ ] No data from outside the student's effective access leaks into any response.
+- [ ] Integration tests verify percentage correctness and access scoping.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter api test` green.
-2. Seed fixture: 10 topics, 4 completed, 5 tasks, 2 completed → manual curl
-   confirms `{ topics: { percent: 40 }, tasks: { percent: 40 } }`.
+### Automated Tests
+- `pnpm --filter api test` — integration suite for `me-progress.spec.ts`.
+
+### Manual Verification
+- Seed a fixture with 10 topics and 5 tasks with known progress states, then confirm the summary percentages match expectations via `curl`.

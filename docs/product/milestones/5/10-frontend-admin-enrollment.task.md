@@ -10,92 +10,56 @@
 
 ## Summary
 
-Two admin surfaces for managing topic access:
-
-- An "Enrollments" tab on the existing `/admin/users/:userId` page.
-- A new `/admin/groups` list page + `/admin/groups/:groupId` detail page (if
-  group management does not yet exist — deliver a minimal viable version here).
+Provide administrators with a UI to manage student topic access. This includes an enrollment tab on the user detail page and a minimal group management interface for group-based access grants.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Role gate:** `requireRole('admin', 'content_creator')` on the client via
-  `useHasAnyRole`.
-- **Reuse the TopicPicker** from M4 Task 07 — the same component handles
-  multi-select against the full topic tree.
-- **Explicit cascade toggle on revoke:** the delete confirmation modal
-  includes a checkbox "Also revoke descendants explicitly granted" — maps to
-  `cascade=true`.
-- **Effective vs direct:** the panel clearly distinguishes:
-  - **Directly granted** (edit-able list).
-  - **Effective** (derived — read-only, shown as a muted chip list).
-- **Minimal groups UX:** for the groups page, a list + detail with add/remove
-  members + grants is enough — do not attempt a full group CRUD if one does
-  not exist. Flag to the reviewer as a scope-creep carve-out.
+- **User Enrollment:** Extends `/admin/users/:userId` page with a new "Enrollments" tab.
+- **Group Management:** New pages at `/admin/groups` and `/admin/groups/:groupId` (if group entity exists server-side; otherwise, flag as a follow-up).
+- **Security:** Client-side role gate via `useHasAnyRole(ADMIN, CONTENT_CREATOR)`.
+- **Reuse:** Leverages the `TopicPicker` component from M4 for topic selection.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. API client — `apps/web/src/lib/admin-enrollment-api.ts`
+### 1. User Enrollment Tab (`/admin/users/:userId`)
 
-```ts
-export const adminEnrollmentApi = {
-  listUser(token, userId): Promise<EnrollmentRecord[]>;
-  grantUser(token, userId, topicId): Promise<EnrollmentRecord>;
-  revokeUser(token, userId, topicId, opts?): Promise<void>;
+A new "Enrollments" tab on the existing user detail page with:
 
-  listGroup(token, groupId): Promise<EnrollmentRecord[]>;
-  grantGroup(token, groupId, topicId): Promise<EnrollmentRecord>;
-  revokeGroup(token, groupId, topicId, opts?): Promise<void>;
-};
-```
+- **Directly Granted Topics:** An editable list of topics explicitly granted to this user. Each row has a revoke button.
+- **Add Grant:** A "Grant topic access" button that opens the Topic Picker for single-topic selection.
+- **Effective Access (Read-only):** A collapsible section showing the full set of topics the user can access (direct + group grants + all descendants), visually distinguished from direct grants.
+- **Cascade Revoke:** The revoke confirmation dialog includes a "Also revoke descendant grants" toggle mapping to the API's `cascade=true` flag.
 
-### 2. User detail tab — extend `apps/web/src/app/(protected)/admin/users/[id]/page.tsx`
+### 2. Group Management (Minimal Viable)
 
-New tab with:
-- "Directly granted" list: rows of topic titles + revoke button (opens
-  cascade-aware modal).
-- "Add grant" button → opens `<TopicPicker />` (single-select here — the grant
-  is issued one-topic-at-a-time to keep audit lines simple).
-- "Effective access" collapsible list (read-only).
-
-### 3. Groups pages
-
-- `apps/web/src/app/(protected)/admin/groups/page.tsx` — table of groups +
-  "New group" button.
-- `apps/web/src/app/(protected)/admin/groups/[id]/page.tsx` — name, members,
-  grants sub-sections.
-
-If a group entity does not yet exist server-side, this task stops at the user
-tab — the groups page is spun off into a follow-up task and `milestone.md` DoD
-is adjusted.
-
-### 4. Tests — `apps/web/__tests__/app/admin/enrollments.test.tsx`
-
-- User tab: renders direct grants from mock API.
-- Grant action calls `grantUser` with the selected topic id.
-- Revoke with cascade checkbox toggled calls the API with `cascade=true`.
-- Revoke without cascade calls without the flag.
-- Student role → cannot access the tab.
+- `/admin/groups` — A table listing existing groups with a "New group" action.
+- `/admin/groups/:groupId` — Group detail showing name, member list, and granted topics, with add/remove actions for both.
+- **Scope Carve-out:** If groups do not yet exist server-side, this work is scoped as a follow-up and flagged to the reviewer. The user enrollment tab is still delivered in this task.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Admin can grant and revoke topics for a user from the UI.
-- [ ] Cascade toggle is visible and functional.
-- [ ] Effective access is visibly distinguished from direct grants.
-- [ ] Component tests in §4 pass.
-- [ ] `make lint` clean. `pnpm --filter web test` green.
+- [ ] Admin can grant and revoke topic access for a user from the user detail page.
+- [ ] The cascade revoke toggle is visible and correctly passed to the API.
+- [ ] Effective access is visually distinct from direct grants.
+- [ ] The group enrollment UI exists for basic grant/revoke operations.
+- [ ] Non-admin users cannot access the enrollment tab.
+- [ ] Component tests cover grant flow, cascade revoke, and role-based access.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter web test` green.
-2. Manual as admin:
-   - Grant "Futebol" to Alice → the effective list shows the whole subtree.
-   - Revoke with cascade unchecked → explicit descendants (if any) remain.
-   - Log in as Alice → `/tasks` includes the tasks under "Futebol".
+### Automated Tests
+- `pnpm --filter web test` — component tests for the enrollment panel.
+
+### Manual Verification
+- As an admin: grant a root topic to a student and verify the effective access list shows the full subtree.
+- Revoke with cascade unchecked; verify only the explicit grant is removed.
+- Log in as the student and verify access matches what the admin configured.

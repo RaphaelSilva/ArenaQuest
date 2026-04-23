@@ -1,4 +1,4 @@
-# Task 07: Markdown Sanitization Helper (Shared Package)
+# Task 07: Markdown Sanitization Helper
 
 ## Metadata
 - **Status:** Pending
@@ -10,114 +10,50 @@
 
 ## Summary
 
-Create a single, shared sanitization helper usable on both the Worker (content write
-path) and the browser (content render path), so the "safe Markdown" contract is
-expressed in exactly one place.
-
-Two surfaces need it:
-- **Write-side (Task 04):** strip dangerous Markdown / HTML *before* persistence. The
-  stored string never contains `<script>`, `<iframe>`, `on*` attributes, or `javascript:`
-  URIs.
-- **Render-side (Task 10):** render persisted Markdown to HTML; defence-in-depth pass
-  with the same sanitizer in case someone bypasses the API and writes directly to D1.
+Implement a centralized Markdown sanitization helper in the shared package. This ensures a consistent "Safe Markdown" contract across both the backend (write-side persistence) and the frontend (render-side display), preventing XSS and other injection attacks.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Isomorphic:** the helper runs in both Workers (fetch/Response environment) and
-  React (browser). `isomorphic-dompurify` satisfies both.
-- **Single source of truth:** lives in `packages/shared/content/sanitize-markdown.ts`.
-- **No HTML output at boundaries:** the WRITE-side function takes Markdown → returns
-  Markdown (minus the disallowed constructs). The RENDER-side function takes Markdown →
-  returns sanitized HTML. Never mix directions in one function.
-- **Allowlist, not denylist:** start from DOMPurify's safe defaults and tighten; do not
-  try to blocklist attack strings.
+- **Location:** `@arenaquest/shared` (isomorphic package).
+- **Tooling:** Recommend using `DOMPurify` (or `isomorphic-dompurify`) and a standard Markdown parser like `marked`.
+- **Dual Surface:**
+    - **Write-Side:** Strips dangerous constructs from raw Markdown strings before DB storage.
+    - **Render-Side:** Converts Markdown to sanitized HTML for safe display in the browser.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Dependencies (add to `packages/shared/package.json`)
+### 1. Sanitization Contract
 
-```jsonc
-"dependencies": {
-  "marked": "^14",
-  "isomorphic-dompurify": "^2"
-}
-```
+- **Allowed Elements:** Standard typography (H1-H6, P, Strong, Em), lists, blockquotes, code blocks, tables, and links.
+- **Disallowed Elements:** Script tags, iframes, event handlers (`on*`), and dangerous URI schemes (`javascript:`, `data:`).
+- **Isomorphic Support:** The helper must be compatible with both the Cloudflare Workers runtime and standard browser environments.
 
-### 2. API
+### 2. Implementation Strategy
 
-```ts
-// packages/shared/content/sanitize-markdown.ts
-
-export const ALLOWED_TAGS = [
-  'h1','h2','h3','h4','h5','h6',
-  'p','ul','ol','li','blockquote','code','pre',
-  'strong','em','a','hr','br',
-  'table','thead','tbody','tr','th','td',
-];
-
-export const ALLOWED_ATTR = ['href','title'];
-
-/** Returns sanitized Markdown — safe to store. */
-export function sanitizeMarkdownSource(input: string): string;
-
-/** Returns sanitized HTML — safe to render via `dangerouslySetInnerHTML`. */
-export function renderSafeMarkdownToHtml(input: string): string;
-```
-
-The write-side function:
-1. Runs `DOMPurify.sanitize(input, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })` on the raw
-   string first (strip any raw HTML entirely).
-2. Returns the remaining text. Markdown syntax (`**bold**`, `[x](y)`) is preserved
-   because it is plain text to the sanitizer.
-
-The render-side function:
-1. `marked.parse(input, { async: false, gfm: true, breaks: true })` → HTML.
-2. `DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR })`.
-3. Force-rewrites every `href` to reject `javascript:` / `data:` URIs (except
-   `data:image/*` if we ever enable inline images; not in this task).
-
-### 3. Tests — `packages/shared/test/sanitize-markdown.spec.ts`
-
-Attack strings that MUST NOT survive:
-- `<script>alert(1)</script>` → dropped on both sides.
-- `<img src=x onerror=alert(1)>` → dropped.
-- `[xss](javascript:alert(1))` → the rendered anchor has no `href`.
-- `<a href="data:text/html,<script>..." >x</a>` → dropped.
-- `<iframe src=...>` → dropped.
-
-Strings that MUST survive:
-- `# Title\n\nParagraph with **bold** and _italic_.`
-- Code fences with language hints (`\`\`\`ts ... \`\`\``).
-- Tables (GFM).
-
-### 4. Re-export
-
-Add to `packages/shared/index.ts`:
-
-```ts
-export { sanitizeMarkdownSource, renderSafeMarkdownToHtml } from './content/sanitize-markdown';
-```
+- **Markdown-to-Markdown (Write-Side):** A function to clean raw Markdown source while preserving the Markdown syntax.
+- **Markdown-to-HTML (Render-Side):** A function to safely parse and sanitize Markdown into HTML for injection into React components (e.g., via `dangerouslySetInnerHTML`).
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] `sanitizeMarkdownSource` and `renderSafeMarkdownToHtml` exported from
-      `@arenaquest/shared`.
-- [ ] Every attack string listed in §3 is neutralised.
-- [ ] Every legitimate Markdown construct listed in §3 survives.
-- [ ] The test suite runs in both `vitest` contexts (the package compiles and tests
-      pass; consumer apps in `apps/api` and `apps/web` can import without type errors).
-- [ ] `make lint` clean; all tests pass.
+- [ ] Sanitization helpers are exported from the shared package and usable in both `apps/api` and `apps/web`.
+- [ ] Attack vectors (scripts, iframes, dangerous links) are successfully neutralized.
+- [ ] Legitimate Markdown (headers, tables, code blocks) is preserved correctly.
+- [ ] Comprehensive unit tests cover a wide range of "safe" and "malicious" inputs.
+- [ ] Integration into the Admin API (Task 04) ensures sanitized storage of content.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter @arenaquest/shared test` — green.
-2. `pnpm --filter api build` + `pnpm --filter web build` — both compile.
-3. Ad-hoc REPL check via `node -e "...sanitizeMarkdownSource(...)..."`.
+### Automated Tests
+- Run unit tests in the shared package: `pnpm --filter @arenaquest/shared test`.
+- Verify that common XSS payloads are dropped or neutralized.
+
+### Manual Verification
+- Test via a scratch script or REPL to ensure the sanitization output matches expectations for complex Markdown structures.

@@ -10,84 +10,57 @@
 
 ## Summary
 
-Two read-only surfaces for any signed-in user:
+Build the read-only student-facing interface for browsing published Tasks. Students can explore the task list and dive into individual tasks to see their description, stages, and the associated learning content from the catalogue.
 
-- `/tasks` — card list of published tasks.
-- `/tasks/:id` — detail page showing description, stages, and per-stage topic
-  chips that deep-link into `/catalog/:topicId`.
-
-No mutation controls — check-in and progress are Milestone 5.
+> **Note:** Progress tracking and check-in functionality are scoped to Milestone 5. This task delivers the navigation and content view only.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Markdown rendering:** description goes through `renderSafeMarkdownToHtml` from
-  the M3 shared helper. Defence-in-depth: server already sanitized on write.
-- **Deep links:** topic chips render as `<Link href={'/catalog/' + topicId}>`.
-  The catalog page already exists from M3 Task 10.
-- **Accessibility:** stage list uses an `<ol>` with semantic `<li>` children;
-  topic chips are `<a>` elements inside the `<li>` so screen readers enumerate
-  "Stage 2: Practice, topics: X, Y".
-- **Empty state:** when `/tasks` returns `[]`, render a friendly "No tasks yet"
-  illustration with a hint to check back later — do not suggest creating one
-  (students can't).
+- **Paths:** `/tasks` (list) and `/tasks/:id` (detail).
+- **Security:** Accessible to any authenticated user.
+- **Navigation:** A "Tasks" link must be added to the main protected-area sidebar.
+- **Content Integration:** Topic chips deep-link into the `/catalog/:topicId` page from Milestone 3.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. API client — `apps/web/src/lib/tasks-api.ts`
+### 1. Task List Page
 
-```ts
-export const tasksApi = {
-  list(token): Promise<PublishedTaskSummary[]>;
-  get(token, id): Promise<PublishedTaskDetail>;
-};
-```
+- Displays published tasks as a card grid/list with the task title, stage count, and a call-to-action.
+- Provides a friendly empty-state view when no tasks are available (does not suggest creating tasks, as students cannot).
 
-### 2. Pages
+### 2. Task Detail Page
 
-- `apps/web/src/app/(protected)/tasks/page.tsx` — list.
-- `apps/web/src/app/(protected)/tasks/[id]/page.tsx` — detail.
-
-### 3. Components
-
-- `apps/web/src/components/tasks/task-card.tsx` — title, stage count, topic count,
-  "Open" CTA.
-- `apps/web/src/components/tasks/stage-list.tsx` — ordered list of stages with
-  topic chips.
-
-### 4. Navigation
-
-Add "Tasks" entry to the protected-area sidebar (the component extended in M2
-Task 09 / M3 Task 08 — confirm the exact module). Visible to all signed-in roles.
-
-### 5. Tests — `apps/web/__tests__/app/tasks.test.tsx`
-
-- List: renders N cards from mock data; clicking a card navigates to `/tasks/:id`.
-- Detail: renders description, stages in order, topic chips per stage.
-- XSS: detail page with a description containing `<script>window.__xss=true</script>`
-  renders the rest of the content; `window.__xss` is undefined.
-- Empty state: `list` returns `[]` → empty-state copy visible.
-- Topic chip → href is `/catalog/:topicId`.
+- **Header:** Task title.
+- **Description:** Renders the sanitized Markdown content safely.
+- **Stage List:** Ordered list of stages, each showing its label and associated topic links.
+- **Topic Chips:** Each topic is a navigable link to `/catalog/:topicId`, styled clearly as interactive.
+- **Accessibility:** Stage list uses semantic HTML (`ol`/`li`) so screen readers enumerate stages and their topics meaningfully.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] `/tasks` and `/tasks/:id` reachable by any signed-in user.
-- [ ] Draft/archived tasks are absent (enforced by the server; verify with a
-      fixture that seeds one draft and one published — only published appears).
-- [ ] Markdown renders safely; XSS test passes.
-- [ ] Clicking a topic chip lands on `/catalog/:topicId`.
-- [ ] Component tests in §5 pass.
-- [ ] `make lint` clean. `pnpm --filter web test` green.
+- [ ] `/tasks` and `/tasks/:id` are accessible to any authenticated user.
+- [ ] Draft and archived tasks do not appear (enforced by the server).
+- [ ] Markdown content is rendered securely (XSS protected).
+- [ ] Clicking a topic chip navigates correctly to the catalogue page.
+- [ ] The "Tasks" entry is visible in the main navigation for all signed-in roles.
+- [ ] Component tests cover list rendering, detail view, XSS safety, and empty state.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter web test` green.
-2. Manual: seed a task via the admin UI, log in as a student, open `/tasks`, open
-   the task, click a topic chip → `/catalog/:topicId` renders the topic.
+### Automated Tests
+- `pnpm --filter web test` — component tests for task list and detail views.
+
+### Manual Verification
+- Seed a task via the admin UI, log in as a student, and navigate the full experience:
+    1. Browse the task list.
+    2. Open a task and read its content.
+    3. Click a topic chip and verify navigation to the catalogue.

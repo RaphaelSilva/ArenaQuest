@@ -4,103 +4,63 @@
 - **Status:** Pending
 - **Complexity:** Medium
 - **Milestone:** 5 — Engagement & Student Progress
-- **Dependencies:** Task 01, Task 02 (effective-access check)
+- **Dependencies:** Task 01, Task 02
 
 ---
 
 ## Summary
 
-The student-facing write path for task engagement:
-`POST /tasks/:id/stages/:stageId/check-in`. Handles ordering (no skipping),
-idempotency (double-click safe), side-effects (topic progress + task
-completion), and access gating.
+Implement the primary student-facing write action: checking into a task stage. This endpoint is the core engagement mechanic, triggering stage completion, automatic topic progress updates, and task completion when the final stage is reached.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Single service entry point** — `ProgressService.checkInStage(userId,
-  taskId, stageId)` — so the HTTP layer stays thin.
-- **Transactionality:** the check-in and its side-effects (upsert task
-  progress, upsert topic progress for linked topics) run in a single
-  `db.batch([...])` so a partial failure does not leave the DB in a weird
-  shape.
-- **Idempotency:** the contract is "insert OR fetch existing"; the handler
-  returns `201` on first call and `200` on a repeat. The response body is
-  identical in shape.
-- **Ordering:** compute the expected next stage as
-  `stages.sort(by order).find(s => !checkedIn.has(s.id))`. If the requested
-  stage is not strictly that stage, return `409 OUT_OF_ORDER` with
-  `{ expected: { id, label, order } }`.
-- **Access gate:** if the task's linked topic set is not a subset of the
-  user's `effectiveAccess`, return `403 NOT_ENROLLED` (before the ordering
-  check — we don't want to leak ordering info to unenrolled users).
+- **Endpoint:** `POST /tasks/:id/stages/:stageId/check-in`
+- **Security:** `authGuard` (any authenticated student).
+- **Service:** `apps/api/src/core/progress/progress-service.ts` — contains the business logic; the HTTP handler stays thin.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Service — `apps/api/src/core/progress/progress-service.ts`
+### 1. Access Gate
 
-```ts
-class ProgressService {
-  constructor(
-    private progress: IProgressRepository,
-    private tasks: ITaskRepository,
-    private stages: ITaskStageRepository,
-    private linking: ITaskLinkingRepository,
-    private enrollments: IEnrollmentRepository,
-  ) {}
+Before processing any check-in logic, verify the student is enrolled in the topics linked to this task. If not enrolled, return `403 NOT_ENROLLED`. This check must happen first to avoid leaking task structure to unenrolled users.
 
-  async checkInStage(userId, taskId, stageId) {
-    // 1. Load task + stages + task-topic links.
-    // 2. Enforce published + access gate.
-    // 3. Enforce ordering.
-    // 4. Insert stage row if missing; compute whether this is the final stage.
-    // 5. Upsert task_progress (status, current_stage_id, completed_at).
-    // 6. For every topic linked to THIS stage, upsert topic_progress = completed.
-    // 7. Return { taskProgress, stageProgress, created: boolean }.
-  }
-}
-```
+### 2. Ordering Enforcement
 
-### 2. Router — `apps/api/src/routes/progress.router.ts`
+Students must check into stages in sequential order. If the requested stage is not the next expected stage, return `409 OUT_OF_ORDER` with details about which stage should be completed first.
 
-```ts
-router.post('/tasks/:id/stages/:stageId/check-in', checkInHandler);
-```
+### 3. Idempotency
 
-### 3. Tests — `apps/api/test/routes/stage-check-in.spec.ts`
+Checking into the same stage twice is safe. The first call returns `201 Created`; subsequent calls for the same `(user, stage)` return `200 OK` with the same response shape.
 
-Scenarios (each with a fresh seeded DB):
-- First-ever check-in on stage 1 → 201; row created.
-- Check-in on stage 2 without stage 1 → 409 `OUT_OF_ORDER`; DB unchanged.
-- Check-in on stage 1 twice → 201 then 200; exactly one row.
-- Final-stage check-in sets `task_progress.status = completed` and stamps
-  `completed_at`.
-- Stage linked to topics `[A, B]` → `topic_progress` for A and B is `completed`
-  after the call.
-- Un-enrolled user → 403 `NOT_ENROLLED`.
-- Archived task → 404.
-- Race test: two parallel requests for the same `(user, stage)` → exactly one
-  `201`, exactly one `200`, exactly one DB row.
+### 4. Side Effects (Atomic)
+
+A successful check-in must atomically:
+1. Create the stage check-in record.
+2. Update the task's overall progress (status and current stage pointer).
+3. Mark all topics linked to the completed stage as `completed` in the student's topic progress.
+4. If this was the final stage, mark the task as `completed`.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Endpoint implemented with the full contract in §3.
-- [ ] All test cases pass, including the race test (uses `Promise.all` in the
-      Vitest Workers harness).
-- [ ] The service exports `ProgressService` for reuse by Task 04 / Task 06.
-- [ ] `make lint` clean. `make test-api` green.
+- [ ] The endpoint enforces enrollment, ordering, and idempotency.
+- [ ] All side effects are atomic — no partial updates on failure.
+- [ ] Stage check-in correctly propagates topic completion.
+- [ ] Completing the final stage marks the task as `completed`.
+- [ ] Integration tests cover: happy path, out-of-order, idempotency, unenrolled user, and concurrent requests.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter api test` green.
-2. Curl sequence as a seeded student:
-   `POST /tasks/$T/stages/$S1/check-in` → 201,
-   same request again → 200,
-   `POST .../$S3/check-in` before S2 → 409.
+### Automated Tests
+- `pnpm --filter api test` — integration suite for the check-in endpoint.
+
+### Manual Verification
+- As a seeded, enrolled student: check in stage 1 (201), repeat (200), attempt stage 3 before stage 2 (409), complete all stages and verify task completion.

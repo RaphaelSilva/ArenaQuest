@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ArenaQuest — Postura e Alinhamento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body { font-family: 'DM Sans', sans-serif; overflow: hidden; }
+
+.theme-dark {
+  --bg: #0B0E17; --bg2: #131825; --bg3: #1C2235; --bg4: #232B40;
+  --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+  --text: #E8EAF0; --text2: #8B92A8; --text3: #5C6480;
+  --accent: oklch(0.74 0.19 52); --accent2: oklch(0.65 0.16 240); --accent3: oklch(0.68 0.17 150);
+  --accent-glow: oklch(0.74 0.19 52 / 0.18); --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+.theme-light {
+  --bg: #F0EEE8; --bg2: #FAFAF8; --bg3: #F5F3EF; --bg4: #EAE8E0;
+  --border: rgba(0,0,0,0.08); --border2: rgba(0,0,0,0.14);
+  --text: #1A1C26; --text2: #5C6070; --text3: #9298A8;
+  --accent: oklch(0.60 0.19 52); --accent2: oklch(0.45 0.16 240); --accent3: oklch(0.48 0.17 150);
+  --accent-glow: oklch(0.60 0.19 52 / 0.12); --shadow: 0 2px 16px rgba(0,0,0,0.08);
+}
+
+.app { display: flex; flex-direction: column; height: 100%; background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
+
+/* TOPBAR */
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 56px; min-height: 56px; background: var(--bg2); border-bottom: 1px solid var(--border); z-index: 10; }
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.logo-mark { width: 28px; height: 28px; border-radius: 6px; background: var(--accent); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; color: #0B0E17; }
+.logo-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: -0.3px; color: var(--text); }
+.logo-name span { color: var(--accent); }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.theme-toggle { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border2); background: var(--bg3); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: all 0.2s; color: var(--text2); }
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: white; cursor: pointer; }
+.xp-pill { display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--bg3); border-radius: 20px; border: 1px solid var(--border2); font-size: 12px; color: var(--accent); font-weight: 600; }
+
+/* LAYOUT */
+.body-layout { display: flex; flex: 1; overflow: hidden; }
+.main-col { flex: 1; overflow-y: auto; padding: 28px 32px; }
+.main-col::-webkit-scrollbar { width: 4px; }
+.main-col::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 4px; }
+
+/* RIGHT SIDEBAR */
+.right-sidebar { width: 272px; min-width: 272px; background: var(--bg2); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+
+/* BREADCRUMB */
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text3); margin-bottom: 20px; flex-wrap: wrap; }
+.breadcrumb a { color: var(--text3); text-decoration: none; transition: color 0.15s; }
+.breadcrumb a:hover { color: var(--accent); }
+.bc-sep { color: var(--text3); }
+.bc-current { color: var(--text2); font-weight: 500; }
+
+/* TOPIC HEADER */
+.topic-header { margin-bottom: 24px; }
+.topic-eyebrow { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.topic-parent-tag { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; background: oklch(0.74 0.19 52 / 0.12); border: 1px solid oklch(0.74 0.19 52 / 0.25); font-size: 11px; font-weight: 600; color: var(--accent); }
+.subtopic-index { font-size: 11px; color: var(--text3); font-weight: 500; }
+.topic-title { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; margin-bottom: 10px; }
+.topic-meta-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.meta-chip { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text3); }
+.meta-chip svg { opacity: 0.7; }
+.tag-pill { font-size: 11px; padding: 3px 9px; border-radius: 6px; background: var(--bg3); color: var(--text3); font-weight: 500; border: 1px solid var(--border); }
+
+/* PROGRESS */
+.progress-row { display: flex; align-items: center; gap: 12px; margin: 16px 0 24px; }
+.prog-bar-wrap { flex: 1; height: 6px; background: var(--bg3); border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+.prog-bar-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.8s ease; }
+.prog-label { font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+.mark-done-btn { display: flex; align-items: center; gap: 6px; padding: 7px 16px; border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; background: var(--accent); color: #0B0E17; transition: all 0.2s; white-space: nowrap; }
+.mark-done-btn:hover { opacity: 0.88; }
+.mark-done-btn.done { background: var(--accent3); color: white; }
+
+/* MEDIA SECTION */
+.media-section { margin-bottom: 32px; }
+.section-label { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1.1px; text-transform: uppercase; color: var(--text3); margin-bottom: 14px; }
+
+.media-tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--bg3); border-radius: 10px; padding: 4px; border: 1px solid var(--border); width: fit-content; }
+.media-tab { padding: 6px 16px; border-radius: 7px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; background: transparent; color: var(--text3); transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+.media-tab.active { background: var(--bg2); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+.media-tab .tab-count { font-size: 10px; background: var(--bg4); color: var(--text3); padding: 1px 6px; border-radius: 10px; }
+.media-tab.active .tab-count { background: var(--accent-glow); color: var(--accent); }
+
+/* VIDEO PLAYER */
+.video-player { border-radius: 14px; overflow: hidden; background: #000; position: relative; aspect-ratio: 16/9; margin-bottom: 16px; cursor: pointer; border: 1px solid var(--border); }
+.video-thumb { width: 100%; height: 100%; object-fit: cover; display: flex; align-items: center; justify-content: center; }
+.video-thumb-bg { width: 100%; height: 100%; background: linear-gradient(135deg, #0a1020 0%, #1a2540 50%, #0d1525 100%); position: relative; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
+.video-thumb-stripes { position: absolute; inset: 0; background: repeating-linear-gradient(45deg, transparent, transparent 30px, rgba(255,255,255,0.015) 30px, rgba(255,255,255,0.015) 60px); }
+.video-thumb-label { font-family: 'Space Grotesk', sans-serif; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,0.3); position: absolute; top: 16px; left: 16px; }
+.play-btn { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 12px oklch(0.74 0.19 52 / 0.15); transition: all 0.2s; z-index: 1; }
+.play-btn:hover { transform: scale(1.08); }
+.play-btn svg { margin-left: 4px; }
+.video-overlay-info { position: absolute; bottom: 0; left: 0; right: 0; padding: 32px 20px 16px; background: linear-gradient(transparent, rgba(0,0,0,0.85)); }
+.video-title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; color: white; }
+.video-duration { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+.video-scrubber { width: 100%; height: 3px; background: rgba(255,255,255,0.2); border-radius: 3px; margin-top: 10px; position: relative; cursor: pointer; }
+.video-scrubber-fill { height: 100%; width: 35%; background: var(--accent); border-radius: 3px; }
+.video-scrubber-thumb { position: absolute; left: 35%; top: 50%; transform: translate(-50%, -50%); width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+
+.video-playlist { display: flex; flex-direction: column; gap: 8px; }
+.video-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg2); cursor: pointer; transition: all 0.2s; }
+.video-item:hover { border-color: var(--border2); background: var(--bg3); }
+.video-item.active { border-color: var(--accent); background: var(--accent-glow); }
+.vi-thumb { width: 56px; height: 36px; border-radius: 6px; background: var(--bg4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; overflow: hidden; position: relative; }
+.vi-thumb-bg { width: 100%; height: 100%; background: linear-gradient(135deg, #0a1020, #1a2540); display: flex; align-items: center; justify-content: center; }
+.vi-play { width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; }
+.vi-info { flex: 1; min-width: 0; }
+.vi-title { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vi-dur { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.vi-check { width: 18px; height: 18px; border-radius: 50%; background: var(--accent3); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.vi-locked { width: 18px; height: 18px; border-radius: 50%; background: var(--bg4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--text3); }
+
+/* FILES */
+.files-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.file-card { padding: 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg2); cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; gap: 10px; }
+.file-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow); }
+.file-icon-wrap { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.file-name { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.3; }
+.file-meta { display: flex; align-items: center; justify-content: space-between; }
+.file-size { font-size: 11px; color: var(--text3); }
+.file-dl-btn { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--accent); font-weight: 600; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent-glow); transition: all 0.2s; }
+.file-dl-btn:hover { background: var(--accent); color: #0B0E17; }
+
+/* PHOTOS */
+.photos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.photo-card { aspect-ratio: 4/3; border-radius: 10px; overflow: hidden; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); position: relative; transition: transform 0.2s; }
+.photo-card:hover { transform: scale(1.02); z-index: 1; }
+.photo-card:first-child { grid-column: span 2; aspect-ratio: 16/9; }
+.photo-bg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px; position: relative; }
+.photo-label { font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 0.5px; font-family: 'Space Grotesk', sans-serif; }
+
+/* COMMENTS */
+.comments-section { margin-bottom: 32px; }
+.comment-input-wrap { display: flex; gap: 12px; margin-bottom: 24px; align-items: flex-start; }
+.comment-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; color: white; flex-shrink: 0; }
+.comment-input-box { flex: 1; background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; transition: border-color 0.2s; }
+.comment-input-box:focus-within { border-color: var(--accent); }
+.comment-input-box textarea { background: transparent; border: none; outline: none; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text); resize: none; width: 100%; caret-color: var(--accent); line-height: 1.5; min-height: 40px; }
+.comment-input-box textarea::placeholder { color: var(--text3); }
+.comment-input-actions { display: flex; justify-content: flex-end; }
+.comment-submit { padding: 7px 16px; border-radius: 8px; border: none; background: var(--accent); color: #0B0E17; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+.comment-submit:hover { opacity: 0.88; }
+
+.comments-list { display: flex; flex-direction: column; gap: 20px; }
+.comment { display: flex; gap: 12px; }
+.comment-body { flex: 1; }
+.comment-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.comment-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.comment-time { font-size: 11px; color: var(--text3); }
+.comment-badge { font-size: 10px; padding: 2px 7px; border-radius: 6px; background: var(--accent-glow); color: var(--accent); font-weight: 600; border: 1px solid oklch(0.74 0.19 52 / 0.3); }
+.comment-text { font-size: 13px; color: var(--text2); line-height: 1.6; text-wrap: pretty; }
+.comment-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.comment-action { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text3); cursor: pointer; transition: color 0.15s; background: none; border: none; font-family: 'DM Sans', sans-serif; }
+.comment-action:hover, .comment-action.liked { color: var(--accent); }
+.comment-replies { margin-top: 12px; padding-left: 16px; border-left: 2px solid var(--border2); display: flex; flex-direction: column; gap: 12px; }
+.reply { display: flex; gap: 10px; }
+.reply-body { flex: 1; }
+.reply-name { font-size: 12px; font-weight: 600; color: var(--text); }
+.reply-time { font-size: 10px; color: var(--text3); }
+.reply-text { font-size: 12px; color: var(--text2); line-height: 1.5; margin-top: 3px; }
+
+/* RIGHT SIDEBAR */
+.rs-header { padding: 20px 20px 14px; border-bottom: 1px solid var(--border); }
+.rs-title { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1.1px; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+.rs-topic-info { display: flex; align-items: center; gap: 10px; }
+.rs-topic-icon { width: 32px; height: 32px; border-radius: 8px; background: oklch(0.74 0.19 52 / 0.15); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.rs-topic-name { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.3; }
+.rs-topic-pct { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.rs-progress { margin-top: 12px; }
+.rs-prog-outer { height: 5px; background: var(--bg4); border-radius: 5px; overflow: hidden; }
+.rs-prog-inner { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 5px; transition: width 0.6s; }
+
+.rs-subtopics { flex: 1; overflow-y: auto; padding: 12px 0; }
+.rs-subtopics::-webkit-scrollbar { width: 3px; }
+.rs-subtopics::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+
+.rs-sub-item { padding: 10px 20px; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 12px; position: relative; }
+.rs-sub-item:hover { background: var(--bg3); }
+.rs-sub-item.current { background: var(--accent-glow); }
+.rs-sub-item.current::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); border-radius: 0 2px 2px 0; }
+.rs-sub-num { width: 24px; height: 24px; border-radius: 7px; background: var(--bg4); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; color: var(--text3); flex-shrink: 0; }
+.rs-sub-num.done { background: var(--accent3); border-color: transparent; color: white; }
+.rs-sub-num.current { background: var(--accent); border-color: transparent; color: #0B0E17; }
+.rs-sub-info { flex: 1; min-width: 0; }
+.rs-sub-name { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-sub-bar { height: 3px; background: var(--bg4); border-radius: 3px; margin-top: 5px; overflow: hidden; }
+.rs-sub-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.4s; }
+.rs-sub-pct { font-size: 10px; color: var(--text3); margin-top: 3px; }
+
+.rs-nav-btns { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+.rs-nav-btn { flex: 1; padding: 9px; border-radius: 9px; border: 1px solid var(--border2); background: var(--bg3); cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; color: var(--text2); transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.rs-nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+.rs-nav-btn.next { background: var(--accent); color: #0B0E17; border-color: transparent; }
+.rs-nav-btn.next:hover { opacity: 0.88; }
+
+/* DIVIDER */
+.divider { height: 1px; background: var(--border); margin: 28px 0; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.anim { animation: fadeUp 0.35s ease forwards; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef } = React;
+
+// ---- ICONS ----
+const PlayIcon = () => <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M6 4.5L13.5 9L6 13.5V4.5Z" fill="currentColor"/></svg>;
+const CheckIcon = () => <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5L4.5 7.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const LockIcon = () => <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="2" y="4.5" width="6" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.1"/><path d="M3.5 4.5V3A2 2 0 016.5 3V4.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>;
+const SunIcon = () => <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="3" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 1.5V3M7.5 12V13.5M1.5 7.5H3M12 7.5H13.5M3.5 3.5L4.5 4.5M10.5 10.5L11.5 11.5M3.5 11.5L4.5 10.5M10.5 4.5L11.5 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>;
+const MoonIcon = () => <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12.5 9.5A6 6 0 014.5 1.5a6 6 0 000 11h1a6 6 0 007-3z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>;
+const DownloadIcon = () => <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v6M3 5.5l2.5 2.5L8 5.5M1.5 9.5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const ChevronLeft = () => <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7.5 3L4.5 6L7.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const ChevronRight = () => <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 3L7.5 6L4.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const HeartIcon = ({filled}) => <svg width="12" height="12" viewBox="0 0 12 12" fill={filled ? 'currentColor' : 'none'}><path d="M6 10.5S1.5 7.5 1.5 4.5a2.5 2.5 0 015-0a2.5 2.5 0 015 0c0 3-4.5 6-4.5 6z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg>;
+const ReplyIcon = () => <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 3L1.5 5.5L4 8M1.5 5.5H8a2.5 2.5 0 010 5H7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+
+// ---- DATA ----
+const SUBTOPICS = [
+  { id: 1, name: "Postura e alinhamento", progress: 100, status: "done" },
+  { id: 2, name: "Padrão de respiração", progress: 60, status: "inprog" },
+  { id: 3, name: "Controle motor básico", progress: 30, status: "inprog" },
+  { id: 4, name: "Mobilidade articular", progress: 0, status: "locked" },
+];
+
+const VIDEOS = [
+  { id: 1, title: "Introdução à postura corporal", duration: "12:34", watched: true, active: true },
+  { id: 2, title: "Alinhamento cervical e escapular", duration: "08:50", watched: false, active: false },
+  { id: 3, title: "Postura em carga axial", duration: "15:22", watched: false, active: false },
+];
+
+const FILES = [
+  { id: 1, name: "Guia de Postura — Módulo 1.pdf", size: "2.4 MB", type: "pdf", color: "#E74C3C", bg: "rgba(231,76,60,0.12)" },
+  { id: 2, name: "Checklist de Avaliação Postural.pdf", size: "840 KB", type: "pdf", color: "#E74C3C", bg: "rgba(231,76,60,0.12)" },
+  { id: 3, name: "Planilha de Exercícios Corretivos.xlsx", size: "1.1 MB", type: "xls", color: "#27AE60", bg: "rgba(39,174,96,0.12)" },
+];
+
+const PHOTOS = [
+  { id: 1, label: "postura lateral — referência", color1: "#0d1a2e", color2: "#1a3050" },
+  { id: 2, label: "alinhamento anterior", color1: "#1a1a0d", color2: "#2e2e1a" },
+  { id: 3, label: "análise de coluna", color1: "#1a0d1a", color2: "#2e1a2e" },
+  { id: 4, label: "exercício corretivo", color1: "#0d1a1a", color2: "#1a2e2e" },
+];
+
+const COMMENTS_DATA = [
+  {
+    id: 1, name: "Mariana Costa", initials: "MC", time: "2h atrás", badge: "Instrutora",
+    text: "Ótimo conteúdo! Vale reforçar que a retroversão pélvica é um ponto crítico que muitos alunos ignoram na fase inicial. O vídeo 2 cobre bem esse aspecto.",
+    likes: 8, liked: false,
+    replies: [
+      { id: 11, name: "João Silva", initials: "JS", time: "1h atrás", text: "Concordo totalmente! Faz diferença enorme no deadlift." },
+    ]
+  },
+  {
+    id: 2, name: "Rafael Mendes", initials: "RM", time: "5h atrás", badge: null,
+    text: "Tenho dificuldade em manter a posição neutra durante agachamento pesado. Alguma dica para trabalhar a conscientização corporal fora do treino?",
+    likes: 3, liked: false,
+    replies: []
+  },
+  {
+    id: 3, name: "Aline Torres", initials: "AT", time: "1 dia atrás", badge: null,
+    text: "Material excelente. A progressão de dificuldade dos exercícios está bem didática. Terminei esse módulo em 3 semanas e senti mudança real na postura.",
+    likes: 14, liked: true,
+    replies: [
+      { id: 31, name: "Mariana Costa", initials: "MC", time: "22h atrás", text: "Que progresso incrível, Aline! Continua assim 💪" },
+    ]
+  },
+];
+
+// ---- PHOTO BG ----
+function PhotoBg({ color1, color2, label }) {
+  return (
+    <div className="photo-bg" style={{ background: `linear-gradient(135deg, ${color1}, ${color2})` }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.02) 20px, rgba(255,255,255,0.02) 40px)' }} />
+      <span style={{ fontFamily: 'monospace', fontSize: 9, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '0 8px', zIndex: 1, letterSpacing: '0.5px' }}>{label}</span>
+    </div>
+  );
+}
+
+// ---- COMMENT ----
+function Comment({ c }) {
+  const [liked, setLiked] = useState(c.liked);
+  const [likes, setLikes] = useState(c.likes);
+  const [showReply, setShowReply] = useState(false);
+
+  return (
+    <div className="comment">
+      <div className="comment-avatar" style={{ width: 34, height: 34, fontSize: 11 }}>{c.initials}</div>
+      <div className="comment-body">
+        <div className="comment-header">
+          <span className="comment-name">{c.name}</span>
+          {c.badge && <span className="comment-badge">{c.badge}</span>}
+          <span className="comment-time">{c.time}</span>
+        </div>
+        <p className="comment-text">{c.text}</p>
+        <div className="comment-actions">
+          <button className={`comment-action ${liked ? 'liked' : ''}`} onClick={() => { setLiked(!liked); setLikes(l => liked ? l - 1 : l + 1); }}>
+            <HeartIcon filled={liked} /> {likes}
+          </button>
+          <button className="comment-action" onClick={() => setShowReply(!showReply)}>
+            <ReplyIcon /> Responder
+          </button>
+        </div>
+        {c.replies.length > 0 && (
+          <div className="comment-replies">
+            {c.replies.map(r => (
+              <div className="reply" key={r.id}>
+                <div className="comment-avatar" style={{ width: 26, height: 26, fontSize: 9 }}>{r.initials}</div>
+                <div className="reply-body">
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span className="reply-name">{r.name}</span>
+                    <span className="reply-time">{r.time}</span>
+                  </div>
+                  <p className="reply-text">{r.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---- APP ----
+function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('aq_theme') || 'dark');
+  const [mediaTab, setMediaTab] = useState('videos');
+  const [activeVideo, setActiveVideo] = useState(1);
+  const [done, setDone] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [comments, setComments] = useState(COMMENTS_DATA);
+  const [currentSub, setCurrentSub] = useState(1);
+
+  const submitComment = () => {
+    if (!commentText.trim()) return;
+    setComments(prev => [{
+      id: Date.now(), name: "João Silva", initials: "JS", time: "agora",
+      badge: null, text: commentText.trim(), likes: 0, liked: false, replies: []
+    }, ...prev]);
+    setCommentText('');
+  };
+
+  const topicProgress = Math.round(SUBTOPICS.reduce((a, s) => a + s.progress, 0) / SUBTOPICS.length);
+
+  return (
+    <div className={`app theme-${theme}`}>
+      {/* TOPBAR */}
+      <div className="topbar">
+        <a className="logo" href="ArenaQuest Content.html">
+          <div className="logo-mark">AQ</div>
+          <div className="logo-name">Arena<span>Quest</span></div>
+        </a>
+        <div className="topbar-right">
+          <div className="xp-pill">
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
+            1.240 XP
+          </div>
+          <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          </button>
+          <div className="avatar">JS</div>
+        </div>
+      </div>
+
+      <div className="body-layout">
+        {/* MAIN */}
+        <div className="main-col">
+
+          {/* BREADCRUMB */}
+          <div className="breadcrumb">
+            <a href="ArenaQuest Content.html">Início</a>
+            <span className="bc-sep">›</span>
+            <a href="ArenaQuest Content.html">Conteúdos</a>
+            <span className="bc-sep">›</span>
+            <a href="ArenaQuest Content.html">Fundamentos do Movimento</a>
+            <span className="bc-sep">›</span>
+            <span className="bc-current">Postura e Alinhamento</span>
+          </div>
+
+          {/* TOPIC HEADER */}
+          <div className="topic-header anim">
+            <div className="topic-eyebrow">
+              <div className="topic-parent-tag">🏋️ Fundamentos do Movimento</div>
+              <span className="subtopic-index">Subtópico 1 de 4</span>
+            </div>
+            <h1 className="topic-title">Postura e Alinhamento</h1>
+            <div className="topic-meta-row">
+              <div className="meta-chip">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.1"/><path d="M6 3.5V6l1.5 1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>
+                36 min de conteúdo
+              </div>
+              <div className="meta-chip">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2h8v8H2zM5 5h2" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg>
+                3 vídeos · 3 arquivos · 4 fotos
+              </div>
+              <span className="tag-pill">Biomecânica</span>
+              <span className="tag-pill">Básico</span>
+            </div>
+          </div>
+
+          {/* PROGRESS + MARK DONE */}
+          <div className="progress-row">
+            <div className="prog-bar-wrap">
+              <div className="prog-bar-fill" style={{ width: done ? '100%' : '35%' }} />
+            </div>
+            <span className="prog-label">{done ? '100%' : '35%'}</span>
+            <button className={`mark-done-btn ${done ? 'done' : ''}`} onClick={() => setDone(!done)}>
+              {done ? '✓ Concluído' : 'Marcar como concluído'}
+            </button>
+          </div>
+
+          <div className="divider" />
+
+          {/* MEDIA */}
+          <div className="media-section anim" style={{ animationDelay: '60ms' }}>
+            <div className="section-label">Material do Subtópico</div>
+
+            <div className="media-tabs">
+              {[
+                { key: 'videos', label: 'Vídeos', count: 3 },
+                { key: 'files', label: 'Arquivos', count: 3 },
+                { key: 'photos', label: 'Fotos', count: 4 },
+              ].map(t => (
+                <button key={t.key} className={`media-tab ${mediaTab === t.key ? 'active' : ''}`} onClick={() => setMediaTab(t.key)}>
+                  {t.label} <span className="tab-count">{t.count}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* VIDEOS TAB */}
+            {mediaTab === 'videos' && (
+              <div className="anim">
+                <div className="video-player">
+                  <div className="video-thumb-bg">
+                    <div className="video-thumb-stripes" />
+                    <span className="video-thumb-label">player · postura e alinhamento</span>
+                    <div className="play-btn"><PlayIcon /></div>
+                    <div className="video-overlay-info">
+                      <div className="video-title">{VIDEOS.find(v => v.id === activeVideo)?.title}</div>
+                      <div className="video-duration">{VIDEOS.find(v => v.id === activeVideo)?.duration}</div>
+                      <div className="video-scrubber">
+                        <div className="video-scrubber-fill" />
+                        <div className="video-scrubber-thumb" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="video-playlist">
+                  {VIDEOS.map((v, i) => (
+                    <div key={v.id} className={`video-item ${activeVideo === v.id ? 'active' : ''}`} onClick={() => setActiveVideo(v.id)}>
+                      <div className="vi-thumb">
+                        <div className="vi-thumb-bg">
+                          <div className="vi-play" style={{ background: activeVideo === v.id ? 'var(--accent)' : 'rgba(255,255,255,0.15)' }}>
+                            <PlayIcon />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="vi-info">
+                        <div className="vi-title">{i + 1}. {v.title}</div>
+                        <div className="vi-dur">{v.duration}</div>
+                      </div>
+                      {v.watched ? (
+                        <div className="vi-check"><CheckIcon /></div>
+                      ) : (
+                        <div style={{ fontSize: 10, color: 'var(--text3)', whiteSpace: 'nowrap' }}>{v.duration}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* FILES TAB */}
+            {mediaTab === 'files' && (
+              <div className="files-grid anim">
+                {FILES.map(f => (
+                  <div className="file-card" key={f.id}>
+                    <div className="file-icon-wrap" style={{ background: f.bg }}>
+                      <span style={{ fontSize: 22 }}>{f.type === 'pdf' ? '📄' : '📊'}</span>
+                    </div>
+                    <div className="file-name">{f.name}</div>
+                    <div className="file-meta">
+                      <span className="file-size">{f.size}</span>
+                      <button className="file-dl-btn"><DownloadIcon /> Baixar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* PHOTOS TAB */}
+            {mediaTab === 'photos' && (
+              <div className="photos-grid anim">
+                {PHOTOS.map(p => (
+                  <div className="photo-card" key={p.id}>
+                    <PhotoBg color1={p.color1} color2={p.color2} label={p.label} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="divider" />
+
+          {/* COMMENTS */}
+          <div className="comments-section anim" style={{ animationDelay: '120ms' }}>
+            <div className="section-label">Discussão · {comments.length} comentários</div>
+
+            <div className="comment-input-wrap">
+              <div className="comment-avatar">JS</div>
+              <div className="comment-input-box">
+                <textarea
+                  placeholder="Compartilhe uma dúvida ou observação…"
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) submitComment(); }}
+                  rows={2}
+                />
+                {commentText && (
+                  <div className="comment-input-actions">
+                    <button className="comment-submit" onClick={submitComment}>Publicar</button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="comments-list">
+              {comments.map(c => <Comment key={c.id} c={c} />)}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT SIDEBAR */}
+        <div className="right-sidebar">
+          <div className="rs-header">
+            <div className="rs-title">Subtópicos</div>
+            <div className="rs-topic-info">
+              <div className="rs-topic-icon">🏋️</div>
+              <div>
+                <div className="rs-topic-name">Fundamentos do Movimento</div>
+                <div className="rs-topic-pct">{topicProgress}% concluído</div>
+              </div>
+            </div>
+            <div className="rs-progress">
+              <div className="rs-prog-outer">
+                <div className="rs-prog-inner" style={{ width: `${topicProgress}%` }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="rs-subtopics">
+            {SUBTOPICS.map((s, i) => (
+              <div
+                key={s.id}
+                className={`rs-sub-item ${currentSub === s.id ? 'current' : ''}`}
+                onClick={() => setCurrentSub(s.id)}
+              >
+                <div className={`rs-sub-num ${s.status === 'done' ? 'done' : currentSub === s.id ? 'current' : ''}`}>
+                  {s.status === 'done' ? '✓' : s.status === 'locked' ? <LockIcon /> : i + 1}
+                </div>
+                <div className="rs-sub-info">
+                  <div className="rs-sub-name">{s.name}</div>
+                  <div className="rs-sub-bar">
+                    <div className="rs-sub-bar-fill" style={{ width: `${s.progress}%` }} />
+                  </div>
+                  <div className="rs-sub-pct">{s.progress}%</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="rs-nav-btns">
+            <button className="rs-nav-btn" title="Subtópico anterior">
+              <ChevronLeft /> Anterior
+            </button>
+            <button className="rs-nav-btn next" title="Próximo subtópico">
+              Próximo <ChevronRight />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

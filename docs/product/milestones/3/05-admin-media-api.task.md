@@ -1,4 +1,4 @@
-# Task 05: Admin Media API (Presigned Upload + Finalize + Delete)
+# Task 05: Admin Media API
 
 ## Metadata
 - **Status:** Pending
@@ -10,104 +10,61 @@
 
 ## Summary
 
-Expose the media-lifecycle endpoints so the admin UI can upload attachments directly to
-R2 using presigned URLs. The Worker never handles the file bytes — it issues a URL,
-records a PENDING row, and flips it to READY after the client confirms.
+Implement the media lifecycle management API to enable direct-to-R2 uploads. The system uses a presigned URL strategy where the backend issues authorization for the client to upload directly to storage, maintaining performance and security by keeping file bytes out of the Worker process.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Presigned-URL flow only:** the Worker refuses to stream bodies to R2 for media
-  uploads. This protects the 100 MB Worker request limit and keeps CPU time bounded.
-- **Per-type size limits:** enforced at presign time via `Content-Length`.
-  - `application/pdf` → 25 MB
-  - `video/mp4` → 100 MB
-  - `image/*` → 5 MB
-- **Storage key layout:** `topics/{topicId}/{mediaId}-{sanitizedName}` — one prefix per
-  topic enables `listObjects` for auditing and bulk delete.
-- **RBAC:** guarded by `authGuard + requireRole(ADMIN, CONTENT_CREATOR)`.
-- **Finalize is idempotent:** calling finalize twice is a no-op for a READY row and
-  400 for a DELETED row.
+- **Router:** `apps/api/src/routes/admin-media.router.ts` (Mounted under `/admin/topics/:id/media`)
+- **Security:** Guarded by `authGuard` and `requireRole(ADMIN, CONTENT_CREATOR)`.
+- **Storage Strategy:** Presigned PUT URLs for R2.
+- **Data Integrity:** Database rows track state (`pending` → `ready` → `deleted`).
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Router — `apps/api/src/routes/admin-media.router.ts`
+### 1. Media Lifecycle Endpoints
 
-Mounted under `/admin/topics/:id/media`:
+| Method   | Path                  | Description                                                                 |
+|----------|-----------------------|-----------------------------------------------------------------------------|
+| `POST`   | `/presign`            | Generates a presigned URL and creates a `pending` media record in the DB.   |
+| `POST`   | `/:mediaId/finalize`  | Verifies object existence in R2 and updates DB status to `ready`.           |
+| `DELETE` | `/:mediaId`           | Removes the media record (soft delete) and attempts R2 object deletion.     |
 
-| Method | Path | Body |
-|--------|------|------|
-| `POST`   | `/presign`            | `{ filename, type, sizeBytes }` |
-| `POST`   | `/:mediaId/finalize`  | — |
-| `DELETE` | `/:mediaId`           | — |
+### 2. Constraints & Validation
 
-### 2. Presign handler flow
-
-```ts
-1. Validate `type` is in the allow-list.
-2. Validate `sizeBytes` against the per-type limit.
-3. Generate `mediaId = crypto.randomUUID()` and compute `storageKey`.
-4. `media.create({ topicNodeId, storageKey, type, sizeBytes, originalName: filename,
-                  uploadedBy: user.sub })`  → inserts with `status = 'pending'`.
-5. `storage.getPresignedUploadUrl(storageKey, { contentType: type, maxSizeBytes,
-                                                 expiresInSeconds: 600 })`.
-6. Return `{ mediaId, uploadUrl, storageKey, expiresIn: 600 }`.
-```
-
-### 3. Finalize handler flow
-
-```ts
-1. Load the media row; 404 if missing or its `topicNodeId` does not match `:id`.
-2. Call `storage.headObject(storageKey)`; if it returns null, 409 `NOT_UPLOADED`.
-3. Optionally verify `size` from `headObject` matches the declared `sizeBytes`;
-   reject with 409 `SIZE_MISMATCH` if off by > 1 % (tolerance for provider rounding).
-4. `media.markReady(mediaId)`.
-5. Return the updated row.
-```
-
-### 4. Delete handler flow
-
-```ts
-1. Load the media row; 404 if missing.
-2. `media.softDelete(mediaId)` — DB first, so a storage failure cannot orphan the row.
-3. `storage.deleteObject(storageKey)` — log and continue on error; a sweeper job can
-   reconcile later.
-4. Return 204.
-```
-
-### 5. Integration tests
-
-- Presign with an invalid MIME → 400.
-- Presign with PDF > 25 MB → 400 `TOO_LARGE`.
-- Finalize before upload → 409 `NOT_UPLOADED`. Use a mock storage adapter whose
-  `headObject` returns `null`.
-- Finalize after upload → 200, row is READY.
-- Finalize again → 200, row stays READY (idempotent).
-- Delete → 204, `listByTopic(..., false)` no longer returns the row.
+- **Type-Specific Size Limits:**
+    - PDF: 25 MB
+    - MP4: 100 MB
+    - Images: 5 MB
+- **Storage Layout:** Objects must be keyed as `topics/{topicId}/{mediaId}-{sanitizedName}`.
+- **Idempotency:** The `finalize` operation must be idempotent (safe to retry).
+- **Atomic Operations:** Ensure DB records are updated before storage deletions to prevent orphan files or broken references.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] All three endpoints work and are RBAC-guarded.
-- [ ] Presign rejects unsupported MIME and oversized declarations.
-- [ ] Finalize verifies the object exists in storage before flipping to READY.
-- [ ] Delete removes the storage object; failure to delete from storage does not leave
-      the DB in an inconsistent state.
-- [ ] Integration tests in `admin-media.router.spec.ts` pass every case above using an
-      in-memory fake storage adapter (no real R2).
-- [ ] `make lint` clean; all tests pass.
+- [ ] All endpoints are implemented and correctly RBAC-protected.
+- [ ] Presigned URLs are generated with correct content-type and size constraints.
+- [ ] Media records transition from `pending` to `ready` only after successful R2 verification.
+- [ ] Deletion removes both the database record and the storage object.
+- [ ] Integration tests cover the full lifecycle, including error cases for size/type violations.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter api test` — green.
-2. Manual `wrangler dev` + `curl` (local R2 bucket):
-   - `POST /admin/topics/<t>/media/presign { filename: "lesson.pdf", type: "application/pdf", sizeBytes: 123456 }` → returns URL.
-   - `curl -X PUT <uploadUrl> --data-binary @lesson.pdf -H 'Content-Type: application/pdf'` → 200.
-   - `POST /admin/topics/<t>/media/<m>/finalize` → 200, status READY.
-   - `DELETE /admin/topics/<t>/media/<m>` → 204, bucket listing shows the object gone.
+### Automated Tests
+- Run integration tests in `admin-media.router.spec.ts` using a mock storage adapter.
+- `pnpm --filter api test`
+
+### Manual Verification
+- Use `curl` or a REST client to perform a full upload flow:
+    1. Request presigned URL.
+    2. PUT file to R2 (local or staging).
+    3. Finalize upload.
+    4. Delete media and verify object removal.

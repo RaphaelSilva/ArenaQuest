@@ -10,94 +10,59 @@
 
 ## Summary
 
-Extend the Playwright smoke suite introduced in Milestone 3 with a second scenario
-that exercises the full Milestone 4 happy path end-to-end. No new runner, no new CI
-job — just one more `.spec.ts` file and a small set of API fixtures.
+Extend the Playwright E2E suite from Milestone 3 with a new scenario covering the complete Task lifecycle — from admin authoring through to student consumption and cross-navigation to the content catalogue.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Runs inside the existing `e2e/` workspace** — do not duplicate scaffolding.
-- **Isolation:** each run seeds a uniquely-suffixed topic tree AND task via the API
-  helpers (so the suite is parallel-safe and deterministic).
-- **Timeout budget:** the new spec must finish under 45 s locally on a warm start.
-- **Assertions lean on semantic selectors** (`getByRole('link', { name: ... })`) —
-  avoid CSS class selectors.
+- **Framework:** Extends the existing `e2e/` workspace. No new scaffolding or CI jobs required.
+- **Isolation:** Each test run seeds a unique topic tree and task via API helpers to ensure determinism and parallel-safe execution.
+- **CI:** The existing `e2e.yml` GitHub Actions workflow automatically picks up new spec files.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Fixture extensions — `e2e/fixtures/auth.ts`
+### 1. New E2E Fixture Helpers
 
-```ts
-export async function createTaskViaApi(token, input: {
-  title, description, topicIds,
-}): Promise<Task>;
+The API fixture helpers need to be extended to support the Milestone 4 operations:
+- Create a Task via the API.
+- Add a Stage to a Task.
+- Link topics to a Stage.
+- Publish a Task.
 
-export async function addStageViaApi(token, taskId, { label }): Promise<Stage>;
+### 2. Core E2E Scenario
 
-export async function setStageTopicsViaApi(token, taskId, stageId, topicIds): Promise<void>;
+The new spec must cover the following happy path:
+1. **Admin Seeds Content:** Uses API helpers to create published topics, create a task with stages, link topics to stages, and publish the task.
+2. **Student Browses:** Logs in as a student and navigates to `/tasks`.
+3. **Task Visibility:** Verifies the published task appears in the list.
+4. **Task Detail:** Opens the task and verifies the title, stages, and topic chips are correct.
+5. **Catalogue Deep Link:** Clicks a topic chip and verifies successful navigation to the correct `/catalog/:topicId` page.
 
-export async function publishTaskViaApi(token, taskId): Promise<void>;
-```
+### 3. Performance Budget
 
-### 2. Spec — `e2e/tests/task-authoring.spec.ts`
-
-```ts
-test('admin authors a task; student sees it with deep links to /catalog', async ({ page }) => {
-  const admin = await apiLogin('admin@arenaquest.com', 'password123');
-
-  const topicA = await createTopicViaApi(admin, { title: 'E2E Topic A', status: 'published' });
-  const topicB = await createTopicViaApi(admin, { title: 'E2E Topic B', status: 'published' });
-
-  const task = await createTaskViaApi(admin, {
-    title: 'E2E Smoke Task',
-    description: '# Hello\n\nA test task.',
-    topicIds: [topicA.id, topicB.id],
-  });
-  const stage = await addStageViaApi(admin, task.id, { label: 'Reading' });
-  await setStageTopicsViaApi(admin, task.id, stage.id, [topicA.id]);
-  await publishTaskViaApi(admin, task.id);
-
-  await loginAs(page, 'student@arenaquest.com', 'password123');
-  await page.goto('/tasks');
-
-  const card = page.getByRole('link', { name: /E2E Smoke Task/ });
-  await expect(card).toBeVisible();
-  await card.click();
-
-  await expect(page.getByRole('heading', { name: 'E2E Smoke Task' })).toBeVisible();
-  await expect(page.getByText('Reading')).toBeVisible();
-
-  const chip = page.getByRole('link', { name: 'E2E Topic A' });
-  await expect(chip).toHaveAttribute('href', `/catalog/${topicA.id}`);
-  await chip.click();
-  await expect(page.getByRole('treeitem', { name: 'E2E Topic A' })).toBeVisible();
-});
-```
-
-### 3. CI — no changes required. The existing `e2e.yml` already runs every spec
-    under `e2e/tests/`.
+- The new spec must complete in under 45 seconds on a warm local start.
+- The total E2E suite must remain under 3 minutes on a cold start.
 
 ---
 
 ## Acceptance Criteria
 
 - [ ] New spec passes locally via `make e2e`.
-- [ ] Same spec passes in CI on a PR.
-- [ ] A forced failure (rename the task title assertion) uploads traces +
-      screenshots as artifacts.
-- [ ] Total e2e suite still finishes under 3 minutes locally on a cold start.
-- [ ] `make lint` clean (including any new TS files in `e2e/`).
+- [ ] New spec passes in CI on a PR.
+- [ ] Playwright traces and screenshots are captured on a forced test failure.
+- [ ] Total E2E suite duration remains within the 3-minute budget.
+- [ ] Tests use semantic selectors (`getByRole`) rather than brittle CSS selectors.
+- [ ] Codebase remains lint-clean.
 
 ---
 
 ## Verification Plan
 
-1. `make dev` + `make e2e` → both specs green.
-2. Break the task title intentionally (`title: 'nope'`) → run `make e2e` → failure
-   with a useful trace; revert.
-3. Push branch; confirm the existing CI job runs and reports pass / fail for both
-   scenarios.
+### Automated Tests
+- `make e2e` — both the M3 smoke test and the new M4 spec must pass.
+
+### Manual Verification
+- Deliberately introduce a broken assertion (e.g., wrong task title) and verify that the failure generates a useful Playwright trace in the test-results directory.

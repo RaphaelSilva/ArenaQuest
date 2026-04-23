@@ -1,104 +1,61 @@
-# Task 07: Frontend — Admin Tasks Dashboard (List + Editor Skeleton)
+# Task 07: Frontend — Admin Tasks Dashboard
 
 ## Metadata
 - **Status:** Pending
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
-- **Dependencies:** Task 03 (and structurally Task 05, but the UI for linking can be
-  stubbed and wired in Task 08)
+- **Dependencies:** Task 03, Task 05
 
 ---
 
 ## Summary
 
-Two pages:
-
-- `/admin/tasks` — list of all tasks (drafts + published + archived) with status
-  chips and a "New task" button.
-- `/admin/tasks/:id` — editor frame: title + Markdown description + topic picker +
-  status toggle. Stage editing lives in Task 08 (mounted as a slot here).
+Build the admin interface for managing Tasks. Consists of a list page for an overview of all tasks and a detail editor page for authoring task metadata, content, and topic associations.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Role gate:** same `useHasAnyRole('admin', 'content_creator')` helper introduced
-  for the topic dashboard in M3 Task 08. Students → redirect to `/dashboard`.
-- **API client:** new `apps/web/src/lib/admin-tasks-api.ts` mirroring the shape of
-  `admin-topics-api.ts`. All HTTP through this module.
-- **Topic picker:** a reusable `<TopicPicker value onChange includeDrafts />`
-  component that wraps the existing published-tree fetcher. When `includeDrafts` is
-  true (task status = draft), it fetches from `/admin/topics` instead.
-- **Status toggle guards:** on publish attempt, surface the 409 `reasons` from the
-  API as inline errors (e.g. "Add at least one stage" / "Topic X is not
-  published"). Do **not** block client-side — let the server be the source of
-  truth, but mirror the most common cases in a tooltip.
-- **Loading state:** show a Skeleton list (not a spinner) while loading; mirrors
-  the style of the admin users dashboard.
+- **Paths:** `/admin/tasks` (list) and `/admin/tasks/:id` (editor).
+- **Security:** Accessible to `admin` and `content_creator` roles. Students are redirected to `/dashboard`.
+- **Stage Editing:** The stage management UI is a separate implementation (Task 08); this task renders a placeholder slot for it within the editor layout.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. API client — `apps/web/src/lib/admin-tasks-api.ts`
+### 1. Tasks List Page
 
-```ts
-export const adminTasksApi = {
-  list(token, filter?): Promise<TaskSummary[]>;
-  get(token, id): Promise<TaskDetail>;
-  create(token, input): Promise<TaskSummary>;
-  update(token, id, patch): Promise<TaskSummary>;
-  archive(token, id): Promise<void>;
-  setTopics(token, id, topicIds): Promise<string[]>;
-};
-```
+- Displays all tasks (draft, published, archived) with status chips, stage counts, and last-updated timestamps.
+- Provides a "New Task" action that creates a draft and navigates to the editor.
+- Includes an "Archive" action with a confirmation step for each task row.
+- Shows skeleton loaders while fetching data.
 
-### 2. Pages
+### 2. Task Editor Page
 
-- `apps/web/src/app/(protected)/admin/tasks/page.tsx` — list.
-- `apps/web/src/app/(protected)/admin/tasks/new/page.tsx` — thin wrapper creating a
-  draft and redirecting to `/admin/tasks/:id`.
-- `apps/web/src/app/(protected)/admin/tasks/[id]/page.tsx` — editor.
-
-### 3. Components
-
-- `apps/web/src/components/tasks/task-list.tsx` — card rows with title, status
-  chip, stage count, updatedAt. Click → `/admin/tasks/:id`. "Archive" action with
-  confirm modal.
-- `apps/web/src/components/tasks/task-editor.tsx` — title input, description
-  textarea + preview (using `renderSafeMarkdownToHtml` from M3 Task 07), topic
-  picker, status toggle, "Save" button. **Stages slot** is a placeholder
-  `<StagesEditorPlaceholder />` for Task 08 to fill.
-- `apps/web/src/components/tasks/topic-picker.tsx` — dialog with the published
-  topic tree (read-only from `/topics` or `/admin/topics`), checkbox multi-select,
-  search. Uses the existing `CatalogTree` visuals from M3 Task 10.
-
-### 4. Tests — `apps/web/__tests__/app/admin/tasks.test.tsx`
-
-- List page renders 3 mocked tasks with their statuses.
-- "Archive" calls `adminTasksApi.archive` and removes the row.
-- Editor: typing in title and blurring calls `update`.
-- Publish toggle: server returns 409 with `reasons:['NO_STAGES']` → UI shows
-  "Add at least one stage" error.
-- Student role → redirected to `/dashboard`.
+- **Metadata Fields:** Title, description (with Markdown preview using the M3 sanitization helper).
+- **Topic Association:** A multi-select Topic Picker that allows associating published topics with the task. When the task is a draft, it can also select from draft topics.
+- **Status Toggle:** Allows authors to change the task status. On publish failure (e.g., `409 TASK_NOT_PUBLISHABLE`), inline error messages display the specific reasons from the API response.
+- **Stage Editor Slot:** Renders a clearly marked placeholder for the Stage Editor component (Task 08).
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Both pages compile and lint clean.
-- [ ] The list page loads under 300 ms against mocked data (React profiler).
-- [ ] The editor persists title / description / status / task-level topic links.
-- [ ] The stage editor placeholder is visibly marked "Stages editor — Task 08".
-- [ ] Component tests in §4 pass.
-- [ ] `make lint` clean. `pnpm --filter web test` green.
+- [ ] The list and editor pages compile and are accessible to authorized roles.
+- [ ] The editor correctly saves title, description, status, and task-level topic links.
+- [ ] Publish validation errors from the API are surfaced as readable inline messages.
+- [ ] Students are redirected away from admin task routes.
+- [ ] Component tests cover list rendering, archive flow, and publish error surfacing.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter web test` green.
-2. Manual (both apps running):
-   - Log in as admin → `/admin/tasks` lists existing tasks.
-   - Click "New task" → URL becomes `/admin/tasks/:id` with a blank draft.
-   - Edit title, select 2 topics, save → reload → state preserved.
+### Automated Tests
+- `pnpm --filter web test` — component tests for the task list and editor.
+
+### Manual Verification
+- Log in as an admin, create a task, add topic links, and verify state is preserved after a page reload.
+- Attempt to publish a task without stages and verify the inline error message.

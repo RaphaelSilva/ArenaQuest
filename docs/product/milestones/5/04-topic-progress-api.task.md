@@ -1,4 +1,4 @@
-# Task 04: Topic Progress API (visit + complete)
+# Task 04: Topic Progress API
 
 ## Metadata
 - **Status:** Pending
@@ -10,70 +10,57 @@
 
 ## Summary
 
-Two small write endpoints for topic-level progress signals:
-
-- `POST /topics/:id/visit` — idempotent signal that the student opened the
-  topic; transitions `not_started → in_progress`, never regresses.
-- `POST /topics/:id/complete` — explicit mark-as-done; transitions whatever →
-  `completed`.
-
-Both routes respect the access gate and refuse draft/archived topics.
+Implement two lightweight endpoints for explicit topic-level progress signals. These allow students to mark topics as visited or completed independently of task check-ins.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Monotonic status:** `visit` never demotes. If the row is already
-  `completed`, `visit` returns 200 with the existing row and no mutation.
-- **Idempotency:** `complete` is likewise a single-shot marker. Repeated calls
-  return 200 + existing row.
-- **Access gate:** 403 if the topic id is not in the user's effective-access
-  set. Draft/archived topics → 404 (leaking draft-vs-unenrolled would be an
-  info-disclosure bug).
-- **Response shape:** `{ topicProgress: TopicProgressRecord, changed: boolean }`
-  so the UI can decide whether to refresh dashboard aggregates.
+- **Endpoints:** `POST /topics/:id/visit` and `POST /topics/:id/complete`.
+- **Security:** `authGuard` (any authenticated student).
+- **Service:** Extends `apps/api/src/core/progress/progress-service.ts`.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Extend `ProgressService`
+### 1. Visit Endpoint (`POST /topics/:id/visit`)
 
-```ts
-markTopicVisited(userId, topicId): Promise<{ topicProgress, changed }>;
-markTopicCompleted(userId, topicId): Promise<{ topicProgress, changed }>;
-```
+- Signals that a student has opened a topic.
+- Transitions status from `not_started` to `in_progress`.
+- **Monotonic:** Never demotes a status. If the topic is already `completed`, this is a no-op.
+- Idempotent: Repeated calls are safe and return `200 OK`.
 
-### 2. Router — extend `progress.router.ts`
+### 2. Complete Endpoint (`POST /topics/:id/complete`)
 
-```ts
-router.post('/topics/:id/visit',    visitHandler);
-router.post('/topics/:id/complete', completeHandler);
-```
+- Explicitly marks a topic as fully read/completed by the student.
+- Transitions status to `completed` regardless of current state.
+- Idempotent: Repeated calls are safe and return `200 OK`.
 
-### 3. Tests — `apps/api/test/routes/topic-progress.spec.ts`
+### 3. Access & Visibility Guards
 
-- First `visit` on a published topic → 200 + `in_progress`.
-- `visit` when already `completed` → 200 + no status change.
-- `complete` from `not_started` → 200 + `completed_at` stamped.
-- `visit` on a draft topic → 404.
-- `complete` without enrollment → 403.
-- Non-existent topic id → 404.
+- **Enrollment Check:** Both endpoints return `403` if the topic is not in the student's effective-access set.
+- **Draft/Archived Guard:** Both endpoints return `404` for non-published topics (to prevent information disclosure about the existence of hidden content).
+
+### 4. Response Shape
+
+Both endpoints return `{ topicProgress, changed }`, where `changed` indicates whether the status was actually updated, allowing the UI to decide whether to refresh related views.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Both routes implemented and tested.
-- [ ] The monotonic-status contract has an explicit test.
-- [ ] `make lint` clean. `make test-api` green.
+- [ ] Both endpoints are implemented and guarded correctly.
+- [ ] The monotonic status contract is covered by a test (visit on a completed topic must not change status).
+- [ ] The `changed` flag correctly distinguishes mutations from no-ops.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter api test` green.
-2. Curl as seeded student:
-   `POST /topics/$T/visit` → 200 `in_progress`,
-   `POST /topics/$T/complete` → 200 `completed`,
-   `POST /topics/$T/visit` → 200 (no regression).
+### Automated Tests
+- `pnpm --filter api test` — integration suite for topic progress endpoints.
+
+### Manual Verification
+- As a seeded, enrolled student: visit a topic (becomes `in_progress`), complete it, then visit again and verify it stays `completed`.

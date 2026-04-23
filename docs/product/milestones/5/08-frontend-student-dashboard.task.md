@@ -10,110 +10,56 @@
 
 ## Summary
 
-Replace the `/dashboard` placeholder with a genuine student home surface:
-progress summary cards, a "Continue" list of in-progress tasks, and a
-per-top-level-topic progress breakdown.
+Replace the `/dashboard` placeholder with a functional student home page. The dashboard gives students a motivating, at-a-glance view of their learning journey: overall progress, content to continue, and a topic-by-topic breakdown.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Client-side data fetching** via `useAuth` token + the new `progressApi`;
-  no server components (the token lives in context).
-- **No heavy chart deps in M5:** all visualisations are plain SVG + Tailwind.
-  A `RadialProgress` atom renders an SVG circle with `stroke-dasharray`
-  math; a `BarProgress` atom renders a div with width %.
-- **Stale-while-revalidate feel:** on mount, render cached data from a small
-  in-memory map, then fetch fresh; the UI flashes freshly but never shows an
-  empty state unless the data really is empty.
-- **Accessibility:** every progress visualisation has an adjacent numeric
-  readout (`<span aria-hidden>` for the ring, `<span className="sr-only">`
-  carrying "40 % of topics completed"). No colour-only encoding.
+- **Path:** `/dashboard` (replaces existing placeholder).
+- **Data Fetching:** Client-side using the progress API, authenticated via the session token.
+- **Visualizations:** Plain SVG-based progress rings and percentage bars — no heavy charting libraries in M5.
+- **Accessibility:** Every visual progress indicator must have an adjacent numerical text equivalent. No color-only encoding.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. API client — `apps/web/src/lib/progress-api.ts`
+### 1. Dashboard Layout
 
-```ts
-export const progressApi = {
-  summary(token): Promise<ProgressSummary>;
-  topics(token): Promise<TopicProgressEntry[]>;
-  tasks(token): Promise<TaskProgressEntry[]>;
-};
-```
+The dashboard is organized into three sections:
 
-### 2. Page — `apps/web/src/app/(protected)/dashboard/page.tsx`
+- **Summary Row:** High-level progress cards showing overall topic completion %, task completion %, and last activity timestamp.
+- **"Continue" Section:** A short list of in-progress tasks the student can resume, each deep-linking to the task detail page.
+- **Topics Breakdown:** Per-root-topic progress bars showing completion percentage rolled up across all descendant topics.
 
-Layout:
+### 2. Topic Progress Roll-up
 
-```
-┌──────────────────────────────────────────────┐
-│  ⟨greeting⟩                                   │
-├──────────────────────────────────────────────┤
-│  SummaryRow:                                  │
-│    [Topics 40%] [Tasks 40%] [Last active …]   │
-├──────────────────────────────────────────────┤
-│  "Continue" section                           │
-│    Card: Task A — Stage 2 "Practice" — [Open] │
-│    Card: Task B — Stage 1 "Reading"  — [Open] │
-├──────────────────────────────────────────────┤
-│  Topics section (top-level only)              │
-│    "Futebol"   ▰▰▰▰▱▱▱▱▱▱ 40%                 │
-│    "Vôlei"     ▰▰▱▱▱▱▱▱▱▱ 20%                 │
-└──────────────────────────────────────────────┘
-```
+For the topics breakdown, compute per-root-topic completion by aggregating progress across all descendants:
+- A pure utility function should handle this calculation independently of rendering, making it independently testable.
 
-### 3. Components — under `apps/web/src/components/progress/`
+### 3. User Experience
 
-- `summary-card.tsx` — label, big number / percent, subtitle.
-- `continue-list.tsx` — task card row; deep-links to `/tasks/:id`.
-- `topic-progress-list.tsx` — bar-per-root-topic. Rolls up descendants as:
-  `descendants_completed / descendants_total`.
-- `radial-progress.tsx` and `bar-progress.tsx` — atoms.
-
-### 4. Roll-up logic
-
-Given `TopicProgressEntry[]` and a lightweight tree structure from `/topics`,
-compute for each root:
-
-```ts
-{
-  rootId,
-  rootTitle,
-  completed: descendants.filter(t => t.status === 'completed').length,
-  total:     descendants.length,
-}
-```
-
-Extract into `apps/web/src/lib/progress-rollup.ts` (pure function, unit-tested).
-
-### 5. Tests — `apps/web/__tests__/app/dashboard.test.tsx`
-
-- Renders summary percentages from mocked API.
-- "Continue" list renders up to 3 most recent in-progress tasks ordered by
-  `updatedAt DESC`.
-- Topic roll-up collapses descendants under their root.
-- Empty state: `summary.topics.total === 0` → "You don't have any topics
-  assigned yet" message (no progress bar).
-- Accessible copy: each progress ring has a text equivalent.
+- **Stale-While-Revalidate:** Show cached data immediately on mount, then refresh in the background. The dashboard should never show an empty state unless the data is truly empty.
+- **Empty State:** When no topics are assigned, show a friendly message; do not suggest creating content (students cannot).
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] `/dashboard` renders the three sections with live API data.
-- [ ] Pure `progress-rollup` function has its own unit tests.
-- [ ] Loads under 500 ms against a seeded fixture of 50 topics + 10 tasks
-      (`performance.mark` measurement; document in PR).
-- [ ] Component tests in §5 pass.
-- [ ] `make lint` clean. `pnpm --filter web test` green.
+- [ ] The dashboard renders summary cards, continue-list, and topic breakdown with live API data.
+- [ ] The progress roll-up utility is independently unit tested.
+- [ ] Empty states are handled gracefully for both topics and tasks.
+- [ ] All progress visualizations have accessible text equivalents.
+- [ ] Component tests cover summary rendering, continue-list, topic roll-up, and empty states.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter web test` green.
-2. Manual: log in as seeded student; check boxes / progress bars update after
-   a check-in in another tab and a dashboard refresh.
+### Automated Tests
+- `pnpm --filter web test` — component tests for the dashboard.
+
+### Manual Verification
+- Log in as a seeded, enrolled student; complete a check-in in another tab, refresh the dashboard, and verify the progress percentages update.

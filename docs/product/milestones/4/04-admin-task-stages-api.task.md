@@ -10,75 +10,53 @@
 
 ## Summary
 
-Nested REST endpoints for `TaskStage` CRUD + bulk reorder. Lives under
-`/admin/tasks/:id/stages`. Includes the parent-status guard ("cannot delete stages
-on a published task").
+Implement nested REST endpoints for managing `TaskStage` resources under `/admin/tasks/:id/stages`. Includes CRUD operations and a bulk reorder action, with a parent-status guard preventing stage mutations on published tasks.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Order allocation on create:** new stages go to `max(order) + 10` (gaps of 10 keep
-  manual insertions cheap without a full renumber). If the table is empty, start at
-  `10`.
-- **Reorder atomicity:** `POST /admin/tasks/:id/stages/reorder` accepts the full
-  ordered id list and rewrites every `order` in a single batched transaction. The
-  request is rejected if the id set does not exactly match the persisted set
-  (`409 STAGE_SET_MISMATCH`).
-- **Delete guard:** if the parent task is `published`, `DELETE` returns
-  `409 STAGE_DELETE_FORBIDDEN` with `reason: 'PARENT_PUBLISHED'`.
-- **Label validation:** 1–120 chars, trimmed, no newlines.
+- **Router:** Extends `apps/api/src/routes/admin-tasks.router.ts`.
+- **Service:** Extends `apps/api/src/core/engagement/task-service.ts`.
+- **Security:** Inherits `authGuard + requireRole(ADMIN, CONTENT_CREATOR)` from the parent task router.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Extend `TaskService` (same file as Task 03)
+### 1. Stage Management Endpoints
 
-```ts
-addStage(taskId, input: { label: string }): Promise<TaskStageRecord>;
-updateStage(taskId, stageId, patch: { label?: string }): Promise<TaskStageRecord>;
-deleteStage(taskId, stageId): Promise<void>;   // enforces parent-status guard
-reorderStages(taskId, orderedIds: string[]): Promise<TaskStageRecord[]>;
-```
+| Method   | Path                                     | Description                                     |
+|----------|------------------------------------------|-------------------------------------------------|
+| `POST`   | `/admin/tasks/:id/stages`                | Add a new stage to a task.                      |
+| `PATCH`  | `/admin/tasks/:id/stages/:stageId`       | Update a stage's label.                         |
+| `DELETE` | `/admin/tasks/:id/stages/:stageId`       | Remove a stage from a task.                     |
+| `POST`   | `/admin/tasks/:id/stages/reorder`        | Rewrite the full ordered sequence of stages.    |
 
-The service validates that `stageId.taskId === taskId` before mutation (404 if not).
+### 2. Business Rules
 
-### 2. Router — extend `admin-tasks.router.ts`
-
-```ts
-router.post  ('/admin/tasks/:id/stages',                       addStageHandler);
-router.patch ('/admin/tasks/:id/stages/:stageId',              updateStageHandler);
-router.delete('/admin/tasks/:id/stages/:stageId',              deleteStageHandler);
-router.post  ('/admin/tasks/:id/stages/reorder',               reorderHandler);
-```
-
-### 3. Tests — `apps/api/test/routes/admin-task-stages.spec.ts`
-
-- Create stage on draft task → 201; order is 10 (first), 20 (second), 30 (third).
-- Reorder `[third, first, second]` → 200, reading the task returns the new order.
-- Reorder with a missing id → 409 `STAGE_SET_MISMATCH`.
-- PATCH label to a 200-char string → 400 (validation).
-- Delete on `draft` task → 204.
-- Delete on `published` task → 409 `STAGE_DELETE_FORBIDDEN`.
-- Stage not belonging to `:id` → 404.
+- **Auto-ordering:** New stages are appended to the end of the list with automatic order allocation.
+- **Atomic Reorder:** The reorder endpoint accepts the complete, desired ordered list of stage IDs and replaces the existing order. The request is rejected if the provided set does not exactly match the current set (`409 STAGE_SET_MISMATCH`).
+- **Label Validation:** Stage labels must be 1–120 characters, trimmed, with no newlines.
+- **Parent-Status Guard:** Stages cannot be deleted when the parent Task has `published` status (`409 STAGE_DELETE_FORBIDDEN`).
+- **Ownership Validation:** Any stage operation must verify the stage belongs to the specified Task (otherwise `404`).
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] All routes in §2 implemented, tested, and wired in `AppRouter`.
-- [ ] Order allocation and reorder atomicity verified under concurrent-write test
-      (two requests racing reorder → both succeed or one returns `STAGE_SET_MISMATCH`;
-      no duplicate orders).
-- [ ] `make lint` clean. `make test-api` green.
+- [ ] All four endpoints are implemented and tested.
+- [ ] Stage reorder is atomic with no duplicate order conflicts.
+- [ ] The parent-status delete guard is enforced and covered by a test.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter api test` green.
-2. Manual sequence via curl:
-   - create task (draft), add 3 stages, reorder, delete middle stage, read.
-3. `sqlite3 .wrangler/state/d1/DB.sqlite "SELECT id, \"order\" FROM task_stages;"` →
-   orders match the last reorder call.
+### Automated Tests
+- `pnpm --filter api test` — integration suite for `admin-task-stages.spec.ts`.
+
+### Manual Verification
+- Create a task, add three stages, reorder them via the API, and verify persistence.
+- Publish the task and verify that the delete endpoint returns the correct 409 error.

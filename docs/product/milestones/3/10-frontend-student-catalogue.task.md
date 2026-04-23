@@ -10,100 +10,61 @@
 
 ## Summary
 
-Build the read-only surface at `/catalog` where any signed-in user can browse the
-published topic tree and consume its content. Introduces the three viewers: safe
-Markdown, inline PDF, and native HTML5 video.
+Build the public catalogue where students can browse the educational hierarchy and consume content. This task involves creating the read-only catalogue interface and specialized viewers for different media types (Markdown, PDF, Video, Images).
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Defence in depth:** Markdown is sanitized on the server (Task 04 write-path) AND
-  again in the client via `renderSafeMarkdownToHtml` from Task 07. The page uses
-  `dangerouslySetInnerHTML` only on the result of that helper — never on raw input.
-- **URL freshness:** each time a media item is viewed, use the `downloadUrl` returned
-  by the API (15-minute expiry). Do not cache URLs across route changes.
-- **Server components where possible:** the outer `/catalog/page.tsx` is a client
-  component (it uses `useAuth`), but viewers themselves can be simple presentational
-  components.
-- **Accessibility:** the tree uses `role="tree"` / `role="treeitem"`; media viewers
-  have text alternatives (title attribute + visible filename for PDF/video fallback).
+- **Path:** `/catalog`
+- **Security:** Accessible to any authenticated user.
+- **Content Integrity:** Employs client-side sanitization for Markdown rendering to ensure a secure viewing experience.
+- **Media Strategy:** Uses short-lived presigned URLs for all media assets.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. API client — `apps/web/src/lib/topics-api.ts`
+### 1. Catalogue Browser
 
-```ts
-export const topicsApi = {
-  list(token): Promise<TopicNodeRecord[]>;       // published only
-  get(token, id): Promise<TopicNodeDetail>;      // node + children + media(with downloadUrl)
-};
-```
+- **Navigation:** A hierarchical sidebar for browsing the published topic tree.
+- **Content Selection:** Selecting a topic updates the main view with its full content and media list.
 
-### 2. Page — `apps/web/src/app/(protected)/catalog/page.tsx`
+### 2. Specialized Viewers
 
-Layout:
-```
-┌────────────┬────────────────────────────┐
-│ Sidebar    │  Content pane               │
-│ (tree)     │  ── Title                   │
-│            │  ── Tags · estimatedMinutes │
-│            │  ── Sanitized Markdown      │
-│            │  ── Media list              │
-│            │       • PdfViewer           │
-│            │       • VideoViewer         │
-│            │       • ImageViewer         │
-└────────────┴────────────────────────────┘
-```
+- **Markdown Viewer:** Renders rich text content with consistent typography and strict sanitization.
+- **PDF Viewer:** Enables inline viewing of PDF documents with fallback options for unsupported browsers.
+- **Video Player:** Native HTML5 video playback for educational content.
+- **Image Gallery:** Optimized display of attached images.
 
-### 3. Viewers — `apps/web/src/components/viewers/`
+### 3. Accessibility & UX
 
-- `markdown-viewer.tsx` — takes raw Markdown, renders via
-  `renderSafeMarkdownToHtml`, injects with `dangerouslySetInnerHTML`, adds a `prose`
-  CSS class for typography.
-- `pdf-viewer.tsx` — `<object data={url} type="application/pdf" className="w-full h-[70vh]">`
-  with a fallback `<a>` link for browsers without the plugin.
-- `video-viewer.tsx` — `<video controls src={url} className="w-full max-h-[70vh]">`
-  with a captions slot (unused this milestone but stub the prop).
-- `image-viewer.tsx` — `<img alt={name} src={url}>` with lazy loading.
-
-### 4. Tree sidebar — `apps/web/src/components/topics/catalog-tree.tsx`
-
-Same flat → nested transform as Task 08's admin tree, but read-only (no drag-drop).
-
-### 5. Component tests — `__tests__/app/catalog.test.tsx`
-
-- Tree renders from mock data.
-- Selecting a node fetches its detail and renders Markdown + media.
-- Attempting to render `# Heading\n\n<script>alert(1)</script>` results in the
-  heading being visible but `window.alert` is never called (verify via spy).
-- A media item of type `application/pdf` renders `<object type="application/pdf">`.
+- **Semantic Structure:** Ensure the tree and content panes use appropriate ARIA roles for accessibility.
+- **Loading States:** Provide smooth transitions and skeleton loaders while fetching topic details or media.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] `/catalog` is reachable by any signed-in user.
-- [ ] Only published topics appear in the tree.
-- [ ] Markdown renders headings, bold, lists, code blocks, links.
-- [ ] A topic whose Markdown contains `<script>` does NOT execute JS (XSS test passes).
-- [ ] A PDF embeds inline and loads via the presigned URL.
-- [ ] A video streams via the presigned URL with native controls.
-- [ ] Component tests in §5 pass.
-- [ ] `make lint` clean; `pnpm --filter web test` green.
+- [ ] The `/catalog` page is functional and restricted to authenticated users.
+- [ ] Students can only see `published` content and `ready` media.
+- [ ] Markdown content is rendered accurately and securely (no XSS).
+- [ ] PDF and Video content is accessible inline via presigned URLs.
+- [ ] The catalogue is fully navigable using keyboard/screen readers (Basic ARIA compliance).
+- [ ] Component tests cover the navigation logic and the safety of the Markdown viewer.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter web test` — green.
-2. Manual (both apps running with content seeded via the admin UI):
-   - Log in as a student.
-   - Navigate to `/catalog`.
-   - Select a node with a PDF and a video → both play inline.
-   - Inspect DevTools Network: asset requests go to R2, each URL has `X-Amz-Expires` ≈ 900.
-3. XSS smoke test: as admin, create a topic with content
-   `# Hi\n\n<script>window.__xss=true</script>` and publish. Open as student → page
-   loads; `window.__xss` is undefined.
+### Automated Tests
+- Component tests for the catalogue view and media players: `pnpm --filter web test`.
+- Verify the "Safe Markdown" contract in the browser environment.
+
+### Manual Verification
+- Log in as a student and perform the following:
+    1. Browse the topic tree and select various topics.
+    2. Verify that Markdown, PDF, and Video content renders correctly.
+    3. Confirm that no internal/draft content is visible.
+    4. Verify that media URLs expire as expected (by waiting or checking headers).

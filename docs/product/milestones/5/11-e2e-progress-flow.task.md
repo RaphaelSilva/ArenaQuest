@@ -10,91 +10,63 @@
 
 ## Summary
 
-Extend the Playwright smoke suite with a third scenario exercising the full
-M5 loop end-to-end: admin enrolls → student consumes a topic → student
-checks into every stage of a task → dashboard reflects 100 %.
+Extend the Playwright E2E suite with a third scenario covering the complete Milestone 5 engagement loop end-to-end: an admin enrolls a student, the student consumes content, checks into all task stages, and the dashboard reflects 100% completion.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- Runs under the existing `e2e/` workspace — no new runner / CI job.
-- Scenario budget: under 60 s locally on a warm start.
-- Uses semantic selectors (`getByRole`, `getByText`) — never CSS classes.
-- Reuses the M4 fixture helpers (`createTaskViaApi`, `addStageViaApi`, etc.)
-  plus new ones for enrollment.
+- **Framework:** Extends the existing `e2e/` workspace. No new runner or CI jobs required.
+- **Isolation:** Each test run seeds unique topics and tasks via API helpers, with a unique enrollment grant.
+- **CI:** The existing `e2e.yml` automatically picks up new spec files.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Fixture extensions — `e2e/fixtures/auth.ts`
+### 1. New E2E Fixture Helpers
 
-```ts
-export async function grantTopicToUserViaApi(adminToken, userId, topicId): Promise<void>;
-export async function revokeTopicFromUserViaApi(adminToken, userId, topicId, opts?): Promise<void>;
-```
+The API fixture helpers need to be extended to support M5 enrollment operations:
+- Grant topic access to a user via the Admin API.
+- Revoke topic access from a user via the Admin API.
 
-### 2. Spec — `e2e/tests/progress-flow.spec.ts`
+### 2. Core E2E Scenario
 
-```ts
-test('enrolled student completes a task and sees dashboard update', async ({ page }) => {
-  const admin = await apiLogin('admin@arenaquest.com', 'password123');
+The new spec must cover the following complete happy path:
+1. **Admin Seeds Content:** Creates published topics, a multi-stage task, links topics to stages, and publishes the task.
+2. **Admin Enrolls Student:** Grants the student access to the root topic subtree.
+3. **Student Checks Dashboard:** Verifies the initial progress shows 0%.
+4. **Student Completes Task:** Navigates to the task and checks into every stage in order.
+5. **Dashboard Reflects Completion:** Returns to the dashboard and verifies both topic and task progress show 100%.
 
-  const root    = await createTopicViaApi(admin, { title: 'E2E Progress Root', status: 'published' });
-  const child   = await createTopicViaApi(admin, { title: 'E2E Child',      status: 'published', parentId: root.id });
+### 3. Negative-Path Coverage (Recommended)
 
-  const task    = await createTaskViaApi(admin, {
-    title: 'E2E Progress Task',
-    description: 'Check in through all stages.',
-    topicIds: [child.id],
-  });
-  const s1 = await addStageViaApi(admin, task.id, { label: 'Reading' });
-  const s2 = await addStageViaApi(admin, task.id, { label: 'Practice' });
-  const s3 = await addStageViaApi(admin, task.id, { label: 'Review' });
-  for (const s of [s1, s2, s3]) await setStageTopicsViaApi(admin, task.id, s.id, [child.id]);
-  await publishTaskViaApi(admin, task.id);
+- Before enrollment, the student should not see the task in `/tasks`.
+- After access is revoked (with cascade), the task should disappear again.
 
-  const student = await apiFindUserByEmail(admin, 'student@arenaquest.com');
-  await grantTopicToUserViaApi(admin, student.id, root.id);
+### 4. Performance Budget
 
-  await loginAs(page, 'student@arenaquest.com', 'password123');
-  await page.goto('/dashboard');
-  await expect(page.getByText(/Topics .*0%/)).toBeVisible();
-
-  await page.goto(`/tasks/${task.id}`);
-  for (const label of ['Reading', 'Practice', 'Review']) {
-    await page.getByRole('button', { name: new RegExp(`Check in .*${label}`, 'i') }).click();
-    await expect(page.getByText(new RegExp(`Checked in.*${label}`, 'i'))).toBeVisible();
-  }
-
-  await page.goto('/dashboard');
-  await expect(page.getByText(/Tasks .*100%/)).toBeVisible();
-  await expect(page.getByText(/Topics .*100%/)).toBeVisible();
-});
-```
-
-### 3. Negative-path spec (optional in the same file)
-
-- Before the grant, visit `/tasks` → task is NOT present.
-- After revoke (cascade=true), re-visit `/tasks` → task is absent again.
+- The new scenario must complete in under 60 seconds locally on a warm start.
+- The full E2E suite (M3 + M4 + M5 scenarios) must remain under 4 minutes on a cold start.
 
 ---
 
 ## Acceptance Criteria
 
 - [ ] New spec passes locally via `make e2e`.
-- [ ] Same spec passes in CI.
-- [ ] Forced failure (e.g. break the "Review" label assertion) uploads
-      traces + screenshots.
-- [ ] Full E2E suite (three scenarios from M3, M4, M5) finishes under 4
-      minutes locally on a cold start.
-- [ ] `make lint` clean.
+- [ ] New spec passes in CI on a PR.
+- [ ] Playwright traces and screenshots are captured on a forced test failure.
+- [ ] Full E2E suite duration remains within the 4-minute budget.
+- [ ] Tests use semantic selectors (`getByRole`, `getByText`) exclusively.
+- [ ] Codebase remains lint-clean.
 
 ---
 
 ## Verification Plan
 
-1. `make dev` + `make e2e` → all three specs green.
-2. Force failure as above → useful trace in `e2e/test-results/`; revert.
-3. CI run on a PR uploads artifacts on the intentional failure attempt.
+### Automated Tests
+- `make e2e` — all three scenario files (M3, M4, M5) must pass.
+
+### Manual Verification
+- Break an assertion intentionally and verify a useful Playwright trace is generated.
+- Confirm the CI run on a test branch reports the correct pass/fail status.

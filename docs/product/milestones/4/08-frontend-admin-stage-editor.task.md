@@ -10,92 +10,50 @@
 
 ## Summary
 
-Fill the `StagesEditor` slot inside the task editor with a fully interactive
-sortable stage list. Each stage row has an inline-editable label, a
-per-stage topic picker constrained to the parent task's link set, and a delete
-button that respects the parent-status guard.
+Implement the interactive Stage Editor component that fills the placeholder slot in the Task Editor (Task 07). Authors can add, rename, reorder, delete, and assign topics to each stage.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Drag-drop:** `@dnd-kit/sortable` (already used by the topic tree). Reorder fires
-  `POST /admin/tasks/:id/stages/reorder` with the new ordered id list. On failure
-  (e.g. `STAGE_SET_MISMATCH`), revert to the last server state and toast the
-  message.
-- **Per-stage topic picker:** receives `allowedTopicIds` (the task-level set) as a
-  prop. Topics outside the set are disabled (with a tooltip: "Add this topic to
-  the task first") rather than hidden — gives the author a visible hint that the
-  set can be widened.
-- **Delete guard:** if the parent task is `published`, the delete button is
-  disabled with a tooltip "Archive the task first to edit its stages".
-- **Optimistic rename:** label changes are sent on blur; on 400 validation, revert
-  and show an inline error.
+- **Component:** `apps/web/src/components/tasks/stage-editor.tsx` — mounted inside the Task Editor page from Task 07.
+- **API:** Extends the admin tasks API client with stage and stage-topic operations.
+- **Drag-and-Drop:** Reuses the `@dnd-kit/sortable` library already in place from the Milestone 3 Topic Tree.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. API client — extend `admin-tasks-api.ts`
+### 1. Stage List Management
 
-```ts
-addStage(token, taskId, input): Promise<TaskStage>;
-updateStage(token, taskId, stageId, patch): Promise<TaskStage>;
-deleteStage(token, taskId, stageId): Promise<void>;
-reorderStages(token, taskId, orderedIds): Promise<TaskStage[]>;
-setStageTopics(token, taskId, stageId, topicIds): Promise<string[]>;
-```
+- **Reorderable:** Authors can drag-and-drop stages to reorder them. On drop, the change is persisted immediately. If the reorder fails server-side (e.g., `STAGE_SET_MISMATCH`), the list reverts to the previous state and shows a toast error.
+- **Add Stage:** A button to append a new stage, which appears immediately in the list.
+- **Rename Stage:** Inline label editing; changes are saved on blur. Validation errors revert the field and show an inline message.
+- **Delete Stage:** Only available when the parent task is in `draft` status. When the task is `published`, the delete button is disabled with a clear tooltip explaining why.
 
-### 2. Component — `apps/web/src/components/tasks/stage-editor.tsx`
+### 2. Per-Stage Topic Association
 
-Props: `{ task, onChange }`.
-
-Structure:
-
-```tsx
-<SortableList
-  items={task.stages}
-  onReorder={handleReorder}
->
-  {(stage) => (
-    <StageRow
-      stage={stage}
-      allowedTopicIds={task.linkedTopicIds}
-      deleteDisabled={task.status === 'published'}
-      onLabelChange={...}
-      onTopicsChange={...}
-      onDelete={...}
-    />
-  )}
-</SortableList>
-<AddStageButton onAdd={...} />
-```
-
-### 3. Tests — `apps/web/__tests__/app/admin/stage-editor.test.tsx`
-
-- Renders N stages from props.
-- "Add stage" calls `addStage` with `{ label: 'New stage' }`.
-- Drag-reorder calls `reorderStages` with the correct id array.
-- Reorder server-side failure → list reverts, toast shown.
-- `setStageTopics` call includes only ids present in the parent task's set (UI
-  prevents selecting others).
-- When `task.status === 'published'`, delete buttons are disabled.
+- Each stage row has a Topic Picker constrained to the parent task's topic set.
+- Topics outside the task's set are visible but disabled with a hint ("Add this topic to the task first"), guiding authors to widen the task-level set first.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Authors can add, rename, reorder, and (when permitted) delete stages.
-- [ ] Authors can attach topics to each stage from the constrained picker.
-- [ ] All four server-side guards (parent-published delete, stage-set mismatch,
-      stage-not-in-task, 409 publishability) surface as clear inline UI errors.
-- [ ] Component tests in §3 pass.
-- [ ] `make lint` clean. `pnpm --filter web test` green.
+- [ ] Authors can add, rename, reorder, and delete stages (subject to the parent-status guard).
+- [ ] Stage reorder is persisted and reverts gracefully on failure.
+- [ ] Per-stage topic association is constrained to the task's link set.
+- [ ] The delete button is disabled for published tasks with an informative tooltip.
+- [ ] Component tests cover all interactions and guard behaviors.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter web test` green.
-2. Manual: open a draft task → add 3 stages → reorder via drag → reload → order
-   preserved. Publish the task → delete button becomes disabled.
+### Automated Tests
+- `pnpm --filter web test` — component tests for the stage editor.
+
+### Manual Verification
+- Open a draft task with 3 stages, drag to reorder, then reload and verify the new order is persisted.
+- Publish the task and verify the delete action is disabled.

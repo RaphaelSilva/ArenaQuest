@@ -10,81 +10,56 @@
 
 ## Summary
 
-Until now the student surfaces returned **all published** topics and tasks.
-This task tightens the filter: a student sees only topics in their
-effective-access set, and only tasks whose linked-topic set is a subset of
-that access set. Admins and content creators bypass the filter.
+Tighten the student-facing read APIs to enforce enrollment-based access control. Previously, students could see all published content. After this task, students only see topics they are enrolled in and tasks whose content is fully within their access set.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Role bypass:** if the caller has `admin` or `content_creator` role, skip
-  the filter entirely. This keeps the admin "preview as student" flow a
-  future UI concern, not something to bake in now.
-- **Single access lookup per request:** cache the `effectiveAccessTopicIds`
-  set on a request-scoped `c.get('access')` once, reuse across the request.
-- **No silent trimming:** a task whose `linkedTopicIds` is NOT a subset of the
-  caller's access is OMITTED from the list and 404's on detail. Do not return
-  a half-rendered task.
-- **Backwards compatibility note for the UI:** this changes observable behaviour
-  for existing fixtures. Seeds and Playwright helpers in M3 / M4 assumed
-  "published = visible"; update those fixtures to also enroll the seeded
-  student user into the relevant subtree so tests remain green.
+- **Affected Services:** `TopicReadService` (M3) and `TaskReadService` (M4).
+- **Access Lookup:** Computed once per request from `IEnrollmentRepository.getEffectiveAccessTopicIds()` and cached on request context.
+- **Role Bypass:** Admins and content creators bypass this filter entirely.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Read services
+### 1. Enrollment-based Visibility
 
-- Extend `TopicReadService` (M3) with an `accessibleTopicIds?: Set<string>`
-  filter; when present, every list/get query includes a `WHERE id IN (...)`
-  clause or filters post-fetch for trees.
-- Extend `TaskReadService` (M4 Task 06) analogously, filtering tasks where
-  `linkedTopicIds ⊄ accessibleTopicIds`.
+- **Topics (`/topics`, `/catalog`):** A student can only see topics within their effective-access set.
+- **Tasks (`/tasks`):** A student can only see tasks where the complete linked-topic set is a subset of their effective-access set. Tasks with any inaccessible linked topic are fully hidden.
+- **No Silent Trimming:** Tasks are either fully shown or fully hidden. Never return a task with a partial set of stages or topics.
 
-### 2. Wiring
+### 2. Access Lookup Efficiency
 
-- In `apps/api/src/index.ts` (or the composition file), for every request that
-  passes through `authGuard` AND the caller is a student, populate
-  `c.set('access', await enrollments.getEffectiveAccessTopicIds(userId))`.
-  Skip for admin/content_creator roles.
+- The effective-access set must be computed only once per incoming request and stored on the request context for reuse by any handler that needs it.
 
-### 3. Fixture updates
+### 3. Backwards Compatibility (Fixture Updates)
 
-- M3 Playwright fixture: `createTopicViaApi` in `e2e/fixtures/auth.ts` now also
-  enrolls the seeded `student@arenaquest.com` into the created root topic (via
-  the M5 admin enrollment API).
-- M4 Playwright fixture: similarly, after publishing a task, ensure its linked
-  topics are in the student's access set.
-- Seed SQL (`apps/api/scripts/0004_seed_dev_users.sql` or a new seed) grants
-  the demo student access to the demo root topic.
-
-### 4. Tests
-
-- `apps/api/test/routes/tasks-public.spec.ts` gains cases: unenrolled student
-  sees empty `/tasks`; after grant, sees the task; after revoke, back to
-  empty.
-- `apps/api/test/routes/topics-public.spec.ts` gains analogous cases.
-- Admin role sees everything regardless of grants — verify with a dedicated
-  test.
+This change affects existing tests and E2E scenarios. All fixtures that assume "published = visible" must be updated to also enroll the test student user into the relevant topic subtree:
+- M3 Playwright fixtures: enroll the seeded student when creating topics.
+- M4 Playwright fixtures: enroll the seeded student before checking task visibility.
+- Dev seed data: grant the demo student access to the demo root topic.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Student sees only accessible topics and tasks.
-- [ ] Admin/content_creator sees everything.
-- [ ] M3 and M4 Playwright scenarios still pass after fixture updates.
-- [ ] `make lint` clean. `make test-api` green. `make e2e` green.
+- [ ] Students see only enrolled topics and eligible tasks.
+- [ ] Admins and content creators see all content regardless of enrollment.
+- [ ] M3 and M4 Playwright E2E scenarios remain green after fixture updates.
+- [ ] Integration tests verify both visibility and invisibility for unenrolled students.
+- [ ] Codebase remains lint-clean; all unit, integration, and E2E tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter api test` green (with updated M3/M4 suites).
-2. `make e2e` green — both the M3 catalogue scenario and the M4 task scenario
-   pass with the new enrollment seeding.
-3. Curl as unenrolled student: `/tasks` returns `[]`; grant; `/tasks` returns
-   the task.
+### Automated Tests
+- `pnpm --filter api test` — updated visibility test suites for topics and tasks.
+- `make e2e` — all M3, M4 scenarios pass with updated fixtures.
+
+### Manual Verification
+- As an unenrolled student: verify `/tasks` and `/topics` return empty results.
+- Grant access and verify the content becomes visible.
+- Revoke access and verify content disappears.

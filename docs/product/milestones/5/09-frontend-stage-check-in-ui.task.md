@@ -1,4 +1,4 @@
-# Task 09: Frontend — Stage Check-in UI + Topic Mark-as-read
+# Task 09: Frontend — Stage Check-in UI & Topic Mark-as-read
 
 ## Metadata
 - **Status:** Pending
@@ -10,98 +10,53 @@
 
 ## Summary
 
-Wire the two student-facing write surfaces:
-
-- On `/tasks/:id`, per-stage "Check in" buttons respecting ordering.
-- On `/catalog/:id`, a "Mark as read" button + a silent "visited" beacon on
-  first mount.
+Wire the student-facing engagement controls into the existing UI. This adds "Check in" buttons to the task view for completing stages sequentially, and a "Mark as read" button with a silent visit tracker to the topic catalogue viewer.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Disable-then-toast pattern:** the check-in button disables while the
-  request is in flight. On 409 `OUT_OF_ORDER`, the UI surfaces
-  "Check in stage ⟨N⟩ first" using the `expected.label` from the error body.
-- **Double-click guard:** the onClick handler bails if a pending request is
-  already tracked for that stage id (local Map). Separate from the server-side
-  idempotency — both layers must work.
-- **Visited beacon:** fired via `navigator.sendBeacon` when available,
-  otherwise `fetch(..., { keepalive: true })`. It must not block the render.
-- **Local optimistic update:** on a 2xx, append to a local `checkedIn` set so
-  the UI instantly renders the next stage as primary. Re-sync from the server
-  on mount or when the user navigates back.
-- **Accessibility:** stage list is an `<ol>`; the primary next stage is marked
-  with `aria-current="step"`.
+- **Task View:** Extends `apps/web/src/components/tasks/stage-list.tsx` from M4.
+- **Topic View:** Extends `apps/web/src/components/viewers/` from M3.
+- **API clients:** Extends `tasks-api.ts` and `topics-api.ts` with the new write operations.
 
 ---
 
-## Scope
+## Requirements
 
-### 1. API client extensions
+### 1. Stage Check-in Interaction (`/tasks/:id`)
 
-`apps/web/src/lib/tasks-api.ts`:
+- **Visual Stage States:** Each stage in the task view must display one of three states:
+    - **Checked:** Stage is complete; shows completion date.
+    - **Current:** The next expected stage; shows an active "Check in" button.
+    - **Locked:** Future stages; muted appearance with a tooltip ("Complete previous stages first").
+- **Ordering Errors:** If the API returns `409 OUT_OF_ORDER`, display a clear toast message naming the stage to complete first and revert any optimistic UI changes.
+- **Double-click Guard:** The check-in button must be disabled while a request is in flight to prevent duplicate submissions.
+- **Accessibility:** The stage list uses semantic ordered list markup, and the current active stage is marked with `aria-current="step"`.
 
-```ts
-checkInStage(token, taskId, stageId): Promise<{ taskProgress, stageProgress, created }>;
-```
+### 2. Topic Progress Interaction (`/catalog/:id`)
 
-`apps/web/src/lib/topics-api.ts`:
-
-```ts
-visit(token, topicId): Promise<void>;
-complete(token, topicId): Promise<{ topicProgress, changed }>;
-```
-
-### 2. Component — extend `apps/web/src/components/tasks/stage-list.tsx` (M4)
-
-- Load `taskProgress` and `stageCheckIns` from `/me/progress/tasks` and from
-  the task detail hydration (whichever is cheaper — measure in PR).
-- Render each stage with a status:
-  - `checked` (green chip with date)
-  - `current` (primary button "Check in")
-  - `locked` (muted; tooltip "Complete previous stages first")
-- On click, call `checkInStage`; on success, update local state and trigger a
-  dashboard-cache invalidation (simple event bus or a shared context).
-
-### 3. Component — extend `apps/web/src/components/viewers/topic-view.tsx` (M3)
-
-Props gain `{ progress, onComplete }`:
-
-- Fire `topicsApi.visit(topicId)` once on mount (per session — use a small
-  module-scoped `Set`).
-- Render a "Mark as read" button if `progress?.status !== 'completed'`.
-  Clicking calls `complete(topicId)` and flips the UI.
-
-### 4. Tests
-
-- `apps/web/__tests__/components/stage-list.test.tsx`
-  - Renders the next-expected stage as primary.
-  - Clicking it calls the API and advances local state.
-  - 409 error surfaces the expected-stage toast; UI reverts.
-  - Double-click fires exactly one API call.
-- `apps/web/__tests__/components/topic-view-progress.test.tsx`
-  - `visit` is called once per mount (not twice under StrictMode).
-  - "Mark as read" flips to `completed` + the button disappears.
-  - XSS still guarded (regression check against M3 Task 10).
+- **Silent Visit Beacon:** When a student first views a topic, silently send a "visit" signal to the API. This must be non-blocking and must not fire more than once per page mount.
+- **Mark as Read Button:** Display a "Mark as read" button when the topic is not yet completed. On click, call the complete endpoint and update the UI optimistically.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Student can advance through a 3-stage task via the UI.
-- [ ] Out-of-order click surfaces a useful toast and does not mutate state.
-- [ ] Topic visit beacon fires once per mount; mark-as-read works.
-- [ ] All tests in §4 pass.
-- [ ] `make lint` clean. `pnpm --filter web test` green.
+- [ ] Students can advance through a task's stages in the correct order.
+- [ ] Out-of-order check-in attempts surface a clear, actionable error message.
+- [ ] Topic visit beacon fires once on mount without blocking the page render.
+- [ ] "Mark as read" correctly updates the topic's status in the UI.
+- [ ] Component tests cover: stage state rendering, check-in flow, out-of-order error, double-click guard, and the mark-as-read flow.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter web test` green.
-2. Manual as seeded + enrolled student:
-   - Open `/tasks/:id`, check in all stages in order → dashboard shows 100 %
-     on the task.
-   - Open `/catalog/:id`, hit "Mark as read" → dashboard shows the topic
-     completed.
+### Automated Tests
+- `pnpm --filter web test` — component tests for the stage list and topic viewer interactions.
+
+### Manual Verification
+- As an enrolled student: complete all stages of a task in order and verify the dashboard updates.
+- Open a topic page and verify the visit is recorded; then click "Mark as read" and confirm the button disappears.

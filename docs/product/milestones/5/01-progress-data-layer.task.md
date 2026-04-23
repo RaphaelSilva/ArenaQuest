@@ -10,125 +10,67 @@
 
 ## Summary
 
-Introduce the three progress tables, their port (`IProgressRepository`), and its
-D1 adapter. The API surface is covered in Tasks 03, 04, and 06 — this task is
-strictly data-layer.
+Introduce the three progress tracking entities into the data layer. This is the foundational task for all engagement and progress features in Milestone 5.
 
 ---
 
-## Technical Constraints
+## Architectural Context
 
-- **Append-only for stage check-ins:** no `updated_at` column on
-  `task_stage_progress`; there is no `update` method on the repo.
-- **Upsert semantics:** `topic_progress` and `task_progress` use "insert on
-  conflict do update" via D1's `INSERT ... ON CONFLICT(...) DO UPDATE`.
-- **UTC ISO timestamps** everywhere.
-- **No business logic in the adapter** — ordering / gating / aggregation lives
-  in the service layer (Task 03+).
+- **Pattern:** Ports and Adapters — port in `packages/shared/ports/`, adapter in `apps/api/src/adapters/db/`.
+- **Migration:** `apps/api/migrations/0009_progress.sql`.
+- **Design Principle:** Append-only for stage check-ins (no updates, no deletes). Topic and task progress use upsert semantics (last write wins).
 
 ---
 
-## Scope
+## Requirements
 
-### 1. Migration — `apps/api/migrations/0009_progress.sql`
+### 1. `TopicProgress` Entity
 
-```sql
-CREATE TABLE topic_progress (
-  id            TEXT PRIMARY KEY,
-  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  topic_node_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-  status        TEXT NOT NULL CHECK (status IN ('not_started','in_progress','completed')),
-  completed_at  TEXT,
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL,
-  UNIQUE (user_id, topic_node_id)
-);
-CREATE INDEX idx_topic_progress_user ON topic_progress(user_id);
+Tracks a student's progress on a specific topic.
 
-CREATE TABLE task_progress (
-  id               TEXT PRIMARY KEY,
-  user_id          TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  task_id          TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-  status           TEXT NOT NULL CHECK (status IN ('not_started','in_progress','completed')),
-  current_stage_id TEXT REFERENCES task_stages(id),
-  completed_at     TEXT,
-  created_at       TEXT NOT NULL,
-  updated_at       TEXT NOT NULL,
-  UNIQUE (user_id, task_id)
-);
-CREATE INDEX idx_task_progress_user ON task_progress(user_id);
+**Fields:** `id`, `userId`, `topicNodeId`, `status` (`not_started` | `in_progress` | `completed`), `completedAt` (nullable), `createdAt`, `updatedAt`.
 
-CREATE TABLE task_stage_progress (
-  id             TEXT PRIMARY KEY,
-  user_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  task_id        TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-  stage_id       TEXT NOT NULL REFERENCES task_stages(id) ON DELETE CASCADE,
-  checked_in_at  TEXT NOT NULL,
-  UNIQUE (user_id, stage_id)
-);
-CREATE INDEX idx_stage_progress_user_task ON task_stage_progress(user_id, task_id);
-```
+**Constraint:** One row per `(userId, topicNodeId)` pair (unique index).
 
-### 2. Port — `packages/shared/ports/i-progress-repository.ts`
+### 2. `TaskProgress` Entity
 
-```ts
-export interface IProgressRepository {
-  // topic progress
-  getTopicProgress(userId, topicId): Promise<TopicProgressRecord | null>;
-  listTopicProgress(userId, topicIds?: string[]): Promise<TopicProgressRecord[]>;
-  upsertTopicProgress(
-    userId, topicId,
-    patch: { status: ProgressStatus; completedAt?: string | null },
-  ): Promise<TopicProgressRecord>;
+Tracks a student's overall progress through a task.
 
-  // task progress
-  getTaskProgress(userId, taskId): Promise<TaskProgressRecord | null>;
-  listTaskProgress(userId): Promise<TaskProgressRecord[]>;
-  upsertTaskProgress(
-    userId, taskId,
-    patch: { status: ProgressStatus; currentStageId?: string | null; completedAt?: string | null },
-  ): Promise<TaskProgressRecord>;
+**Fields:** `id`, `userId`, `taskId`, `status` (`not_started` | `in_progress` | `completed`), `currentStageId` (nullable), `completedAt` (nullable), `createdAt`, `updatedAt`.
 
-  // stage check-ins
-  hasStageCheckIn(userId, stageId): Promise<boolean>;
-  listStageCheckIns(userId, taskId): Promise<TaskStageProgressRecord[]>;
-  createStageCheckIn(userId, taskId, stageId): Promise<TaskStageProgressRecord>;
+**Constraint:** One row per `(userId, taskId)` pair.
 
-  // aggregates — used by the dashboard
-  countCompletedTopics(userId, topicIds?: string[]): Promise<number>;
-  countCompletedTasks(userId, taskIds?: string[]): Promise<number>;
-}
-```
+### 3. `TaskStageProgress` Entity (Stage Check-In)
 
-### 3. Adapter — `apps/api/src/adapters/db/d1-progress-repository.ts`
+An immutable, append-only log of a student checking into a task stage.
 
-Prepared statements. `createStageCheckIn` uses `INSERT OR IGNORE` + a post-read
-to support the "double check-in returns the existing row" contract (the service
-layer wraps this into a 200 response).
+**Fields:** `id`, `userId`, `taskId`, `stageId`, `checkedInAt`.
 
-### 4. Tests — `apps/api/test/adapters/d1-progress-repository.spec.ts`
+**Constraint:** One row per `(userId, stageId)` — a stage can only be checked into once per user.
 
-- Upsert topic progress twice → one row, last write wins.
-- Insert stage check-in twice with the same `(user, stage)` → second call does
-  not create a row; `hasStageCheckIn` returns `true` either way.
-- Count queries respect the optional `topicIds` / `taskIds` filter.
-- Cascade: deleting a task removes its stage-progress rows and its task-progress
-  rows (relies on FK cascade).
+### 4. Repository Operations (`IProgressRepository`)
+
+- **Topic Progress:** Get, list, and upsert for a user's topic progress.
+- **Task Progress:** Get, list, and upsert for a user's task progress.
+- **Stage Check-Ins:** Check existence, list by task, and create (idempotent).
+- **Aggregates:** Count completed topics and tasks for a user (filtered by a provided ID list).
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Migration applies cleanly.
-- [ ] Port exported from `packages/shared/index.ts`.
-- [ ] Adapter passes all Vitest specs under the workers pool.
-- [ ] `make lint` clean. `make test-api` green.
-- [ ] No D1 types leak outside `apps/api/src/adapters/db/`.
+- [ ] Database migration applies cleanly to a fresh local database.
+- [ ] `IProgressRepository` is exported from `packages/shared/index.ts`.
+- [ ] Adapter passes all integration tests, including idempotency and cascade deletion.
+- [ ] No D1-specific types leak beyond the adapter layer.
+- [ ] Codebase remains lint-clean and all tests pass.
 
 ---
 
 ## Verification Plan
 
-1. `pnpm --filter api exec wrangler d1 migrations apply DB --local`.
-2. `pnpm --filter api test` → new suite green.
-3. `sqlite3 .wrangler/state/d1/DB.sqlite ".schema topic_progress"` → matches §1.
+### Automated Tests
+- `pnpm --filter api test` — adapter integration suite.
+
+### Manual Verification
+- Apply the migration and verify the schema matches the defined entities.
