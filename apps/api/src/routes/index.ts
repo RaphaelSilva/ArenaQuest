@@ -10,6 +10,8 @@ import type {
   IRateLimiter,
   IRefreshTokenRepository,
   IUserRepository,
+  ITopicNodeRepository,
+  ITagRepository,
 } from '@arenaquest/shared/ports';
 import type { AuthService } from '@api/core/auth/auth-service';
 
@@ -30,6 +32,8 @@ export class AppRouter {
       auth: IAuthAdapter;
       users: IUserRepository;
       tokens: IRefreshTokenRepository;
+      topics: ITopicNodeRepository;
+      tags: ITagRepository;
       authService: AuthService;
       loginLimiter: IRateLimiter;
       cookieSameSite: CookieSameSite;
