@@ -68,7 +68,7 @@
 				}
 			],
 			"vars": {
-				"ALLOWED_ORIGINS": "https://c2ee7644.arenaquest-web-staging.pages.dev",
+				"ALLOWED_ORIGINS": "https://arenaquest-web-staging.pages.dev",
 				"COOKIE_SAMESITE": "None"
 			}
 		}

@@ -10,24 +10,26 @@ The project aims to provide a robust framework for managing hierarchical topics,
 
 The system is designed following a **Cloud-Agnostic Strategy**:
 
-- **Front-End:** Modern, responsive interface (Next.js) focused on the participant's journey.
-- **Back-End:** Decoupled logic using Cloudflare Workers (Wrangler) for serverless, edge-first API execution.
-- **Database:** Utilizing flexible persistence layers (NoSQL/Document-based) to maintain schema agility.
-- **Storage:** Object Storage integration for media handling, compatible with S3-like APIs.
+- **Front-End:** Next.js 15 (React 19) focused on the participant's journey.
+- **Back-End:** Hono-based API running on Cloudflare Workers (Wrangler).
+- **Database:** Cloudflare D1 (SQLite) for structured data with a repository-based abstraction layer.
+- **Cache/Rate-Limit:** Cloudflare KV for transient state and security.
+- **Storage:** Object Storage integration (R2/S3 compatible) for media handling.
 
 ## 🛠️ Key Features (Phase 1 & Beyond)
 
+- **Secure Authentication:** Portable JWT-based auth with PBKDF2 hashing (Web Crypto API).
 - **Hierarchical Content Management:** Organize sports and activities into logical trees of topics and sub-topics.
 - **Engagement Engine:** Define tasks and stages to track user milestones.
-- **Student Progress Portal:** A dedicated area for participants to visualize their growth and pending activities.
-- **Administrative Backoffice:** Comprehensive tools for managing users, content, and system configurations.
+- **Student Progress Portal:** A dedicated area for participants to visualize their growth.
+- **Administrative Backoffice:** Comprehensive tools for managing users (with lockout protection), content, and system configurations.
 
 ## 🗺️ Roadmap
 
-1. **Foundation & Infrastructure:** Setting up the core repository and CI/CD pipelines.
-2. **Auth & User Management:** Implementing secure, portable authentication.
-3. **Core Content & Media:** Deploying the hierarchical topic engine and media storage.
-4. **Task Engine:** Building the logic for interconnection and progress tracking.
+1. **✅ Foundation & Infrastructure:** Core repository, monorepo setup, and CI/CD.
+2. **✅ Auth & User Management:** Secure, portable authentication and admin guards.
+3. **🚧 Core Content & Media:** Deploying the hierarchical topic engine and media storage.
+4. **📅 Task Engine:** Building the logic for interconnection and progress tracking.
 
 ---
 
@@ -41,7 +43,7 @@ ArenaQuest/
 │   ├── web/               # Next.js front-end application
 │   └── api/               # Cloudflare Workers API (Wrangler)
 ├── packages/
-│   └── shared/            # Shared types, utilities and constants
+│   └── shared/            # Shared types, ports (interfaces), and utilities
 ├── turbo.json             # Turborepo pipeline configuration
 ├── pnpm-workspace.yaml    # pnpm workspace declarations
 ├── package.json           # Root package (dev tooling)
@@ -74,11 +76,12 @@ make dev
 
 A `Makefile` is provided at the root of the repository with convenient shortcuts for the most common development tasks. Run `make help` at any time to list all available commands.
 
-### 📦 Install
+### 📦 Install & Setup
 
 | Command | Description |
 |---|---|
 | `make install` | Install all workspace dependencies via `pnpm install` |
+| `make bootstrap-admin` | Interactively create the first admin account |
 
 ### 🚀 Development
 
@@ -88,43 +91,35 @@ A `Makefile` is provided at the root of the repository with convenient shortcuts
 | `make dev-web` | Start only `apps/web` (Next.js dev server) |
 | `make dev-api` | Start only `apps/api` (Wrangler dev server) |
 
-### 🏗️ Build
+### 🏗️ Build & Lint
 
 | Command | Description |
 |---|---|
-| `make build` | Build all apps and packages via Turborepo (with caching) |
-| `make build-web` | Build only `apps/web` |
-| `make build-api` | Build only `apps/api` |
-
-### 🔍 Lint
-
-| Command | Description |
-|---|---|
-| `make lint` | Lint all workspaces (via Turborepo) |
-| `make lint-web` | Lint only `apps/web` |
-
-### 🧪 Test
-
-| Command | Description |
-|---|---|
+| `make build` | Build all apps and packages via Turborepo |
+| `make lint` | Lint all workspaces |
 | `make test` | Run all tests across the monorepo |
-| `make test-api` | Run `apps/api` tests (Vitest + Cloudflare Workers pool) |
 
-### ☁️ Cloudflare Workers
+### 🗄️ Database (D1)
 
 | Command | Description |
 |---|---|
-| `make cf-typegen` | Regenerate Cloudflare Worker types (`wrangler types`) |
-| `make deploy-web` | Build and deploy `apps/web` to Cloudflare Pages |
-| `make deploy-api` | Deploy `apps/api` to Cloudflare Workers (production) |
+| `make db-migrate-local` | Apply migrations to local D1 instance |
+| `make db-migrate-staging`| Apply migrations to remote staging D1 |
+
+### ☁️ Deployment
+
+| Command | Description |
+|---|---|
+| `make deploy` | Deploy both Web and API to **Production** |
+| `make deploy-staging` | Deploy both Web and API to **Staging** |
+| `make deploy-api` | Deploy only `apps/api` (Production) |
+| `make deploy-web` | Deploy only `apps/web` (Production) |
 
 ### 🧹 Clean
 
 | Command | Description |
 |---|---|
-| `make clean` | Remove build artefacts (`.next`, `dist`) from all apps |
-| `make clean-cache` | Remove Turborepo caches (`.turbo` directories) |
-| `make clean-all` | Remove build artefacts **and** Turborepo cache |
+| `make clean-all` | Remove all build artefacts and Turborepo caches |
 
 ---
 
@@ -135,27 +130,21 @@ The following GitHub Actions workflows are defined in `.github/workflows/`:
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | `ci.yml` | Push / PR → `main`, `develop` | Lint → Build → Test |
-| `deploy-web.yml` | Push → `main`, `develop` (when `apps/web/**` or `packages/shared/**` changes) | Build & deploy `apps/web` to Cloudflare Pages |
-| `deploy-api.yml` | Push → `main`, `develop` (when `apps/api/**` or `packages/shared/**` changes) | Build & deploy `apps/api` to Cloudflare Workers |
+| `deploy-web.yml` | Push → `main`, `develop` | Build & deploy `apps/web` |
+| `deploy-api.yml` | Push → `main`, `develop` | Build & deploy `apps/api` |
 
 ### Required GitHub Secrets
 
-Go to **Settings → Secrets and variables → Actions** in your repository and add:
-
-| Secret | Description | Where to get it |
-|---|---|---|
-| `CF_API_TOKEN` | Cloudflare API token with **Cloudflare Pages — Edit** and **Workers Scripts — Edit** permissions | [Cloudflare Dashboard → My Profile → API Tokens](https://dash.cloudflare.com/profile/api-tokens) |
-| `CF_ACCOUNT_ID` | Your Cloudflare account ID | Cloudflare Dashboard → right sidebar on any zone page |
-
-> **Tip:** Create a scoped API token with only the permissions listed above — never use your Global API Key.
+| Secret | Description |
+|---|---|
+| `CF_API_TOKEN` | Cloudflare API token (Pages & Workers edit permissions) |
+| `CF_ACCOUNT_ID` | Your Cloudflare account ID |
 
 ---
 
 ## 🤝 Contributing
 
-As an open-source project, we welcome contributions! Whether you are a front-end developer, a backend enthusiast, or a DevOps specialist, your help is appreciated.
-
-Please read the [CONTRIBUTING.md](CONTRIBUTING.md) guide before opening a Pull Request. It covers the **branch strategy**, commit conventions, PR guidelines, and local development setup.
+As an open-source project, we welcome contributions! Please read the [CONTRIBUTING.md](CONTRIBUTING.md) guide before opening a Pull Request.
 
 ## 📄 License
 
