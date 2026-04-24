@@ -47,7 +47,9 @@ function buildTree(nodes: TopicNode[]): TreeNode[] {
 function getDropPosition(e: React.DragEvent<HTMLElement>): DropPosition {
   const rect = e.currentTarget.getBoundingClientRect();
   const height = rect.height || 1;
-  const ratio = (e.clientY - rect.top) / height;
+  // Use a fallback for clientY to handle environments where it might be in different places
+  const clientY = e.clientY ?? (e as any).nativeEvent?.clientY ?? 0;
+  const ratio = (clientY - rect.top) / height;
   if (ratio < 0.35) return 'before';
   if (ratio > 0.65) return 'after';
   return 'child';
@@ -58,9 +60,9 @@ function getDropPosition(e: React.DragEvent<HTMLElement>): DropPosition {
 // ---------------------------------------------------------------------------
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
-  published: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
-  archived: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+  draft: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 ring-1 ring-inset ring-zinc-200 dark:ring-zinc-700',
+  published: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 ring-1 ring-inset ring-emerald-200 dark:ring-emerald-500/20',
+  archived: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 ring-1 ring-inset ring-amber-200 dark:ring-amber-500/20',
 };
 
 // ---------------------------------------------------------------------------
@@ -96,7 +98,7 @@ function CreateModal({ parentId, onSubmit, onClose }: CreateModalProps) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={parentId ? 'Add child topic' : 'Create root topic'}
+      aria-label={parentId ? 'Add child topic' : 'New root topic'}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
       <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
@@ -382,14 +384,14 @@ export default function AdminTopicsPage() {
   function handleDragStart(nodeId: string) {
     return (e: React.DragEvent) => {
       draggingIdRef.current = nodeId;
-      e.dataTransfer.effectAllowed = 'move';
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
     };
   }
 
   function handleDragOver(node: TopicNode) {
     return (e: React.DragEvent<HTMLElement>) => {
       e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
       const position = getDropPosition(e);
       setDropTarget({ id: node.id, position });
     };
@@ -409,11 +411,11 @@ export default function AdminTopicsPage() {
       e.preventDefault();
       const sourceId = draggingIdRef.current;
       draggingIdRef.current = null;
+      const position = getDropPosition(e);
       setDropTarget(null);
 
       if (!sourceId || sourceId === targetNode.id || !accessToken) return;
 
-      const position = getDropPosition(e);
       try {
         let moveArgs: { newParentId: string | null; newSortOrder?: number };
         if (position === 'child') {
@@ -448,20 +450,20 @@ export default function AdminTopicsPage() {
 
       let dropIndicatorClass = '';
       if (isDropTarget) {
-        if (dropTarget.position === 'child') dropIndicatorClass = 'ring-2 ring-indigo-400';
-        else if (dropTarget.position === 'before') dropIndicatorClass = 'border-t-2 border-indigo-400';
-        else dropIndicatorClass = 'border-b-2 border-indigo-400';
+        if (dropTarget.position === 'child') dropIndicatorClass = 'ring-2 ring-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10';
+        else if (dropTarget.position === 'before') dropIndicatorClass = 'before:absolute before:-top-px before:left-0 before:right-0 before:h-0.5 before:bg-indigo-500 before:z-10 relative';
+        else dropIndicatorClass = 'after:absolute after:-bottom-px after:left-0 after:right-0 after:h-0.5 after:bg-indigo-500 after:z-10 relative';
       }
 
       return (
         <div key={node.id}>
           <div
-            className={`flex items-center gap-1.5 rounded py-1 pr-2 text-sm transition-colors ${
+            className={`group flex items-center gap-1.5 rounded-lg py-1.5 pr-2 text-sm transition-all duration-200 ${
               isSelected
-                ? 'bg-indigo-50 dark:bg-indigo-900/20'
-                : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
-            } ${node.archived ? 'opacity-50' : ''} ${dropIndicatorClass}`}
-            style={{ paddingLeft: `${4 + depth * 18}px` }}
+                ? 'bg-indigo-50 text-indigo-900 shadow-sm dark:bg-indigo-500/10 dark:text-indigo-300'
+                : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/50'
+            } ${node.archived ? 'opacity-40 grayscale-[0.5]' : ''} ${dropIndicatorClass}`}
+            style={{ paddingLeft: `${6 + depth * 18}px` }}
             data-testid={`topic-node-${node.id}`}
             onClick={() => setSelectedId(node.id)}
             onDragOver={handleDragOver(node)}
@@ -485,11 +487,13 @@ export default function AdminTopicsPage() {
               onDragStart={handleDragStart(node.id)}
               onDragEnd={handleDragEnd}
               onClick={(e) => e.stopPropagation()}
-              className="flex-shrink-0 cursor-grab text-zinc-400 hover:text-zinc-600 select-none"
+              className="flex-shrink-0 cursor-grab text-zinc-300 transition-colors group-hover:text-zinc-500 dark:text-zinc-600 dark:group-hover:text-zinc-400 select-none active:cursor-grabbing"
               data-testid={`drag-handle-${node.id}`}
               aria-label="Drag to reorder"
             >
-              ⠿
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+              </svg>
             </span>
 
             {/* Title — inline edit or text */}
@@ -582,13 +586,16 @@ export default function AdminTopicsPage() {
   const tree = buildTree(nodes);
 
   return (
-    <main className="flex h-[calc(100vh-57px)] flex-col">
+    <main className="flex h-[calc(100vh-57px)] flex-col bg-zinc-50 dark:bg-zinc-950">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Topic Tree</h1>
+      <div className="flex items-center justify-between border-b border-zinc-200/80 bg-white/50 px-6 py-4 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/50">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Topic Tree</h1>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Build and organize your educational hierarchy</p>
+        </div>
         <button
           onClick={() => { setCreateParentId(null); setShowCreate(true); }}
-          className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-indigo-500/25 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
         >
           New Root Topic
         </button>
@@ -597,7 +604,7 @@ export default function AdminTopicsPage() {
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left: tree panel */}
-        <div className="w-80 flex-shrink-0 overflow-y-auto border-r border-zinc-200 p-3 dark:border-zinc-800">
+        <div className="w-80 flex-shrink-0 overflow-y-auto border-r border-zinc-200/80 bg-white/30 backdrop-blur-sm p-4 dark:border-zinc-800/80 dark:bg-zinc-900/10">
           {fetchError && (
             <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{fetchError}</p>
           )}
@@ -616,16 +623,31 @@ export default function AdminTopicsPage() {
         </div>
 
         {/* Right: detail pane */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-8">
           {!selectedNode ? (
-            <div className="flex h-full flex-col items-center justify-center text-zinc-400">
-              <p className="text-sm">Select a topic to edit its details.</p>
+            <div className="flex h-full flex-col items-center justify-center space-y-4 opacity-40">
+              <div className="rounded-full bg-zinc-100 p-6 dark:bg-zinc-800">
+                <svg className="h-12 w-12 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-zinc-500">Select a topic to edit its details</p>
             </div>
           ) : (
-            <form onSubmit={handleDetailSave} className="max-w-2xl space-y-5" noValidate>
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                Edit: {selectedNode.title}
-              </h2>
+            <div className="mx-auto max-w-3xl space-y-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                    {detailTitle || 'Untitled Topic'}
+                  </h2>
+                  <p className="text-sm text-zinc-500">Topic ID: <code className="font-mono text-xs">{selectedId}</code></p>
+                </div>
+                <div className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${STATUS_COLORS[detailStatus]}`}>
+                  {detailStatus}
+                </div>
+              </div>
+
+              <form onSubmit={handleDetailSave} className="space-y-6 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50" noValidate>
 
               <div>
                 <label htmlFor="dp-title" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -726,6 +748,7 @@ export default function AdminTopicsPage() {
                 </button>
               </div>
             </form>
+          </div>
           )}
         </div>
       </div>

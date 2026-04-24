@@ -229,7 +229,13 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
 
     if (data.title !== undefined) { setClauses.push('title = ?'); values.push(data.title); }
     if (data.content !== undefined) { setClauses.push('content = ?'); values.push(data.content); }
-    if (data.status !== undefined) { setClauses.push('status = ?'); values.push(data.status); }
+    if (data.status !== undefined) { 
+      setClauses.push('status = ?'); 
+      values.push(data.status); 
+      if (data.status === 'archived') {
+        setClauses.push('archived = 1');
+      }
+    }
     if (data.estimatedMinutes !== undefined) { setClauses.push('estimated_minutes = ?'); values.push(data.estimatedMinutes); }
 
     values.push(id);
@@ -327,7 +333,7 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
            UNION ALL
            SELECT tn.id FROM topic_nodes tn JOIN descendants d ON tn.parent_id = d.id
          )
-         UPDATE topic_nodes SET archived = 1, updated_at = datetime('now')
+         UPDATE topic_nodes SET archived = 1, status = 'archived', updated_at = datetime('now')
          WHERE id IN (SELECT id FROM descendants)`,
       )
       .bind(id)
@@ -342,7 +348,7 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
     let currentId: string | null = proposedParentId;
     while (currentId !== null) {
       if (currentId === nodeId) return true;
-      const row = await this.db
+      const row: { parent_id: string | null } | null = await this.db
         .prepare('SELECT parent_id FROM topic_nodes WHERE id = ?')
         .bind(currentId)
         .first<{ parent_id: string | null }>();

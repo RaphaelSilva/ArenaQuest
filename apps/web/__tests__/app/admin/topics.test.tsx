@@ -287,7 +287,7 @@ describe('Detail pane', () => {
     await user.click(nodeRow);
 
     await waitFor(() => {
-      expect(screen.getByText(/edit: root topic a/i)).toBeInTheDocument();
+      expect(screen.getByText('Root Topic A', { selector: 'h2' })).toBeInTheDocument();
     });
 
     expect((screen.getByLabelText(/^title/i) as HTMLInputElement).value).toBe('Root Topic A');
@@ -300,7 +300,7 @@ describe('Detail pane', () => {
     await waitFor(() => screen.getByText('Root Topic A'));
 
     await user.click(screen.getByTestId('topic-node-topic-1'));
-    await waitFor(() => screen.getByText(/edit: root topic a/i));
+    await waitFor(() => screen.getByText('Root Topic A', { selector: 'h2' }));
 
     // Change status to published
     await user.selectOptions(screen.getByLabelText(/status/i), 'published');
@@ -430,12 +430,16 @@ describe('Drag and drop', () => {
     const dragHandle = screen.getByTestId('drag-handle-topic-1');
     const targetNode = screen.getByTestId('topic-node-topic-2');
 
-    // dragStart sets the ref
+    // Prototype spy so it applies to e.currentTarget regardless of object identity.
+    // top:100 ensures (clientY - top) / height < 0 → 'before' for any realistic clientY.
+    const gBCRSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 100, height: 100, bottom: 200, left: 0, right: 200, width: 200, x: 0, y: 100,
+      toJSON: () => ({}),
+    } as DOMRect);
+
     fireEvent.dragStart(dragHandle);
-    // dragOver (clientY=0, height=0 → ratio=0 → 'before')
-    fireEvent.dragOver(targetNode, { clientY: 0 });
-    // drop triggers the move
-    fireEvent.drop(targetNode, { clientY: 0 });
+    fireEvent.dragOver(targetNode);
+    fireEvent.drop(targetNode);
 
     await waitFor(() => {
       // 'before' position: newParentId = target.parentId (null), newSortOrder = target.order (1)
@@ -444,6 +448,8 @@ describe('Drag and drop', () => {
         newSortOrder: 1,
       });
     });
+
+    gBCRSpy.mockRestore();
   });
 
   it('calls move with child args when drop position is in the middle of the target', async () => {
@@ -454,21 +460,36 @@ describe('Drag and drop', () => {
     const dragHandle = screen.getByTestId('drag-handle-topic-1');
     const targetNode = screen.getByTestId('topic-node-topic-2');
 
-    // Mock getBoundingClientRect so ratio = 0.5 → 'child'
-    vi.spyOn(targetNode, 'getBoundingClientRect').mockReturnValue({
+    // Mock on Element prototype for consistency in JSDOM
+    const gBCRSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
       top: 0, height: 100, bottom: 100, left: 0, right: 200, width: 200, x: 0, y: 0,
       toJSON: () => ({}),
     } as DOMRect);
 
     fireEvent.dragStart(dragHandle);
-    fireEvent.dragOver(targetNode, { clientY: 50 });
-    fireEvent.drop(targetNode, { clientY: 50 });
+    
+    // Use more explicit event creation to ensure clientY is preserved
+    fireEvent(targetNode, new MouseEvent('dragover', {
+      bubbles: true,
+      cancelable: true,
+      clientY: 50,
+    }));
+    
+    fireEvent(targetNode, new MouseEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientY: 50,
+    }));
 
     await waitFor(() => {
       expect(mockApi.move).toHaveBeenCalledWith('mock-token', 'topic-1', {
         newParentId: 'topic-2',
       });
     });
+
+    gBCRSpy.mockRestore();
+
+    gBCRSpy.mockRestore();
   });
 
   it('shows an error toast when move results in a cycle', async () => {

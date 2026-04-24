@@ -48,7 +48,7 @@ export class AppRouter {
     },
   ): void {
     const { auth, users, tokens, topics, tags, media, storage, authService, loginLimiter, cookieSameSite, allowedOrigins } = deps;
-
+    console.log(`allowedOrigins: ${allowedOrigins}`);
     // Enable CORS for frontend interaction
     app.use(
       '*',
