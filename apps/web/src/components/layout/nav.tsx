@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { CanView } from '@web/components/auth/can-view';
-import { useAuth } from '@web/hooks/use-auth';
+import { useAuth, useHasRole } from '@web/hooks/use-auth';
 
 export function Nav() {
   const { logout } = useAuth();
+  const canSeeTopics = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
 
   return (
     <nav className="flex items-center gap-6 border-b border-zinc-200 bg-white px-6 py-3 dark:border-zinc-800 dark:bg-zinc-900">
@@ -28,6 +29,15 @@ export function Nav() {
             User Management
           </Link>
         </CanView>
+
+        {canSeeTopics && (
+          <Link
+            href="/admin/topics"
+            className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            Topic Tree
+          </Link>
+        )}
       </div>
 
       <button
