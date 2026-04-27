@@ -15,7 +15,7 @@
 		"nodejs_compat"
 	],
 	"vars": {
-		"ALLOWED_ORIGINS": "https://*.arenaquest-web.pages.dev",
+		"ALLOWED_ORIGINS": "https://arenaquest-web-staging.pages.dev",
 		"COOKIE_SAMESITE": "Strict",
 		"R2_S3_ENDPOINT": "https://ACCOUNT_ID.r2.cloudflarestorage.com",
 		"R2_PUBLIC_BASE": "",
@@ -28,8 +28,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "arenaquest-db",
-			"database_id": "148eaf0b-b615-4e0d-83c0-8d8c681061e4",
+			"database_name": "arenaquest-db-staging",
+			"database_id": "6a2f5784-c57e-46ae-a858-27ca876f1dfe",
 			"migrations_dir": "migrations"
 		}
 	],
@@ -56,7 +56,7 @@
 	"r2_buckets": [
 		{
 			"binding": "R2",
-			"bucket_name": "arenaquest-media"
+			"bucket_name": "arenaquest-media-staging"
 		}
 	],
 	/**

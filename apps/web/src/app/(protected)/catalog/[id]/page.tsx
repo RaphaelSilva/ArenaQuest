@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
+
+export const runtime = 'edge';
 import { useAuth } from '@web/hooks/use-auth';
 import { topicsApi } from '@web/lib/topics-api';
 import type { TopicNode } from '@web/lib/topics-api';
@@ -25,8 +27,6 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
     if (!accessToken) return;
     
     let isMounted = true;
-    setLoading(true);
-    setError('');
 
     topicsApi.getById(accessToken, id)
       .then((data) => {
