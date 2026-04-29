@@ -15,8 +15,11 @@
 		"nodejs_compat"
 	],
 	"vars": {
-		"ALLOWED_ORIGINS": "https://*.arenaquest-web.pages.dev",
-		"COOKIE_SAMESITE": "Strict"
+		"ALLOWED_ORIGINS": "https://arenaquest-web.pages.dev",
+		"COOKIE_SAMESITE": "Strict",
+		"R2_S3_ENDPOINT": "https://ACCOUNT_ID.r2.cloudflarestorage.com",
+		"R2_PUBLIC_BASE": "",
+		"R2_BUCKET_NAME": "arenaquest-media"
 	},
 	/**
 	 * D1 Databases
@@ -44,6 +47,19 @@
 		}
 	],
 	/**
+	 * R2 Object Storage
+	 * https://developers.cloudflare.com/r2/
+	 *
+	 * Create the production bucket: `wrangler r2 bucket create arenaquest-media`
+	 * Secrets (set via `wrangler secret put`): R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+	 */
+	"r2_buckets": [
+		{
+			"binding": "R2",
+			"bucket_name": "arenaquest-media"
+		}
+	],
+	/**
 	 * Environments
 	 * https://developers.cloudflare.com/workers/wrangler/configuration/#environments
 	 *
@@ -67,9 +83,18 @@
 					"id": "c697147935024190ada81e743c3479d9"
 				}
 			],
+			"r2_buckets": [
+				{
+					"binding": "R2",
+					"bucket_name": "arenaquest-media-staging"
+				}
+			],
 			"vars": {
-				"ALLOWED_ORIGINS": "https://arenaquest-web-staging.pages.dev",
-				"COOKIE_SAMESITE": "None"
+				"ALLOWED_ORIGINS": "https://arenaquest-web-staging.pages.dev,http://localhost:3000",
+				"COOKIE_SAMESITE": "None",
+				"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+				"R2_PUBLIC_BASE": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+				"R2_BUCKET_NAME": "arenaquest-media-staging"
 			}
 		}
 	}

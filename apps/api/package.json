@@ -9,18 +9,22 @@
 		"lint": "eslint .",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"gen-hash": "tsx scripts/gen-hash.ts",
-		"check:no-dev-seed": "tsx scripts/check-no-dev-seed.ts",
+		"db:create": "wrangler d1 create arenaquest-db",
+		"db:create:staging": "wrangler d1 create arenaquest-db-staging --env staging",
+		"db:apply:migrations": "wrangler d1 migrations apply arenaquest-db",
+		"db:apply:migrations:staging": "wrangler d1 migrations apply arenaquest-db-staging --env staging",		
 		"cf-typegen": "wrangler types"
 	},
 	"dependencies": {
 		"@arenaquest/shared": "workspace:*",
+		"@aws-sdk/client-s3": "^3.1036.0",
+		"@aws-sdk/s3-request-presigner": "^3.1036.0",
 		"hono": "^4",
 		"zod": "^3"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20250224.0",
 		"@cloudflare/vitest-pool-workers": "^0.12.4",
+		"@cloudflare/workers-types": "^4.20250224.0",
 		"@types/node": "^20",
 		"typescript": "^5.5.2",
 		"typescript-eslint": "^8.0.0",

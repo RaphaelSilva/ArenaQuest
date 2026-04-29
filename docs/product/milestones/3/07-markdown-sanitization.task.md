@@ -1,7 +1,7 @@
 # Task 07: Markdown Sanitization Helper
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Low
 - **Milestone:** 3 — Content & Media Core
 - **Dependencies:** none
@@ -41,11 +41,11 @@ Implement a centralized Markdown sanitization helper in the shared package. This
 
 ## Acceptance Criteria
 
-- [ ] Sanitization helpers are exported from the shared package and usable in both `apps/api` and `apps/web`.
-- [ ] Attack vectors (scripts, iframes, dangerous links) are successfully neutralized.
-- [ ] Legitimate Markdown (headers, tables, code blocks) is preserved correctly.
-- [ ] Comprehensive unit tests cover a wide range of "safe" and "malicious" inputs.
-- [ ] Integration into the Admin API (Task 04) ensures sanitized storage of content.
+- [x] Sanitization helpers are exported from the shared package and usable in both `apps/api` and `apps/web`.
+- [x] Attack vectors (scripts, iframes, dangerous links) are successfully neutralized.
+- [x] Legitimate Markdown (headers, tables, code blocks) is preserved correctly.
+- [x] Comprehensive unit tests cover a wide range of "safe" and "malicious" inputs.
+- [x] Integration into the Admin API (Task 04) ensures sanitized storage of content.
 
 ---
 

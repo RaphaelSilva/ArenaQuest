@@ -8,18 +8,30 @@ declare namespace Cloudflare {
 	interface StagingEnv {
 		RATE_LIMIT_KV: KVNamespace;
 		DB: D1Database;
+		R2: R2Bucket;
 		ALLOWED_ORIGINS: "https://c2ee7644.arenaquest-web-staging.pages.dev";
 		COOKIE_SAMESITE: "None";
 		JWT_SECRET: string;
 		ALLOWED_ORIGIN: string;
+		R2_S3_ENDPOINT: string;
+		R2_PUBLIC_BASE: string;
+		R2_BUCKET_NAME: string;
+		R2_ACCESS_KEY_ID: string;
+		R2_SECRET_ACCESS_KEY: string;
 	}
 	interface Env {
 		RATE_LIMIT_KV: KVNamespace;
 		DB: D1Database;
+		R2: R2Bucket;
 		ALLOWED_ORIGINS: "https://c2ee7644.arenaquest-web-staging.pages.dev" | "https://*.arenaquest-web.pages.dev";
 		COOKIE_SAMESITE: "None" | "Strict";
 		JWT_SECRET: string;
 		ALLOWED_ORIGIN: string;
+		R2_S3_ENDPOINT: string;
+		R2_PUBLIC_BASE: string;
+		R2_BUCKET_NAME: string;
+		R2_ACCESS_KEY_ID: string;
+		R2_SECRET_ACCESS_KEY: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

@@ -1,7 +1,7 @@
 # Task 06: Public Topics Read API
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Low
 - **Milestone:** 3 — Content & Media Core
 - **Dependencies:** Task 04, Task 05
@@ -45,12 +45,12 @@ Implement the public-facing API for the student catalogue. This API provides rea
 
 ## Acceptance Criteria
 
-- [ ] Endpoints are correctly implemented and accessible to authenticated users.
-- [ ] Content filtering is verified: `draft` and `archived` content is unreachable (404).
-- [ ] Media filtering is verified: Only `ready` media is returned with valid download URLs.
-- [ ] Response headers include correct caching directives.
-- [ ] Integration tests verify security boundaries and content visibility.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] Endpoints are correctly implemented and accessible to authenticated users.
+- [x] Content filtering is verified: `draft` and `archived` content is unreachable (404).
+- [x] Media filtering is verified: Only `ready` media is returned with valid download URLs.
+- [x] Response headers include correct caching directives.
+- [x] Integration tests verify security boundaries and content visibility.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

@@ -1,7 +1,7 @@
 # Task 08: Frontend — Admin Topic Tree Dashboard
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** High
 - **Milestone:** 3 — Content & Media Core
 - **Dependencies:** Task 04
@@ -49,13 +49,13 @@ Build the management dashboard for content creators to manage the topic tree. Th
 
 ## Acceptance Criteria
 
-- [ ] The Admin Topic Tree page is functional and restricted to authorized roles.
-- [ ] Users can build a multi-level hierarchy from scratch.
-- [ ] Drag-and-drop reordering and re-parenting work correctly and persist on reload.
-- [ ] Circular dependency attempts are blocked and reported with clear error messages.
-- [ ] Node status changes (e.g., publishing) are reflected immediately in the UI.
-- [ ] Unit/Component tests cover the tree interaction logic and RBAC guards.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] The Admin Topic Tree page is functional and restricted to authorized roles.
+- [x] Users can build a multi-level hierarchy from scratch.
+- [x] Drag-and-drop reordering and re-parenting work correctly and persist on reload.
+- [x] Circular dependency attempts are blocked and reported with clear error messages.
+- [x] Node status changes (e.g., publishing) are reflected immediately in the UI.
+- [x] Unit/Component tests cover the tree interaction logic and RBAC guards.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

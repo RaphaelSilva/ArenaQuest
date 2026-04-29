@@ -1,7 +1,7 @@
 # Task 01: Topics & Tags Data Layer
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 3 — Content & Media Core
 - **Dependencies:** none (foundational)
@@ -39,12 +39,12 @@ The `TopicNode` and `Tag` entity shapes already exist in `packages/shared/types/
 
 ## Acceptance Criteria
 
-- [ ] `ITopicNodeRepository` and `ITagRepository` are exported from `@arenaquest/shared/ports`.
-- [ ] Migration exists and is idempotent (safe to run twice).
-- [ ] Both adapters implement every method declared in their port.
-- [ ] Cycle detection: moving a node under itself or any of its descendants is rejected.
-- [ ] Archiving a node cascades the `archived` status to all descendants.
-- [ ] `listChildren(null)` returns only root-level nodes.
-- [ ] Sibling reorder after a move produces a gapless `sort_order` sequence.
-- [ ] `grep -R "@cloudflare/workers-types" packages/shared` returns zero matches.
-- [ ] Unit tests cover the above cases; `make lint` is clean.
+- [x] `ITopicNodeRepository` and `ITagRepository` are exported from `@arenaquest/shared/ports`.
+- [x] Migration exists and is idempotent (safe to run twice).
+- [x] Both adapters implement every method declared in their port.
+- [x] Cycle detection: moving a node under itself or any of its descendants is rejected.
+- [x] Archiving a node cascades the `archived` status to all descendants.
+- [x] `listChildren(null)` returns only root-level nodes.
+- [x] Sibling reorder after a move produces a gapless `sort_order` sequence.
+- [x] `grep -R "@cloudflare/workers-types" packages/shared` returns zero matches.
+- [x] Unit tests cover the above cases; `make lint` is clean.

@@ -1,0 +1,25 @@
+info:
+  name: auth-api
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{host}}/auth/login"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "email": "eng.raphaelsn@gmail.com",
+        "password": "qwertasdfgzxcvb123456789"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

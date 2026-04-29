@@ -1,7 +1,7 @@
 # Task 10: Frontend — Student Catalogue + Content Viewers
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** High
 - **Milestone:** 3 — Content & Media Core
 - **Dependencies:** Task 06, Task 07
@@ -46,13 +46,13 @@ Build the public catalogue where students can browse the educational hierarchy a
 
 ## Acceptance Criteria
 
-- [ ] The `/catalog` page is functional and restricted to authenticated users.
-- [ ] Students can only see `published` content and `ready` media.
-- [ ] Markdown content is rendered accurately and securely (no XSS).
-- [ ] PDF and Video content is accessible inline via presigned URLs.
-- [ ] The catalogue is fully navigable using keyboard/screen readers (Basic ARIA compliance).
-- [ ] Component tests cover the navigation logic and the safety of the Markdown viewer.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] The `/catalog` page is functional and restricted to authenticated users.
+- [x] Students can only see `published` content and `ready` media.
+- [x] Markdown content is rendered accurately and securely (no XSS).
+- [x] PDF and Video content is accessible inline via presigned URLs.
+- [x] The catalogue is fully navigable using keyboard/screen readers (Basic ARIA compliance).
+- [x] Component tests cover the navigation logic and the safety of the Markdown viewer.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

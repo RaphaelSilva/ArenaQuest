@@ -1,0 +1,4 @@
+name: staging
+variables:
+  - name: host
+    value: https://api-staging.raphael-1d2.workers.dev

@@ -1,7 +1,7 @@
 # Task 03: R2 Storage Adapter
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 3 — Content & Media Core
 - **Dependencies:** none (port already exists in shared)
@@ -45,10 +45,10 @@ Provide a working concrete implementation of `IStorageAdapter` backed by Cloudfl
 
 ## Acceptance Criteria
 
-- [ ] Adapter implements every method of `IStorageAdapter`.
-- [ ] `wrangler.jsonc` declares the R2 binding, `R2_S3_ENDPOINT`, and `R2_PUBLIC_BASE`.
-- [ ] `make cf-typegen` produces a clean types file that includes `R2` as `R2Bucket`.
-- [ ] `@aws-sdk/*` imports are confined to the adapter file (enforced by a grep assertion in tests).
-- [ ] Constructing the adapter with missing credentials throws immediately.
-- [ ] Unit tests against a fake R2Bucket pass for all operations.
-- [ ] `make lint` is clean; all tests pass.
+- [x] Adapter implements every method of `IStorageAdapter`.
+- [x] `wrangler.jsonc` declares the R2 binding, `R2_S3_ENDPOINT`, and `R2_PUBLIC_BASE`.
+- [x] `make cf-typegen` produces a clean types file that includes `R2` as `R2Bucket`.
+- [x] `@aws-sdk/*` imports are confined to the adapter file (enforced by a grep assertion in tests).
+- [x] Constructing the adapter with missing credentials throws immediately.
+- [x] Unit tests against a fake R2Bucket pass for all operations.
+- [x] `make lint` is clean; all tests pass.

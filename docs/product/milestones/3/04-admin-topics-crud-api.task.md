@@ -1,7 +1,7 @@
 # Task 04: Admin Topics CRUD + Move API
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 3 — Content & Media Core
 - **Dependencies:** Task 01, Task 07
@@ -41,11 +41,11 @@ Expose the topic authoring endpoints under `/admin/topics`. Admins and content c
 
 ## Acceptance Criteria
 
-- [ ] All six endpoints exist and are guarded by `authGuard + requireRole(ADMIN, CONTENT_CREATOR)`.
-- [ ] Creating a node with a non-existent `parentId` returns `404`.
-- [ ] Creating a node with an unknown prerequisite ID returns `422 UNKNOWN_PREREQ`.
-- [ ] Moving a node under itself or any descendant returns `409 WOULD_CYCLE`.
-- [ ] Archiving a parent archives all descendants.
-- [ ] `PATCH { status: 'published' }` is immediately reflected in `GET`.
-- [ ] Markdown content is sanitized before persistence.
-- [ ] Integration tests cover every case above; `make lint` is clean.
+- [x] All six endpoints exist and are guarded by `authGuard + requireRole(ADMIN, CONTENT_CREATOR)`.
+- [x] Creating a node with a non-existent `parentId` returns `404`.
+- [x] Creating a node with an unknown prerequisite ID returns `422 UNKNOWN_PREREQ`.
+- [x] Moving a node under itself or any descendant returns `409 WOULD_CYCLE`.
+- [x] Archiving a parent archives all descendants.
+- [x] `PATCH { status: 'published' }` is immediately reflected in `GET`.
+- [x] Markdown content is sanitized before persistence.
+- [x] Integration tests cover every case above; `make lint` is clean.

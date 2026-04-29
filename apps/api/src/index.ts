@@ -14,6 +14,10 @@ import { Hono } from 'hono';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { D1UserRepository } from '@api/adapters/db/d1-user-repository';
 import { D1RefreshTokenRepository } from '@api/adapters/db/d1-refresh-token-repository';
+import { D1TopicNodeRepository } from '@api/adapters/db/d1-topic-node-repository';
+import { D1TagRepository } from '@api/adapters/db/d1-tag-repository';
+import { D1MediaRepository } from '@api/adapters/db/d1-media-repository';
+import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
 import { AuthService } from '@api/core/auth/auth-service';
 import { AppRouter } from '@api/routes';
@@ -29,6 +33,17 @@ function buildApp(env: AppEnv): Hono {
   });
   const users = new D1UserRepository(env.DB);
   const tokens = new D1RefreshTokenRepository(env.DB);
+  const topics = new D1TopicNodeRepository(env.DB);
+  const tags = new D1TagRepository(env.DB);
+  const media = new D1MediaRepository(env.DB);
+  const storage = new R2StorageAdapter({
+    bucket: env.R2,
+    s3Endpoint: env.R2_S3_ENDPOINT,
+    bucketName: env.R2_BUCKET_NAME,
+    accessKeyId: env.R2_ACCESS_KEY_ID,
+    secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+    publicBase: env.R2_PUBLIC_BASE || undefined,
+  });
   const authService = new AuthService(auth, users, tokens);
   const loginLimiter = new KvRateLimiter(env.RATE_LIMIT_KV);
 
@@ -38,6 +53,10 @@ function buildApp(env: AppEnv): Hono {
     auth,
     users,
     tokens,
+    topics,
+    tags,
+    media,
+    storage,
     authService,
     loginLimiter,
     cookieSameSite: parseCookieSameSite(env.COOKIE_SAMESITE),

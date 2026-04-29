@@ -1,7 +1,7 @@
 # Task 09: Frontend — Admin Media Uploader
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 3 — Content & Media Core
 - **Dependencies:** Task 05, Task 08
@@ -42,13 +42,13 @@ Integrate media upload capabilities into the Admin Topic Tree dashboard. This al
 
 ## Acceptance Criteria
 
-- [ ] Users can upload media directly to storage without overloading the API Worker.
-- [ ] Upload progress is accurately reflected in the UI.
-- [ ] Client-side validation prevents oversized or unsupported file uploads.
-- [ ] Uploaded media is immediately listed and accessible within the topic detail pane.
-- [ ] Deletion of media is synchronous and cleans up both the UI and backend records.
-- [ ] Component tests cover the upload state machine, including success, failure, and cancellation scenarios.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] Users can upload media directly to storage without overloading the API Worker.
+- [x] Upload progress is accurately reflected in the UI.
+- [x] Client-side validation prevents oversized or unsupported file uploads.
+- [x] Uploaded media is immediately listed and accessible within the topic detail pane.
+- [x] Deletion of media is synchronous and cleans up both the UI and backend records.
+- [x] Component tests cover the upload state machine, including success, failure, and cancellation scenarios.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

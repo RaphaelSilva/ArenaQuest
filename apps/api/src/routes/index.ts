@@ -3,6 +3,9 @@ import { cors } from 'hono/cors';
 import { buildAuthRouter } from './auth.router';
 import type { CookieSameSite } from './auth.router';
 import { buildAdminUsersRouter } from './admin-users.router';
+import { buildAdminTopicsRouter } from './admin-topics.router';
+import { buildAdminMediaRouter } from './admin-media.router';
+import { buildTopicsRouter } from './topics.router';
 import { getHealth } from '@api/controllers/health.controller';
 import { authGuard } from '@api/middleware/auth-guard';
 import type {
@@ -10,6 +13,10 @@ import type {
   IRateLimiter,
   IRefreshTokenRepository,
   IUserRepository,
+  ITopicNodeRepository,
+  ITagRepository,
+  IMediaRepository,
+  IStorageAdapter,
 } from '@arenaquest/shared/ports';
 import type { AuthService } from '@api/core/auth/auth-service';
 
@@ -30,20 +37,24 @@ export class AppRouter {
       auth: IAuthAdapter;
       users: IUserRepository;
       tokens: IRefreshTokenRepository;
+      topics: ITopicNodeRepository;
+      tags: ITagRepository;
+      media: IMediaRepository;
+      storage: IStorageAdapter;
       authService: AuthService;
       loginLimiter: IRateLimiter;
       cookieSameSite: CookieSameSite;
       allowedOrigins?: string;
     },
   ): void {
-    const { auth, users, tokens, authService, loginLimiter, cookieSameSite, allowedOrigins } = deps;
-
+    const { auth, users, tokens, topics, tags, media, storage, authService, loginLimiter, cookieSameSite, allowedOrigins } = deps;
+    console.log(`allowedOrigins: ${allowedOrigins}`);
     // Enable CORS for frontend interaction
     app.use(
       '*',
       cors({
         origin: allowedOrigins?.split(',') ?? 'http://localhost:3000',
-        allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
         allowHeaders: ['Content-Type', 'Authorization'],
         credentials: true,
       }),
@@ -63,6 +74,9 @@ export class AppRouter {
     // Feature routes
     app.route('/auth', buildAuthRouter({ authService, loginLimiter, cookieSameSite }));
     app.route('/admin/users', buildAdminUsersRouter(users, auth, tokens));
+    app.route('/admin/topics', buildAdminTopicsRouter(topics, tags));
+    app.route('/admin/topics', buildAdminMediaRouter(topics, media, storage));
+    app.route('/topics', buildTopicsRouter(topics, media, storage));
 
     // Sanity demo — development only, can be removed post-milestone.
     app.get('/protected/ping', authGuard, (c) =>

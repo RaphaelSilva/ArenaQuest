@@ -1,7 +1,7 @@
 # Task 05: Admin Media API
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 3 — Content & Media Core
 - **Dependencies:** Task 02, Task 03
@@ -47,12 +47,12 @@ Implement the media lifecycle management API to enable direct-to-R2 uploads. The
 
 ## Acceptance Criteria
 
-- [ ] All endpoints are implemented and correctly RBAC-protected.
-- [ ] Presigned URLs are generated with correct content-type and size constraints.
-- [ ] Media records transition from `pending` to `ready` only after successful R2 verification.
-- [ ] Deletion removes both the database record and the storage object.
-- [ ] Integration tests cover the full lifecycle, including error cases for size/type violations.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] All endpoints are implemented and correctly RBAC-protected.
+- [x] Presigned URLs are generated with correct content-type and size constraints.
+- [x] Media records transition from `pending` to `ready` only after successful R2 verification.
+- [x] Deletion removes both the database record and the storage object.
+- [x] Integration tests cover the full lifecycle, including error cases for size/type violations.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

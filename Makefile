@@ -7,7 +7,7 @@
 .PHONY: help install dev dev-web dev-api build build-web build-api \
         lint lint-web lint-shared test test-api \
         cf-typegen \
-        db-migrate-local db-migrate-local-staging \
+        db-migrations-dev db-migrations-staging db-migrations-prod \
         deploy-api deploy-web bootstrap-admin \
         clean clean-cache clean-all
 
@@ -66,6 +66,9 @@ lint: ## Lint all workspaces (Turborepo)
 lint-web: ## Lint only apps/web
 	pnpm --filter web lint
 
+lint-api: ## Lint only apps/api
+	pnpm --filter api lint
+
 lint-shared: ## Lint only packages/shared
 	pnpm --filter @arenaquest/shared lint
 
@@ -80,21 +83,6 @@ test-web: ## Run apps/web tests (Vitest + JSDOM)
 
 test-api: ## Run apps/api tests (Vitest + Cloudflare Workers pool)
 	pnpm --filter api test
-
-# ==============================================================================
-# 🔧 CLOUDFLARE WORKERS UTILS
-# ==============================================================================
-cf-typegen: ## Regenerate Cloudflare Worker types (wrangler types)
-	pnpm --filter api cf-typegen
-
-db-migrate-local: ## Apply all D1 migrations locally (arenaquest-db)
-	pnpm --filter api exec wrangler d1 migrations apply arenaquest-db --local
-
-db-migrate-local-staging: ## Apply all D1 migrations to local staging DB (arenaquest-db-staging)
-	pnpm --filter api exec wrangler d1 migrations apply arenaquest-db-staging --local --env staging
-
-db-migrate-staging: ## Apply all D1 migrations to remote staging DB (arenaquest-db-staging)
-	pnpm --filter api exec wrangler d1 migrations apply arenaquest-db-staging --remote --env staging
 
 # ==============================================================================
 # 🚢 DEPLOY
@@ -113,11 +101,19 @@ deploy-api: ## Deploy apps/api to Cloudflare Workers (Production)
 deploy-api-staging: ## Deploy apps/api to Cloudflare Workers (Staging)
 	pnpm --filter api exec wrangler deploy --env staging
 
+
+deploy: deploy-web deploy-api
+
+deploy-staging: deploy-web-staging deploy-api-staging
+
+# ==============================================================================
+# 🛠️ D1 UTILS
+# ==============================================================================
 create-db: ## Create a new D1 database
-	pnpm --filter api exec wrangler d1 create arenaquest-db
+	pnpm --filter api db:create
 
 create-db-staging: ## Create a new D1 database (Staging)
-	pnpm --filter api exec wrangler d1 create arenaquest-db-staging --env staging
+	pnpm --filter api db:create:staging 
 
 create-kv: ## Create a new KV namespace
 	pnpm --filter api exec wrangler kv:namespace create RATE_LIMIT_KV
@@ -134,9 +130,20 @@ list-kv-staging: ## List all KV namespaces (Staging)
 bootstrap-admin: ## Interactively create the first admin account (local / staging / production)
 	@bash scripts/bootstrap-first-admin.sh
 
-deploy: deploy-web deploy-api
+# ==============================================================================
+# 🔧 CLOUDFLARE WORKERS UTILS
+# ==============================================================================
+cf-typegen: ## Regenerate Cloudflare Worker types (wrangler types)
+	pnpm --filter api cf-typegen
 
-deploy-staging: deploy-web-staging deploy-api-staging
+db-migrations-dev: ## Apply all D1 migrations locally (arenaquest-db)
+	pnpm --filter api db:apply:migrations:staging --local
+
+db-migrations-staging: ## Apply all D1 migrations to remote staging DB (arenaquest-db-staging)
+	pnpm --filter api db:apply:migrations:staging --remote
+
+db-migrations-prod: ## Apply all D1 migrations to remote production DB (arenaquest-db)
+	pnpm --filter api db:apply:migrations --remote
 
 # ==============================================================================
 # 🧹 CLEAN

@@ -1,7 +1,7 @@
 # Task 02: Media Data Layer
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Low
 - **Milestone:** 3 — Content & Media Core
 - **Dependencies:** Task 01
@@ -36,12 +36,12 @@ The `Media` entity shape already exists in shared types — this task adds the p
 
 ## Acceptance Criteria
 
-- [ ] `MediaStatus` enum and the extended `Media` interface are exported from `@arenaquest/shared`.
-- [ ] `IMediaRepository` port is exported from `@arenaquest/shared/ports`.
-- [ ] Migration exists and is idempotent.
-- [ ] `create` always inserts with `status = 'pending'`.
-- [ ] `markReady` transitions a PENDING row to READY.
-- [ ] `listByTopic(..., false)` excludes both PENDING and DELETED rows.
-- [ ] `softDelete` hides the row from `listByTopic` but keeps it in the database.
-- [ ] `hardDelete` removes the row entirely.
-- [ ] Unit tests cover every case above; `make lint` is clean.
+- [x] `MediaStatus` enum and the extended `Media` interface are exported from `@arenaquest/shared`.
+- [x] `IMediaRepository` port is exported from `@arenaquest/shared/ports`.
+- [x] Migration exists and is idempotent.
+- [x] `create` always inserts with `status = 'pending'`.
+- [x] `markReady` transitions a PENDING row to READY.
+- [x] `listByTopic(..., false)` excludes both PENDING and DELETED rows.
+- [x] `softDelete` hides the row from `listByTopic` but keeps it in the database.
+- [x] `hardDelete` removes the row entirely.
+- [x] Unit tests cover every case above; `make lint` is clean.

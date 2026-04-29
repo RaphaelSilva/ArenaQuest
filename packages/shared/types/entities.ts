@@ -14,6 +14,12 @@ export namespace Entities {
             ARCHIVED = 'archived',
         }
 
+        export enum MediaStatus {
+            PENDING = 'pending',
+            READY = 'ready',
+            DELETED = 'deleted',
+        }
+
         export enum ProgressStatus {
             NOT_STARTED = 'not_started',
             IN_PROGRESS = 'in_progress',
@@ -81,8 +87,17 @@ export namespace Entities {
 
         export interface Media {
             id: string;
+            topicNodeId: string;
+            /** Resolved by the storage adapter at the route layer; empty string when returned by the repository. */
             url: string;
             type: string;
+            storageKey: string;
+            sizeBytes: number;
+            originalName: string;
+            uploadedById: string;
+            status: Config.MediaStatus;
+            createdAt: Date;
+            updatedAt: Date;
         }
 
         export interface Tag {
