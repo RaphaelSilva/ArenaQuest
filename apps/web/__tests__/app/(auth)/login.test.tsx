@@ -37,20 +37,20 @@ beforeEach(() => {
 describe('LoginPage', () => {
   it('renders email and password fields', () => {
     render(<LoginPage />);
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/e-mail/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^senha$/i)).toBeInTheDocument();
   });
 
   it('renders a submit button', () => {
     render(<LoginPage />);
-    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /entrar na arena/i })).toBeInTheDocument();
   });
 
   it('shows a validation error when fields are empty', async () => {
     render(<LoginPage />);
-    fireEvent.submit(screen.getByRole('button', { name: /sign in/i }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: /entrar na arena/i }).closest('form')!);
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Email and password are required.');
+      expect(screen.getByRole('alert')).toHaveTextContent('Informe seu e-mail.');
     });
     expect(mockLogin).not.toHaveBeenCalled();
   });
@@ -60,9 +60,9 @@ describe('LoginPage', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText(/email/i), 'alice@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'secret');
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
+    await user.type(screen.getByLabelText(/e-mail/i), 'alice@example.com');
+    await user.type(screen.getByLabelText(/^senha$/i), 'secret');
+    await user.click(screen.getByRole('button', { name: /entrar na arena/i }));
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('alice@example.com', 'secret');
@@ -74,9 +74,9 @@ describe('LoginPage', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText(/email/i), 'alice@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'secret');
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
+    await user.type(screen.getByLabelText(/e-mail/i), 'alice@example.com');
+    await user.type(screen.getByLabelText(/^senha$/i), 'secret');
+    await user.click(screen.getByRole('button', { name: /entrar na arena/i }));
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/dashboard');
@@ -88,12 +88,12 @@ describe('LoginPage', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText(/email/i), 'bad@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'wrong');
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
+    await user.type(screen.getByLabelText(/e-mail/i), 'bad@example.com');
+    await user.type(screen.getByLabelText(/^senha$/i), 'wrong');
+    await user.click(screen.getByRole('button', { name: /entrar na arena/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Invalid email or password.');
+      expect(screen.getByRole('alert')).toHaveTextContent('E-mail ou senha inválidos.');
     });
     expect(mockReplace).not.toHaveBeenCalled();
   });

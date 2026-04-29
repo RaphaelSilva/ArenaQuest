@@ -3,6 +3,24 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* ArenaQuest design tokens */
+  --aq-bg: #0B0E17;
+  --aq-bg2: #131825;
+  --aq-bg3: #1C2235;
+  --aq-bg4: #232B40;
+  --aq-border: rgba(255,255,255,0.07);
+  --aq-border2: rgba(255,255,255,0.13);
+  --aq-border3: rgba(255,255,255,0.22);
+  --aq-text: #E8EAF0;
+  --aq-text2: #8B92A8;
+  --aq-text3: #5C6480;
+  --aq-accent: oklch(0.74 0.19 52);
+  --aq-accent2: oklch(0.65 0.16 240);
+  --aq-accent3: oklch(0.68 0.17 150);
+  --aq-accent-glow: oklch(0.74 0.19 52 / 0.18);
+  --aq-error: oklch(0.65 0.22 15);
+  --aq-error-bg: oklch(0.65 0.22 15 / 0.12);
 }
 
 @theme inline {
@@ -23,4 +41,40 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ArenaQuest auth page animations */
+@keyframes aq-fade-slide {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes aq-shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+@keyframes aq-pop-in {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+@keyframes aq-progress {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+
+.aq-anim { animation: aq-fade-slide 0.4s ease forwards; }
+
+.aq-submit-btn-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
+  animation: aq-shimmer 1.2s infinite;
+}
+
+.aq-success-icon {
+  animation: aq-pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.aq-progress-bar {
+  animation: aq-progress 3s linear forwards;
 }
