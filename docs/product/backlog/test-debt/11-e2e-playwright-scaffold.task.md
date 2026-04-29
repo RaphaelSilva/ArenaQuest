@@ -1,10 +1,12 @@
 # Task 11: E2E Scaffolding (Playwright Smoke Test)
 
 ## Metadata
-- **Status:** Pending
+- **Status:** ⏩ Deferred (Moved to Test Debt)
 - **Complexity:** Medium
-- **Milestone:** 3 — Content & Media Core
+- **Milestone:** Backlog — Test Debt
 - **Dependencies:** Task 08, Task 09, Task 10
+- **Deferred Date:** 2026-04-29
+- **Reason:** Postponed until after UX review to avoid test rework during design iterations.
 
 ---
 

@@ -4,6 +4,33 @@
 
 ---
 
+## Milestone 3 — Content & Media Core
+
+> Hierarchical content engine and direct-to-storage media pipeline.
+
+### New Features
+
+- **🌳 Hierarchical Topic Engine**
+  - Unlimited depth parent-child relationships for curriculum building.
+  - Interactive Admin Topic Tree with drag-and-drop reordering/re-parenting.
+  - Draft/Published/Archived lifecycle for granular visibility control.
+
+- **📁 Media & Storage System**
+  - Direct-to-R2 upload strategy via presigned URLs (zero-byte Worker overhead).
+  - Native support for PDF, MP4 Video, and Image assets.
+  - Secure media serving via short-lived presigned download URLs.
+
+- **🛡️ Security & Content Integrity**
+  - Isomorphic Markdown sanitization (backend persistence + frontend rendering).
+  - Strict filtering ensures students only see published nodes and ready media.
+  - Content-type and size enforcement on presigned upload requests.
+
+- **💻 Dashboards & Viewers**
+  - Admin Authoring Pane: Inline editing, tag management, and real-time upload progress.
+  - Student Catalogue: Responsive sidebar navigation and specialized media viewers.
+
+---
+
 ## Milestone 2 — Auth Hardening (Security Epic S-01 → S-10)
 
 > All findings from the Milestone 2 close-out security audit are now closed.
