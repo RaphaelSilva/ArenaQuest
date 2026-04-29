@@ -3,6 +3,7 @@ import type { ITopicNodeRepository, ITagRepository, TopicNodeRecord } from '@are
 import { Entities } from '@arenaquest/shared/types/entities';
 import { sanitizeMarkdown } from '@arenaquest/shared/utils/sanitize-markdown';
 import type { ControllerResult } from '../core/result';
+import { ValidateBody, Body } from '../core/decorators';
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -55,13 +56,9 @@ export class AdminTopicsController {
     return { ok: true, data: nodes };
   }
 
-  async create(body: unknown): Promise<ControllerResult<TopicNodeRecord>> {
-    const parsed = CreateTopicSchema.safeParse(body);
-    if (!parsed.success) {
-      return { ok: false, status: 400, error: 'BadRequest', meta: { details: parsed.error.flatten() } };
-    }
-
-    const { parentId, title, content, status, estimatedMinutes, tagIds, prerequisiteIds } = parsed.data;
+  @ValidateBody(CreateTopicSchema)
+  async create(@Body() body: z.infer<typeof CreateTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
+    const { parentId, title, content, status, estimatedMinutes, tagIds, prerequisiteIds } = body;
 
     if (parentId) {
       const parent = await this.topics.findById(parentId);
@@ -99,16 +96,12 @@ export class AdminTopicsController {
     return { ok: true, data: { ...node, children } };
   }
 
-  async update(id: string, body: unknown): Promise<ControllerResult<TopicNodeRecord>> {
-    const parsed = UpdateTopicSchema.safeParse(body);
-    if (!parsed.success) {
-      return { ok: false, status: 400, error: 'BadRequest', meta: { details: parsed.error.flatten() } };
-    }
-
+  @ValidateBody(UpdateTopicSchema)
+  async update(id: string, @Body() body: z.infer<typeof UpdateTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
     const existing = await this.topics.findById(id);
     if (!existing) return { ok: false, status: 404, error: 'NotFound' };
 
-    const { title, content, status, estimatedMinutes, tagIds, prerequisiteIds } = parsed.data;
+    const { title, content, status, estimatedMinutes, tagIds, prerequisiteIds } = body;
 
     if (prerequisiteIds && prerequisiteIds.length > 0) {
       for (const prereqId of prerequisiteIds) {
@@ -131,16 +124,12 @@ export class AdminTopicsController {
     return { ok: true, data: node };
   }
 
-  async move(id: string, body: unknown): Promise<ControllerResult<TopicNodeRecord>> {
-    const parsed = MoveTopicSchema.safeParse(body);
-    if (!parsed.success) {
-      return { ok: false, status: 400, error: 'BadRequest', meta: { details: parsed.error.flatten() } };
-    }
-
+  @ValidateBody(MoveTopicSchema)
+  async move(id: string, @Body() body: z.infer<typeof MoveTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
     const existing = await this.topics.findById(id);
     if (!existing) return { ok: false, status: 404, error: 'NotFound' };
 
-    const { newParentId, newSortOrder } = parsed.data;
+    const { newParentId, newSortOrder } = body;
 
     if (newParentId === id) {
       return { ok: false, status: 409, error: 'WOULD_CYCLE' };

@@ -33,6 +33,7 @@
 
 		/* Enable all strict type-checking options. */
 		"strict": true,
+		"experimentalDecorators": true,
 
 		/* Skip type checking all .d.ts files. */
 		"skipLibCheck": true,

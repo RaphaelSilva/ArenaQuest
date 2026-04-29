@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ITopicNodeRepository, IMediaRepository, IStorageAdapter } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
 import type { ControllerResult } from '../core/result';
+import { ValidateBody, Body } from '../core/decorators';
 
 // ---------------------------------------------------------------------------
 // Validation constants
@@ -73,20 +74,16 @@ export class AdminMediaController {
     return { ok: true, data: mediaWithUrls };
   }
 
+  @ValidateBody(PresignSchema)
   async presignUpload(
     topicId: string,
-    body: unknown,
+    @Body() body: z.infer<typeof PresignSchema>,
     userId: string,
   ): Promise<ControllerResult<PresignResult>> {
     const topic = await this.topics.findById(topicId);
     if (!topic) return { ok: false, status: 404, error: 'NotFound', meta: { detail: 'topic not found' } };
 
-    const parsed = PresignSchema.safeParse(body);
-    if (!parsed.success) {
-      return { ok: false, status: 400, error: 'BadRequest', meta: { details: parsed.error.flatten() } };
-    }
-
-    const { fileName, contentType, sizeBytes } = parsed.data;
+    const { fileName, contentType, sizeBytes } = body;
     const maxBytes = SIZE_LIMIT_BYTES[contentType];
     if (sizeBytes > maxBytes) {
       return {
