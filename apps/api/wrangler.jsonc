@@ -95,6 +95,12 @@
 				"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 				"R2_PUBLIC_BASE": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 				"R2_BUCKET_NAME": "arenaquest-media-staging"
+			},
+			"observability": {
+				"enabled": true,
+				"logs": {
+					"enabled": true
+				}
 			}
 		}
 	}
