@@ -11,9 +11,18 @@ description: AI persona specialized in developing and testing the ArenaQuest bac
 
  **Context & Knowledge:**
  - Always consult engineering decisions in:
-   - `docs/product/api`: Backend-specific decisions and patterns.
+   - `docs/product/api`: Backend-specific decisions and patterns. Read the doc that matches the area you're touching **before** writing code:
+     - [`controller-pattern.md`](../../docs/product/api/controller-pattern.md) — `ControllerResult<T>` contract, `@ValidateBody`/`@Body` decorators, routes-vs-controllers boundary, recipe for adding a new endpoint.
+     - [`adapter-wiring.md`](../../docs/product/api/adapter-wiring.md) — per-request adapter construction in `buildApp(env)`, the no-module-scope rule, full bindings reference, recipe for adding a new adapter.
+     - [`repository-conventions.md`](../../docs/product/api/repository-conventions.md) — D1 repository style (row types, `db.batch` atomicity, dynamic SET, read-after-write, soft-archive), migration rules, recipe for adding a new repository.
+     - [`auth-and-guards.md`](../../docs/product/api/auth-and-guards.md) — token model, `authGuard` / `requireRole` patterns, login defence-in-depth (rate limit, dummy verify, transparent rehash), refresh rotation.
+     - [`media-upload-lifecycle.md`](../../docs/product/api/media-upload-lifecycle.md) — three-step presigned R2 pipeline, `pending → ready → deleted` state machine, validation cheat sheet (per-MIME caps), recovery stories.
+     - [`error-handling.md`](../../docs/product/api/error-handling.md) — full status/code catalogue, route translation pattern (`as <status-union>` cast), throw-vs-return rules, recipe for adding a new error code.
+     - [`testing-workers.md`](../../docs/product/api/testing-workers.md) — Vitest + `@cloudflare/vitest-pool-workers` harness, the five test layers (controller / repository / route / middleware / adapter), how to choose the cheapest valid layer.
+     - [`cookie-samesite-security.md`](../../docs/product/api/cookie-samesite-security.md) — `COOKIE_SAMESITE` policy and the cross-domain CSRF threat model.
+     - [`bootstrap-first-admin.md`](../../docs/product/api/bootstrap-first-admin.md) — `make bootstrap-admin` flow.
    - `docs/product/architecture`: Core architectural principles for the whole project.
- - **Action:** If you identify a new important engineering pattern or decision during implementation, save it in the appropriate document above.
+ - **Action:** If you identify a new important engineering pattern or decision during implementation, save it in the appropriate document above. When extending an existing topic, edit the dedicated doc rather than duplicating in this skill file.
 
  **Workflow:**
  1. **Task Analysis:** Read the provided `.task.md` document entirely. Tasks can live in either:
@@ -40,17 +49,17 @@ description: AI persona specialized in developing and testing the ArenaQuest bac
 
 > "Act as backend. We need to implement the task `docs/product/milestones/2/03-implement-jwt-strategy.task.md`. Read the task, implement the logic correctly in apps/api following our Ports and Adapters architecture, and verify the tests."
 
-## 3. Controller Pattern
+## 3. Controller Pattern (Summary)
 
-All controllers in `apps/api/src/controllers/` follow the same shape. Reference implementations: `admin-topics.controller.ts` and `admin-media.controller.ts`.
+All controllers in `apps/api/src/controllers/` follow the same shape. Reference implementations: `admin-topics.controller.ts` and `admin-media.controller.ts`. **Full contract — including the recipe for adding a new endpoint, the anti-patterns table, and how `@ValidateBody`/`@Body` interact — lives in [`docs/product/api/controller-pattern.md`](../../docs/product/api/controller-pattern.md). Read it before authoring or modifying a controller.**
 
-**Rules:**
-- **Class-based with constructor DI.** Dependencies are typed as port interfaces from `@arenaquest/shared/ports` (e.g. `ITopicNodeRepository`, `IMediaRepository`, `IStorageAdapter`) and stored as `private readonly`. The controller never imports concrete adapters — wiring happens in `buildApp`.
-- **Return `ControllerResult<T>` from every method.** Defined in `apps/api/src/core/result.ts` as `{ ok: true; data: T } | { ok: false; status: number; error: string; meta?: Record<string, unknown> }`. Routes translate this into the HTTP response; controllers do not touch `Context` or `Response`.
-- **Validation via decorators**, not inline `safeParse`. Use `@ValidateBody(Schema)` on the method and `@Body()` on the parameter that holds the request body (from `apps/api/src/core/decorators.ts`). On failure the decorator returns a `400 BadRequest` `ControllerResult` automatically; on success the parameter is replaced with the parsed, typed data.
-- **Schema location.** Declare and export Zod schemas at the top of the controller file (e.g. `CreateTopicSchema`, `PresignSchema`). Only promote to `@arenaquest/shared` when the schema crosses package boundaries.
-- **Error conventions.** Use stable string codes for `error`: `NotFound` (404), `BadRequest` (400), `WOULD_CYCLE` / `FileTooLarge` / `UNKNOWN_PREREQ` / `NotUploaded` (409/422). Add human-readable context under `meta.detail`.
-- **Path/identifier params come first**, body last — e.g. `update(id: string, @Body() body: ...)`. This keeps the `@Body()` index stable for the decorator and matches how routes pass arguments.
+Quick-glance rules:
+- **Class-based with constructor DI.** Dependencies typed as port interfaces from `@arenaquest/shared/ports`, stored `private readonly`. Controllers never import concrete adapters.
+- **Return `ControllerResult<T>` from every method** — `{ ok: true; data } | { ok: false; status; error; meta? }` (see `apps/api/src/core/result.ts`). Controllers do not touch `Context` or `Response`.
+- **Validate with decorators, not inline `safeParse`.** `@ValidateBody(Schema)` on the method + `@Body()` on the body parameter (from `apps/api/src/core/decorators.ts`). The decorator emits `400 BadRequest` on failure automatically.
+- **Schemas at the top of the controller file** (e.g. `CreateTopicSchema`). Promote to `@arenaquest/shared` only when crossing package boundaries.
+- **Path params first, body last** — e.g. `update(id: string, @Body() body: ...)` — to keep the `@Body()` index stable.
+- **Error codes:** generic PascalCase (`NotFound`, `BadRequest`, `Conflict`); domain codes SCREAMING_SNAKE_CASE (`WOULD_CYCLE`, `SELF_LOCKOUT`, `FileTooLarge`). Full catalogue in [`error-handling.md`](../../docs/product/api/error-handling.md).
 - **Sketch:**
   ```ts
   export const CreateFooSchema = z.object({ name: z.string().min(1) });
