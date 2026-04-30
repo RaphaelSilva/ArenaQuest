@@ -8,6 +8,7 @@ import { buildAdminMediaRouter } from './admin-media.router';
 import { buildTopicsRouter } from './topics.router';
 import { getHealth } from '@api/controllers/health.controller';
 import { authGuard } from '@api/middleware/auth-guard';
+import { parseAllowedOrigins, buildOriginMatcher } from '@api/core/cors/origin-policy';
 import type {
   IAuthAdapter,
   IRateLimiter,
@@ -45,15 +46,24 @@ export class AppRouter {
       loginLimiter: IRateLimiter;
       cookieSameSite: CookieSameSite;
       allowedOrigins?: string;
+      /**
+       * When true, `parseAllowedOrigins` throws at construction time if
+       * `allowedOrigins` is missing or invalid. Set to `false` for local dev
+       * so a missing var doesn't prevent `wrangler dev` from booting.
+       */
+      strictCors: boolean;
     },
   ): void {
-    const { auth, users, tokens, topics, tags, media, storage, authService, loginLimiter, cookieSameSite, allowedOrigins } = deps;
-    console.log(`allowedOrigins: ${allowedOrigins}`);
+    const { auth, users, tokens, topics, tags, media, storage, authService, loginLimiter, cookieSameSite, allowedOrigins, strictCors } = deps;
+    // Build origin matcher from config — strict in prod, lenient in dev.
+    const originMatcher = buildOriginMatcher(
+      parseAllowedOrigins(allowedOrigins, { strict: strictCors }),
+    );
     // Enable CORS for frontend interaction
     app.use(
       '*',
       cors({
-        origin: allowedOrigins?.split(',') ?? 'http://localhost:3000',
+        origin: originMatcher,
         allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
         allowHeaders: ['Content-Type', 'Authorization'],
         credentials: true,

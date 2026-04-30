@@ -1,7 +1,7 @@
 # Task 01: Extract CORS Setup into a Config-Driven Origin Policy
 
 ## Metadata
-- **Status:** Ready
+- **Status:** Done
 - **Complexity:** Small
 - **Area:** `apps/api`
 - **Depends on:** existing `apps/api/src/routes/index.ts`, `ALLOWED_ORIGINS` env var
@@ -64,13 +64,13 @@ This task is a **pure refactor**: same observable behavior, but the CORS setup m
 
 ## Acceptance Criteria
 
-- [ ] `parseAllowedOrigins("https://a.com, https://b.com ,", { strict: true })` returns `['https://a.com', 'https://b.com']` (trimmed, empties dropped).
-- [ ] `parseAllowedOrigins("not a url", { strict: true })` throws `OriginPolicyError`.
-- [ ] `parseAllowedOrigins(undefined, { strict: true })` throws `OriginPolicyError`.
-- [ ] `parseAllowedOrigins(undefined, { strict: false })` returns `['http://localhost:3000']` and emits one `console.warn`.
-- [ ] `buildOriginMatcher(['https://a.com'])` returns a function that yields `'https://a.com'` for that origin and `null` for `'https://evil.com'`.
-- [ ] `routes/index.ts` no longer contains `.split(',')` or `console.log` for origins; the CORS middleware uses the matcher.
-- [ ] Existing integration tests that exercise `Origin: https://arenaquest-web.pages.dev` against the production-style env still pass with the same `Access-Control-Allow-Origin` header.
+- [x] `parseAllowedOrigins("https://a.com, https://b.com ,", { strict: true })` returns `['https://a.com', 'https://b.com']` (trimmed, empties dropped).
+- [x] `parseAllowedOrigins("not a url", { strict: true })` throws `OriginPolicyError`.
+- [x] `parseAllowedOrigins(undefined, { strict: true })` throws `OriginPolicyError`.
+- [x] `parseAllowedOrigins(undefined, { strict: false })` returns `['http://localhost:3000']` and emits one `console.warn`.
+- [x] `buildOriginMatcher(['https://a.com'])` returns a function that yields `'https://a.com'` for that origin and `null` for `'https://evil.com'`.
+- [x] `routes/index.ts` no longer contains `.split(',')` or `console.log` for origins; the CORS middleware uses the matcher.
+- [x] Existing integration tests that exercise `Origin: https://arenaquest-web.pages.dev` against the production-style env still pass with the same `Access-Control-Allow-Origin` header.
 
 ---
 
@@ -95,7 +95,7 @@ This task is a **pure refactor**: same observable behavior, but the CORS setup m
 3. Diff `Access-Control-Allow-Origin` headers against `main` for the staging origin list — must match exactly.
 
 ### Definition of Done
-- [ ] All unit + integration tests green (`make test-api`).
-- [ ] No `hono` imports in `apps/api/src/core/cors/`.
-- [ ] `console.log` for origins removed from `routes/index.ts`.
-- [ ] No new dependencies in `apps/api/package.json`.
+- [x] All unit + integration tests green (`make test-api`).
+- [x] No `hono` imports in `apps/api/src/core/cors/`.
+- [x] `console.log` for origins removed from `routes/index.ts`.
+- [x] No new dependencies in `apps/api/package.json`.
