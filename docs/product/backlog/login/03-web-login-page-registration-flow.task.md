@@ -90,13 +90,13 @@ Both throw a typed error class (reuse / extend whatever `login` throws today) wi
 
 ## Acceptance Criteria
 
-- [ ] `RegisterForm` submits to `POST /auth/register` and shows the new "Confira seu e-mail" state on `202`.
-- [ ] On `400 ValidationFailed`, field errors render inline next to the offending input — no generic toast.
-- [ ] No auto-redirect to `/dashboard` after registration. The user must explicitly navigate via the activation link or the "Voltar ao login" button.
-- [ ] `/activate?token=<valid>` flips the user to active and lands on `/login?activated=1` with the green banner visible.
-- [ ] `/activate?token=<invalid|missing|expired>` shows the error state and never throws an uncaught promise rejection.
-- [ ] An unactivated user attempting to log in sees the activation reminder copy iff the registration just happened in this browser (the local-storage key is set); otherwise the generic invalid-credentials copy still shows (no enumeration leak).
-- [ ] No regressions in the existing Login flow for already-active users.
+- [x] `RegisterForm` submits to `POST /auth/register` and shows the new "Confira seu e-mail" state on `202`.
+- [x] On `400 ValidationFailed`, field errors render inline next to the offending input — no generic toast.
+- [x] No auto-redirect to `/dashboard` after registration. The user must explicitly navigate via the activation link or the "Voltar ao login" button.
+- [x] `/activate?token=<valid>` flips the user to active and lands on `/login?activated=1` with the green banner visible.
+- [x] `/activate?token=<invalid|missing|expired>` shows the error state and never throws an uncaught promise rejection.
+- [x] An unactivated user attempting to log in sees the activation reminder copy iff the registration just happened in this browser (the local-storage key is set); otherwise the generic invalid-credentials copy still shows (no enumeration leak).
+- [x] No regressions in the existing Login flow for already-active users.
 
 ---
 

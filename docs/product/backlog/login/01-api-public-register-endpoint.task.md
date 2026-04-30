@@ -98,13 +98,13 @@ Error responses:
 
 ## Acceptance Criteria
 
-- [ ] `POST /auth/register` with a valid, unused email creates a user with `status = INACTIVE`, role `student`, password stored as a PBKDF2 hash, and returns `202 { status: 'pending_activation' }`.
-- [ ] `POST /auth/register` with an email already present in `users` returns the **same** `202 { status: 'pending_activation' }` response (no enumeration leak) and does **not** insert a duplicate row.
-- [ ] `POST /auth/register` with a malformed body returns `400` with field-level `ValidationFailed` errors.
-- [ ] `POST /auth/register` exceeding the rate limit returns `429` and never touches the DB.
-- [ ] `POST /auth/login` with the new user's credentials returns `401 InvalidCredentials` until the user is activated (regression — must keep failing).
-- [ ] The registration-event emitter is invoked exactly once per accepted request, with the discriminator `USER_REGISTRATION_CREATED` for new users and `USER_REGISTRATION_DUPLICATE` for duplicates.
-- [ ] `RegisterController` has zero `hono` imports.
+- [x] `POST /auth/register` with a valid, unused email creates a user with `status = INACTIVE`, role `student`, password stored as a PBKDF2 hash, and returns `202 { status: 'pending_activation' }`.
+- [x] `POST /auth/register` with an email already present in `users` returns the **same** `202 { status: 'pending_activation' }` response (no enumeration leak) and does **not** insert a duplicate row.
+- [x] `POST /auth/register` with a malformed body returns `400` with field-level `ValidationFailed` errors.
+- [x] `POST /auth/register` exceeding the rate limit returns `429` and never touches the DB.
+- [x] `POST /auth/login` with the new user's credentials returns `401 InvalidCredentials` until the user is activated (regression — must keep failing).
+- [x] The registration-event emitter is invoked exactly once per accepted request, with the discriminator `USER_REGISTRATION_CREATED` for new users and `USER_REGISTRATION_DUPLICATE` for duplicates.
+- [x] `RegisterController` has zero `hono` imports.
 
 ---
 
