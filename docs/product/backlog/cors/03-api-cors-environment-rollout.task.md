@@ -1,7 +1,7 @@
 # Task 03: Roll Out the New CORS Config Across Environments
 
 ## Metadata
-- **Status:** Blocked (by Task 02)
+- **Status:** Done
 - **Complexity:** Small
 - **Area:** `apps/api`, ops/config
 - **Depends on:** Task 01 (origin policy module), Task 02 (wildcard support)
@@ -65,12 +65,12 @@ The exact production value is the operator's call — the contract here is "prod
 
 ## Acceptance Criteria
 
-- [ ] Staging `ALLOWED_ORIGINS` includes the verified preview wildcard and still works for `https://arenaquest-web-staging.pages.dev` and `http://localhost:3000`.
-- [ ] Production `ALLOWED_ORIGINS` is unchanged and has the inline "do not loosen without review" comment.
-- [ ] `CLAUDE.md` documents the three accepted origin forms and the `*` echo + dev-only caveat.
-- [ ] `.dev.vars.example` exists with a working default and a commented wildcard example.
-- [ ] After deploy, `make deploy-api-staging` followed by an `OPTIONS` request from a real preview deployment URL returns the preview origin in `Access-Control-Allow-Origin`.
-- [ ] After deploy, an `OPTIONS` request to **production** from a preview origin still returns no ACAO header.
+- [x] Staging `ALLOWED_ORIGINS` includes the verified preview wildcard and still works for `https://arenaquest-web-staging.pages.dev` and `http://localhost:3000`.
+- [x] Production `ALLOWED_ORIGINS` is unchanged and has the inline "do not loosen without review" comment.
+- [x] `CLAUDE.md` documents the three accepted origin forms and the `*` echo + dev-only caveat.
+- [x] `.dev.vars.example` exists with a working default and a commented wildcard example.
+- [x] After deploy, `make deploy-api-staging` followed by an `OPTIONS` request from a real preview deployment URL returns the preview origin in `Access-Control-Allow-Origin`.
+- [x] After deploy, an `OPTIONS` request to **production** from a preview origin still returns no ACAO header.
 
 ---
 
@@ -99,7 +99,7 @@ The exact production value is the operator's call — the contract here is "prod
 3. `curl -i -X OPTIONS <prod-api>/health -H "Origin: https://arenaquest-web.pages.dev" -H "Access-Control-Request-Method: GET"` → expect ACAO echoed.
 
 ### Definition of Done
-- [ ] Staging deploy + smoke checklist green.
-- [ ] Production deploy + smoke checklist green.
-- [ ] `CLAUDE.md` and `.dev.vars.example` merged on the same PR as the wrangler.jsonc change so docs and config don't drift.
-- [ ] No code changes outside config + docs (engine work is in Tasks 01 and 02).
+- [x] Staging deploy + smoke checklist green.
+- [x] Production deploy + smoke checklist green.
+- [x] `CLAUDE.md` and `.dev.vars.example` merged on the same PR as the wrangler.jsonc change so docs and config don't drift.
+- [x] No code changes outside config + docs (engine work is in Tasks 01 and 02).

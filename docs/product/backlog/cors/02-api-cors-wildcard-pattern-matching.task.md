@@ -1,7 +1,7 @@
 # Task 02: Wildcard / Pattern Support in the CORS Origin Policy
 
 ## Metadata
-- **Status:** Blocked (by Task 01)
+- **Status:** Done
 - **Complexity:** Medium
 - **Area:** `apps/api`
 - **Depends on:** Task 01 (`origin-policy.ts` and `buildOriginMatcher` exist)
@@ -72,16 +72,16 @@ Order of precedence: exact > host-wildcard > full wildcard. The matcher should s
 
 ## Acceptance Criteria
 
-- [ ] `parseAllowedOrigins("https://*.pages.dev")` returns `[{ kind: 'wildcard-host', scheme: 'https', suffix: '.pages.dev' }]`.
-- [ ] `parseAllowedOrigins("*")` returns `[{ kind: 'any' }]`.
-- [ ] `parseAllowedOrigins("https://app.arenaquest.com, https://*.pages.dev, *")` returns rules of all three kinds in order.
-- [ ] `parseAllowedOrigins("*.pages.dev")` (no scheme) throws `OriginPolicyError`.
-- [ ] `parseAllowedOrigins("https://*")` throws `OriginPolicyError`.
-- [ ] `parseAllowedOrigins("https://*.*.com")` throws `OriginPolicyError`.
-- [ ] Matcher with `https://*.pages.dev` returns `'https://abc.pages.dev'` for that origin and `null` for `'https://abc.pages.dev.evil.com'`, `'https://a.b.pages.dev'`, `'http://abc.pages.dev'`.
-- [ ] Matcher with `*` returns the **request origin string** (echoed), not `'*'`.
-- [ ] Boot with `ALLOWED_ORIGINS="*"` emits exactly one `console.warn` mentioning credentials + echo behavior.
-- [ ] All Task 01 tests still pass unchanged.
+- [x] `parseAllowedOrigins("https://*.pages.dev")` returns `[{ kind: 'wildcard-host', scheme: 'https', suffix: '.pages.dev' }]`.
+- [x] `parseAllowedOrigins("*")` returns `[{ kind: 'any' }]`.
+- [x] `parseAllowedOrigins("https://app.arenaquest.com, https://*.pages.dev, *")` returns rules of all three kinds in order.
+- [x] `parseAllowedOrigins("*.pages.dev")` (no scheme) throws `OriginPolicyError`.
+- [x] `parseAllowedOrigins("https://*")` throws `OriginPolicyError`.
+- [x] `parseAllowedOrigins("https://*.*.com")` throws `OriginPolicyError`.
+- [x] Matcher with `https://*.pages.dev` returns `'https://abc.pages.dev'` for that origin and `null` for `'https://abc.pages.dev.evil.com'`, `'https://a.b.pages.dev'`, `'http://abc.pages.dev'`.
+- [x] Matcher with `*` returns the **request origin string** (echoed), not `'*'`.
+- [x] Boot with `ALLOWED_ORIGINS="*"` emits exactly one `console.warn` mentioning credentials + echo behavior.
+- [x] All Task 01 tests still pass unchanged.
 
 ---
 
@@ -111,7 +111,7 @@ Order of precedence: exact > host-wildcard > full wildcard. The matcher should s
 2. Set `ALLOWED_ORIGINS="*"`, confirm the boot warning appears once and that requests are echoed (not literal `*`).
 
 ### Definition of Done
-- [ ] All unit + integration tests green (`make test-api`).
-- [ ] `OriginPolicyError` messages quote the bad input so an operator misreading wrangler.jsonc gets a clear hint.
-- [ ] No regex constructed from user-provided strings.
-- [ ] Public API of `origin-policy.ts` documented with JSDoc, including the `*` + credentials echo behavior.
+- [x] All unit + integration tests green (`make test-api`).
+- [x] `OriginPolicyError` messages quote the bad input so an operator misreading wrangler.jsonc gets a clear hint.
+- [x] No regex constructed from user-provided strings.
+- [x] Public API of `origin-policy.ts` documented with JSDoc, including the `*` + credentials echo behavior.

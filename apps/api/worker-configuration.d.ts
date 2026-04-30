@@ -9,7 +9,7 @@ declare namespace Cloudflare {
 		RATE_LIMIT_KV: KVNamespace;
 		DB: D1Database;
 		R2: R2Bucket;
-		ALLOWED_ORIGINS: "https://c2ee7644.arenaquest-web-staging.pages.dev";
+		ALLOWED_ORIGINS: string;
 		COOKIE_SAMESITE: "None";
 		JWT_SECRET: string;
 		ALLOWED_ORIGIN: string;
@@ -23,7 +23,7 @@ declare namespace Cloudflare {
 		RATE_LIMIT_KV: KVNamespace;
 		DB: D1Database;
 		R2: R2Bucket;
-		ALLOWED_ORIGINS: "https://c2ee7644.arenaquest-web-staging.pages.dev" | "https://*.arenaquest-web.pages.dev";
+		ALLOWED_ORIGINS: string;
 		COOKIE_SAMESITE: "None" | "Strict";
 		JWT_SECRET: string;
 		ALLOWED_ORIGIN: string;

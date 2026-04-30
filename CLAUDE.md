@@ -63,6 +63,11 @@ Cloudflare Workers serverless backend (Hono). Patterns to follow:
 - **Auth** — `JwtAuthAdapter` implements `IAuthAdapter` using Web Crypto API. **PBKDF2 uses 100,000 iterations** (Cloudflare limit). Refresh tokens are persisted hashed via `D1RefreshTokenRepository`.
 - **Storage** — `R2StorageAdapter` exposes a presigned-upload lifecycle backed by R2 over the S3-compatible API; `D1MediaRepository` tracks media records and their topic associations.
 - **Bindings** — `JWT_SECRET` (secret), `DB` (D1), `RATE_LIMIT_KV` (KV), `R2` (bucket binding), `R2_S3_ENDPOINT`, `R2_BUCKET_NAME`, `R2_PUBLIC_BASE`, `R2_ACCESS_KEY_ID` (secret), `R2_SECRET_ACCESS_KEY` (secret), `ALLOWED_ORIGINS` (CORS), `COOKIE_SAMESITE` (security policy).
+  - **`ALLOWED_ORIGINS`** — comma-separated list of allowed request origins. Three forms are supported by the `OriginPolicy` core module (`src/core/cors/`):
+    1. **Exact** — `https://arenaquest-web.pages.dev` — only that literal origin is accepted.
+    2. **Wildcard subdomain** — `https://*.arenaquest-web-staging.pages.dev` — any single-label subdomain of that host (e.g. PR preview deployments). Patterns with multiple wildcard labels are not supported.
+    3. **Full wildcard** — `*` — echoes back the actual request `Origin` header (required because browsers block `Access-Control-Allow-Origin: *` on credentialed requests). **For local development only — never set this in staging or production.**
+  - Production is locked to exact origins; do not introduce wildcards without a security review (see `docs/product/backlog/cors/`). Staging includes the PR-preview wildcard (`https://*.arenaquest-web-staging.pages.dev`). Local development uses `ALLOWED_ORIGINS=http://localhost:3000` (or `*`) in `.dev.vars` — see `.dev.vars.example`.
 - **User Management** — Includes admin lockout guards to prevent deleting the last active admin or self-lockout.
 - **Tests** — Vitest with `@cloudflare/vitest-pool-workers`. Config: `vitest.config.mts`.
 

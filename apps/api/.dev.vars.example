@@ -1,0 +1,15 @@
+# Local development environment variables template.
+# Copy this file to .dev.vars and fill in your own values.
+# NEVER commit .dev.vars — it is listed in .gitignore.
+
+JWT_SECRET=local-dev-only-secret-replace-in-staging-and-prod
+
+# CORS — accepted origins (comma-separated).
+# For local development, you can use the exact origin below.
+ALLOWED_ORIGINS=http://localhost:3000
+# Wildcard form (for testing pattern matching locally — dev-only, never for production):
+# ALLOWED_ORIGINS=*
+
+# R2 credentials for local dev — replace with real values from Cloudflare dashboard
+R2_ACCESS_KEY_ID=local-dev-r2-access-key-id
+R2_SECRET_ACCESS_KEY=local-dev-r2-secret-access-key

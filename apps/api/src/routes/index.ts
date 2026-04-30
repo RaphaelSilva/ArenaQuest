@@ -8,7 +8,7 @@ import { buildAdminMediaRouter } from './admin-media.router';
 import { buildTopicsRouter } from './topics.router';
 import { getHealth } from '@api/controllers/health.controller';
 import { authGuard } from '@api/middleware/auth-guard';
-import { parseAllowedOrigins, buildOriginMatcher } from '@api/core/cors/origin-policy';
+import { parseAllowedOrigins, buildOriginMatcher, hasAnyRule } from '@api/core/cors/origin-policy';
 import type {
   IAuthAdapter,
   IRateLimiter,
@@ -56,9 +56,22 @@ export class AppRouter {
   ): void {
     const { auth, users, tokens, topics, tags, media, storage, authService, loginLimiter, cookieSameSite, allowedOrigins, strictCors } = deps;
     // Build origin matcher from config — strict in prod, lenient in dev.
-    const originMatcher = buildOriginMatcher(
-      parseAllowedOrigins(allowedOrigins, { strict: strictCors }),
-    );
+    const originRules = parseAllowedOrigins(allowedOrigins, { strict: strictCors });
+
+    // Boot-time guardrail: when '*' is configured alongside credentials: true, the matcher
+    // echoes the request origin instead of returning the literal '*'. Browsers reject
+    // 'Access-Control-Allow-Origin: *' with credentialed requests (CORS spec §7.1.5).
+    // This is correct and intentional behavior — the warning is for future maintainers.
+    if (hasAnyRule(originRules)) {
+      console.warn(
+        '[CORS] ALLOWED_ORIGINS contains "*" with credentials: true. ' +
+        'The origin matcher will echo the request origin rather than returning "*" ' +
+        '(CORS spec §7.1.5 forbids ACAO: * with credentialed requests). ' +
+        'This is intentional — restrict ALLOWED_ORIGINS in production environments.',
+      );
+    }
+
+    const originMatcher = buildOriginMatcher(originRules);
     // Enable CORS for frontend interaction
     app.use(
       '*',
