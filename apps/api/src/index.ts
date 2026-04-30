@@ -20,6 +20,8 @@ import { D1MediaRepository } from '@api/adapters/db/d1-media-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
 import { AuthService } from '@api/core/auth/auth-service';
+import { RegisterController } from '@api/controllers/register.controller';
+import type { RegistrationEventEmitter } from '@api/core/registration/registration-events';
 import { AppRouter } from '@api/routes';
 import { parseCookieSameSite } from '@api/routes/auth.router';
 import '@api/types/hono-env';
@@ -47,6 +49,24 @@ function buildApp(env: AppEnv): Hono {
   const authService = new AuthService(auth, users, tokens);
   const loginLimiter = new KvRateLimiter(env.RATE_LIMIT_KV);
 
+  // Registration limiter: separate KV-prefixed bucket so login lockouts and
+  // registration throttles can never bleed into each other. 5 attempts per
+  // 15-minute window mirrors the spec for `POST /auth/register`.
+  const registerLimiter = new KvRateLimiter(env.RATE_LIMIT_KV, {
+    windowMs: 15 * 60_000,
+    maxAttempts: 5,
+    lockoutMs: 15 * 60_000,
+    prefix: 'rl:register:',
+  });
+
+  // In-process registration event emitter. Task 02 (activation email) will
+  // attach a real subscriber here; for now the stub keeps the wiring intact
+  // while leaving the emitter shape ready for the handler to plug in.
+  const registrationEmitter: RegistrationEventEmitter = (event) => {
+    console.info('[registration] event', event.type, event.email);
+  };
+  const registerController = new RegisterController(users, auth, registrationEmitter);
+
   const app = new Hono();
 
   AppRouter.register(app, {
@@ -59,6 +79,8 @@ function buildApp(env: AppEnv): Hono {
     storage,
     authService,
     loginLimiter,
+    registerController,
+    registerLimiter,
     cookieSameSite: parseCookieSameSite(env.COOKIE_SAMESITE),
     allowedOrigins: env.ALLOWED_ORIGINS,
     // If ALLOWED_ORIGINS is configured, enforce strict validation — an invalid
