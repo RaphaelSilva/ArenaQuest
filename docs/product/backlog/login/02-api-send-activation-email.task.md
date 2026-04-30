@@ -1,7 +1,7 @@
 # Task 02: Activation Email + Activation Endpoint
 
 ## Metadata
-- **Status:** Ready
+- **Status:** Done
 - **Complexity:** Medium-High
 - **Area:** `apps/api`
 - **Depends on:** Task 01 (`01-api-public-register-endpoint.task.md`) — needs the `USER_REGISTRATION_CREATED` / `USER_REGISTRATION_DUPLICATE` events and the `INACTIVE` user row.

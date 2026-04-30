@@ -1,7 +1,7 @@
 # Task 03: Wire the Login Page to the Real Registration + Activation Flow
 
 ## Metadata
-- **Status:** Ready
+- **Status:** Done
 - **Complexity:** Medium
 - **Area:** `apps/web`
 - **Depends on:** Task 01 (`POST /auth/register`), Task 02 (`POST /auth/activate` + activation email).

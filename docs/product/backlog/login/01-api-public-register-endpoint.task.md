@@ -1,7 +1,7 @@
 # Task 01: Public Self-Registration Endpoint (User created as INACTIVE)
 
 ## Metadata
-- **Status:** Ready
+- **Status:** Done
 - **Complexity:** Medium
 - **Area:** `apps/api`
 - **Depends on:** existing `IUserRepository`, `JwtAuthAdapter` (PBKDF2), Hono router, controller pattern (`docs/product/backlog/refactoring/01-move-route-logic-to-controllers.task.md`)
