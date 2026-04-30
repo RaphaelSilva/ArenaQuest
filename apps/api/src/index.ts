@@ -61,6 +61,10 @@ function buildApp(env: AppEnv): Hono {
     loginLimiter,
     cookieSameSite: parseCookieSameSite(env.COOKIE_SAMESITE),
     allowedOrigins: env.ALLOWED_ORIGINS,
+    // If ALLOWED_ORIGINS is configured, enforce strict validation — an invalid
+    // origin list should fail loudly at boot rather than silently allow all.
+    // If the variable is absent (local dev), fall back gracefully to localhost.
+    strictCors: env.ALLOWED_ORIGINS !== undefined && env.ALLOWED_ORIGINS.trim() !== '',
   });
 
   return app;
