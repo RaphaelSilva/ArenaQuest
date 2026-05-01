@@ -14,6 +14,12 @@ export namespace Entities {
             ARCHIVED = 'archived',
         }
 
+        export enum TaskStatus {
+            DRAFT = 'draft',
+            PUBLISHED = 'published',
+            ARCHIVED = 'archived',
+        }
+
         export enum MediaStatus {
             PENDING = 'pending',
             READY = 'ready',
@@ -127,6 +133,10 @@ export namespace Entities {
             id: string;
             title: string;
             description: string;
+            status: Config.TaskStatus;
+            createdBy: string;
+            createdAt: Date;
+            updatedAt: Date;
             stages: TaskStage[];
             linkedTopic: Content.TopicNode[];
         }
@@ -137,6 +147,7 @@ export namespace Entities {
             linkedTopic: Content.TopicNode[];
             label: string;
             order: number;
+            createdAt: Date;
         }
 
     }
