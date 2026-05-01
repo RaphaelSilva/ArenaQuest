@@ -8,7 +8,7 @@ import { useAuth, useHasRole } from '@web/hooks/use-auth';
 import { Spinner } from '@web/components/spinner';
 import { MarkdownViewer } from '@web/components/catalog/MarkdownViewer';
 import { TaskTopicPicker } from '@web/components/tasks/task-topic-picker';
-import { StageEditorSlot } from '@web/components/tasks/stage-editor-slot';
+import { StageEditor } from '@web/components/tasks/stage-editor';
 import { adminTopicsApi, type TopicNode } from '@web/lib/admin-topics-api';
 import {
   AdminTasksApiError,
@@ -206,7 +206,7 @@ export default function AdminTaskEditorPage() {
 
       <section className="mt-6 rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">Stages</h2>
-        <StageEditorSlot task={task} topics={topics} onChange={reload} />
+        <StageEditor task={task} topics={topics} onChange={reload} />
       </section>
 
       <section className="mt-6 rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
