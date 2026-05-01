@@ -7,6 +7,9 @@ import { Spinner } from '@web/components/spinner';
 import { StudentTaskDetail } from '@web/components/tasks/student-task-detail';
 import { tasksApi, type PublicTaskDetail } from '@web/lib/tasks-api';
 
+/**
+ * @see https://nextjs.org/docs/app/api-reference/edge
+ */
 export const runtime = 'edge';
 
 export default function StudentTaskDetailPage() {

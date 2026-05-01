@@ -2,7 +2,11 @@
 
 import { useEffect, useState, use } from 'react';
 
+/**
+ * @see https://nextjs.org/docs/app/api-reference/edge
+ */
 export const runtime = 'edge';
+
 import { useAuth } from '@web/hooks/use-auth';
 import { topicsApi } from '@web/lib/topics-api';
 import type { TopicNode } from '@web/lib/topics-api';

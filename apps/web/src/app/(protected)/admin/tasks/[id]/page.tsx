@@ -17,6 +17,9 @@ import {
   type TaskStatus,
 } from '@web/lib/admin-tasks-api';
 
+/**
+ * @see https://nextjs.org/docs/app/api-reference/edge
+ */
 export const runtime = 'edge';
 
 const PUBLISH_REASONS: Record<string, string> = {
