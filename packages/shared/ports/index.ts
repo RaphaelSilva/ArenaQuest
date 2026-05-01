@@ -10,4 +10,5 @@ export * from './i-mailer';
 export * from './i-activation-token-repository';
 export * from './i-task-repository';
 export * from './i-task-stage-repository';
+export * from './i-task-linking-repository';
 // i-database-adapter defines the full future IDatabaseAdapter contract (not yet implemented)
