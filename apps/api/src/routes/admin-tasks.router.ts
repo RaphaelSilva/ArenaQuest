@@ -4,6 +4,7 @@ import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { AdminTasksController } from '@api/controllers/admin-tasks.controller';
 import { AdminTaskStagesController } from '@api/controllers/admin-task-stages.controller';
+import { AdminTaskLinkingController } from '@api/controllers/admin-task-linking.controller';
 import type {
   ITaskRepository,
   ITaskStageRepository,
@@ -20,6 +21,7 @@ export function buildAdminTasksRouter(
   const router = new Hono();
   const controller = new AdminTasksController(tasks, stages, links, topics);
   const stagesController = new AdminTaskStagesController(tasks, stages);
+  const linkingController = new AdminTaskLinkingController(tasks, stages, links, topics);
 
   router.use('*', authGuard, requireRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR));
 
@@ -57,6 +59,26 @@ export function buildAdminTasksRouter(
   router.patch('/:id', async (c) => {
     const body = await c.req.json();
     const result = await controller.update(c.req.param('id'), body);
+    if (!result.ok) return c.json({ error: result.error, ...result.meta }, result.status as 400 | 404 | 409);
+    return c.json(result.data);
+  });
+
+  // POST /admin/tasks/:id/topics — replace task-level link set
+  router.post('/:id/topics', async (c) => {
+    const body = await c.req.json();
+    const result = await linkingController.replaceTaskTopics(c.req.param('id'), body);
+    if (!result.ok) return c.json({ error: result.error, ...result.meta }, result.status as 400 | 404 | 409);
+    return c.json(result.data);
+  });
+
+  // POST /admin/tasks/:id/stages/:stageId/topics — replace stage-level link set
+  router.post('/:id/stages/:stageId/topics', async (c) => {
+    const body = await c.req.json();
+    const result = await linkingController.replaceStageTopics(
+      c.req.param('id'),
+      c.req.param('stageId'),
+      body,
+    );
     if (!result.ok) return c.json({ error: result.error, ...result.meta }, result.status as 400 | 404 | 409);
     return c.json(result.data);
   });
