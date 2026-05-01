@@ -17,9 +17,17 @@ import { D1RefreshTokenRepository } from '@api/adapters/db/d1-refresh-token-repo
 import { D1TopicNodeRepository } from '@api/adapters/db/d1-topic-node-repository';
 import { D1TagRepository } from '@api/adapters/db/d1-tag-repository';
 import { D1MediaRepository } from '@api/adapters/db/d1-media-repository';
+import { D1ActivationTokenRepository } from '@api/adapters/db/d1-activation-token-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
+import { ConsoleMailAdapter } from '@api/adapters/mail/console-mail-adapter';
+import { ResendMailAdapter } from '@api/adapters/mail/resend-mail-adapter';
 import { AuthService } from '@api/core/auth/auth-service';
+import { RegisterController } from '@api/controllers/register.controller';
+import { ActivateController } from '@api/controllers/activate.controller';
+import { buildRegistrationMailHandler } from '@api/core/registration/registration-mail-handler';
+import type { IMailer } from '@arenaquest/shared/ports';
+import type { RegistrationEventEmitter } from '@api/core/registration/registration-events';
 import { AppRouter } from '@api/routes';
 import { parseCookieSameSite } from '@api/routes/auth.router';
 import '@api/types/hono-env';
@@ -47,6 +55,47 @@ function buildApp(env: AppEnv): Hono {
   const authService = new AuthService(auth, users, tokens);
   const loginLimiter = new KvRateLimiter(env.RATE_LIMIT_KV);
 
+  // Registration limiter: separate KV-prefixed bucket so login lockouts and
+  // registration throttles can never bleed into each other. 5 attempts per
+  // 15-minute window mirrors the spec for `POST /auth/register`.
+  const registerLimiter = new KvRateLimiter(env.RATE_LIMIT_KV, {
+    windowMs: 15 * 60_000,
+    maxAttempts: 5,
+    lockoutMs: 15 * 60_000,
+    prefix: 'rl:register:',
+  });
+
+  // Activation flow wiring (Task 02):
+  //  - Console mailer when MAIL_DRIVER=console (local dev / tests).
+  //  - Resend mailer otherwise — single-fetch HTTP API, no Node deps.
+  const mailer: IMailer = env.MAIL_DRIVER === 'resend'
+    ? new ResendMailAdapter({
+        apiKey: env.RESEND_API_KEY,
+        from: env.MAIL_FROM,
+      })
+    : new ConsoleMailAdapter();
+
+  const activationTokens = new D1ActivationTokenRepository(env.DB, users);
+
+  const registrationEmitter: RegistrationEventEmitter = buildRegistrationMailHandler({
+    users,
+    tokens: activationTokens,
+    mailer,
+    duplicateNoticeStore: env.RATE_LIMIT_KV,
+    webBaseUrl: env.WEB_BASE_URL || 'http://localhost:3000',
+  });
+
+  const registerController = new RegisterController(users, auth, registrationEmitter);
+  const activateController = new ActivateController(activationTokens);
+
+  // Activation limiter: 20 attempts per 15-min window keyed by IP.
+  const activateLimiter = new KvRateLimiter(env.RATE_LIMIT_KV, {
+    windowMs: 15 * 60_000,
+    maxAttempts: 20,
+    lockoutMs: 15 * 60_000,
+    prefix: 'rl:activate:',
+  });
+
   const app = new Hono();
 
   AppRouter.register(app, {
@@ -59,6 +108,10 @@ function buildApp(env: AppEnv): Hono {
     storage,
     authService,
     loginLimiter,
+    registerController,
+    registerLimiter,
+    activateController,
+    activateLimiter,
     cookieSameSite: parseCookieSameSite(env.COOKIE_SAMESITE),
     allowedOrigins: env.ALLOWED_ORIGINS,
     // If ALLOWED_ORIGINS is configured, enforce strict validation — an invalid

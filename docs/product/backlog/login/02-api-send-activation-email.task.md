@@ -1,7 +1,7 @@
 # Task 02: Activation Email + Activation Endpoint
 
 ## Metadata
-- **Status:** Ready
+- **Status:** Done
 - **Complexity:** Medium-High
 - **Area:** `apps/api`
 - **Depends on:** Task 01 (`01-api-public-register-endpoint.task.md`) — needs the `USER_REGISTRATION_CREATED` / `USER_REGISTRATION_DUPLICATE` events and the `INACTIVE` user row.
@@ -103,14 +103,14 @@ Each template, in Portuguese (matching the existing UI copy):
 
 ## Acceptance Criteria
 
-- [ ] After `POST /auth/register` (Task 01) succeeds for a fresh email, exactly one activation email is sent to that address with a working link of shape `${WEB_BASE_URL}/activate?token=...`.
-- [ ] After `POST /auth/register` for an email already in `users`, the duplicate-registration email is sent (no activation link), but only **once per 24h** for the same address.
-- [ ] `POST /auth/activate` with a valid, unconsumed, unexpired token sets `users.status = 'active'`, marks the token consumed, and returns `200 { status: 'activated' }`.
-- [ ] `POST /auth/activate` with the same token a second time returns `200 { status: 'already_active' }` and does not write to `users` again.
-- [ ] `POST /auth/activate` with a missing/expired/unknown/malformed token returns `400 InvalidToken` with no ability to distinguish expired-vs-unknown.
-- [ ] After successful activation, `POST /auth/login` with the user's credentials returns `200` with `accessToken` (regression — confirms the `INACTIVE` block is gone).
-- [ ] The activation-token table stores only **hashes** of tokens; selecting the table never reveals plaintext.
-- [ ] `MAIL_DRIVER=console` writes the activation link to stdout in dev so engineers can complete the flow without an SMTP setup.
+- [x] After `POST /auth/register` (Task 01) succeeds for a fresh email, exactly one activation email is sent to that address with a working link of shape `${WEB_BASE_URL}/activate?token=...`.
+- [x] After `POST /auth/register` for an email already in `users`, the duplicate-registration email is sent (no activation link), but only **once per 24h** for the same address.
+- [x] `POST /auth/activate` with a valid, unconsumed, unexpired token sets `users.status = 'active'`, marks the token consumed, and returns `200 { status: 'activated' }`.
+- [x] `POST /auth/activate` with the same token a second time returns `200 { status: 'already_active' }` and does not write to `users` again.
+- [x] `POST /auth/activate` with a missing/expired/unknown/malformed token returns `400 InvalidToken` with no ability to distinguish expired-vs-unknown.
+- [x] After successful activation, `POST /auth/login` with the user's credentials returns `200` with `accessToken` (regression — confirms the `INACTIVE` block is gone).
+- [x] The activation-token table stores only **hashes** of tokens; selecting the table never reveals plaintext.
+- [x] `MAIL_DRIVER=console` writes the activation link to stdout in dev so engineers can complete the flow without an SMTP setup.
 
 ---
 
@@ -151,8 +151,8 @@ Each template, in Portuguese (matching the existing UI copy):
 9. Wait or manually expire a token, retry → expect `400 InvalidToken`.
 
 ### Definition of Done
-- [ ] Unit + integration tests green (`make test-api`).
-- [ ] Migration `0007_create_activation_tokens.sql` runs cleanly against a fresh local D1.
-- [ ] `MAIL_DRIVER=console` and `MAIL_DRIVER=resend` both wire successfully (Resend exercised manually against a sandbox key, not in CI).
-- [ ] No plaintext tokens in any persistent store (DB, KV, logs sent to production telemetry).
-- [ ] `IMailer` and `IActivationTokenRepository` ports live in `packages/shared/ports` (cloud-agnostic) — no Cloudflare types in their signatures.
+- [x] Unit + integration tests green (`make test-api`).
+- [x] Migration `0007_create_activation_tokens.sql` runs cleanly against a fresh local D1.
+- [x] `MAIL_DRIVER=console` and `MAIL_DRIVER=resend` both wire successfully (Resend exercised manually against a sandbox key, not in CI).
+- [x] No plaintext tokens in any persistent store (DB, KV, logs sent to production telemetry).
+- [x] `IMailer` and `IActivationTokenRepository` ports live in `packages/shared/ports` (cloud-agnostic) — no Cloudflare types in their signatures.

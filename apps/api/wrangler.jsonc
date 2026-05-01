@@ -21,7 +21,12 @@
 		"COOKIE_SAMESITE": "Strict",
 		"R2_S3_ENDPOINT": "https://ACCOUNT_ID.r2.cloudflarestorage.com",
 		"R2_PUBLIC_BASE": "",
-		"R2_BUCKET_NAME": "arenaquest-media"
+		"R2_BUCKET_NAME": "arenaquest-media",
+		// Mail + activation config (Task 02). RESEND_API_KEY is a secret —
+		// set with `wrangler secret put RESEND_API_KEY`.
+		"MAIL_DRIVER": "resend",
+		"MAIL_FROM": "ArenaQuest <noreply@arenaquest.app>",
+		"WEB_BASE_URL": "https://arenaquest-web.pages.dev"
 	},
 	/**
 	 * D1 Databases
@@ -98,7 +103,10 @@
 				"COOKIE_SAMESITE": "None",
 				"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 				"R2_PUBLIC_BASE": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
-				"R2_BUCKET_NAME": "arenaquest-media-staging"
+				"R2_BUCKET_NAME": "arenaquest-media-staging",
+				"MAIL_DRIVER": "resend",
+				"MAIL_FROM": "ArenaQuest Staging <noreply@arenaquest.app>",
+				"WEB_BASE_URL": "https://arenaquest-web-staging.pages.dev"
 			},
 			"observability": {
 				"enabled": true,

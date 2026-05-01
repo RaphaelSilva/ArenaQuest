@@ -18,6 +18,10 @@ declare namespace Cloudflare {
 		R2_BUCKET_NAME: string;
 		R2_ACCESS_KEY_ID: string;
 		R2_SECRET_ACCESS_KEY: string;
+		MAIL_DRIVER: "console" | "resend";
+		MAIL_FROM: string;
+		RESEND_API_KEY: string;
+		WEB_BASE_URL: string;
 	}
 	interface Env {
 		RATE_LIMIT_KV: KVNamespace;
@@ -32,6 +36,10 @@ declare namespace Cloudflare {
 		R2_BUCKET_NAME: string;
 		R2_ACCESS_KEY_ID: string;
 		R2_SECRET_ACCESS_KEY: string;
+		MAIL_DRIVER: "console" | "resend";
+		MAIL_FROM: string;
+		RESEND_API_KEY: string;
+		WEB_BASE_URL: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

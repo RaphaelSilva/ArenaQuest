@@ -1,7 +1,7 @@
 # Task 01: Public Self-Registration Endpoint (User created as INACTIVE)
 
 ## Metadata
-- **Status:** Ready
+- **Status:** Done
 - **Complexity:** Medium
 - **Area:** `apps/api`
 - **Depends on:** existing `IUserRepository`, `JwtAuthAdapter` (PBKDF2), Hono router, controller pattern (`docs/product/backlog/refactoring/01-move-route-logic-to-controllers.task.md`)
@@ -98,13 +98,13 @@ Error responses:
 
 ## Acceptance Criteria
 
-- [ ] `POST /auth/register` with a valid, unused email creates a user with `status = INACTIVE`, role `student`, password stored as a PBKDF2 hash, and returns `202 { status: 'pending_activation' }`.
-- [ ] `POST /auth/register` with an email already present in `users` returns the **same** `202 { status: 'pending_activation' }` response (no enumeration leak) and does **not** insert a duplicate row.
-- [ ] `POST /auth/register` with a malformed body returns `400` with field-level `ValidationFailed` errors.
-- [ ] `POST /auth/register` exceeding the rate limit returns `429` and never touches the DB.
-- [ ] `POST /auth/login` with the new user's credentials returns `401 InvalidCredentials` until the user is activated (regression — must keep failing).
-- [ ] The registration-event emitter is invoked exactly once per accepted request, with the discriminator `USER_REGISTRATION_CREATED` for new users and `USER_REGISTRATION_DUPLICATE` for duplicates.
-- [ ] `RegisterController` has zero `hono` imports.
+- [x] `POST /auth/register` with a valid, unused email creates a user with `status = INACTIVE`, role `student`, password stored as a PBKDF2 hash, and returns `202 { status: 'pending_activation' }`.
+- [x] `POST /auth/register` with an email already present in `users` returns the **same** `202 { status: 'pending_activation' }` response (no enumeration leak) and does **not** insert a duplicate row.
+- [x] `POST /auth/register` with a malformed body returns `400` with field-level `ValidationFailed` errors.
+- [x] `POST /auth/register` exceeding the rate limit returns `429` and never touches the DB.
+- [x] `POST /auth/login` with the new user's credentials returns `401 InvalidCredentials` until the user is activated (regression — must keep failing).
+- [x] The registration-event emitter is invoked exactly once per accepted request, with the discriminator `USER_REGISTRATION_CREATED` for new users and `USER_REGISTRATION_DUPLICATE` for duplicates.
+- [x] `RegisterController` has zero `hono` imports.
 
 ---
 
@@ -133,7 +133,7 @@ Error responses:
 5. Repeat the registration call 6× quickly → 6th call returns `429`.
 
 ### Definition of Done
-- [ ] All unit + integration tests green (`make test-api`).
-- [ ] No new `hono` imports outside `routes/`.
-- [ ] No new external auth/crypto dependencies in `apps/api/package.json`.
-- [ ] Event emitter contract documented inline (JSDoc on the emitter type) so Task 02 can subscribe without re-reading this spec.
+- [x] All unit + integration tests green (`make test-api`).
+- [x] No new `hono` imports outside `routes/`.
+- [x] No new external auth/crypto dependencies in `apps/api/package.json`.
+- [x] Event emitter contract documented inline (JSDoc on the emitter type) so Task 02 can subscribe without re-reading this spec.

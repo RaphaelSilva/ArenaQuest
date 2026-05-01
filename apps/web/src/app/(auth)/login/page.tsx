@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, useEffect, type FormEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@web/hooks/use-auth';
+import { authApi, AuthApiError, type ValidationFieldError } from '@web/lib/auth-api';
 import { Spinner } from '@web/components/spinner';
+
+const PENDING_ACTIVATION_STORAGE_KEY = 'aq_pending_activation_email';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -158,9 +161,27 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
     setLoading(true);
     try {
       await login(email, pw);
+      // Successful login — clear any stale "check your email" hint from a
+      // prior registration in this browser.
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(PENDING_ACTIVATION_STORAGE_KEY);
+      }
       router.replace('/dashboard');
     } catch {
-      setError('E-mail ou senha inválidos.');
+      // We can't tell wrong-password from inactive-account over the wire
+      // (anti-enumeration: both collapse to 401 InvalidCredentials). The
+      // localStorage hint, set on this browser when the user just
+      // registered, lets us upgrade the message in that one specific
+      // case without leaking account existence to anyone else.
+      const pendingEmail =
+        typeof window !== 'undefined'
+          ? window.localStorage.getItem(PENDING_ACTIVATION_STORAGE_KEY)
+          : null;
+      if (pendingEmail && pendingEmail === email.trim().toLowerCase()) {
+        setError('Confira seu e-mail para ativar sua conta antes de entrar.');
+      } else {
+        setError('E-mail ou senha inválidos.');
+      }
     } finally {
       setLoading(false);
     }
@@ -278,7 +299,34 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
 
 type RegisterErrors = Partial<Record<'firstName' | 'email' | 'pw' | 'pwConfirm' | 'terms', string>>;
 
-function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess: () => void }) {
+/**
+ * Map the API's `{ field, code }` validation errors back onto the local
+ * RegisterErrors shape. The API speaks `name`/`email`/`password`; the
+ * form's first-step inputs are `firstName`/`email`/`pw`. `code` carries
+ * a stable identifier (TooShort, TooLong, Invalid, NoDigit) that we
+ * translate into Portuguese copy here so the spec lives next to the UI.
+ */
+function mapApiErrorsToFields(fields: ValidationFieldError[]): RegisterErrors {
+  const next: RegisterErrors = {};
+  for (const f of fields) {
+    if (f.field === 'name') {
+      next.firstName =
+        f.code === 'TooShort' ? 'Nome muito curto' :
+        f.code === 'TooLong'  ? 'Nome muito longo' :
+                                'Nome inválido';
+    } else if (f.field === 'email') {
+      next.email = f.code === 'Invalid' ? 'E-mail inválido' : 'E-mail inválido';
+    } else if (f.field === 'password') {
+      next.pw =
+        f.code === 'TooShort' ? 'Mínimo 8 caracteres' :
+        f.code === 'NoDigit'  ? 'Inclua pelo menos um número' :
+                                'Senha inválida';
+    }
+  }
+  return next;
+}
+
+function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess: (email: string) => void }) {
   const [step, setStep] = useState(1);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -310,12 +358,43 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
     if (validateStep1()) setStep(2);
   }
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!terms) { setErrors({ terms: 'Aceite os termos para continuar' }); return; }
     setErrors({});
     setLoading(true);
-    setTimeout(() => { setLoading(false); onSuccess(); }, 1600);
+
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    try {
+      await authApi.register({
+        name: fullName,
+        email: normalizedEmail,
+        password: pw,
+      });
+      // Persist a hint so the LoginForm can show the activation reminder
+      // if this same browser then tries to log in before activating.
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(PENDING_ACTIVATION_STORAGE_KEY, normalizedEmail);
+      }
+      onSuccess(normalizedEmail);
+    } catch (err) {
+      if (err instanceof AuthApiError && err.code === 'ValidationFailed' && err.fields) {
+        setErrors(mapApiErrorsToFields(err.fields));
+        // Surface field-level errors at step 1 — bring the user back so
+        // they can see the highlighted inputs.
+        if (err.fields.some(f => f.field === 'name' || f.field === 'email' || f.field === 'password')) {
+          setStep(1);
+        }
+      } else if (err instanceof AuthApiError && err.code === 'RateLimited') {
+        setErrors({ terms: 'Muitas tentativas. Tente novamente em alguns minutos.' });
+      } else {
+        setErrors({ terms: 'Não foi possível concluir o cadastro. Tente novamente.' });
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   const stepIndicator = (
@@ -510,39 +589,53 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
   );
 }
 
-// ─── Success state ─────────────────────────────────────────────────────────────
+// ─── Registration pending state ───────────────────────────────────────────────
 
-function SuccessState() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const t = setTimeout(() => router.replace('/dashboard'), 3000);
-    return () => clearTimeout(t);
-  }, [router]);
-
+function RegistrationPendingState({ email, onBackToLogin }: { email: string; onBackToLogin: () => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 16, padding: '20px 0' }} className="aq-anim">
-      <div className="aq-success-icon" style={{ width: 72, height: 72, borderRadius: '50%', background: 'oklch(0.68 0.17 150 / 0.15)', border: '2px solid var(--aq-accent3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
-        🏆
+      <div className="aq-success-icon" style={{ width: 72, height: 72, borderRadius: '50%', background: 'oklch(0.65 0.16 240 / 0.15)', border: '2px solid var(--aq-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
+        ✉️
       </div>
       <h2 style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 22, fontWeight: 700 }}>
-        Arena desbloqueada!
+        Confira seu e-mail
       </h2>
-      <p style={{ fontSize: 13, color: 'var(--aq-text2)', lineHeight: 1.6, maxWidth: 280 }}>
-        Sua conta foi criada com sucesso. Preparando sua experiência…
+      <p style={{ fontSize: 13, color: 'var(--aq-text2)', lineHeight: 1.6, maxWidth: 320 }}>
+        Enviamos um link de ativação para <strong style={{ color: 'var(--aq-text)' }}>{email}</strong>.
+        Clique no link para ativar sua conta e entrar na Arena.
       </p>
-      <div style={{ width: '100%', height: 4, background: 'var(--aq-bg4)', borderRadius: 4, overflow: 'hidden', marginTop: 8 }}>
-        <div className="aq-progress-bar" style={{ height: '100%', background: 'linear-gradient(90deg, var(--aq-accent), var(--aq-accent3))', borderRadius: 4 }} />
-      </div>
+      <p style={{ fontSize: 12, color: 'var(--aq-text3)', lineHeight: 1.6, maxWidth: 320 }}>
+        Não recebeu? Verifique a caixa de spam. O link expira em 24 horas.
+      </p>
+      <button
+        type="button"
+        onClick={onBackToLogin}
+        style={{ marginTop: 8, width: '100%', padding: 13, borderRadius: 10, border: 'none', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 15, fontWeight: 700, cursor: 'pointer', background: 'var(--aq-accent)', color: '#0B0E17', boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)' }}
+      >
+        Voltar ao login
+      </button>
     </div>
   );
 }
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
-export default function LoginPage() {
+function LoginPageInner() {
   const { isLoading } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register' | 'success'>('login');
+  const searchParams = useSearchParams();
+  const [mode, setMode] = useState<'login' | 'register' | 'pending'>('login');
+  const [pendingEmail, setPendingEmail] = useState('');
+  // `?activated=1` lands here from the /activate page after a successful
+  // activation. Initialize the banner from the URL directly (no
+  // synchronous setState in an effect) and schedule dismissal after 6s.
+  const initiallyActivated = searchParams?.get('activated') === '1';
+  const [activatedBannerVisible, setActivatedBannerVisible] = useState(initiallyActivated);
+
+  useEffect(() => {
+    if (!initiallyActivated) return;
+    const t = setTimeout(() => setActivatedBannerVisible(false), 6000);
+    return () => clearTimeout(t);
+  }, [initiallyActivated]);
 
   if (isLoading) {
     return (
@@ -605,8 +698,14 @@ export default function LoginPage() {
 
       {/* Right panel */}
       <div style={{ width: 480, minWidth: 480, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '40px 48px', background: 'var(--aq-bg2)', borderLeft: '1px solid var(--aq-border)', position: 'relative', zIndex: 1, overflowY: 'auto' }}>
-        {mode === 'success' ? (
-          <SuccessState />
+        {activatedBannerVisible && (
+          <div role="status" style={{ marginBottom: 18, padding: '10px 14px', borderRadius: 9, background: 'oklch(0.68 0.17 150 / 0.15)', border: '1px solid var(--aq-accent3)', fontSize: 13, color: 'var(--aq-accent3)' }}>
+            Conta ativada! Faça login para continuar.
+          </div>
+        )}
+
+        {mode === 'pending' ? (
+          <RegistrationPendingState email={pendingEmail} onBackToLogin={() => setMode('login')} />
         ) : (
           <>
             <div style={{ display: 'flex', background: 'var(--aq-bg3)', borderRadius: 12, padding: 4, border: '1px solid var(--aq-border)', marginBottom: 32 }}>
@@ -623,11 +722,22 @@ export default function LoginPage() {
 
             {mode === 'login'
               ? <LoginForm onSwitch={() => setMode('register')} />
-              : <RegisterForm onSwitch={() => setMode('login')} onSuccess={() => setMode('success')} />
+              : <RegisterForm
+                  onSwitch={() => setMode('login')}
+                  onSuccess={(email) => { setPendingEmail(email); setMode('pending'); }}
+                />
             }
           </>
         )}
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--aq-bg)' }}><Spinner className="h-8 w-8" /></div>}>
+      <LoginPageInner />
+    </Suspense>
   );
 }
