@@ -8,6 +8,7 @@ import { buildAdminUsersRouter } from './admin-users.router';
 import { buildAdminTopicsRouter } from './admin-topics.router';
 import { buildAdminMediaRouter } from './admin-media.router';
 import { buildAdminTasksRouter } from './admin-tasks.router';
+import { buildTasksRouter } from './tasks.router';
 import { buildTopicsRouter } from './topics.router';
 import { getHealth } from '@api/controllers/health.controller';
 import { authGuard } from '@api/middleware/auth-guard';
@@ -113,6 +114,7 @@ export class AppRouter {
     app.route('/admin/topics', buildAdminTopicsRouter(topics, tags));
     app.route('/admin/topics', buildAdminMediaRouter(topics, media, storage));
     app.route('/admin/tasks', buildAdminTasksRouter(taskRepo, taskStages, taskLinks, topics));
+    app.route('/tasks', buildTasksRouter(taskRepo, taskStages, taskLinks, topics));
     app.route('/topics', buildTopicsRouter(topics, media, storage));
 
     // Sanity demo — development only, can be removed post-milestone.
