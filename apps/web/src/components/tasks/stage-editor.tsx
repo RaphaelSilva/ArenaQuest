@@ -23,7 +23,7 @@ const ERROR_HINTS: Record<string, string> = {
 };
 
 export function StageEditor({ task, topics, onChange }: Props) {
-  const { token } = useAuth();
+  const { accessToken: token } = useAuth();
   const [stages, setStages] = useState<TaskStage[]>(task.stages);
   const [stageTopics, setStageTopics] = useState<Record<string, string[]>>(task.stageTopicIds);
   const [creating, setCreating] = useState(false);

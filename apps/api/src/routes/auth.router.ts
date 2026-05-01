@@ -103,7 +103,7 @@ export function buildAuthRouter(deps: AuthRouterDeps): Hono {
           console.error('[rate-limit] hit failed', err);
         }
       }
-      return c.json({ error: result.error }, result.status);
+      return c.json({ error: result.error }, result.status as 400 | 401 | 429 | 500);
     }
 
     try {
@@ -127,7 +127,7 @@ export function buildAuthRouter(deps: AuthRouterDeps): Hono {
     const token = getCookie(c, COOKIE_NAME);
     const result = await controller.logout(token);
 
-    if (!result.ok) return c.json({ error: result.error }, result.status);
+    if (!result.ok) return c.json({ error: result.error }, result.status as 401 | 404 | 500);
 
     deleteCookie(c, COOKIE_NAME, { path: '/' });
     return c.body(null, 204);
@@ -137,7 +137,7 @@ export function buildAuthRouter(deps: AuthRouterDeps): Hono {
     const token = getCookie(c, COOKIE_NAME);
     const result = await controller.refresh(token);
 
-    if (!result.ok) return c.json({ error: result.error }, result.status);
+    if (!result.ok) return c.json({ error: result.error }, result.status as 401 | 500);
 
     setCookie(c, COOKIE_NAME, result.data.refreshToken, {
       httpOnly: true,

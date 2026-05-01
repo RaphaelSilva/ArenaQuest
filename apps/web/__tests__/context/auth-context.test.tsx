@@ -19,11 +19,7 @@ vi.mock('@web/lib/auth-api', () => ({
 // Import AFTER mock so we get the mocked version.
 import { authApi } from '@web/lib/auth-api';
 
-const mockAuthApi = authApi as {
-  login: ReturnType<typeof vi.fn>;
-  logout: ReturnType<typeof vi.fn>;
-  refresh: ReturnType<typeof vi.fn>;
-};
+const mockAuthApi = vi.mocked(authApi);
 
 // ---------------------------------------------------------------------------
 // Fixtures

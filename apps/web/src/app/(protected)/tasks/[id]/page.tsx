@@ -9,7 +9,7 @@ import { tasksApi, type PublicTaskDetail } from '@web/lib/tasks-api';
 
 export default function StudentTaskDetailPage() {
   const params = useParams<{ id: string }>();
-  const { token } = useAuth();
+  const { accessToken: token } = useAuth();
   const [task, setTask] = useState<PublicTaskDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 

@@ -7,7 +7,7 @@ import { StudentTaskCard } from '@web/components/tasks/student-task-card';
 import { tasksApi, type TaskSummary } from '@web/lib/tasks-api';
 
 export default function StudentTasksPage() {
-  const { token } = useAuth();
+  const { accessToken: token } = useAuth();
   const [tasks, setTasks] = useState<TaskSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 

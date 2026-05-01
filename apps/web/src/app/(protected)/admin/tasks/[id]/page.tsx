@@ -26,7 +26,7 @@ export default function AdminTaskEditorPage() {
   const params = useParams<{ id: string }>();
   const taskId = params.id;
   const router = useRouter();
-  const { token } = useAuth();
+  const { accessToken: token } = useAuth();
   const canAuthor = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
 
   const [task, setTask] = useState<TaskDetail | null>(null);

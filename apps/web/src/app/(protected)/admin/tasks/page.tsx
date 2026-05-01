@@ -16,7 +16,7 @@ const STATUS_STYLES: Record<Task['status'], string> = {
 
 export default function AdminTasksPage() {
   const router = useRouter();
-  const { token } = useAuth();
+  const { accessToken: token } = useAuth();
   const canAuthor = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
 
   const [tasks, setTasks] = useState<Task[] | null>(null);
