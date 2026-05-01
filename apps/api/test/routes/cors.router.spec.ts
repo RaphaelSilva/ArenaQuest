@@ -34,9 +34,11 @@ async function get(path: string, origin: string, overrideEnv?: Partial<AppEnv>):
   return res;
 }
 
-// The allowed origin as configured in .dev.vars (takes precedence over wrangler.jsonc in tests).
-// `env.ALLOWED_ORIGINS` is set to "http://localhost:3000" from .dev.vars during vitest runs.
-const ALLOWED_ORIGIN = env.ALLOWED_ORIGINS as string;
+// Baseline environment for exact-match tests (Task 01) to ensure they pass
+// regardless of the developer's local .dev.vars (which might be set to '*').
+const BASELINE_ALLOWED_ORIGIN = 'http://localhost:3000';
+const BASELINE_ENV = { ALLOWED_ORIGINS: BASELINE_ALLOWED_ORIGIN };
+
 const EVIL_ORIGIN = 'https://evil.com';
 
 // ---------------------------------------------------------------------------
@@ -45,17 +47,17 @@ const EVIL_ORIGIN = 'https://evil.com';
 
 describe('CORS — preflight (OPTIONS /health)', () => {
   it('echoes the allowed origin back in ACAO header', async () => {
-    const res = await options('/health', ALLOWED_ORIGIN);
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ALLOWED_ORIGIN);
+    const res = await options('/health', BASELINE_ALLOWED_ORIGIN, BASELINE_ENV);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(BASELINE_ALLOWED_ORIGIN);
   });
 
   it('sets Access-Control-Allow-Credentials: true for allowed origin', async () => {
-    const res = await options('/health', ALLOWED_ORIGIN);
+    const res = await options('/health', BASELINE_ALLOWED_ORIGIN, BASELINE_ENV);
     expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
   });
 
   it('does NOT echo a disallowed origin in the ACAO header', async () => {
-    const res = await options('/health', EVIL_ORIGIN);
+    const res = await options('/health', EVIL_ORIGIN, BASELINE_ENV);
     const acao = res.headers.get('Access-Control-Allow-Origin');
     // hono/cors returns null string or omits the header entirely when matcher returns null
     expect(acao).not.toBe(EVIL_ORIGIN);
@@ -64,12 +66,12 @@ describe('CORS — preflight (OPTIONS /health)', () => {
 
 describe('CORS — simple request (GET /health)', () => {
   it('sets ACAO header for an allowed origin', async () => {
-    const res = await get('/health', ALLOWED_ORIGIN);
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ALLOWED_ORIGIN);
+    const res = await get('/health', BASELINE_ALLOWED_ORIGIN, BASELINE_ENV);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(BASELINE_ALLOWED_ORIGIN);
   });
 
   it('does NOT set ACAO header for a disallowed origin', async () => {
-    const res = await get('/health', EVIL_ORIGIN);
+    const res = await get('/health', EVIL_ORIGIN, BASELINE_ENV);
     const acao = res.headers.get('Access-Control-Allow-Origin');
     expect(acao).not.toBe(EVIL_ORIGIN);
   });
@@ -77,7 +79,7 @@ describe('CORS — simple request (GET /health)', () => {
 
 describe('CORS — no console.log regression', () => {
   it('does NOT set ACAO header for origins outside the allowed list', async () => {
-    const res = await get('/health', EVIL_ORIGIN);
+    const res = await get('/health', EVIL_ORIGIN, BASELINE_ENV);
     expect(res.headers.get('Access-Control-Allow-Origin')).not.toBe(EVIL_ORIGIN);
   });
 });
