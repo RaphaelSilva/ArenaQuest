@@ -10,6 +10,8 @@ export interface ResendMailAdapterConfig {
  * Resend mailer for staging/production. Uses Resend because it ships from
  * a Cloudflare Worker without any Node-runtime dependency — a single fetch
  * call with `Authorization: Bearer <RESEND_API_KEY>`.
+ * 
+ * Documentation: https://resend.com/docs
  *
  * Errors are surfaced to the caller; the registration-mail handler catches
  * and logs them so a transient mailer outage cannot abort registration.
