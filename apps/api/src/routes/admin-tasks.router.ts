@@ -3,6 +3,7 @@ import { authGuard } from '@api/middleware/auth-guard';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { AdminTasksController } from '@api/controllers/admin-tasks.controller';
+import { AdminTaskStagesController } from '@api/controllers/admin-task-stages.controller';
 import type {
   ITaskRepository,
   ITaskStageRepository,
@@ -18,6 +19,7 @@ export function buildAdminTasksRouter(
 ): Hono {
   const router = new Hono();
   const controller = new AdminTasksController(tasks, stages, links, topics);
+  const stagesController = new AdminTaskStagesController(tasks, stages);
 
   router.use('*', authGuard, requireRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR));
 
@@ -57,6 +59,37 @@ export function buildAdminTasksRouter(
     const result = await controller.update(c.req.param('id'), body);
     if (!result.ok) return c.json({ error: result.error, ...result.meta }, result.status as 400 | 404 | 409);
     return c.json(result.data);
+  });
+
+  // POST /admin/tasks/:id/stages
+  router.post('/:id/stages', async (c) => {
+    const body = await c.req.json();
+    const result = await stagesController.create(c.req.param('id'), body);
+    if (!result.ok) return c.json({ error: result.error, ...result.meta }, result.status as 400 | 404);
+    return c.json(result.data, 201);
+  });
+
+  // POST /admin/tasks/:id/stages/reorder — must precede /:stageId routes.
+  router.post('/:id/stages/reorder', async (c) => {
+    const body = await c.req.json();
+    const result = await stagesController.reorder(c.req.param('id'), body);
+    if (!result.ok) return c.json({ error: result.error, ...result.meta }, result.status as 400 | 404 | 409);
+    return c.json({ data: result.data });
+  });
+
+  // PATCH /admin/tasks/:id/stages/:stageId
+  router.patch('/:id/stages/:stageId', async (c) => {
+    const body = await c.req.json();
+    const result = await stagesController.update(c.req.param('id'), c.req.param('stageId'), body);
+    if (!result.ok) return c.json({ error: result.error, ...result.meta }, result.status as 400 | 404);
+    return c.json(result.data);
+  });
+
+  // DELETE /admin/tasks/:id/stages/:stageId
+  router.delete('/:id/stages/:stageId', async (c) => {
+    const result = await stagesController.delete(c.req.param('id'), c.req.param('stageId'));
+    if (!result.ok) return c.json({ error: result.error }, result.status as 404 | 409);
+    return c.body(null, 204);
   });
 
   // DELETE /admin/tasks/:id — soft archive
