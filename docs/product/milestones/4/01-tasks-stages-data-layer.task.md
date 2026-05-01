@@ -1,7 +1,7 @@
 # Task 01: Tasks & Stages Data Layer
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Milestone 3 Task 01 (topics table must exist so FKs are valid later)
@@ -14,15 +14,15 @@ Introduce the two backbone entities of Milestone 4 — `Task` and `TaskStage` �
 
 ---
 
-## Architectural Context
+## Technical Constraints
 
 - **Pattern:** Ports and Adapters — ports live in `packages/shared/ports/`, adapters in `apps/api/src/adapters/db/`.
-- **Migration:** `apps/api/migrations/0007_tasks_and_stages.sql`.
+- **Migration:** `apps/api/migrations/0008_create_tasks_and_stages.sql`.
 - **Status Enum:** Extend `packages/shared/types/entities.ts` with a `TaskStatus` enum (`draft`, `published`, `archived`), mirroring the existing `TopicNodeStatus` pattern.
 
 ---
 
-## Requirements
+## Scope (no code)
 
 ### 1. `Task` Entity
 
@@ -56,12 +56,12 @@ Introduce the two backbone entities of Milestone 4 — `Task` and `TaskStage` �
 
 ## Acceptance Criteria
 
-- [ ] Database migration applies cleanly to a fresh local database.
-- [ ] `ITaskRepository` and `ITaskStageRepository` are exported from `packages/shared/index.ts`.
-- [ ] `TaskStatus` enum is added to the shared types.
-- [ ] Both adapters pass their integration test suites.
-- [ ] No D1-specific types leak beyond the adapter layer.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] Database migration applies cleanly to a fresh local database.
+- [x] `ITaskRepository` and `ITaskStageRepository` are exported from `packages/shared/index.ts`.
+- [x] `TaskStatus` enum is added to the shared types.
+- [x] Both adapters pass their integration test suites.
+- [x] No D1-specific types leak beyond the adapter layer.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

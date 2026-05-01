@@ -1,7 +1,7 @@
 # Task 05: Admin Task-Topic Linking API
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Task 02, Task 03, Task 04
@@ -14,16 +14,16 @@ Implement the HTTP endpoints that manage the topic associations for a Task and i
 
 ---
 
-## Architectural Context
+## Technical Constraints
 
 - **Router:** Extends `apps/api/src/routes/admin-tasks.router.ts`.
-- **Service:** Extends `apps/api/src/core/engagement/task-service.ts`.
+- **Service:** Logic implemented in `apps/api/src/controllers/admin-task-linking.controller.ts`.
 - **Semantics:** Replace-style operations — each request provides the complete desired set, which the server mirrors exactly.
 - **Security:** Inherits `authGuard + requireRole(ADMIN, CONTENT_CREATOR)`.
 
 ---
 
-## Requirements
+## Scope (no code)
 
 ### 1. Topic Linking Endpoints
 
@@ -43,10 +43,10 @@ Implement the HTTP endpoints that manage the topic associations for a Task and i
 
 ## Acceptance Criteria
 
-- [ ] Both endpoints are implemented and tested.
-- [ ] The cascade-shrink behavior (task-level shrink automatically prunes stage-level sets) is covered by an explicit test.
-- [ ] All validation rules return the correct error codes.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] Both endpoints are implemented and tested.
+- [x] The cascade-shrink behavior (task-level shrink automatically prunes stage-level sets) is covered by an explicit test.
+- [x] All validation rules return the correct error codes.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

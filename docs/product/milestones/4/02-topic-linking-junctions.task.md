@@ -1,7 +1,7 @@
 # Task 02: Topic Linking Junctions
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Task 01
@@ -14,16 +14,16 @@ Introduce the junction tables and repository that connect `Task` and `TaskStage`
 
 ---
 
-## Architectural Context
+## Technical Constraints
 
-- **Migration:** `apps/api/migrations/0008_task_topic_links.sql`.
+- **Migration:** `apps/api/migrations/0009_create_task_topic_links.sql`.
 - **Port:** `ITaskLinkingRepository` in `packages/shared/ports/`.
 - **Adapter:** `apps/api/src/adapters/db/d1-task-linking-repository.ts`.
 - **Error Types:** A typed `StageTopicNotInTaskError` must be defined in `packages/shared/ports/` for use by the adapter and service layers.
 
 ---
 
-## Requirements
+## Scope (no code)
 
 ### 1. Linking Model
 
@@ -49,12 +49,12 @@ Introduce the junction tables and repository that connect `Task` and `TaskStage`
 
 ## Acceptance Criteria
 
-- [ ] Database migration applies cleanly.
-- [ ] `ITaskLinkingRepository` is exported from `packages/shared/index.ts`.
-- [ ] The narrowing invariant is enforced and covered by an explicit test.
-- [ ] Deleting a referenced Topic Node fails with a clear error.
-- [ ] All adapter tests pass under the Workers test pool.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] Database migration applies cleanly.
+- [x] `ITaskLinkingRepository` is exported from `packages/shared/index.ts`.
+- [x] The narrowing invariant is enforced and covered by an explicit test.
+- [x] Deleting a referenced Topic Node fails with a clear error.
+- [x] All adapter tests pass under the Workers test pool.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

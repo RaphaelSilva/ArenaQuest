@@ -184,12 +184,12 @@ Each task is sized for **1–2 coding sessions** and is owned by a single PR.
 
 | #  | Task File | Status |
 |----|-----------|--------|
-| 01 | [Tasks & Stages Data Layer (ports + D1 adapters + migration)](./01-tasks-stages-data-layer.task.md) | ⬜ Pending |
-| 02 | [Topic Linking Junctions (task↔topic, stage↔topic)](./02-topic-linking-junctions.task.md) | ⬜ Pending |
-| 03 | [Admin Tasks CRUD API (`/admin/tasks`)](./03-admin-tasks-crud-api.task.md) | ⬜ Pending |
-| 04 | [Admin Task Stages API (nested + reorder)](./04-admin-task-stages-api.task.md) | ⬜ Pending |
-| 05 | [Admin Task-Topic Linking API (task and stage scopes)](./05-admin-task-topic-linking-api.task.md) | ⬜ Pending |
-| 06 | [Public Tasks Read API (`/tasks`)](./06-public-tasks-read-api.task.md) | ⬜ Pending |
+| 01 | [Tasks & Stages Data Layer (ports + D1 adapters + migration)](./01-tasks-stages-data-layer.task.md) | ✅ Done |
+| 02 | [Topic Linking Junctions (task↔topic, stage↔topic)](./02-topic-linking-junctions.task.md) | ✅ Done |
+| 03 | [Admin Tasks CRUD API (`/admin/tasks`)](./03-admin-tasks-crud-api.task.md) | ✅ Done |
+| 04 | [Admin Task Stages API (nested + reorder)](./04-admin-task-stages-api.task.md) | ✅ Done |
+| 05 | [Admin Task-Topic Linking API (task and stage scopes)](./05-admin-task-topic-linking-api.task.md) | ✅ Done |
+| 06 | [Public Tasks Read API (`/tasks`)](./06-public-tasks-read-api.task.md) | ✅ Done |
 | 07 | [Frontend: Admin Tasks Dashboard (list + editor skeleton)](./07-frontend-admin-tasks-dashboard.task.md) | ⬜ Pending |
 | 08 | [Frontend: Admin Stage Editor (sortable + per-stage topic picker)](./08-frontend-admin-stage-editor.task.md) | ⬜ Pending |
 | 09 | [Frontend: Student Task View (list + detail, read-only)](./09-frontend-student-task-view.task.md) | ⬜ Pending |

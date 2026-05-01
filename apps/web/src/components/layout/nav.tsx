@@ -38,6 +38,22 @@ export function Nav() {
             Topic Tree
           </Link>
         )}
+
+        {canSeeTopics && (
+          <Link
+            href="/admin/tasks"
+            className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            Tasks (Admin)
+          </Link>
+        )}
+
+        <Link
+          href="/tasks"
+          className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+        >
+          Tasks
+        </Link>
       </div>
 
       <button
