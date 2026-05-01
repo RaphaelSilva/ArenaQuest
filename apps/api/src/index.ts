@@ -17,6 +17,9 @@ import { D1RefreshTokenRepository } from '@api/adapters/db/d1-refresh-token-repo
 import { D1TopicNodeRepository } from '@api/adapters/db/d1-topic-node-repository';
 import { D1TagRepository } from '@api/adapters/db/d1-tag-repository';
 import { D1MediaRepository } from '@api/adapters/db/d1-media-repository';
+import { D1TaskRepository } from '@api/adapters/db/d1-task-repository';
+import { D1TaskStageRepository } from '@api/adapters/db/d1-task-stage-repository';
+import { D1TaskLinkingRepository } from '@api/adapters/db/d1-task-linking-repository';
 import { D1ActivationTokenRepository } from '@api/adapters/db/d1-activation-token-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
@@ -44,6 +47,9 @@ function buildApp(env: AppEnv): Hono {
   const topics = new D1TopicNodeRepository(env.DB);
   const tags = new D1TagRepository(env.DB);
   const media = new D1MediaRepository(env.DB);
+  const taskRepo = new D1TaskRepository(env.DB);
+  const taskStages = new D1TaskStageRepository(env.DB);
+  const taskLinks = new D1TaskLinkingRepository(env.DB);
   const storage = new R2StorageAdapter({
     bucket: env.R2,
     s3Endpoint: env.R2_S3_ENDPOINT,
@@ -106,6 +112,9 @@ function buildApp(env: AppEnv): Hono {
     tags,
     media,
     storage,
+    taskRepo,
+    taskStages,
+    taskLinks,
     authService,
     loginLimiter,
     registerController,

@@ -7,6 +7,7 @@ import type { ActivateController } from '@api/controllers/activate.controller';
 import { buildAdminUsersRouter } from './admin-users.router';
 import { buildAdminTopicsRouter } from './admin-topics.router';
 import { buildAdminMediaRouter } from './admin-media.router';
+import { buildAdminTasksRouter } from './admin-tasks.router';
 import { buildTopicsRouter } from './topics.router';
 import { getHealth } from '@api/controllers/health.controller';
 import { authGuard } from '@api/middleware/auth-guard';
@@ -20,6 +21,9 @@ import type {
   ITagRepository,
   IMediaRepository,
   IStorageAdapter,
+  ITaskRepository,
+  ITaskStageRepository,
+  ITaskLinkingRepository,
 } from '@arenaquest/shared/ports';
 import type { AuthService } from '@api/core/auth/auth-service';
 
@@ -44,6 +48,9 @@ export class AppRouter {
       tags: ITagRepository;
       media: IMediaRepository;
       storage: IStorageAdapter;
+      taskRepo: ITaskRepository;
+      taskStages: ITaskStageRepository;
+      taskLinks: ITaskLinkingRepository;
       authService: AuthService;
       loginLimiter: IRateLimiter;
       registerController: RegisterController;
@@ -60,7 +67,7 @@ export class AppRouter {
       strictCors: boolean;
     },
   ): void {
-    const { auth, users, tokens, topics, tags, media, storage, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, cookieSameSite, allowedOrigins, strictCors } = deps;
+    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, cookieSameSite, allowedOrigins, strictCors } = deps;
     // Build origin matcher from config — strict in prod, lenient in dev.
     const originRules = parseAllowedOrigins(allowedOrigins, { strict: strictCors });
 
@@ -105,6 +112,7 @@ export class AppRouter {
     app.route('/admin/users', buildAdminUsersRouter(users, auth, tokens));
     app.route('/admin/topics', buildAdminTopicsRouter(topics, tags));
     app.route('/admin/topics', buildAdminMediaRouter(topics, media, storage));
+    app.route('/admin/tasks', buildAdminTasksRouter(taskRepo, taskStages, taskLinks, topics));
     app.route('/topics', buildTopicsRouter(topics, media, storage));
 
     // Sanity demo — development only, can be removed post-milestone.
