@@ -17,6 +17,8 @@ import {
   type TaskStatus,
 } from '@web/lib/admin-tasks-api';
 
+export const runtime = 'edge';
+
 const PUBLISH_REASONS: Record<string, string> = {
   NO_STAGES: 'Add at least one stage before publishing.',
   LINKED_TOPIC_NOT_PUBLISHED: 'Every linked topic must itself be published.',

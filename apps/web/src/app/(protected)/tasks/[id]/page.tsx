@@ -7,6 +7,8 @@ import { Spinner } from '@web/components/spinner';
 import { StudentTaskDetail } from '@web/components/tasks/student-task-detail';
 import { tasksApi, type PublicTaskDetail } from '@web/lib/tasks-api';
 
+export const runtime = 'edge';
+
 export default function StudentTaskDetailPage() {
   const params = useParams<{ id: string }>();
   const { accessToken: token } = useAuth();
