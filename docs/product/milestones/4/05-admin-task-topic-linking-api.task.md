@@ -1,7 +1,7 @@
 # Task 05: Admin Task-Topic Linking API
 
 ## Metadata
-- **Status:** Completed
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Task 02, Task 03, Task 04

@@ -1,7 +1,7 @@
 # Task 09: Frontend — Student Task View
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Task 06
@@ -44,13 +44,13 @@ Build the read-only student-facing interface for browsing published Tasks. Stude
 
 ## Acceptance Criteria
 
-- [ ] `/tasks` and `/tasks/:id` are accessible to any authenticated user.
-- [ ] Draft and archived tasks do not appear (enforced by the server).
-- [ ] Markdown content is rendered securely (XSS protected).
-- [ ] Clicking a topic chip navigates correctly to the catalogue page.
-- [ ] The "Tasks" entry is visible in the main navigation for all signed-in roles.
-- [ ] Component tests cover list rendering, detail view, XSS safety, and empty state.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] `/tasks` and `/tasks/:id` are accessible to any authenticated user.
+- [x] Draft and archived tasks do not appear (enforced by the server).
+- [x] Markdown content is rendered securely (XSS protected).
+- [x] Clicking a topic chip navigates correctly to the catalogue page.
+- [x] The "Tasks" entry is visible in the main navigation for all signed-in roles.
+- [x] Component tests cover list rendering, detail view, XSS safety, and empty state.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

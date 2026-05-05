@@ -1,7 +1,7 @@
 # Task 06: Public Tasks Read API
 
 ## Metadata
-- **Status:** Completed
+- **Status:** Done
 - **Complexity:** Low
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Task 03, Task 04, Task 05
