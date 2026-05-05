@@ -4,6 +4,41 @@
 
 ---
 
+## Milestone 4 — Task Engine & Interconnection
+
+> The engagement engine: enabling content creators to design multi-stage tasks and link them to the knowledge tree.
+
+### New Features
+
+- **📝 Task Authoring Engine**
+  - First-class `Task` entity with draft/published/archived lifecycle.
+  - Ordered `TaskStage` entities with human-readable labels (e.g., Reading, Practice, Completion).
+  - Admin Authoring UX: List, create, edit tasks, and reorder stages using an intuitive drag-and-drop interface.
+
+- **🔗 Interconnection & Referential Integrity**
+  - Robust N-to-N linking between tasks and topics from the knowledge tree.
+  - Stage-level subset linking allowing specific stages to target specific topics.
+  - Strict referential integrity: tasks cannot be published without stages, and linked topics must be published.
+
+- **👨‍🎓 Student Surface**
+  - Read-only `/tasks` dashboard showing published tasks.
+  - Deep-linking from task stages directly into the knowledge catalog (`/catalog/:topicId`).
+
+### Platform Enhancements & Fixes
+
+- **🌐 Dynamic CORS Engine**
+  - New type-safe `OriginPolicy` module with wildcard subdomain matching support (`*.pages.dev`).
+  - Improved environment-specific CORS rules ensuring strict security for production and flexibility for staging/local development.
+- **✨ UX Improvements**
+  - Stylized login page with updated design tokens, fluid animations, and custom icons.
+  - Complete registration and activation flow for new users.
+- **🛠️ Developer Experience & Architecture**
+  - New `@Body` and `@ValidateBody` decorators to centralize and formalize API request schema validation.
+  - Streamlined backend and frontend developer skill personas and workflow documentation.
+  - Expanded E2E integration test coverage for task flows.
+
+---
+
 ## Milestone 3 — Content & Media Core
 
 > Hierarchical content engine and direct-to-storage media pipeline.
