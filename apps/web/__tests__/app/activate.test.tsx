@@ -30,7 +30,7 @@ vi.mock('@web/lib/auth-api', async () => {
   };
 });
 
-import ActivatePage from '@web/app/activate/page';
+import ActivatePage from '@web/app/(auth)/activate/page';
 
 beforeEach(() => {
   vi.resetAllMocks();

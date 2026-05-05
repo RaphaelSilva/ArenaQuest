@@ -8,7 +8,7 @@
  * @aws-sdk/* imports are intentionally confined to this file.
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import type {
@@ -89,8 +89,20 @@ export class R2StorageAdapter implements IStorageAdapter {
   }
 
   async objectExists(key: string): Promise<boolean> {
-    const obj = await this.bucket.head(key);
-    return obj !== null;
+    try {
+      await this.s3.send(
+        new HeadObjectCommand({
+          Bucket: this.bucketName,
+          Key: key,
+        }),
+      );
+      return true;
+    } catch (err: any) {
+      if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) {
+        return false;
+      }
+      throw err;
+    }
   }
 
   async headObject(key: string): Promise<StorageObject | null> {
