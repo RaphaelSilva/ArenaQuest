@@ -1,7 +1,7 @@
 # Task 06: Public Tasks Read API
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Low
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Task 03, Task 04, Task 05
@@ -14,15 +14,16 @@ Implement the student-facing read API for Tasks. Returns only `published` tasks 
 
 ---
 
-## Architectural Context
+## Technical Constraints
 
 - **Router:** `apps/api/src/routes/tasks.router.ts`.
+- **Service:** Logic implemented in `apps/api/src/controllers/public-tasks.controller.ts`.
 - **Security:** Guarded by `authGuard` only — any authenticated user can read.
 - **Access Control:** Strictly limited to `published` tasks. Draft and archived tasks are invisible.
 
 ---
 
-## Requirements
+## Scope (no code)
 
 ### 1. Public Task Endpoints
 
@@ -46,13 +47,13 @@ Implement the student-facing read API for Tasks. Returns only `published` tasks 
 
 ## Acceptance Criteria
 
-- [ ] Both endpoints are correctly guarded by `authGuard`.
-- [ ] Draft and archived tasks are not accessible.
-- [ ] Hydrated task details include correct stages and topic references.
-- [ ] Stale topic links are filtered from public responses without causing errors.
-- [ ] Caching headers are present on the list endpoint.
-- [ ] Integration tests cover visibility and RBAC boundaries.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] Both endpoints are correctly guarded by `authGuard`.
+- [x] Draft and archived tasks are not accessible.
+- [x] Hydrated task details include correct stages and topic references.
+- [x] Stale topic links are filtered from public responses without causing errors.
+- [x] Caching headers are present on the list endpoint.
+- [x] Integration tests (Controller level) cover visibility and RBAC boundaries.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 
