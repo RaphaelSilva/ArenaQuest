@@ -1,7 +1,7 @@
 # Task 08: Frontend — Admin Stage Editor
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Task 04, Task 05, Task 07
@@ -40,12 +40,12 @@ Implement the interactive Stage Editor component that fills the placeholder slot
 
 ## Acceptance Criteria
 
-- [ ] Authors can add, rename, reorder, and delete stages (subject to the parent-status guard).
-- [ ] Stage reorder is persisted and reverts gracefully on failure.
-- [ ] Per-stage topic association is constrained to the task's link set.
-- [ ] The delete button is disabled for published tasks with an informative tooltip.
-- [ ] Component tests cover all interactions and guard behaviors.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] Authors can add, rename, reorder, and delete stages (subject to the parent-status guard).
+- [x] Stage reorder is persisted and reverts gracefully on failure.
+- [x] Per-stage topic association is constrained to the task's link set.
+- [x] The delete button is disabled for published tasks with an informative tooltip.
+- [x] Component tests cover all interactions and guard behaviors.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

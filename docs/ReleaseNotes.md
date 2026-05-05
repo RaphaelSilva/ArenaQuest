@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+## Milestone 4 — Task Engine & Interconnection
+
+> Integrated pedagogical task system with nested stages and curriculum-topic linking.
+
+### New Features
+
+- **🏗️ Pedagogical Task Engine**
+  - New Task entity with draft/published/archived states.
+  - Hierarchical Task Stages (Reading, Practice, Review) with interactive reordering.
+  - Interconnection: Tasks and individual stages can be linked to multiple curriculum topics.
+
+- **🛠️ Admin Task Management**
+  - New Admin Tasks Dashboard for lifecycle management.
+  - Interactive Stage Editor with drag-and-drop support (via `@dnd-kit`).
+  - Validation guards prevent publishing tasks with invalid stage/topic configurations.
+
+- **🎓 Student Task Experience**
+  - Read-only Task Catalog for browsing published learning paths.
+  - Task Detail view with full Markdown support and deep-links to the curriculum catalog.
+  - Semantic HTML structure ensuring screen-reader accessibility for task stages.
+
+- **🛡️ Quality & Security**
+  - Strict ownership checks prevent cross-topic stage or media injection.
+  - Comprehensive unit and integration test suite covering the full task-topic graph.
+  - Zero-overhead storage adapter ensures cloud-agnostic R2 usage.
+
 ---
 
 ## Milestone 4 — Task Engine & Interconnection

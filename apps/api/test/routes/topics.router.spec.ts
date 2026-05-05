@@ -154,10 +154,13 @@ beforeAll(async () => {
   // Simulate client upload directly into miniflare R2.
   await env.R2.put(readyMediaStorageKey, 'test-pdf-content');
 
-  // Finalize the media record.
-  await req('POST', `/admin/topics/${publishedTopicId}/media/${presignData.media.id}/finalize`, {
-    token: adminToken,
-  });
+  // Mark the media record as 'ready' directly in the DB. The finalize endpoint
+  // relies on objectExists (S3 client) which is unreachable in miniflare's test
+  // sandbox. The finalize flow itself is tested in admin-media.controller.spec.ts.
+  await env.DB
+    .prepare("UPDATE media SET status = 'ready' WHERE storage_key = ?")
+    .bind(readyMediaStorageKey)
+    .run();
 
   // Seed a pending (not-finalized) media item — should not appear in public response.
   await req('POST', `/admin/topics/${publishedTopicId}/media/presign`, {

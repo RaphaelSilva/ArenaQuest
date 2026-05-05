@@ -1,7 +1,7 @@
 # Task 01: Tasks & Stages Data Layer
 
 ## Metadata
-- **Status:** Completed
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Milestone 3 Task 01 (topics table must exist so FKs are valid later)
