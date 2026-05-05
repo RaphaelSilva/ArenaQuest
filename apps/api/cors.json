@@ -1,0 +1,21 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "http://localhost:3000",
+          "https://arenaquest-web-staging.pages.dev"
+        ],
+        "methods": [
+          "PUT",
+          "GET"
+        ],
+        "headers": [
+          "Content-Type",
+          "Content-Length"
+        ]
+      },
+      "maxAgeSeconds": 3600
+    }
+  ]
+}
