@@ -137,6 +137,9 @@ cf-typegen: ## Regenerate Cloudflare Worker types (wrangler types)
 	pnpm --filter api cf-typegen
 
 db-migrations-dev: ## Apply all D1 migrations locally (arenaquest-db)
+	pnpm --filter api db:apply:migrations --local
+
+db-migrations-staging-local: ## Apply all D1 migrations locally (arenaquest-db-staging)
 	pnpm --filter api db:apply:migrations:staging --local
 
 db-migrations-staging: ## Apply all D1 migrations to remote staging DB (arenaquest-db-staging)

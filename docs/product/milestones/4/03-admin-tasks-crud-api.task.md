@@ -1,7 +1,7 @@
 # Task 03: Admin Tasks CRUD API
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Task 01
@@ -14,16 +14,16 @@ Expose the HTTP endpoints for authoring and managing Tasks under `/admin/tasks`.
 
 ---
 
-## Architectural Context
+## Technical Constraints
 
 - **Router:** `apps/api/src/routes/admin-tasks.router.ts`.
-- **Service:** `apps/api/src/core/engagement/task-service.ts` — orchestrates repositories.
+- **Service:** Logic implemented in `apps/api/src/controllers/admin-tasks.controller.ts` (orchestrates repositories).
 - **Security:** Guarded by `authGuard + requireRole(ADMIN, CONTENT_CREATOR)`.
 - **Content Safety:** Task descriptions must be sanitized (via the M3 shared helper) before persistence.
 
 ---
 
-## Requirements
+## Scope (no code)
 
 ### 1. Task Management Endpoints
 
@@ -53,11 +53,11 @@ Transitions are enforced server-side:
 
 ## Acceptance Criteria
 
-- [ ] All five endpoints are implemented and correctly RBAC-protected.
-- [ ] Status transition guards are enforced and return the correct error codes and reasons.
-- [ ] Content sanitization is active; submitting malicious content results in a sanitized, stored value.
-- [ ] Integration tests cover CRUD, status guards, and role-based access.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] All five endpoints are implemented and correctly RBAC-protected.
+- [x] Status transition guards are enforced and return the correct error codes and reasons.
+- [x] Content sanitization is active; submitting malicious content results in a sanitized, stored value.
+- [x] Integration tests (Controller level) cover CRUD, status guards, and role-based access logic.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

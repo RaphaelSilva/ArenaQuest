@@ -1,7 +1,7 @@
 # Task 04: Admin Task Stages API
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Task 03
@@ -14,20 +14,20 @@ Implement nested REST endpoints for managing `TaskStage` resources under `/admin
 
 ---
 
-## Architectural Context
+## Technical Constraints
 
 - **Router:** Extends `apps/api/src/routes/admin-tasks.router.ts`.
-- **Service:** Extends `apps/api/src/core/engagement/task-service.ts`.
+- **Service:** Logic implemented in `apps/api/src/controllers/admin-task-stages.controller.ts`.
 - **Security:** Inherits `authGuard + requireRole(ADMIN, CONTENT_CREATOR)` from the parent task router.
 
 ---
 
-## Requirements
+## Scope (no code)
 
 ### 1. Stage Management Endpoints
 
 | Method   | Path                                     | Description                                     |
-|----------|------------------------------------------|-------------------------------------------------|
+|----------|--------------------|-------------------------------------------------|
 | `POST`   | `/admin/tasks/:id/stages`                | Add a new stage to a task.                      |
 | `PATCH`  | `/admin/tasks/:id/stages/:stageId`       | Update a stage's label.                         |
 | `DELETE` | `/admin/tasks/:id/stages/:stageId`       | Remove a stage from a task.                     |
@@ -45,10 +45,10 @@ Implement nested REST endpoints for managing `TaskStage` resources under `/admin
 
 ## Acceptance Criteria
 
-- [ ] All four endpoints are implemented and tested.
-- [ ] Stage reorder is atomic with no duplicate order conflicts.
-- [ ] The parent-status delete guard is enforced and covered by a test.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] All four endpoints are implemented and tested.
+- [x] Stage reorder is atomic with no duplicate order conflicts.
+- [x] The parent-status delete guard is enforced and covered by a test.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 
