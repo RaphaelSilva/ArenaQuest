@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { Entities } from '@arenaquest/shared/types/entities';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import type { RoleName } from '@arenaquest/shared/constants/roles';
@@ -362,6 +363,12 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
+                        <Link
+                          href={`/admin/users/${u.id}`}
+                          className="text-indigo-600 hover:underline dark:text-indigo-400"
+                        >
+                          Enrollments
+                        </Link>
                         <button
                           onClick={() => { setEditTarget(u); setShowForm(true); }}
                           className="text-indigo-600 hover:underline dark:text-indigo-400"

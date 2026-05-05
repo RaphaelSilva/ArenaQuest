@@ -1,7 +1,7 @@
 # Task 10: Frontend — Admin Enrollment Panel
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium
 - **Milestone:** 5 — Engagement & Student Progress
 - **Dependencies:** Task 05
@@ -44,13 +44,13 @@ A new "Enrollments" tab on the existing user detail page with:
 
 ## Acceptance Criteria
 
-- [ ] Admin can grant and revoke topic access for a user from the user detail page.
-- [ ] The cascade revoke toggle is visible and correctly passed to the API.
-- [ ] Effective access is visually distinct from direct grants.
-- [ ] The group enrollment UI exists for basic grant/revoke operations.
-- [ ] Non-admin users cannot access the enrollment tab.
-- [ ] Component tests cover grant flow, cascade revoke, and role-based access.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] Admin can grant and revoke topic access for a user from the user detail page.
+- [x] The cascade revoke toggle is visible and correctly passed to the API.
+- [x] Effective access is visually distinct from direct grants.
+- [x] The group enrollment UI exists for basic grant/revoke operations (placeholder flagged — group CRUD backend pending).
+- [x] Non-admin users cannot access the enrollment tab.
+- [x] Component tests cover grant flow, cascade revoke, and role-based access.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 
