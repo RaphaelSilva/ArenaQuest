@@ -129,29 +129,3 @@
   admins (`409 WOULD_LOCK_OUT_ADMINS`) or that target the acting admin's own account
   (`409 SELF_LOCKOUT`).
 
-- **S-06 (Low) — PBKDF2 iteration upgrade** *(commit `feda632`)*  
-  Default iteration count raised from 100 000 to 210 000 (OWASP 2023 recommendation).
-  Existing hashes are transparently rehashed to 210 000 iterations on the user's next
-  successful login — no forced password-reset required.
-
-- **S-07 (Low) — Web logging hygiene** *(commit `1acf836`)*  
-  Removed `console.log('API_URL', …)` from `apps/web/src/lib/auth-api.ts`. Added an
-  ESLint `no-console` rule (warn level, `console.warn`/`console.error` allowed) to
-  `apps/web` to prevent regressions.
-
-- **S-08 (Low) — Production seed guard** *(commit `012d7b7`)*  
-  Dev seed SQL moved to `apps/api/scripts/dev/`. A new pre-deploy script
-  (`scripts/check-no-dev-seed.ts`) fails loudly if the known dev password hash is
-  present in the target D1. `make deploy-api` and `make deploy-api-staging` run it
-  automatically as a prerequisite. See
-  [`docs/product/api/bootstrap-first-admin.md`](api/bootstrap-first-admin.md) for the
-  operator procedure to create the first production admin account.
-
-- **S-09 (Info) — Accepted as designed.**  
-  Edge middleware checks cookie presence only; the API rejects invalid tokens on every
-  authenticated request. No code change.
-
-- **S-10 (Info) — JWT adversarial test suite** *(commit `feda632`)*  
-  `apps/api/test/adapters/auth/jwt-auth-adapter.spec.ts` added with 32 tests covering
-  malformed headers, wrong algorithms (`alg:none`, RS256), wrong segment counts, signature
-  tampering, expired tokens, and claim-shape mutations.
