@@ -131,6 +131,18 @@ bootstrap-admin: ## Interactively create the first admin account (local / stagin
 	@bash scripts/bootstrap-first-admin.sh
 
 # ==============================================================================
+# 🪣 R2 UTILS
+# ==============================================================================
+r2-cors-dev: ## Apply CORS rules to the dev bucket (arenaquest-media-dev)
+	pnpm --filter api exec wrangler r2 bucket cors set arenaquest-media-dev --file cors.json -y
+
+r2-cors-staging: ## Apply CORS rules to the staging bucket (arenaquest-media-staging)
+	pnpm --filter api exec wrangler r2 bucket cors set arenaquest-media-staging --file cors.json -y
+
+r2-cors-prod: ## Apply CORS rules to the production bucket (arenaquest-media)
+	pnpm --filter api exec wrangler r2 bucket cors set arenaquest-media --file cors.json -y
+
+# ==============================================================================
 # 🔧 CLOUDFLARE WORKERS UTILS
 # ==============================================================================
 cf-typegen: ## Regenerate Cloudflare Worker types (wrangler types)
