@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { tasksApi, type PublicTaskDetail, type CheckInResult } from '@web/lib/tasks-api';
+import { tasksApi, type PublicTaskDetail } from '@web/lib/tasks-api';
 
 type StageState = 'checked' | 'current' | 'locked';
 
