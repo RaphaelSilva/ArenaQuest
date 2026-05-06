@@ -56,8 +56,9 @@ export function StudentTaskDetail({ task, token, initialCheckins = [] }: Props) 
       setInflight(null);
 
       if ('error' in res) {
-        if (res.error.type === 'OUT_OF_ORDER') {
-          const expectedStage = task.stages.find((s) => s.id === res.error.expectedStageId);
+        const { error } = res;
+        if (error.type === 'OUT_OF_ORDER') {
+          const expectedStage = task.stages.find((s) => s.id === error.expectedStageId);
           const stageName = expectedStage ? `"${expectedStage.label}"` : 'a etapa anterior';
           showToast(`Conclua ${stageName} primeiro antes de avançar.`);
         } else {
@@ -66,7 +67,8 @@ export function StudentTaskDetail({ task, token, initialCheckins = [] }: Props) 
         return;
       }
 
-      const checkIn = (res as { result: CheckInResult; created: boolean }).result.checkIn;
+      const { result } = res;
+      const checkIn = result.checkIn;
       setCheckins((prev) => [
         ...prev.filter((c) => c.stageId !== stageId),
         { stageId: checkIn.stageId, checkedInAt: checkIn.checkedInAt },
