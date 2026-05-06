@@ -203,7 +203,6 @@ Reads updated (M4 endpoints adjusted):
 | 08 | [Frontend: Student Dashboard](./08-frontend-student-dashboard.task.md) | ⬜ Pending |
 | 09 | [Frontend: Stage check-in UI + topic mark-as-read](./09-frontend-stage-check-in-ui.task.md) | ⬜ Pending |
 | 10 | [Frontend: Admin Enrollment Panel](./10-frontend-admin-enrollment.task.md) | ⬜ Pending |
-| 11 | [E2E Extension: enroll → consume → check-in → dashboard](./11-e2e-progress-flow.task.md) | ⬜ Pending |
 
 Dependency graph:
 
@@ -213,11 +212,11 @@ Dependency graph:
     └─ 06 ─┤
 02 ─┬─ 05 ─┤
     └─ 07 ─┤
-           ├─ 08, 09, 10 ──── 11
+           ├─ 08, 09, 10 (parallel)
 ```
 
 **Recommended execution order:** `01, 02` (parallel) → `03, 04, 05, 07` (parallel)
-→ `06` → `08, 09, 10` (parallel) → `11`.
+→ `06` → `08, 09, 10` (parallel).
 
 ---
 

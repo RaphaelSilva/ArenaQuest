@@ -10,6 +10,12 @@ import { buildAdminMediaRouter } from './admin-media.router';
 import { buildAdminTasksRouter } from './admin-tasks.router';
 import { buildTasksRouter } from './tasks.router';
 import { buildTopicsRouter } from './topics.router';
+import {
+  buildProgressTaskRouter,
+  buildProgressTopicRouter,
+  buildMeProgressRouter,
+} from './progress.router';
+import { buildAdminEnrollmentRouter } from './admin-enrollment.router';
 import { getHealth } from '@api/controllers/health.controller';
 import { authGuard } from '@api/middleware/auth-guard';
 import { parseAllowedOrigins, buildOriginMatcher, hasAnyRule } from '@api/core/cors/origin-policy';
@@ -25,6 +31,8 @@ import type {
   ITaskRepository,
   ITaskStageRepository,
   ITaskLinkingRepository,
+  IProgressRepository,
+  IEnrollmentRepository,
 } from '@arenaquest/shared/ports';
 import type { AuthService } from '@api/core/auth/auth-service';
 
@@ -52,6 +60,8 @@ export class AppRouter {
       taskRepo: ITaskRepository;
       taskStages: ITaskStageRepository;
       taskLinks: ITaskLinkingRepository;
+      progressRepo: IProgressRepository;
+      enrollmentRepo: IEnrollmentRepository;
       authService: AuthService;
       loginLimiter: IRateLimiter;
       registerController: RegisterController;
@@ -68,7 +78,7 @@ export class AppRouter {
       strictCors: boolean;
     },
   ): void {
-    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, cookieSameSite, allowedOrigins, strictCors } = deps;
+    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, cookieSameSite, allowedOrigins, strictCors } = deps;
     // Build origin matcher from config — strict in prod, lenient in dev.
     const originRules = parseAllowedOrigins(allowedOrigins, { strict: strictCors });
 
@@ -114,8 +124,12 @@ export class AppRouter {
     app.route('/admin/topics', buildAdminTopicsRouter(topics, tags));
     app.route('/admin/topics', buildAdminMediaRouter(topics, media, storage));
     app.route('/admin/tasks', buildAdminTasksRouter(taskRepo, taskStages, taskLinks, topics));
-    app.route('/tasks', buildTasksRouter(taskRepo, taskStages, taskLinks, topics));
-    app.route('/topics', buildTopicsRouter(topics, media, storage));
+    app.route('/tasks', buildTasksRouter(taskRepo, taskStages, taskLinks, topics, enrollmentRepo));
+    app.route('/tasks', buildProgressTaskRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
+    app.route('/topics', buildTopicsRouter(topics, media, storage, enrollmentRepo));
+    app.route('/topics', buildProgressTopicRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
+    app.route('/me', buildMeProgressRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
+    app.route('/admin', buildAdminEnrollmentRouter(enrollmentRepo, users, topics));
 
     // Sanity demo — development only, can be removed post-milestone.
     app.get('/protected/ping', authGuard, (c) =>

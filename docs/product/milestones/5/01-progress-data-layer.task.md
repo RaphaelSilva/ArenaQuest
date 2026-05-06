@@ -1,7 +1,7 @@
 # Task 01: Progress Data Layer
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium
 - **Milestone:** 5 — Engagement & Student Progress
 - **Dependencies:** Milestone 3 Task 01 (topics), Milestone 4 Task 01 (tasks & stages)
@@ -59,11 +59,11 @@ An immutable, append-only log of a student checking into a task stage.
 
 ## Acceptance Criteria
 
-- [ ] Database migration applies cleanly to a fresh local database.
-- [ ] `IProgressRepository` is exported from `packages/shared/index.ts`.
-- [ ] Adapter passes all integration tests, including idempotency and cascade deletion.
-- [ ] No D1-specific types leak beyond the adapter layer.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] Database migration applies cleanly to a fresh local database.
+- [x] `IProgressRepository` is exported from `packages/shared/index.ts`.
+- [x] Adapter passes all integration tests, including idempotency and cascade deletion.
+- [x] No D1-specific types leak beyond the adapter layer.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

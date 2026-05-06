@@ -1,7 +1,7 @@
 # Task 03: Stage Check-in API
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium
 - **Milestone:** 5 — Engagement & Student Progress
 - **Dependencies:** Task 01, Task 02
@@ -48,12 +48,12 @@ A successful check-in must atomically:
 
 ## Acceptance Criteria
 
-- [ ] The endpoint enforces enrollment, ordering, and idempotency.
-- [ ] All side effects are atomic — no partial updates on failure.
-- [ ] Stage check-in correctly propagates topic completion.
-- [ ] Completing the final stage marks the task as `completed`.
-- [ ] Integration tests cover: happy path, out-of-order, idempotency, unenrolled user, and concurrent requests.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] The endpoint enforces enrollment, ordering, and idempotency.
+- [x] All side effects are atomic — no partial updates on failure.
+- [x] Stage check-in correctly propagates topic completion.
+- [x] Completing the final stage marks the task as `completed`.
+- [x] Integration tests cover: happy path, out-of-order, idempotency, unenrolled user, and concurrent requests.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

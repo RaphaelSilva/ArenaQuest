@@ -3,6 +3,7 @@ import type {
   ITaskStageRepository,
   ITaskLinkingRepository,
   ITopicNodeRepository,
+  IEnrollmentRepository,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
 import type { ControllerResult } from '../core/result';
@@ -36,9 +37,23 @@ export class PublicTasksController {
     private readonly stages: ITaskStageRepository,
     private readonly links: ITaskLinkingRepository,
     private readonly topics: ITopicNodeRepository,
+    private readonly enrollment: IEnrollmentRepository | null = null,
   ) {}
 
-  async list(opts: { limit?: number; offset?: number }): Promise<ControllerResult<TaskSummary[]>> {
+  /**
+   * Builds a Set of effective topic IDs for the given user.
+   * Returns null when enrollment filtering is disabled (admin/content_creator bypass).
+   */
+  private async effectiveSet(userId: string | null): Promise<Set<string> | null> {
+    if (!userId || !this.enrollment) return null;
+    const ids = await this.enrollment.getEffectiveAccessTopicIds(userId);
+    return new Set(ids);
+  }
+
+  async list(
+    opts: { limit?: number; offset?: number },
+    userId?: string,
+  ): Promise<ControllerResult<TaskSummary[]>> {
     const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
     const offset = Math.max(opts.offset ?? 0, 0);
 
@@ -48,12 +63,16 @@ export class PublicTasksController {
       offset,
     });
 
+    const access = await this.effectiveSet(userId ?? null);
+
     const summaries = await Promise.all(
-      tasks.map(async (task): Promise<TaskSummary> => {
+      tasks.map(async (task): Promise<TaskSummary | null> => {
         const [stagesList, topicIds] = await Promise.all([
           this.stages.listByTask(task.id),
           this.links.listTaskTopics(task.id),
         ]);
+        // Access filter: task is visible only if ALL linked topics are accessible.
+        if (access && topicIds.some((tid) => !access.has(tid))) return null;
         return {
           id: task.id,
           title: task.title,
@@ -64,13 +83,25 @@ export class PublicTasksController {
       }),
     );
 
-    return { ok: true, data: summaries };
+    return { ok: true, data: summaries.filter((s): s is TaskSummary => s !== null) };
   }
 
-  async getById(id: string): Promise<ControllerResult<PublicTaskDetail>> {
+  async getById(id: string, userId?: string): Promise<ControllerResult<PublicTaskDetail>> {
     const task = await this.tasks.findById(id);
     if (!task || task.status !== Entities.Config.TaskStatus.PUBLISHED) {
       return { ok: false, status: 404, error: 'NotFound' };
+    }
+
+    // Access filter: verify all task topics are in the effective set
+    if (userId && this.enrollment) {
+      const [effectiveIds, taskTopicIds] = await Promise.all([
+        this.enrollment.getEffectiveAccessTopicIds(userId),
+        this.links.listTaskTopics(id),
+      ]);
+      const effectiveSet = new Set(effectiveIds);
+      if (taskTopicIds.some((tid) => !effectiveSet.has(tid))) {
+        return { ok: false, status: 404, error: 'NotFound' };
+      }
     }
 
     const [stagesList, hydration] = await Promise.all([

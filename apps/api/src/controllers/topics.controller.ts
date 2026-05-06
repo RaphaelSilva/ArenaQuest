@@ -1,4 +1,10 @@
-import type { ITopicNodeRepository, IMediaRepository, IStorageAdapter, TopicNodeRecord } from '@arenaquest/shared/ports';
+import type {
+  ITopicNodeRepository,
+  IMediaRepository,
+  IStorageAdapter,
+  IEnrollmentRepository,
+  TopicNodeRecord,
+} from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
 import type { ControllerResult } from '../core/result';
 
@@ -23,20 +29,35 @@ export class TopicsController {
     private readonly topics: ITopicNodeRepository,
     private readonly media: IMediaRepository,
     private readonly storage: IStorageAdapter,
+    private readonly enrollment: IEnrollmentRepository | null = null,
   ) {}
 
-  async listPublished(): Promise<ControllerResult<TopicNodeRecord[]>> {
+  async listPublished(userId?: string): Promise<ControllerResult<TopicNodeRecord[]>> {
     const all = await this.topics.listAll();
-    const published = all.filter(
+    let published = all.filter(
       n => n.status === Entities.Config.TopicNodeStatus.PUBLISHED && !n.archived,
     );
+
+    if (userId && this.enrollment) {
+      const effectiveIds = await this.enrollment.getEffectiveAccessTopicIds(userId);
+      const effectiveSet = new Set(effectiveIds);
+      published = published.filter(n => effectiveSet.has(n.id));
+    }
+
     return { ok: true, data: published };
   }
 
-  async getPublishedById(id: string): Promise<ControllerResult<TopicWithMedia>> {
+  async getPublishedById(id: string, userId?: string): Promise<ControllerResult<TopicWithMedia>> {
     const node = await this.topics.findById(id);
     if (!node || node.status !== Entities.Config.TopicNodeStatus.PUBLISHED || node.archived) {
       return { ok: false, status: 404, error: 'NotFound' };
+    }
+
+    if (userId && this.enrollment) {
+      const effectiveIds = await this.enrollment.getEffectiveAccessTopicIds(userId);
+      if (!effectiveIds.includes(id)) {
+        return { ok: false, status: 404, error: 'NotFound' };
+      }
     }
 
     const [children, mediaItems] = await Promise.all([
