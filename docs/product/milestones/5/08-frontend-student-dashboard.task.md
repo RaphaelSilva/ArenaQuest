@@ -1,7 +1,7 @@
 # Task 08: Frontend — Student Dashboard
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium-High
 - **Milestone:** 5 — Engagement & Student Progress
 - **Dependencies:** Task 06
@@ -47,12 +47,12 @@ For the topics breakdown, compute per-root-topic completion by aggregating progr
 
 ## Acceptance Criteria
 
-- [ ] The dashboard renders summary cards, continue-list, and topic breakdown with live API data.
-- [ ] The progress roll-up utility is independently unit tested.
-- [ ] Empty states are handled gracefully for both topics and tasks.
-- [ ] All progress visualizations have accessible text equivalents.
-- [ ] Component tests cover summary rendering, continue-list, topic roll-up, and empty states.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] The dashboard renders summary cards, continue-list, and topic breakdown with live API data.
+- [x] The progress roll-up utility is independently unit tested.
+- [x] Empty states are handled gracefully for both topics and tasks.
+- [x] All progress visualizations have accessible text equivalents.
+- [x] Component tests cover summary rendering, continue-list, topic roll-up, and empty states.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

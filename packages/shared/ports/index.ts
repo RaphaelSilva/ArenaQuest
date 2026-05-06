@@ -11,4 +11,6 @@ export * from './i-activation-token-repository';
 export * from './i-task-repository';
 export * from './i-task-stage-repository';
 export * from './i-task-linking-repository';
+export * from './i-progress-repository';
+export * from './i-enrollment-repository';
 // i-database-adapter defines the full future IDatabaseAdapter contract (not yet implemented)

@@ -1,7 +1,7 @@
 # Task 09: Frontend — Stage Check-in UI & Topic Mark-as-read
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium
 - **Milestone:** 5 — Engagement & Student Progress
 - **Dependencies:** Task 03, Task 04, Milestone 4 Task 09 (student task view)
@@ -43,12 +43,12 @@ Wire the student-facing engagement controls into the existing UI. This adds "Che
 
 ## Acceptance Criteria
 
-- [ ] Students can advance through a task's stages in the correct order.
-- [ ] Out-of-order check-in attempts surface a clear, actionable error message.
-- [ ] Topic visit beacon fires once on mount without blocking the page render.
-- [ ] "Mark as read" correctly updates the topic's status in the UI.
-- [ ] Component tests cover: stage state rendering, check-in flow, out-of-order error, double-click guard, and the mark-as-read flow.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] Students can advance through a task's stages in the correct order.
+- [x] Out-of-order check-in attempts surface a clear, actionable error message.
+- [x] Topic visit beacon fires once on mount without blocking the page render.
+- [x] "Mark as read" correctly updates the topic's status in the UI.
+- [x] Component tests cover: stage state rendering, check-in flow, out-of-order error, double-click guard, and the mark-as-read flow.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+## Milestone 5 — Engagement & Student Progress
+
+> The learner loop closed: student-facing dashboards, stage check-ins, and granular enrollment control.
+
+### New Features
+
+- **📊 Student Dashboard**
+  - Live interaction hub with real-time progress summary (topics & tasks).
+  - "Continue Learning" section powered by SWR (Stale-While-Revalidate) for instant loading.
+  - Interactive SVG-based progress rings and root-topic rollup visualizations.
+  - Accessible design with numerical text equivalents for all visual indicators.
+
+- **✅ Engagement & Progress Tracking**
+  - **Stage Check-ins:** Sequential, auditable, and idempotent check-in system for task stages.
+  - **Progress Signals:** Implicit "visit" tracking and explicit "mark as read" actions for topics.
+  - **Deterministic Aggregation:** Completion percentages computed on-the-fly to ensure accuracy.
+
+- **🛡️ Granular Access Control (Enrollment)**
+  - Direct user-to-topic grants and group-based access inheritance.
+  - Recursive Effective Access: High-performance CTE calculation for full subtree visibility.
+  - Admin Enrollment UI: Manage access for individuals or cohorts with cascading revoke support.
+
+- **⚡ Platform Performance**
+  - Recursive CTE optimization for access lookups (sub-50ms latency).
+  - Intelligent request-level caching for effective access sets.
+  - Optimized database schema for progress and enrollment tracking.
+
+---
+
 ## Milestone 4 — Task Engine & Interconnection
 
 > Integrated pedagogical task system with nested stages and curriculum-topic linking.
@@ -27,28 +56,6 @@
   - Strict ownership checks prevent cross-topic stage or media injection.
   - Comprehensive unit and integration test suite covering the full task-topic graph.
   - Zero-overhead storage adapter ensures cloud-agnostic R2 usage.
-
----
-
-## Milestone 4 — Task Engine & Interconnection
-
-> The engagement engine: enabling content creators to design multi-stage tasks and link them to the knowledge tree.
-
-### New Features
-
-- **📝 Task Authoring Engine**
-  - First-class `Task` entity with draft/published/archived lifecycle.
-  - Ordered `TaskStage` entities with human-readable labels (e.g., Reading, Practice, Completion).
-  - Admin Authoring UX: List, create, edit tasks, and reorder stages using an intuitive drag-and-drop interface.
-
-- **🔗 Interconnection & Referential Integrity**
-  - Robust N-to-N linking between tasks and topics from the knowledge tree.
-  - Stage-level subset linking allowing specific stages to target specific topics.
-  - Strict referential integrity: tasks cannot be published without stages, and linked topics must be published.
-
-- **👨‍🎓 Student Surface**
-  - Read-only `/tasks` dashboard showing published tasks.
-  - Deep-linking from task stages directly into the knowledge catalog (`/catalog/:topicId`).
 
 ### Platform Enhancements & Fixes
 
@@ -128,4 +135,3 @@
   `PATCH` and `DELETE /admin/users/:id` now reject changes that would leave zero active
   admins (`409 WOULD_LOCK_OUT_ADMINS`) or that target the acting admin's own account
   (`409 SELF_LOCKOUT`).
-

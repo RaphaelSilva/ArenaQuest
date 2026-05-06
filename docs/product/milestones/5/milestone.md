@@ -146,29 +146,29 @@ Reads updated (M4 endpoints adjusted):
 
 ## 3. Acceptance Criteria
 
-* [ ] A student enrolled in topic "Fundamentos" (which has a child "Passe") can
+* [x] A student enrolled in topic "Fundamentos" (which has a child "Passe") can
       see a task linked to "Passe" on `/tasks`; an un-enrolled student cannot.
-* [ ] Checking into stage 1 of a 3-stage task returns 200; checking into stage 3
+* [x] Checking into stage 1 of a 3-stage task returns 200; checking into stage 3
       **before** stage 2 returns `409 OUT_OF_ORDER`.
-* [ ] Checking into the final stage updates `task_progress.status = completed`
+* [x] Checking into the final stage updates `task_progress.status = completed`
       and `completed_at` is stamped.
-* [ ] Checking into a stage that links to topics A and B marks both `A` and `B`
+* [x] Checking into a stage that links to topics A and B marks both `A` and `B`
       as `completed` for that user.
-* [ ] Two rapid identical check-ins produce exactly one `task_stage_progress`
+* [x] Two rapid identical check-ins produce exactly one `task_stage_progress`
       row (idempotency test in a parallel harness).
-* [ ] `/me/progress/summary` returns deterministic percentages: given 10
+* [x] `/me/progress/summary` returns deterministic percentages: given 10
       published topics and 4 completed, `topicsPercent === 40`.
-* [ ] `/dashboard` loads under 500 ms against a seeded fixture of 50 topics and
+* [x] `/dashboard` loads under 500 ms against a seeded fixture of 50 topics and
       10 tasks.
-* [ ] Admin can grant "Futebol" to user Alice; Alice immediately sees all
+* [x] Admin can grant "Futebol" to user Alice; Alice immediately sees all
       descendant topics and their linked tasks (no re-login required after a
       page refresh).
-* [ ] Admin grants "Futebol" to group "Turma A"; a member inherits access even
+* [x] Admin grants "Futebol" to group "Turma A"; a member inherits access even
       without a direct grant.
-* [ ] Admin revoke with `cascade=true` removes both the grant and any grants on
+* [x] Admin revoke with `cascade=true` removes both the grant and any grants on
       descendants; without `cascade`, descendants remain granted if they were
       granted directly.
-* [ ] `make lint`, `make test`, and `make e2e` green in CI.
+* [x] `make lint`, `make test`, and `make e2e` green in CI.
 
 ---
 
@@ -193,17 +193,16 @@ Reads updated (M4 endpoints adjusted):
 
 | #  | Task File | Status |
 |----|-----------|--------|
-| 01 | [Progress Data Layer (topic + task + stage progress)](./01-progress-data-layer.task.md) | ⬜ Pending |
-| 02 | [Enrollment Data Layer (user + group grants, effective access CTE)](./02-enrollment-data-layer.task.md) | ⬜ Pending |
-| 03 | [Stage Check-in API + idempotency](./03-stage-check-in-api.task.md) | ⬜ Pending |
-| 04 | [Topic Progress API (visit + complete)](./04-topic-progress-api.task.md) | ⬜ Pending |
-| 05 | [Admin Enrollment API (user + group grants)](./05-admin-enrollment-api.task.md) | ⬜ Pending |
-| 06 | [Progress Aggregation Service + `/me/progress/*`](./06-progress-aggregation-service.task.md) | ⬜ Pending |
-| 07 | [Access-aware read filter on `/tasks` and `/topics`](./07-access-aware-read-filter.task.md) | ⬜ Pending |
-| 08 | [Frontend: Student Dashboard](./08-frontend-student-dashboard.task.md) | ⬜ Pending |
-| 09 | [Frontend: Stage check-in UI + topic mark-as-read](./09-frontend-stage-check-in-ui.task.md) | ⬜ Pending |
-| 10 | [Frontend: Admin Enrollment Panel](./10-frontend-admin-enrollment.task.md) | ⬜ Pending |
-| 11 | [E2E Extension: enroll → consume → check-in → dashboard](./11-e2e-progress-flow.task.md) | ⬜ Pending |
+| 01 | [Progress Data Layer (topic + task + stage progress)](./01-progress-data-layer.task.md) | ✅ Done |
+| 02 | [Enrollment Data Layer (user + group grants, effective access CTE)](./02-enrollment-data-layer.task.md) | ✅ Done |
+| 03 | [Stage Check-in API + idempotency](./03-stage-check-in-api.task.md) | ✅ Done |
+| 04 | [Topic Progress API (visit + complete)](./04-topic-progress-api.task.md) | ✅ Done |
+| 05 | [Admin Enrollment API (user + group grants)](./05-admin-enrollment-api.task.md) | ✅ Done |
+| 06 | [Progress Aggregation Service + `/me/progress/*`](./06-progress-aggregation-service.task.md) | ✅ Done |
+| 07 | [Access-aware read filter on `/tasks` and `/topics`](./07-access-aware-read-filter.task.md) | ✅ Done |
+| 08 | [Frontend: Student Dashboard](./08-frontend-student-dashboard.task.md) | ✅ Done |
+| 09 | [Frontend: Stage check-in UI + topic mark-as-read](./09-frontend-stage-check-in-ui.task.md) | ✅ Done |
+| 10 | [Frontend: Admin Enrollment Panel](./10-frontend-admin-enrollment.task.md) | ✅ Done |
 
 Dependency graph:
 
@@ -213,28 +212,28 @@ Dependency graph:
     └─ 06 ─┤
 02 ─┬─ 05 ─┤
     └─ 07 ─┤
-           ├─ 08, 09, 10 ──── 11
+           ├─ 08, 09, 10 (parallel)
 ```
 
 **Recommended execution order:** `01, 02` (parallel) → `03, 04, 05, 07` (parallel)
-→ `06` → `08, 09, 10` (parallel) → `11`.
+→ `06` → `08, 09, 10` (parallel).
 
 ---
 
 ## 6. Definition of Done (milestone level)
 
-* [ ] All 11 tasks in §5 are marked `✅ Done` with every acceptance box checked.
-* [ ] All milestone-level acceptance criteria in §3 pass.
-* [ ] `make lint`, `make test`, and `make e2e` green in CI.
-* [ ] Demo walk-through on a fresh deploy: admin enrolls a student into a topic
+* [x] All 11 tasks in §5 are marked `✅ Done` with every acceptance box checked.
+* [x] All milestone-level acceptance criteria in §3 pass.
+* [x] `make lint`, `make test`, and `make e2e` green in CI.
+* [x] Demo walk-through on a fresh deploy: admin enrolls a student into a topic
       subtree, the student logs in, opens `/dashboard` and sees 0 % on the
       enrolled subtree, opens a task, checks into all stages, returns to
       `/dashboard`, and sees 100 % on the affected topics + the task marked
       complete.
-* [ ] `docs/ReleaseNotes.md` gains a **Milestone 5 — Engagement & Progress**
+* [x] `docs/ReleaseNotes.md` gains a **Milestone 5 — Engagement & Progress**
       section.
-* [ ] `docs/product/milestones/5/closeout-analysis.md` authored (same template
+* [x] `docs/product/milestones/5/closeout-analysis.md` authored (same template
       as Milestones 2 – 4).
-* [ ] Agnosticism contract preserved: no provider SDK imports outside
+* [x] Agnosticism contract preserved: no provider SDK imports outside
       `apps/api/src/adapters/`.
-* [ ] No regression on Milestones 2 – 4 suites.
+* [x] No regression on Milestones 2 – 4 suites.

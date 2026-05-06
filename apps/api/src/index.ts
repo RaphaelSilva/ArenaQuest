@@ -21,6 +21,8 @@ import { D1TaskRepository } from '@api/adapters/db/d1-task-repository';
 import { D1TaskStageRepository } from '@api/adapters/db/d1-task-stage-repository';
 import { D1TaskLinkingRepository } from '@api/adapters/db/d1-task-linking-repository';
 import { D1ActivationTokenRepository } from '@api/adapters/db/d1-activation-token-repository';
+import { D1ProgressRepository } from '@api/adapters/db/d1-progress-repository';
+import { D1EnrollmentRepository } from '@api/adapters/db/d1-enrollment-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
 import { ConsoleMailAdapter } from '@api/adapters/mail/console-mail-adapter';
@@ -50,6 +52,8 @@ function buildApp(env: AppEnv): Hono {
   const taskRepo = new D1TaskRepository(env.DB);
   const taskStages = new D1TaskStageRepository(env.DB);
   const taskLinks = new D1TaskLinkingRepository(env.DB);
+  const progressRepo = new D1ProgressRepository(env.DB);
+  const enrollmentRepo = new D1EnrollmentRepository(env.DB);
   const storage = new R2StorageAdapter({
     bucket: env.R2,
     s3Endpoint: env.R2_S3_ENDPOINT,
@@ -115,6 +119,8 @@ function buildApp(env: AppEnv): Hono {
     taskRepo,
     taskStages,
     taskLinks,
+    progressRepo,
+    enrollmentRepo,
     authService,
     loginLimiter,
     registerController,

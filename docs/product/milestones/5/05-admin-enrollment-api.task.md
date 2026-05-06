@@ -1,7 +1,7 @@
 # Task 05: Admin Enrollment API
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium
 - **Milestone:** 5 — Engagement & Student Progress
 - **Dependencies:** Task 02
@@ -51,11 +51,11 @@ Expose the administrative endpoints for managing student access to topic content
 
 ## Acceptance Criteria
 
-- [ ] All six endpoints are implemented, tested, and registered in the router.
-- [ ] Idempotency and cascade semantics are covered by integration tests.
-- [ ] Structured log entries are emitted for every grant and revoke action.
-- [ ] Non-admin roles receive `403` on all routes.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] All six endpoints are implemented, tested, and registered in the router.
+- [x] Idempotency and cascade semantics are covered by integration tests.
+- [x] Structured log entries are emitted for every grant and revoke action.
+- [x] Non-admin roles receive `403` on all routes.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

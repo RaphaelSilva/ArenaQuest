@@ -1,7 +1,7 @@
 # Task 02: Enrollment Data Layer
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium-High
 - **Milestone:** 5 — Engagement & Student Progress
 - **Dependencies:** Milestone 3 Task 01 (topics)
@@ -51,12 +51,12 @@ The core contract of this data layer:
 
 ## Acceptance Criteria
 
-- [ ] Database migration applies cleanly.
-- [ ] `IEnrollmentRepository` is exported from `packages/shared/index.ts`.
-- [ ] `getEffectiveAccessTopicIds` correctly expands to all descendants.
-- [ ] Performance test passes: effective access query under 50ms on a 1,000-topic fixture.
-- [ ] Cascade revoke behavior is covered by an explicit test.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] Database migration applies cleanly.
+- [x] `IEnrollmentRepository` is exported from `packages/shared/index.ts`.
+- [x] `getEffectiveAccessTopicIds` correctly expands to all descendants.
+- [x] Performance test passes: effective access query under 50ms on a 1,000-topic fixture.
+- [x] Cascade revoke behavior is covered by an explicit test.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 
