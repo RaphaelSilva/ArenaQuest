@@ -15,6 +15,7 @@ export default defineWorkersConfig({
 					bindings: {
 						JWT_SECRET: "test-secret-at-least-32-characters-long",
 						ALLOWED_ORIGINS: "*",
+						ALLOWED_ORIGIN: "*",
 						COOKIE_SAMESITE: "Strict",
 						MAIL_DRIVER: "console",
 						MAIL_FROM: "ArenaQuest Test <noreply@test.local>",
@@ -22,6 +23,7 @@ export default defineWorkersConfig({
 						WEB_BASE_URL: "http://localhost:3000",
 						R2_S3_ENDPOINT: "http://localhost:4566",
 						R2_BUCKET_NAME: "test-bucket",
+						R2_PUBLIC_BASE: "",
 						R2_ACCESS_KEY_ID: "test-access-key",
 						R2_SECRET_ACCESS_KEY: "test-secret-key-at-least-32-chars-long",
 					},
