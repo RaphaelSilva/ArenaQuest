@@ -52,10 +52,10 @@ build: ## Build all apps and packages (Turborepo)
 	pnpm turbo run build
 
 build-web: ## Build only apps/web
-	pnpm --filter web build
+	pnpm turbo build --filter web
 
 build-api: ## Build only apps/api
-	pnpm --filter api build
+	pnpm turbo build --filter api
 
 # ==============================================================================
 # 🔍 LINT
@@ -64,13 +64,13 @@ lint: ## Lint all workspaces (Turborepo)
 	pnpm turbo run lint
 
 lint-web: ## Lint only apps/web
-	pnpm --filter web lint
+	pnpm turbo lint --filter web
 
 lint-api: ## Lint only apps/api
-	pnpm --filter api lint
+	pnpm turbo lint --filter api
 
 lint-shared: ## Lint only packages/shared
-	pnpm --filter @arenaquest/shared lint
+	pnpm turbo lint --filter @arenaquest/shared
 
 # ==============================================================================
 # 🧪 TEST
@@ -79,10 +79,10 @@ test: ## Run all tests
 	pnpm turbo run test
 
 test-web: ## Run apps/web tests (Vitest + JSDOM)
-	pnpm --filter web test
+	pnpm turbo test --filter web
 
 test-api: ## Run apps/api tests (Vitest + Cloudflare Workers pool)
-	pnpm --filter api test
+	pnpm turbo test --filter api
 
 # ==============================================================================
 # 🚢 DEPLOY
