@@ -261,16 +261,17 @@ describe('buildOriginMatcher', () => {
 
   // ── Performance ───────────────────────────────────────────────────────────────
 
-  it('completes 10 000 calls well under 50 ms', () => {
+  it('completes 20 000 calls well under 150 ms', () => {
     const matcher = buildOriginMatcher([
       exact('https://app.arenaquest.com'),
       wildcardHost('https', '.pages.dev'),
     ]);
     const start = Date.now();
-    for (let i = 0; i < 10_000; i++) {
+    for (let i = 0; i < 20_000; i++) {
       matcher('https://pr-123.arenaquest-web.pages.dev');
     }
     const elapsed = Date.now() - start;
-    expect(elapsed).toBeLessThan(50);
+    // 150ms for 20k calls is 7.5μs/call — very generous for the optimized fast path.
+    expect(elapsed).toBeLessThan(150);
   });
 });

@@ -225,6 +225,48 @@ export function buildOriginMatcher(rules: OriginRule[]): (origin: string) => str
   }
 
   return (requestOrigin: string): string | null => {
+    if (!requestOrigin) return null;
+
+    // 1. Fast path: check for clean origin (no path, query, or fragment)
+    // Most Origin headers are exactly 'scheme://host[:port]'.
+    const schemeSep = requestOrigin.indexOf('://');
+    if (schemeSep !== -1) {
+      const pathSep = requestOrigin.indexOf('/', schemeSep + 3);
+      if (pathSep === -1) {
+        const lower = requestOrigin.toLowerCase();
+
+        // Exact match — O(1)
+        if (exactSet.has(lower)) {
+          return lower;
+        }
+
+        // Wildcard-host match
+        if (wildcardRules.length > 0) {
+          const scheme = lower.slice(0, schemeSep);
+          const host = lower.slice(schemeSep + 3);
+
+          for (const rule of wildcardRules) {
+            if (rule.scheme !== scheme) continue;
+            if (!host.endsWith(rule.suffix)) continue;
+
+            const label = host.slice(0, host.length - rule.suffix.length);
+            if (label.length > 0 && !label.includes('.')) {
+              return lower;
+            }
+          }
+        }
+
+        // Full wildcard (*) — echo request origin, never the literal '*'.
+        // Browsers reject `ACAO: *` on credentialed requests (CORS spec §7.1.5).
+        if (hasAny) {
+          return lower;
+        }
+
+        return null;
+      }
+    }
+
+    // 2. Slow path: full URL normalization (handles paths, trailing slashes, etc.)
     let parsedUrl: URL;
     let normalizedOrigin: string;
     try {
@@ -234,12 +276,11 @@ export function buildOriginMatcher(rules: OriginRule[]): (origin: string) => str
       return null;
     }
 
-    // 1. Exact match — O(1)
-    if (exactSet.has(normalizedOrigin.toLowerCase())) {
+    // URL.origin is already lowercased in modern JS runtimes.
+    if (exactSet.has(normalizedOrigin)) {
       return normalizedOrigin;
     }
 
-    // 2. Wildcard-host match
     if (wildcardRules.length > 0) {
       const reqScheme = parsedUrl.protocol.replace(':', '').toLowerCase();
       const reqHost = parsedUrl.hostname.toLowerCase();
@@ -248,7 +289,6 @@ export function buildOriginMatcher(rules: OriginRule[]): (origin: string) => str
         if (rule.scheme !== reqScheme) continue;
         if (!reqHost.endsWith(rule.suffix)) continue;
 
-        // The label preceding the suffix must be a single label (no dots)
         const label = reqHost.slice(0, reqHost.length - rule.suffix.length);
         if (label.length > 0 && !label.includes('.')) {
           return normalizedOrigin;
@@ -256,8 +296,8 @@ export function buildOriginMatcher(rules: OriginRule[]): (origin: string) => str
       }
     }
 
-    // 3. Full wildcard — echo request origin.
-    //    Never return the literal '*': browsers reject ACAO: * with credentials: true.
+    // Full wildcard (*) — echo request origin, never the literal '*'.
+    // Browsers reject `ACAO: *` on credentialed requests (CORS spec §7.1.5).
     if (hasAny) {
       return normalizedOrigin;
     }
