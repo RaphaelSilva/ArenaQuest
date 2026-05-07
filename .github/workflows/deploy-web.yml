@@ -21,7 +21,7 @@ jobs:
   # 1. Verify — Ensure code is clean and passes tests
   # ────────────────────────────────────────────────────────────────────────────
   verify:
-    name: Verify (Lint & Test)
+    name: Verify (Lint, Build & Test)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -42,7 +42,10 @@ jobs:
       - name: Lint
         run: make lint-web
 
-      - name: Test
+      - name: Build
+        run: make build-web
+
+      - name: Run Tests
         run: make test-web
 
   # ────────────────────────────────────────────────────────────────────────────
@@ -58,14 +61,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'pnpm'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
@@ -96,14 +99,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'pnpm'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile

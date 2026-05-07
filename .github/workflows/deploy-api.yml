@@ -21,11 +21,14 @@ jobs:
   # 1. Verify — Ensure code is clean and buildable
   # ────────────────────────────────────────────────────────────────────────────
   verify:
-    name: Verify (Lint & Build)
+    name: Verify (Lint, Build & Test)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -33,17 +36,17 @@ jobs:
           node-version: 20
           cache: 'pnpm'
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Lint
         run: make lint-api
 
-      - name: Build (api + dependencies)
+      - name: Build
         run: make build-api
+
+      - name: Run Tests
+        run: make test-api
 
   # ────────────────────────────────────────────────────────────────────────────
   # 2. Deploy Staging — runs on both develop and main
@@ -100,14 +103,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'pnpm'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
