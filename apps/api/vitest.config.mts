@@ -12,17 +12,18 @@ export default defineWorkersConfig({
 			workers: {
 				wrangler: { configPath: "./wrangler.jsonc" },
 				miniflare: {
-					// Force the activation flow to the in-process Console mailer so
-					// integration tests never hit the real Resend API. The wrangler
-					// config sets MAIL_DRIVER=resend for staging/prod parity; this
-					// override only applies to the test pool.
 					bindings: {
 						JWT_SECRET: "test-secret-at-least-32-characters-long",
+						ALLOWED_ORIGINS: "*",
+						COOKIE_SAMESITE: "Lax",
 						MAIL_DRIVER: "console",
 						MAIL_FROM: "ArenaQuest Test <noreply@test.local>",
 						RESEND_API_KEY: "test-key-unused",
 						WEB_BASE_URL: "http://localhost:3000",
 					},
+					d1Databases: ["DB"],
+					r2Buckets: ["R2"],
+					kvNamespaces: ["RATE_LIMIT_KV"],
 				},
 			},
 		},
