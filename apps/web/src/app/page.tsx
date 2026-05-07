@@ -272,10 +272,8 @@ export default function LandingPage() {
         <nav className="flex items-center gap-3" aria-label="Navegação principal">
           <Link
             href="/login"
-            className="rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150"
+            className="rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 hover:text-[var(--aq-text)]"
             style={{ color: 'var(--aq-text2)' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--aq-text)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--aq-text2)'; }}
           >
             Entrar
           </Link>
