@@ -17,6 +17,7 @@ export default defineWorkersConfig({
 					// config sets MAIL_DRIVER=resend for staging/prod parity; this
 					// override only applies to the test pool.
 					bindings: {
+						JWT_SECRET: "test-secret-at-least-32-characters-long",
 						MAIL_DRIVER: "console",
 						MAIL_FROM: "ArenaQuest Test <noreply@test.local>",
 						RESEND_API_KEY: "test-key-unused",
