@@ -1,7 +1,7 @@
 # Task 04: Topic Progress API
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Low
 - **Milestone:** 5 — Engagement & Student Progress
 - **Dependencies:** Task 01, Task 02
@@ -50,10 +50,10 @@ Both endpoints return `{ topicProgress, changed }`, where `changed` indicates wh
 
 ## Acceptance Criteria
 
-- [ ] Both endpoints are implemented and guarded correctly.
-- [ ] The monotonic status contract is covered by a test (visit on a completed topic must not change status).
-- [ ] The `changed` flag correctly distinguishes mutations from no-ops.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] Both endpoints are implemented and guarded correctly.
+- [x] The monotonic status contract is covered by a test (visit on a completed topic must not change status).
+- [x] The `changed` flag correctly distinguishes mutations from no-ops.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

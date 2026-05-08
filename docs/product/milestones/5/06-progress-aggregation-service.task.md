@@ -1,7 +1,7 @@
 # Task 06: Progress Aggregation Service & `/me/progress/*` API
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Medium
 - **Milestone:** 5 — Engagement & Student Progress
 - **Dependencies:** Task 01, Task 02, Task 03, Task 04
@@ -50,12 +50,12 @@ Returns the student's individual progress record for each accessible task (publi
 
 ## Acceptance Criteria
 
-- [ ] All three endpoints are implemented and guarded by `authGuard`.
-- [ ] Percentages are deterministic and handle the zero-total edge case.
-- [ ] Response shapes match the shared types in `packages/shared`.
-- [ ] No data from outside the student's effective access leaks into any response.
-- [ ] Integration tests verify percentage correctness and access scoping.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] All three endpoints are implemented and guarded by `authGuard`.
+- [x] Percentages are deterministic and handle the zero-total edge case.
+- [x] Response shapes match the shared types in `packages/shared`.
+- [x] No data from outside the student's effective access leaks into any response.
+- [x] Integration tests verify percentage correctness and access scoping.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

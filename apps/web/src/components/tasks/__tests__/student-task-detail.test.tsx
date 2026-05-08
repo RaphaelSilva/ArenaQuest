@@ -1,59 +1,148 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StudentTaskDetail } from '../student-task-detail';
 import type { PublicTaskDetail } from '@web/lib/tasks-api';
+
+const mockCheckIn = vi.fn();
+
+vi.mock('@web/lib/tasks-api', async () => {
+  const actual = await vi.importActual<typeof import('@web/lib/tasks-api')>('@web/lib/tasks-api');
+  return {
+    ...actual,
+    tasksApi: {
+      ...actual.tasksApi,
+      checkIn: (...args: unknown[]) => mockCheckIn(...args),
+    },
+  };
+});
 
 function makeTask(overrides: Partial<PublicTaskDetail> = {}): PublicTaskDetail {
   return {
     id: 't1',
     title: 'Passe de bola',
-    description: '# Welcome\n\n**Bold** content.',
+    description: 'Descrição da missão',
     updatedAt: '2026-05-01T00:00:00Z',
     stages: [
-      {
-        id: 's1',
-        label: 'Reading',
-        order: 0,
-        topics: [{ id: 'top1', title: 'Fundamentos' }],
-      },
-      { id: 's2', label: 'Practice', order: 1, topics: [] },
+      { id: 's1', label: 'Aquecimento', order: 0, topics: [{ id: 'top1', title: 'Fundamentos' }] },
+      { id: 's2', label: 'Prática', order: 1, topics: [] },
+      { id: 's3', label: 'Revisão', order: 2, topics: [] },
     ],
     ...overrides,
   };
 }
 
-describe('StudentTaskDetail', () => {
-  it('renders title, sanitized markdown, and stages', () => {
-    render(<StudentTaskDetail task={makeTask()} />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Passe de bola' })).toBeInTheDocument();
-    expect(screen.getByText('Welcome')).toBeInTheDocument();
-    expect(screen.getByText('Reading')).toBeInTheDocument();
-    expect(screen.getByText('Practice')).toBeInTheDocument();
+const TOKEN = 'test-token';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('StudentTaskDetail — stage state rendering', () => {
+  it('marks the first stage as current and renders its check-in button', () => {
+    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    const btn = screen.getByRole('button', { name: /check-in na etapa aquecimento/i });
+    expect(btn).toBeInTheDocument();
+    expect(btn).not.toBeDisabled();
   });
 
-  it('uses ordered list semantics for stages', () => {
-    const { container } = render(<StudentTaskDetail task={makeTask()} />);
-    expect(container.querySelector('ol[data-testid="stages-list"]')).not.toBeNull();
+  it('marks subsequent stages as locked', () => {
+    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    const locked = screen.getAllByText('Bloqueada');
+    expect(locked).toHaveLength(2);
+  });
+
+  it('marks pre-checked stages as completed with strikethrough label', () => {
+    const checkins = [{ stageId: 's1', checkedInAt: '2026-05-01T10:00:00Z' }];
+    render(<StudentTaskDetail task={makeTask()} token={TOKEN} initialCheckins={checkins} />);
+    const label = screen.getByText('Aquecimento');
+    expect(label).toHaveStyle({ textDecoration: 'line-through' });
+  });
+
+  it('shows all-done banner when all stages are checked', () => {
+    const checkins = [
+      { stageId: 's1', checkedInAt: '2026-05-01T10:00:00Z' },
+      { stageId: 's2', checkedInAt: '2026-05-01T11:00:00Z' },
+      { stageId: 's3', checkedInAt: '2026-05-01T12:00:00Z' },
+    ];
+    render(<StudentTaskDetail task={makeTask()} token={TOKEN} initialCheckins={checkins} />);
+    expect(screen.getByText(/Missão concluída/i)).toBeInTheDocument();
+  });
+
+  it('shows empty state when task has no stages', () => {
+    render(<StudentTaskDetail task={makeTask({ stages: [] })} token={TOKEN} />);
+    expect(screen.getByText(/Nenhuma etapa definida ainda/i)).toBeInTheDocument();
   });
 
   it('renders topic chips as catalog links', () => {
-    render(<StudentTaskDetail task={makeTask()} />);
+    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
     const chip = screen.getByRole('link', { name: 'Fundamentos' });
     expect(chip).toHaveAttribute('href', '/catalog/top1');
   });
+});
 
-  it('sanitizes script tags inside the description', () => {
-    const { container } = render(
-      <StudentTaskDetail
-        task={makeTask({ description: '# Hi\n\n<script>alert(1)</script>' })}
-      />,
-    );
-    expect(container.innerHTML).not.toContain('<script>');
-    expect(container.innerHTML).not.toContain('alert(1)');
+describe('StudentTaskDetail — check-in flow', () => {
+  it('disables button while request is in-flight', async () => {
+    mockCheckIn.mockReturnValue(new Promise(() => {}));
+    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    const btn = screen.getByRole('button', { name: /check-in na etapa aquecimento/i });
+    fireEvent.click(btn);
+    await waitFor(() => expect(btn).toBeDisabled());
+    expect(screen.getByText('Registrando…')).toBeInTheDocument();
   });
 
-  it('shows no-stage placeholder when stages list is empty', () => {
-    render(<StudentTaskDetail task={makeTask({ stages: [] })} />);
-    expect(screen.getByText(/No stages yet/i)).toBeInTheDocument();
+  it('advances stage state after successful check-in', async () => {
+    mockCheckIn.mockResolvedValueOnce({
+      result: {
+        checkIn: { id: 'ci1', stageId: 's1', checkedInAt: '2026-05-02T08:00:00Z' },
+        taskProgress: { status: 'in_progress', currentStageId: 's2', completedAt: null },
+      },
+      created: true,
+    });
+    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    fireEvent.click(screen.getByRole('button', { name: /check-in na etapa aquecimento/i }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /check-in na etapa prática/i })).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole('button', { name: /check-in na etapa aquecimento/i })).toBeNull();
+  });
+
+  it('ignores double-click while inflight (only one request)', async () => {
+    let resolve!: (v: unknown) => void;
+    mockCheckIn.mockReturnValue(new Promise((r) => { resolve = r; }));
+    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    const btn = screen.getByRole('button', { name: /check-in na etapa aquecimento/i });
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+    await waitFor(() => expect(btn).toBeDisabled());
+    resolve({
+      result: { checkIn: { id: 'ci1', stageId: 's1', checkedInAt: '2026-05-02T08:00:00Z' }, taskProgress: {} },
+      created: true,
+    });
+    expect(mockCheckIn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('StudentTaskDetail — error toasts', () => {
+  it('shows OUT_OF_ORDER toast with expected stage name', async () => {
+    mockCheckIn.mockResolvedValueOnce({
+      error: { type: 'OUT_OF_ORDER', expectedStageId: 's1' },
+    });
+    render(<StudentTaskDetail task={makeTask()} token={TOKEN} initialCheckins={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: /check-in na etapa aquecimento/i }));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(/Aquecimento/),
+    );
+  });
+
+  it('shows generic error toast for UNKNOWN errors', async () => {
+    mockCheckIn.mockResolvedValueOnce({
+      error: { type: 'UNKNOWN', message: 'server error' },
+    });
+    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    fireEvent.click(screen.getByRole('button', { name: /check-in na etapa aquecimento/i }));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(/Não foi possível/i),
+    );
   });
 });

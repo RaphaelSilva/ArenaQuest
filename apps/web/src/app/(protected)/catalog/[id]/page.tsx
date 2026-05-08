@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, useRef, use } from 'react';
 
 /**
  * @see https://nextjs.org/docs/app/api-reference/edge
@@ -8,7 +8,7 @@ import { useEffect, useState, use } from 'react';
 export const runtime = 'edge';
 
 import { useAuth } from '@web/hooks/use-auth';
-import { topicsApi } from '@web/lib/topics-api';
+import { topicsApi, type TopicProgressStatus } from '@web/lib/topics-api';
 import type { TopicNode } from '@web/lib/topics-api';
 import { MarkdownViewer } from '@web/components/catalog/MarkdownViewer';
 import { MediaViewer } from '@web/components/catalog/MediaViewer';
@@ -22,14 +22,17 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   // next.js 15 requires awaiting params
   const { id } = use(params);
   const { accessToken } = useAuth();
-  
+
   const [topic, setTopic] = useState<TopicNode | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [progressStatus, setProgressStatus] = useState<TopicProgressStatus>('not_started');
+  const [markingDone, setMarkingDone] = useState(false);
+  const visitedRef = useRef(false);
 
   useEffect(() => {
     if (!accessToken) return;
-    
+
     let isMounted = true;
 
     topicsApi.getById(accessToken, id)
@@ -45,9 +48,27 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
           setLoading(false);
         }
       });
-      
+
     return () => { isMounted = false; };
   }, [accessToken, id]);
+
+  // Silent visit beacon — fires once per mount, non-blocking
+  useEffect(() => {
+    if (!accessToken || visitedRef.current) return;
+    visitedRef.current = true;
+    void topicsApi.visit(accessToken, id);
+  }, [accessToken, id]);
+
+  const handleMarkAsRead = async () => {
+    if (!accessToken || markingDone) return;
+    setMarkingDone(true);
+    try {
+      const status = await topicsApi.complete(accessToken, id);
+      setProgressStatus(status);
+    } catch {
+      setMarkingDone(false);
+    }
+  };
 
   if (error) {
     return (
@@ -123,6 +144,33 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
           </div>
         </div>
       )}
+
+      {/* Mark as read */}
+      <div className="mt-12 flex justify-center border-t border-zinc-200 pt-10 dark:border-zinc-800">
+        {progressStatus === 'completed' ? (
+          <p
+            className="flex items-center gap-2 text-sm font-medium"
+            style={{ color: 'var(--accent3)' }}
+          >
+            <span aria-hidden="true">✓</span> Conteúdo concluído
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void handleMarkAsRead()}
+            disabled={markingDone}
+            aria-label="Marcar conteúdo como lido"
+            className="rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200 disabled:opacity-60"
+            style={{
+              background: 'var(--accent)',
+              color: '#0B0E17',
+              boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)',
+            }}
+          >
+            {markingDone ? 'Registrando…' : 'Marcar como lido'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

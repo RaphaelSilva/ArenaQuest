@@ -9,71 +9,88 @@ on:
       - 'apps/web/**'
       - 'packages/shared/**'
       - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+# Prevent multiple deployments of the same branch from running simultaneously
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
-  # 1. Build — shared by both environments
+  # 1. Verify — Lint, build shared dependency, then run tests
   # ────────────────────────────────────────────────────────────────────────────
-  build:
-    name: Build
+  verify:
+    name: Verify (Lint, Build & Test)
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
+          cache: 'pnpm'
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build (web + dependencies)
-        run: pnpm turbo build --filter=web...
+      - name: Lint
+        run: make lint-web
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-build
-          path: apps/web/.next
-          retention-days: 1
+      - name: Build shared
+        run: pnpm turbo build --filter @arenaquest/shared
+
+      - name: Run Tests
+        run: make test-web
 
   # ────────────────────────────────────────────────────────────────────────────
-  # 2. Deploy Staging — runs on both develop and main
+  # 2. Deploy Staging — builds and deploys with staging API URL
   # ────────────────────────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
-    needs: build
+    needs: verify
     runs-on: ubuntu-latest
     environment:
       name: staging
-
     steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          name: web-build
-          path: apps/web/.next
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared
+        run: pnpm turbo build --filter @arenaquest/shared
+
+      - name: Build for Cloudflare Pages (Staging)
+        run: pnpm --filter web pages:build
+        env:
+          NEXT_PUBLIC_API_URL: https://api-staging.raphael-1d2.workers.dev
 
       - name: Deploy to Cloudflare Pages (Staging)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: >
-            pages deploy apps/web/.next
-            --project-name=arenaquest-web-staging
+          workingDirectory: apps/web
+          command: pages deploy .vercel/output/static --project-name=arenaquest-web-staging
 
   # ────────────────────────────────────────────────────────────────────────────
-  # 3. Deploy Production — runs only on main, requires manual approval
-  #    Configure "Required reviewers" in GitHub → Settings → Environments → production
+  # 3. Deploy Production — builds and deploys with production API URL
   # ────────────────────────────────────────────────────────────────────────────
   deploy-production:
     name: Deploy to Production
@@ -82,19 +99,34 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-
     steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          name: web-build
-          path: apps/web/.next
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared
+        run: pnpm turbo build --filter @arenaquest/shared
+
+      - name: Build for Cloudflare Pages (Production)
+        run: pnpm --filter web pages:build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.raphael-1d2.workers.dev
 
       - name: Deploy to Cloudflare Pages (Production)
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: >
-            pages deploy apps/web/.next
-            --project-name=arenaquest-web
+          workingDirectory: apps/web
+          command: pages deploy .vercel/output/static --project-name=arenaquest-web

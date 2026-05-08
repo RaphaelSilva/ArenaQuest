@@ -1,7 +1,7 @@
 # Task 04: Admin Task Stages API
 
 ## Metadata
-- **Status:** Completed
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Task 03

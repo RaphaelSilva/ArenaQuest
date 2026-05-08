@@ -2,27 +2,60 @@
 
 ## Unreleased
 
+## Milestone 5 — Engagement & Student Progress
+
+> The learner loop closed: student-facing dashboards, stage check-ins, and granular enrollment control.
+
+### New Features
+
+- **📊 Student Dashboard**
+  - Live interaction hub with real-time progress summary (topics & tasks).
+  - "Continue Learning" section powered by SWR (Stale-While-Revalidate) for instant loading.
+  - Interactive SVG-based progress rings and root-topic rollup visualizations.
+  - Accessible design with numerical text equivalents for all visual indicators.
+
+- **✅ Engagement & Progress Tracking**
+  - **Stage Check-ins:** Sequential, auditable, and idempotent check-in system for task stages.
+  - **Progress Signals:** Implicit "visit" tracking and explicit "mark as read" actions for topics.
+  - **Deterministic Aggregation:** Completion percentages computed on-the-fly to ensure accuracy.
+
+- **🛡️ Granular Access Control (Enrollment)**
+  - Direct user-to-topic grants and group-based access inheritance.
+  - Recursive Effective Access: High-performance CTE calculation for full subtree visibility.
+  - Admin Enrollment UI: Manage access for individuals or cohorts with cascading revoke support.
+
+- **⚡ Platform Performance**
+  - Recursive CTE optimization for access lookups (sub-50ms latency).
+  - Intelligent request-level caching for effective access sets.
+  - Optimized database schema for progress and enrollment tracking.
+
 ---
 
 ## Milestone 4 — Task Engine & Interconnection
 
-> The engagement engine: enabling content creators to design multi-stage tasks and link them to the knowledge tree.
+> Integrated pedagogical task system with nested stages and curriculum-topic linking.
 
 ### New Features
 
-- **📝 Task Authoring Engine**
-  - First-class `Task` entity with draft/published/archived lifecycle.
-  - Ordered `TaskStage` entities with human-readable labels (e.g., Reading, Practice, Completion).
-  - Admin Authoring UX: List, create, edit tasks, and reorder stages using an intuitive drag-and-drop interface.
+- **🏗️ Pedagogical Task Engine**
+  - New Task entity with draft/published/archived states.
+  - Hierarchical Task Stages (Reading, Practice, Review) with interactive reordering.
+  - Interconnection: Tasks and individual stages can be linked to multiple curriculum topics.
 
-- **🔗 Interconnection & Referential Integrity**
-  - Robust N-to-N linking between tasks and topics from the knowledge tree.
-  - Stage-level subset linking allowing specific stages to target specific topics.
-  - Strict referential integrity: tasks cannot be published without stages, and linked topics must be published.
+- **🛠️ Admin Task Management**
+  - New Admin Tasks Dashboard for lifecycle management.
+  - Interactive Stage Editor with drag-and-drop support (via `@dnd-kit`).
+  - Validation guards prevent publishing tasks with invalid stage/topic configurations.
 
-- **👨‍🎓 Student Surface**
-  - Read-only `/tasks` dashboard showing published tasks.
-  - Deep-linking from task stages directly into the knowledge catalog (`/catalog/:topicId`).
+- **🎓 Student Task Experience**
+  - Read-only Task Catalog for browsing published learning paths.
+  - Task Detail view with full Markdown support and deep-links to the curriculum catalog.
+  - Semantic HTML structure ensuring screen-reader accessibility for task stages.
+
+- **🛡️ Quality & Security**
+  - Strict ownership checks prevent cross-topic stage or media injection.
+  - Comprehensive unit and integration test suite covering the full task-topic graph.
+  - Zero-overhead storage adapter ensures cloud-agnostic R2 usage.
 
 ### Platform Enhancements & Fixes
 
@@ -102,30 +135,3 @@
   `PATCH` and `DELETE /admin/users/:id` now reject changes that would leave zero active
   admins (`409 WOULD_LOCK_OUT_ADMINS`) or that target the acting admin's own account
   (`409 SELF_LOCKOUT`).
-
-- **S-06 (Low) — PBKDF2 iteration upgrade** *(commit `feda632`)*  
-  Default iteration count raised from 100 000 to 210 000 (OWASP 2023 recommendation).
-  Existing hashes are transparently rehashed to 210 000 iterations on the user's next
-  successful login — no forced password-reset required.
-
-- **S-07 (Low) — Web logging hygiene** *(commit `1acf836`)*  
-  Removed `console.log('API_URL', …)` from `apps/web/src/lib/auth-api.ts`. Added an
-  ESLint `no-console` rule (warn level, `console.warn`/`console.error` allowed) to
-  `apps/web` to prevent regressions.
-
-- **S-08 (Low) — Production seed guard** *(commit `012d7b7`)*  
-  Dev seed SQL moved to `apps/api/scripts/dev/`. A new pre-deploy script
-  (`scripts/check-no-dev-seed.ts`) fails loudly if the known dev password hash is
-  present in the target D1. `make deploy-api` and `make deploy-api-staging` run it
-  automatically as a prerequisite. See
-  [`docs/product/api/bootstrap-first-admin.md`](api/bootstrap-first-admin.md) for the
-  operator procedure to create the first production admin account.
-
-- **S-09 (Info) — Accepted as designed.**  
-  Edge middleware checks cookie presence only; the API rejects invalid tokens on every
-  authenticated request. No code change.
-
-- **S-10 (Info) — JWT adversarial test suite** *(commit `feda632`)*  
-  `apps/api/test/adapters/auth/jwt-auth-adapter.spec.ts` added with 32 tests covering
-  malformed headers, wrong algorithms (`alg:none`, RS256), wrong segment counts, signature
-  tampering, expired tokens, and claim-shape mutations.

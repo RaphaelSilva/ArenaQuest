@@ -77,6 +77,62 @@ const MIGRATION_SQL = [
     created_at    TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+  // M4 tables (required by the worker)
+  `CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'draft', created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS task_stages (
+    id TEXT NOT NULL PRIMARY KEY, task_id TEXT NOT NULL, label TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS task_topic_links (
+    task_id TEXT NOT NULL, topic_node_id TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (task_id, topic_node_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS task_stage_topic_links (
+    stage_id TEXT NOT NULL, topic_node_id TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (stage_id, topic_node_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS activation_tokens (
+    token TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, expires_at TEXT NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  // M5 tables — progress and enrollment (required by access-aware filter)
+  `CREATE TABLE IF NOT EXISTS topic_progress (
+    id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, topic_node_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'not_started', completed_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, topic_node_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS task_progress (
+    id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, task_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'not_started', current_stage_id TEXT, completed_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, task_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS task_stage_progress (
+    id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, task_id TEXT NOT NULL, stage_id TEXT NOT NULL,
+    checked_in_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE (user_id, stage_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS user_groups (
+    id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE TABLE IF NOT EXISTS user_group_members (
+    group_id TEXT NOT NULL, user_id TEXT NOT NULL, PRIMARY KEY (group_id, user_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS enrollments_user (
+    id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, topic_node_id TEXT NOT NULL,
+    granted_by TEXT NOT NULL, granted_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, topic_node_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS enrollments_user_group (
+    id TEXT NOT NULL PRIMARY KEY, group_id TEXT NOT NULL, topic_node_id TEXT NOT NULL,
+    granted_by TEXT NOT NULL, granted_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (group_id, topic_node_id)
+  )`,
 ];
 
 const ADMIN_USER_ID = 'admin-topics-public-test-user';
@@ -154,16 +210,27 @@ beforeAll(async () => {
   // Simulate client upload directly into miniflare R2.
   await env.R2.put(readyMediaStorageKey, 'test-pdf-content');
 
-  // Finalize the media record.
-  await req('POST', `/admin/topics/${publishedTopicId}/media/${presignData.media.id}/finalize`, {
-    token: adminToken,
-  });
+  // Mark the media record as 'ready' directly in the DB. The finalize endpoint
+  // relies on objectExists (S3 client) which is unreachable in miniflare's test
+  // sandbox. The finalize flow itself is tested in admin-media.controller.spec.ts.
+  await env.DB
+    .prepare("UPDATE media SET status = 'ready' WHERE storage_key = ?")
+    .bind(readyMediaStorageKey)
+    .run();
 
   // Seed a pending (not-finalized) media item — should not appear in public response.
   await req('POST', `/admin/topics/${publishedTopicId}/media/presign`, {
     token: adminToken,
     body: { fileName: 'pending.png', contentType: 'image/png', sizeBytes: 512 },
   });
+
+  // Enroll the student user in the published topic subtree so the
+  // access-aware filter (Task 07) allows the student token to see it.
+  // Admin tokens bypass the filter, so only the student grant is needed.
+  await env.DB
+    .prepare('INSERT OR IGNORE INTO enrollments_user (id, user_id, topic_node_id, granted_by) VALUES (?, ?, ?, ?)')
+    .bind(crypto.randomUUID(), ADMIN_USER_ID, publishedTopicId, ADMIN_USER_ID)
+    .run();
 });
 
 // ---------------------------------------------------------------------------

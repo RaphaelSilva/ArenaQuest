@@ -27,7 +27,7 @@ vi.mock('@web/lib/admin-tasks-api', async () => {
 });
 
 vi.mock('@web/hooks/use-auth', () => ({
-  useAuth: () => ({ token: 'tk' }),
+  useAuth: () => ({ accessToken: 'tk' }),
 }));
 
 function stage(id: string, label: string, order: number): TaskStage {

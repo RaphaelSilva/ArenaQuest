@@ -7,9 +7,6 @@ import { Spinner } from '@web/components/spinner';
 import { StudentTaskDetail } from '@web/components/tasks/student-task-detail';
 import { tasksApi, type PublicTaskDetail } from '@web/lib/tasks-api';
 
-/**
- * @see https://nextjs.org/docs/app/api-reference/edge
- */
 export const runtime = 'edge';
 
 export default function StudentTaskDetailPage() {
@@ -35,14 +32,14 @@ export default function StudentTaskDetailPage() {
   if (error) {
     return (
       <main className="mx-auto max-w-3xl px-6 py-12">
-        <p role="alert" className="rounded-md bg-red-100 px-4 py-3 text-sm text-red-800">
+        <p role="alert" className="rounded-md px-4 py-3 text-sm" style={{ background: 'var(--error-bg)', color: 'var(--error)' }}>
           {error}
         </p>
       </main>
     );
   }
 
-  if (!task) {
+  if (!task || !token) {
     return (
       <div className="flex items-center justify-center py-24">
         <Spinner className="h-6 w-6 text-zinc-400" />
@@ -50,5 +47,5 @@ export default function StudentTaskDetailPage() {
     );
   }
 
-  return <StudentTaskDetail task={task} />;
+  return <StudentTaskDetail task={task} token={token} />;
 }

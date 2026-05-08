@@ -1,7 +1,7 @@
 # Task 07: Access-aware Read Filter on `/tasks` and `/topics`
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Completed
 - **Complexity:** Low-Medium
 - **Milestone:** 5 — Engagement & Student Progress
 - **Dependencies:** Task 02
@@ -45,11 +45,11 @@ This change affects existing tests and E2E scenarios. All fixtures that assume "
 
 ## Acceptance Criteria
 
-- [ ] Students see only enrolled topics and eligible tasks.
-- [ ] Admins and content creators see all content regardless of enrollment.
-- [ ] M3 and M4 Playwright E2E scenarios remain green after fixture updates.
-- [ ] Integration tests verify both visibility and invisibility for unenrolled students.
-- [ ] Codebase remains lint-clean; all unit, integration, and E2E tests pass.
+- [x] Students see only enrolled topics and eligible tasks.
+- [x] Admins and content creators see all content regardless of enrollment.
+- [x] M3 and M4 Playwright E2E scenarios remain green after fixture updates.
+- [x] Integration tests verify both visibility and invisibility for unenrolled students.
+- [x] Codebase remains lint-clean; all unit, integration, and E2E tests pass.
 
 ---
 

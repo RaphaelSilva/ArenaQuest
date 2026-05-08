@@ -1,7 +1,7 @@
 # Task 07: Frontend — Admin Tasks Dashboard
 
 ## Metadata
-- **Status:** Pending
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Task 03, Task 05
@@ -42,12 +42,12 @@ Build the admin interface for managing Tasks. Consists of a list page for an ove
 
 ## Acceptance Criteria
 
-- [ ] The list and editor pages compile and are accessible to authorized roles.
-- [ ] The editor correctly saves title, description, status, and task-level topic links.
-- [ ] Publish validation errors from the API are surfaced as readable inline messages.
-- [ ] Students are redirected away from admin task routes.
-- [ ] Component tests cover list rendering, archive flow, and publish error surfacing.
-- [ ] Codebase remains lint-clean and all tests pass.
+- [x] The list and editor pages compile and are accessible to authorized roles.
+- [x] The editor correctly saves title, description, status, and task-level topic links.
+- [x] Publish validation errors from the API are surfaced as readable inline messages.
+- [x] Students are redirected away from admin task routes.
+- [x] Component tests cover list rendering, archive flow, and publish error surfacing.
+- [x] Codebase remains lint-clean and all tests pass.
 
 ---
 

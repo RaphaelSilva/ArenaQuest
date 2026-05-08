@@ -1,7 +1,7 @@
 # Task 03: Admin Tasks CRUD API
 
 ## Metadata
-- **Status:** Completed
+- **Status:** Done
 - **Complexity:** Medium
 - **Milestone:** 4 — Task Engine & Interconnection
 - **Dependencies:** Task 01
