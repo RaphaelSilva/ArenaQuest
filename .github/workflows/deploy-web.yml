@@ -86,7 +86,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy apps/web/.vercel/output/static --project-name=arenaquest-web-staging
+          workingDirectory: apps/web
+          command: pages deploy .vercel/output/static --project-name=arenaquest-web-staging
 
   # ────────────────────────────────────────────────────────────────────────────
   # 3. Deploy Production — builds and deploys with production API URL
@@ -127,4 +128,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy apps/web/.vercel/output/static --project-name=arenaquest-web
+          workingDirectory: apps/web
+          command: pages deploy .vercel/output/static --project-name=arenaquest-web
