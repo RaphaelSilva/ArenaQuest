@@ -4,8 +4,7 @@ import path from "path";
 export default defineWorkersConfig({
 	resolve: {
 		alias: {
-			"@api": path.resolve(__dirname, "./src"),
-			"@arenaquest/shared": path.resolve(__dirname, "../../packages/shared/index.ts"),
+			"@api": path.resolve(__dirname, "./src")
 		},
 	},
 	test: {

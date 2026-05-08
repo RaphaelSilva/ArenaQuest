@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
-  # 1. Verify — Ensure code is clean and passes tests
+  # 1. Verify — Lint, build shared dependency, then run tests
   # ────────────────────────────────────────────────────────────────────────────
   verify:
     name: Verify (Lint, Build & Test)
@@ -42,8 +42,8 @@ jobs:
       - name: Lint
         run: make lint-web
 
-      - name: Build
-        run: make build-web
+      - name: Build shared
+        run: pnpm turbo build --filter @arenaquest/shared
 
       - name: Run Tests
         run: make test-web
@@ -73,7 +73,10 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build (Staging)
+      - name: Build shared
+        run: pnpm turbo build --filter @arenaquest/shared
+
+      - name: Build for Cloudflare Pages (Staging)
         run: pnpm --filter web pages:build
         env:
           NEXT_PUBLIC_API_URL: https://api-staging.raphael-1d2.workers.dev
@@ -111,7 +114,10 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build (Production)
+      - name: Build shared
+        run: pnpm turbo build --filter @arenaquest/shared
+
+      - name: Build for Cloudflare Pages (Production)
         run: pnpm --filter web pages:build
         env:
           NEXT_PUBLIC_API_URL: https://api.raphael-1d2.workers.dev
