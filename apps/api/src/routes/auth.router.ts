@@ -6,6 +6,8 @@ import type { RegisterController } from '@api/controllers/register.controller';
 import type { ActivateController } from '@api/controllers/activate.controller';
 import { buildRegisterRouter } from '@api/routes/register.router';
 import { buildActivateRouter } from '@api/routes/activate.router';
+import { buildPasswordRouter } from '@api/routes/password.router';
+import type { PasswordController } from '@api/controllers/password.controller';
 import type { IRateLimiter } from '@arenaquest/shared/ports';
 
 const COOKIE_NAME = 'refresh_token';
@@ -46,6 +48,8 @@ export interface AuthRouterDeps {
   registerLimiter: IRateLimiter;
   activateController: ActivateController;
   activateLimiter: IRateLimiter;
+  passwordController: PasswordController;
+  forgotPasswordLimiter: IRateLimiter;
 }
 
 /**
@@ -63,15 +67,13 @@ function extractIp(header: string | undefined): string {
 }
 
 export function buildAuthRouter(deps: AuthRouterDeps): Hono {
-  const { authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter } = deps;
+  const { authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter } = deps;
   const controller = new AuthController(authService);
   const router = new Hono();
 
-  // Public self-registration (`POST /auth/register`). Mounted as a sub-router
-  // so the rate limit + body parsing live in their own module without
-  // colliding with login's limiter or cookie handling.
   router.route('/', buildRegisterRouter({ controller: registerController, limiter: registerLimiter }));
   router.route('/', buildActivateRouter({ controller: activateController, limiter: activateLimiter }));
+  router.route('/', buildPasswordRouter({ controller: passwordController, forgotPasswordLimiter }));
 
   router.post('/login', async (c) => {
     const body = await c.req.json<{ email?: string; password?: string }>();
