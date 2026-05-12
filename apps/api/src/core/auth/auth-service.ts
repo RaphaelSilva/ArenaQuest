@@ -80,7 +80,11 @@ export class AuthService {
     await this.tokens.delete(refreshToken);
   }
 
-  private async issueTokens(user: Entities.Identity.User): Promise<LoginResult> {
+  async loginWithOAuth(user: Entities.Identity.User): Promise<LoginResult> {
+    return this.issueTokens(user);
+  }
+
+  async issueTokens(user: Entities.Identity.User): Promise<LoginResult> {
     const [accessToken, refreshToken] = await Promise.all([
       this.auth.signAccessToken({
         sub: user.id,

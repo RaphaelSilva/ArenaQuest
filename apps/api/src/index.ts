@@ -25,6 +25,7 @@ import { D1PasswordResetTokenRepository } from '@api/adapters/db/d1-password-res
 import { D1OAuthAccountRepository } from '@api/adapters/db/d1-oauth-account-repository';
 import { PasswordController } from '@api/controllers/password.controller';
 import { AccountController } from '@api/controllers/account.controller';
+import { GoogleOAuthController } from '@api/controllers/google-oauth.controller';
 import { D1ProgressRepository } from '@api/adapters/db/d1-progress-repository';
 import { D1EnrollmentRepository } from '@api/adapters/db/d1-enrollment-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
@@ -100,8 +101,20 @@ function buildApp(env: AppEnv): Hono {
     env.WEB_BASE_URL || 'http://localhost:3000',
   );
 
-  const _oauthAccounts = new D1OAuthAccountRepository(env.DB);
+  const oauthAccounts = new D1OAuthAccountRepository(env.DB);
   const accountController = new AccountController(auth, users, tokens);
+  const googleOAuthController = new GoogleOAuthController(
+    {
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+      redirectUri: env.GOOGLE_REDIRECT_URI,
+      webBaseUrl: env.WEB_BASE_URL || 'http://localhost:3000',
+    },
+    env.RATE_LIMIT_KV,
+    oauthAccounts,
+    users,
+    authService,
+  );
 
   const forgotPasswordLimiter = new KvRateLimiter(env.RATE_LIMIT_KV, {
     windowMs: 60 * 60_000,
@@ -153,6 +166,7 @@ function buildApp(env: AppEnv): Hono {
     passwordController,
     forgotPasswordLimiter,
     accountController,
+    googleOAuthController,
     cookieSameSite: parseCookieSameSite(env.COOKIE_SAMESITE),
     allowedOrigins: env.ALLOWED_ORIGINS,
     // If ALLOWED_ORIGINS is configured, enforce strict validation — an invalid
