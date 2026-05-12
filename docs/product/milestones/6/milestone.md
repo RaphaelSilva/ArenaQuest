@@ -97,7 +97,7 @@ The seed migration must be explicitly excluded from production deployment. A `ma
 | 07 | [Google OAuth Config & Bindings](./07-google-oauth-config.task.md) | ✅ Done |
 | 08 | [Google OAuth API Endpoints](./08-google-oauth-api.task.md) | ✅ Done |
 | 09 | [Web: Google OAuth Login](./09-web-google-oauth.task.md) | 🔲 Pending |
-| 10 | [Test Seed Accounts](./10-test-seed-accounts.task.md) | 🔲 Pending |
+| 10 | [Test Seed Accounts](./10-test-seed-accounts.task.md) | ✅ Done |
 
 Dependency graph:
 
