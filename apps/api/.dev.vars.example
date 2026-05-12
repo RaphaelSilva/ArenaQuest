@@ -20,5 +20,13 @@ MAIL_DRIVER=
 MAIL_FROM=ArenaQuest Local <noreply@arenaquest.local>
 # Required when MAIL_DRIVER=resend (staging/prod use this).
 RESEND_API_KEY=
-# Activation links land on this host: <WEB_BASE_URL>/activate?token=...
+# Activation and password-reset links land on this host: <WEB_BASE_URL>/activate?token=...
+# Also used as the OAuth post-login redirect base: <WEB_BASE_URL>/auth/callback
 WEB_BASE_URL=http://localhost:3000
+
+# Google OAuth credentials (Task 07 — see docs/product/milestones/6/google-oauth-setup.md)
+# Create an OAuth 2.0 Web Application client in Google Cloud Console, then copy:
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+# Must match one of the Authorised Redirect URIs configured in the Google Console.
+GOOGLE_REDIRECT_URI=http://localhost:8787/auth/google/callback

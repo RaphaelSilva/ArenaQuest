@@ -94,7 +94,7 @@ The seed migration must be explicitly excluded from production deployment. A `ma
 | 04 | [Change Password API (authenticated)](./04-change-password-api.task.md) | ✅ Done |
 | 05 | [Web: Password Self-Service Pages](./05-web-password-self-service.task.md) | 🔲 Pending |
 | 06 | [Google OAuth Data Layer](./06-google-oauth-data-layer.task.md) | ✅ Done |
-| 07 | [Google OAuth Config & Bindings](./07-google-oauth-config.task.md) | 🔲 Pending |
+| 07 | [Google OAuth Config & Bindings](./07-google-oauth-config.task.md) | ✅ Done |
 | 08 | [Google OAuth API Endpoints](./08-google-oauth-api.task.md) | 🔲 Pending |
 | 09 | [Web: Google OAuth Login](./09-web-google-oauth.task.md) | 🔲 Pending |
 | 10 | [Test Seed Accounts](./10-test-seed-accounts.task.md) | 🔲 Pending |
