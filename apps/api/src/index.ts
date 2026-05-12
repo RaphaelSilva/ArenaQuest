@@ -22,6 +22,7 @@ import { D1TaskStageRepository } from '@api/adapters/db/d1-task-stage-repository
 import { D1TaskLinkingRepository } from '@api/adapters/db/d1-task-linking-repository';
 import { D1ActivationTokenRepository } from '@api/adapters/db/d1-activation-token-repository';
 import { D1PasswordResetTokenRepository } from '@api/adapters/db/d1-password-reset-token-repository';
+import { D1OAuthAccountRepository } from '@api/adapters/db/d1-oauth-account-repository';
 import { PasswordController } from '@api/controllers/password.controller';
 import { AccountController } from '@api/controllers/account.controller';
 import { D1ProgressRepository } from '@api/adapters/db/d1-progress-repository';
@@ -99,6 +100,7 @@ function buildApp(env: AppEnv): Hono {
     env.WEB_BASE_URL || 'http://localhost:3000',
   );
 
+  const _oauthAccounts = new D1OAuthAccountRepository(env.DB);
   const accountController = new AccountController(auth, users, tokens);
 
   const forgotPasswordLimiter = new KvRateLimiter(env.RATE_LIMIT_KV, {
