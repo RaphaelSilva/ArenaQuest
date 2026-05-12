@@ -58,6 +58,7 @@ export interface AuthContextValue {
   accessToken: string | null;
   isLoading: boolean;
   login(email: string, password: string): Promise<void>;
+  loginWithAccessToken(token: string): void;
   logout(): Promise<void>;
 }
 
@@ -99,6 +100,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const loginWithAccessToken = useCallback((token: string) => {
+    setAccessToken(token);
+    const claims = decodeJwtClaims(token);
+    if (claims) setUser(userFromClaims(claims));
+  }, []);
+
   const logout = useCallback(async () => {
     await authApi.logout();
     setUser(null);
@@ -106,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, accessToken, isLoading, login, loginWithAccessToken, logout }}>
       {children}
     </AuthContext.Provider>
   );

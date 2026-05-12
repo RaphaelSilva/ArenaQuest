@@ -277,13 +277,12 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
         <div style={{ flex: 1, height: 1, background: 'var(--aq-border)' }} />
       </div>
 
-      <button
-        type="button"
-        onClick={() => {}}
-        style={{ width: '100%', padding: 11, borderRadius: 10, border: '1px solid var(--aq-border2)', background: 'var(--aq-bg3)', fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif', fontSize: 13, fontWeight: 500, color: 'var(--aq-text2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'all 0.2s' }}
+      <a
+        href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/auth/google`}
+        style={{ width: '100%', padding: 11, borderRadius: 10, border: '1px solid var(--aq-border2)', background: 'var(--aq-bg3)', fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif', fontSize: 13, fontWeight: 500, color: 'var(--aq-text2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'all 0.2s', textDecoration: 'none' }}
       >
         <GoogleIcon /> Entrar com Google
-      </button>
+      </a>
 
       <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--aq-text3)', marginTop: 24 }}>
         Não tem conta?{' '}
