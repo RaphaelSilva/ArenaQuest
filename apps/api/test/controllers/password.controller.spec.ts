@@ -49,6 +49,7 @@ function makeRefreshTokenRepo(): IRefreshTokenRepository & { deletedUserIds: str
     findByToken: async () => null,
     delete: async () => {},
     deleteAllForUser: async (userId) => { deletedUserIds.push(userId); },
+    deleteAllForUserExcept: async () => {},
   };
 }
 

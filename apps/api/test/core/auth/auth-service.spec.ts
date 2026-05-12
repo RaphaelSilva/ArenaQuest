@@ -65,6 +65,11 @@ function makeMockTokenRepo(): IRefreshTokenRepository {
         if (record.userId === userId) store.delete(token);
       }
     },
+    deleteAllForUserExcept: async (userId, keepToken) => {
+      for (const [token, record] of store) {
+        if (record.userId === userId && token !== keepToken) store.delete(token);
+      }
+    },
   };
 }
 

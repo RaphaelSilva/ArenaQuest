@@ -23,6 +23,7 @@ import { D1TaskLinkingRepository } from '@api/adapters/db/d1-task-linking-reposi
 import { D1ActivationTokenRepository } from '@api/adapters/db/d1-activation-token-repository';
 import { D1PasswordResetTokenRepository } from '@api/adapters/db/d1-password-reset-token-repository';
 import { PasswordController } from '@api/controllers/password.controller';
+import { AccountController } from '@api/controllers/account.controller';
 import { D1ProgressRepository } from '@api/adapters/db/d1-progress-repository';
 import { D1EnrollmentRepository } from '@api/adapters/db/d1-enrollment-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
@@ -98,6 +99,8 @@ function buildApp(env: AppEnv): Hono {
     env.WEB_BASE_URL || 'http://localhost:3000',
   );
 
+  const accountController = new AccountController(auth, users, tokens);
+
   const forgotPasswordLimiter = new KvRateLimiter(env.RATE_LIMIT_KV, {
     windowMs: 60 * 60_000,
     maxAttempts: 3,
@@ -147,6 +150,7 @@ function buildApp(env: AppEnv): Hono {
     activateLimiter,
     passwordController,
     forgotPasswordLimiter,
+    accountController,
     cookieSameSite: parseCookieSameSite(env.COOKIE_SAMESITE),
     allowedOrigins: env.ALLOWED_ORIGINS,
     // If ALLOWED_ORIGINS is configured, enforce strict validation — an invalid

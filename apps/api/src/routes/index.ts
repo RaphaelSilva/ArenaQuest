@@ -17,6 +17,8 @@ import {
   buildMeProgressRouter,
 } from './progress.router';
 import { buildAdminEnrollmentRouter } from './admin-enrollment.router';
+import { buildAccountRouter } from './account.router';
+import type { AccountController } from '@api/controllers/account.controller';
 import { getHealth } from '@api/controllers/health.controller';
 import { authGuard } from '@api/middleware/auth-guard';
 import { parseAllowedOrigins, buildOriginMatcher, hasAnyRule } from '@api/core/cors/origin-policy';
@@ -71,6 +73,7 @@ export class AppRouter {
       activateLimiter: IRateLimiter;
       passwordController: PasswordController;
       forgotPasswordLimiter: IRateLimiter;
+      accountController: AccountController;
       cookieSameSite: CookieSameSite;
       allowedOrigins?: string;
       /**
@@ -81,7 +84,7 @@ export class AppRouter {
       strictCors: boolean;
     },
   ): void {
-    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, cookieSameSite, allowedOrigins, strictCors } = deps;
+    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, cookieSameSite, allowedOrigins, strictCors } = deps;
     // Build origin matcher from config — strict in prod, lenient in dev.
     const originRules = parseAllowedOrigins(allowedOrigins, { strict: strictCors });
 
@@ -133,6 +136,7 @@ export class AppRouter {
     app.route('/topics', buildProgressTopicRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
     app.route('/me', buildMeProgressRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
     app.route('/admin', buildAdminEnrollmentRouter(enrollmentRepo, users, topics));
+    app.route('/account', buildAccountRouter(accountController));
 
     // Sanity demo — development only, can be removed post-milestone.
     app.get('/protected/ping', authGuard, (c) =>

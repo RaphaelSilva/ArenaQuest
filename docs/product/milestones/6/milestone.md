@@ -91,7 +91,7 @@ The seed migration must be explicitly excluded from production deployment. A `ma
 | 01 | [Password Reset Data Layer](./01-password-reset-data-layer.task.md) | ✅ Done |
 | 02 | [Forgot Password API](./02-forgot-password-api.task.md) | ✅ Done |
 | 03 | [Reset Password API](./03-reset-password-api.task.md) | ✅ Done |
-| 04 | [Change Password API (authenticated)](./04-change-password-api.task.md) | 🔲 Pending |
+| 04 | [Change Password API (authenticated)](./04-change-password-api.task.md) | ✅ Done |
 | 05 | [Web: Password Self-Service Pages](./05-web-password-self-service.task.md) | 🔲 Pending |
 | 06 | [Google OAuth Data Layer](./06-google-oauth-data-layer.task.md) | 🔲 Pending |
 | 07 | [Google OAuth Config & Bindings](./07-google-oauth-config.task.md) | 🔲 Pending |
