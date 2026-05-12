@@ -115,6 +115,47 @@ export const authApi = {
     return res.json();
   },
 
+  async forgotPassword(email: string): Promise<void> {
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+    } catch {
+      throw new AuthApiError('NetworkError', 0, 'Falha de rede.');
+    }
+    if (res.status === 429) throw new AuthApiError('RateLimited', 429, 'Muitas tentativas.');
+    if (!res.ok) {
+      const body = await readJson(res);
+      const errStr = typeof body.error === 'string' ? body.error : '';
+      throw new AuthApiError('Unknown', res.status, errStr || `Failed (${res.status})`);
+    }
+  },
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, newPassword }),
+      });
+    } catch {
+      throw new AuthApiError('NetworkError', 0, 'Falha de rede.');
+    }
+    if (res.status === 429) throw new AuthApiError('RateLimited', 429, 'Muitas tentativas.');
+    if (!res.ok) {
+      const body = await readJson(res);
+      const errStr = typeof body.error === 'string' ? body.error : '';
+      if (errStr === 'InvalidToken' || errStr === 'TokenExpired') {
+        throw new AuthApiError('InvalidToken', res.status, 'Link inválido ou expirado.');
+      }
+      throw new AuthApiError('Unknown', res.status, errStr || `Failed (${res.status})`);
+    }
+  },
+
   async activate(input: { token: string }): Promise<{ status: 'activated' | 'already_active' }> {
     let res: Response;
     try {
