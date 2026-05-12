@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import type {
+  IAuthAdapter,
   IUserRepository,
   IPasswordResetTokenRepository,
+  IRefreshTokenRepository,
   IMailer,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
@@ -11,9 +13,15 @@ import { renderPasswordResetEmail } from '@api/mail/templates/password-reset-ema
 
 const TOKEN_TTL_MS = toMilliseconds(1, 'hours');
 const TOKEN_BYTES = 32;
+const PASSWORD_MIN = 8;
 
 const ForgotPasswordSchema = z.object({
   email: z.string().trim().toLowerCase().email('Invalid'),
+});
+
+const ResetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(PASSWORD_MIN, 'TooShort').regex(/\d/, 'NoDigit'),
 });
 
 function generateResetToken(): string {
@@ -26,11 +34,34 @@ function generateResetToken(): string {
 
 export class PasswordController {
   constructor(
+    private readonly auth: IAuthAdapter,
     private readonly users: IUserRepository,
+    private readonly refreshTokens: IRefreshTokenRepository,
     private readonly resetTokens: IPasswordResetTokenRepository,
     private readonly mailer: IMailer,
     private readonly webBaseUrl: string,
   ) {}
+
+  async resetPassword(input: unknown): Promise<ControllerResult<null>> {
+    const parsed = ResetPasswordSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, status: 400, error: 'BadRequest' };
+    }
+
+    const { token, newPassword } = parsed.data;
+
+    const result = await this.resetTokens.consumeByPlainToken(token);
+
+    if (result.outcome !== 'consumed') {
+      return { ok: false, status: 400, error: 'InvalidOrExpiredToken' };
+    }
+
+    const newHash = await this.auth.hashPassword(newPassword);
+    await this.users.updatePasswordHash(result.userId, newHash);
+    await this.refreshTokens.deleteAllForUser(result.userId);
+
+    return { ok: true, data: null };
+  }
 
   async forgotPassword(input: unknown): Promise<ControllerResult<null>> {
     const parsed = ForgotPasswordSchema.safeParse(input);

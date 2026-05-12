@@ -90,7 +90,9 @@ function buildApp(env: AppEnv): Hono {
   const activationTokens = new D1ActivationTokenRepository(env.DB, users);
   const passwordResetTokens = new D1PasswordResetTokenRepository(env.DB);
   const passwordController = new PasswordController(
+    auth,
     users,
+    tokens,
     passwordResetTokens,
     mailer,
     env.WEB_BASE_URL || 'http://localhost:3000',

@@ -150,3 +150,89 @@ describe('POST /auth/forgot-password', () => {
     expect(res.status).toBe(429);
   });
 });
+
+// ---------------------------------------------------------------------------
+// POST /auth/reset-password
+// ---------------------------------------------------------------------------
+
+describe('POST /auth/reset-password', () => {
+  it('returns 400 for a missing token', async () => {
+    const res = await post('/auth/reset-password', { newPassword: 'ValidPass1' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for a newPassword shorter than 8 chars', async () => {
+    const res = await post('/auth/reset-password', { token: 'any', newPassword: 'sh0rt' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for newPassword with no digit', async () => {
+    const res = await post('/auth/reset-password', { token: 'any', newPassword: 'NoDigitHere' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 InvalidOrExpiredToken for an unknown token', async () => {
+    const res = await post('/auth/reset-password', { token: 'nonexistent-token', newPassword: 'ValidPass1' });
+    expect(res.status).toBe(400);
+    const body = await res.json<{ error: string }>();
+    expect(body.error).toBe('InvalidOrExpiredToken');
+  });
+
+  it('full flow: forgot → reset → login with new password, old password rejected', async () => {
+    // 1. Seed a fresh reset token by calling forgot-password
+    await post('/auth/forgot-password', { email: TEST_EMAIL });
+
+    // 2. Read the token hash row from the DB (not the plaintext — we need to fish
+    //    the token from the ConsoleMailAdapter output). Instead, we directly call
+    //    the repository via the D1 adapter in-process to extract and re-use the token.
+    //    For the integration test, we seed the token ourselves so we control the plaintext.
+    const plainToken = 'integration-test-reset-token-123abc';
+    const { sha256Hex } = await import('@api/adapters/db/hash');
+    const tokenHash = await sha256Hex(plainToken);
+    const expiresAt = Date.now() + 3_600_000;
+    await env.DB
+      .prepare('INSERT OR REPLACE INTO password_reset_tokens (token_hash, user_id, expires_at, consumed_at, created_at) VALUES (?, ?, ?, NULL, ?)')
+      .bind(tokenHash, TEST_USER_ID, expiresAt, Date.now())
+      .run();
+
+    // 3. Reset password
+    const resetRes = await post('/auth/reset-password', { token: plainToken, newPassword: 'NewValidPass9' });
+    expect(resetRes.status).toBe(200);
+
+    // 4. Login with new password should succeed
+    const loginNew = await post('/auth/login', { email: TEST_EMAIL, password: 'NewValidPass9' });
+    expect(loginNew.status).toBe(200);
+
+    // 5. Login with old password should fail
+    const loginOld = await post('/auth/login', { email: TEST_EMAIL, password: 'Password123' });
+    expect(loginOld.status).toBe(401);
+
+    // Restore original password for other tests
+    const { JwtAuthAdapter: Adapter } = await import('@api/adapters/auth');
+    const adapter = new Adapter({ secret: env.JWT_SECRET, pbkdf2Iterations: 1 });
+    const originalHash = await adapter.hashPassword('Password123');
+    await env.DB
+      .prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+      .bind(originalHash, TEST_USER_ID)
+      .run();
+  });
+
+  it('returns 400 when the same token is used a second time', async () => {
+    const plainToken = 'double-submit-token-456def';
+    const { sha256Hex } = await import('@api/adapters/db/hash');
+    const tokenHash = await sha256Hex(plainToken);
+    const expiresAt = Date.now() + 3_600_000;
+    await env.DB
+      .prepare('INSERT OR REPLACE INTO password_reset_tokens (token_hash, user_id, expires_at, consumed_at, created_at) VALUES (?, ?, ?, NULL, ?)')
+      .bind(tokenHash, TEST_USER_ID, expiresAt, Date.now())
+      .run();
+
+    const first = await post('/auth/reset-password', { token: plainToken, newPassword: 'FirstPass1' });
+    expect(first.status).toBe(200);
+
+    const second = await post('/auth/reset-password', { token: plainToken, newPassword: 'SecondPass2' });
+    expect(second.status).toBe(400);
+    const body = await second.json<{ error: string }>();
+    expect(body.error).toBe('InvalidOrExpiredToken');
+  });
+});

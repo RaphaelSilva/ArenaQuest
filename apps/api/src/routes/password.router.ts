@@ -61,5 +61,29 @@ export function buildPasswordRouter(deps: PasswordRouterDeps): Hono {
     return c.body(null, 200);
   });
 
+  /**
+   * POST /auth/reset-password
+   *
+   * Public, unauthenticated. No additional rate limit — the one-time token
+   * with a 1-hour TTL is the natural throttle. Concurrent double-submits
+   * are handled atomically in the repository layer.
+   */
+  router.post('/reset-password', async (c) => {
+    let body: unknown = null;
+    try {
+      body = await c.req.json();
+    } catch {
+      body = null;
+    }
+
+    const result = await controller.resetPassword(body);
+
+    if (!result.ok) {
+      return c.json({ error: result.error }, result.status as 400);
+    }
+
+    return c.body(null, 200);
+  });
+
   return router;
 }

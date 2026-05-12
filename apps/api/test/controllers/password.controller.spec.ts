@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { PasswordController } from '@api/controllers/password.controller';
 import type {
+  IAuthAdapter,
   IUserRepository,
+  IRefreshTokenRepository,
   IPasswordResetTokenRepository,
   IMailer,
 } from '@arenaquest/shared/ports';
@@ -27,6 +29,28 @@ const INACTIVE_USER: Entities.Identity.User = {
   email: 'inactive@example.com',
   status: Entities.Config.UserStatus.INACTIVE,
 };
+
+function makeAuthAdapter(): IAuthAdapter {
+  return {
+    hashPassword: async (plain) => `hashed:${plain}`,
+    verifyPassword: async (plain, stored) => stored === `hashed:${plain}`,
+    signAccessToken: async (payload) => `access.${payload.sub}`,
+    verifyAccessToken: async () => null,
+    generateRefreshToken: async () => 'refresh-token',
+    get currentPbkdf2Iterations() { return 1; },
+  };
+}
+
+function makeRefreshTokenRepo(): IRefreshTokenRepository & { deletedUserIds: string[] } {
+  const deletedUserIds: string[] = [];
+  return {
+    deletedUserIds,
+    save: async () => {},
+    findByToken: async () => null,
+    delete: async () => {},
+    deleteAllForUser: async (userId) => { deletedUserIds.push(userId); },
+  };
+}
 
 function makeUserRepo(user: Entities.Identity.User | null = ACTIVE_USER): IUserRepository {
   return {
@@ -75,14 +99,14 @@ function makeMailer(): IMailer & { sent: Array<{ to: string; subject: string }> 
 
 describe('PasswordController.forgotPassword', () => {
   it('returns 400 for an invalid email', async () => {
-    const controller = new PasswordController(makeUserRepo(), makeResetTokenRepo(), makeMailer(), 'http://localhost:3000');
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeResetTokenRepo(), makeMailer(), 'http://localhost:3000');
     const result = await controller.forgotPassword({ email: 'not-an-email' });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(400);
   });
 
   it('returns 400 for a missing body', async () => {
-    const controller = new PasswordController(makeUserRepo(), makeResetTokenRepo(), makeMailer(), 'http://localhost:3000');
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeResetTokenRepo(), makeMailer(), 'http://localhost:3000');
     const result = await controller.forgotPassword(null);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(400);
@@ -91,7 +115,7 @@ describe('PasswordController.forgotPassword', () => {
   it('returns 200 and sends email for a known active user', async () => {
     const tokenRepo = makeResetTokenRepo();
     const mailer = makeMailer();
-    const controller = new PasswordController(makeUserRepo(), tokenRepo, mailer, 'http://localhost:3000');
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), tokenRepo, mailer, 'http://localhost:3000');
 
     const result = await controller.forgotPassword({ email: 'alice@example.com' });
 
@@ -105,7 +129,7 @@ describe('PasswordController.forgotPassword', () => {
   it('returns 200 but sends no email for an unknown email', async () => {
     const tokenRepo = makeResetTokenRepo();
     const mailer = makeMailer();
-    const controller = new PasswordController(makeUserRepo(null), tokenRepo, mailer, 'http://localhost:3000');
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(null), makeRefreshTokenRepo(), tokenRepo, mailer, 'http://localhost:3000');
 
     const result = await controller.forgotPassword({ email: 'unknown@example.com' });
 
@@ -117,7 +141,7 @@ describe('PasswordController.forgotPassword', () => {
   it('returns 200 but sends no email for an inactive user', async () => {
     const tokenRepo = makeResetTokenRepo();
     const mailer = makeMailer();
-    const controller = new PasswordController(makeUserRepo(INACTIVE_USER), tokenRepo, mailer, 'http://localhost:3000');
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(INACTIVE_USER), makeRefreshTokenRepo(), tokenRepo, mailer, 'http://localhost:3000');
 
     const result = await controller.forgotPassword({ email: 'inactive@example.com' });
 
@@ -127,7 +151,7 @@ describe('PasswordController.forgotPassword', () => {
 
   it('invalidates previous tokens before creating a new one', async () => {
     const tokenRepo = makeResetTokenRepo();
-    const controller = new PasswordController(makeUserRepo(), tokenRepo, makeMailer(), 'http://localhost:3000');
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), tokenRepo, makeMailer(), 'http://localhost:3000');
 
     await controller.forgotPassword({ email: 'alice@example.com' });
 
@@ -140,7 +164,7 @@ describe('PasswordController.forgotPassword', () => {
 
     // Spy on renderPasswordResetEmail indirectly via mailer
     const sendSpy = vi.spyOn(mailer, 'send');
-    const controller = new PasswordController(makeUserRepo(), tokenRepo, mailer, 'https://app.example.com/');
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), tokenRepo, mailer, 'https://app.example.com/');
 
     await controller.forgotPassword({ email: 'alice@example.com' });
 
@@ -151,9 +175,95 @@ describe('PasswordController.forgotPassword', () => {
 
   it('returns 200 even when the mailer throws', async () => {
     const mailer: IMailer = { send: async () => { throw new Error('SMTP down'); } };
-    const controller = new PasswordController(makeUserRepo(), makeResetTokenRepo(), mailer, 'http://localhost:3000');
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeResetTokenRepo(), mailer, 'http://localhost:3000');
 
     const result = await controller.forgotPassword({ email: 'alice@example.com' });
     expect(result.ok).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resetPassword
+// ---------------------------------------------------------------------------
+
+function makeConsumeableResetTokenRepo(outcome: 'consumed' | 'expired' | 'already_used' | 'invalid' = 'consumed'): IPasswordResetTokenRepository {
+  return {
+    create: async () => {},
+    consumeByPlainToken: async () =>
+      outcome === 'consumed'
+        ? { outcome: 'consumed', userId: ACTIVE_USER.id }
+        : { outcome },
+    invalidateAllForUser: async () => {},
+    purgeExpired: async () => {},
+  };
+}
+
+describe('PasswordController.resetPassword', () => {
+  it('returns 400 for missing newPassword', async () => {
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeConsumeableResetTokenRepo(), makeMailer(), 'http://localhost:3000');
+    const result = await controller.resetPassword({ token: 'abc' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(400);
+  });
+
+  it('returns 400 for a newPassword shorter than 8 chars', async () => {
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeConsumeableResetTokenRepo(), makeMailer(), 'http://localhost:3000');
+    const result = await controller.resetPassword({ token: 'abc', newPassword: 'short1' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(400);
+  });
+
+  it('returns 400 for newPassword with no digit', async () => {
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeConsumeableResetTokenRepo(), makeMailer(), 'http://localhost:3000');
+    const result = await controller.resetPassword({ token: 'abc', newPassword: 'NoDigitHere' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(400);
+  });
+
+  it('returns 400 InvalidOrExpiredToken for an expired token', async () => {
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeConsumeableResetTokenRepo('expired'), makeMailer(), 'http://localhost:3000');
+    const result = await controller.resetPassword({ token: 'expired-token', newPassword: 'ValidPass1' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(400);
+      expect(result.error).toBe('InvalidOrExpiredToken');
+    }
+  });
+
+  it('returns 400 InvalidOrExpiredToken for an already-used token', async () => {
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeConsumeableResetTokenRepo('already_used'), makeMailer(), 'http://localhost:3000');
+    const result = await controller.resetPassword({ token: 'used-token', newPassword: 'ValidPass1' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('InvalidOrExpiredToken');
+  });
+
+  it('returns 400 InvalidOrExpiredToken for an unknown token', async () => {
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeConsumeableResetTokenRepo('invalid'), makeMailer(), 'http://localhost:3000');
+    const result = await controller.resetPassword({ token: 'unknown', newPassword: 'ValidPass1' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('InvalidOrExpiredToken');
+  });
+
+  it('returns 200 and updates password hash for a valid token', async () => {
+    const auth = makeAuthAdapter();
+    const userRepo = makeUserRepo();
+    const updatedHashes: string[] = [];
+    userRepo.updatePasswordHash = async (_id, hash) => { updatedHashes.push(hash); };
+
+    const controller = new PasswordController(auth, userRepo, makeRefreshTokenRepo(), makeConsumeableResetTokenRepo(), makeMailer(), 'http://localhost:3000');
+    const result = await controller.resetPassword({ token: 'valid', newPassword: 'NewPass123' });
+
+    expect(result.ok).toBe(true);
+    expect(updatedHashes).toHaveLength(1);
+    expect(updatedHashes[0]).toBe('hashed:NewPass123');
+  });
+
+  it('invalidates all refresh tokens for the user on success', async () => {
+    const refreshTokenRepo = makeRefreshTokenRepo();
+    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), refreshTokenRepo, makeConsumeableResetTokenRepo(), makeMailer(), 'http://localhost:3000');
+
+    await controller.resetPassword({ token: 'valid', newPassword: 'NewPass123' });
+
+    expect(refreshTokenRepo.deletedUserIds).toContain(ACTIVE_USER.id);
   });
 });
