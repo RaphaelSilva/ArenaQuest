@@ -94,4 +94,18 @@ describe('D1RefreshTokenRepository', () => {
     expect(await repo.findByToken('token-b')).toBeNull();
     expect(await repo.findByToken('token-c')).not.toBeNull();
   });
+
+  it('deleteAllForUserExcept keeps the specified token and removes the rest', async () => {
+    await repo.save(USER_ID, 'keep-token', new Date(Date.now() + 60_000));
+    await repo.save(USER_ID, 'remove-token-1', new Date(Date.now() + 60_000));
+    await repo.save(USER_ID, 'remove-token-2', new Date(Date.now() + 60_000));
+    await repo.save(OTHER_USER_ID, 'other-user-token', new Date(Date.now() + 60_000));
+
+    await repo.deleteAllForUserExcept(USER_ID, 'keep-token');
+
+    expect(await repo.findByToken('keep-token')).not.toBeNull();
+    expect(await repo.findByToken('remove-token-1')).toBeNull();
+    expect(await repo.findByToken('remove-token-2')).toBeNull();
+    expect(await repo.findByToken('other-user-token')).not.toBeNull();
+  });
 });

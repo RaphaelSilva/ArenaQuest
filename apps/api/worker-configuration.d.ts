@@ -22,6 +22,9 @@ declare namespace Cloudflare {
 		MAIL_FROM: string;
 		RESEND_API_KEY: string;
 		WEB_BASE_URL: string;
+		GOOGLE_CLIENT_ID: string;
+		GOOGLE_REDIRECT_URI: string;
+		GOOGLE_CLIENT_SECRET: string;
 	}
 	interface Env {
 		RATE_LIMIT_KV: KVNamespace;
@@ -40,6 +43,9 @@ declare namespace Cloudflare {
 		MAIL_FROM: string;
 		RESEND_API_KEY: string;
 		WEB_BASE_URL: string;
+		GOOGLE_CLIENT_ID: string;
+		GOOGLE_REDIRECT_URI: string;
+		GOOGLE_CLIENT_SECRET: string;
 	}
 }
 interface Env extends Cloudflare.Env {}
