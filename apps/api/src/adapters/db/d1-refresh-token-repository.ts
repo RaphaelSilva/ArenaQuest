@@ -38,4 +38,12 @@ export class D1RefreshTokenRepository implements IRefreshTokenRepository {
   async deleteAllForUser(userId: string): Promise<void> {
     await this.db.prepare('DELETE FROM refresh_tokens WHERE user_id = ?').bind(userId).run();
   }
+
+  async deleteAllForUserExcept(userId: string, keepToken: string): Promise<void> {
+    const keepHash = await sha256Hex(keepToken);
+    await this.db
+      .prepare('DELETE FROM refresh_tokens WHERE user_id = ? AND token != ?')
+      .bind(userId, keepHash)
+      .run();
+  }
 }

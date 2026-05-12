@@ -175,4 +175,14 @@ export namespace Entities {
             createdAt: Date;
         }
     }
+
+    export namespace OAuth {
+        export interface OAuthAccount {
+            provider: string;
+            providerUserId: string;
+            userId: string;
+            email: string;
+            createdAt: Date;
+        }
+    }
 }
