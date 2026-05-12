@@ -21,6 +21,8 @@ import { D1TaskRepository } from '@api/adapters/db/d1-task-repository';
 import { D1TaskStageRepository } from '@api/adapters/db/d1-task-stage-repository';
 import { D1TaskLinkingRepository } from '@api/adapters/db/d1-task-linking-repository';
 import { D1ActivationTokenRepository } from '@api/adapters/db/d1-activation-token-repository';
+import { D1PasswordResetTokenRepository } from '@api/adapters/db/d1-password-reset-token-repository';
+import { PasswordController } from '@api/controllers/password.controller';
 import { D1ProgressRepository } from '@api/adapters/db/d1-progress-repository';
 import { D1EnrollmentRepository } from '@api/adapters/db/d1-enrollment-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
@@ -86,6 +88,20 @@ function buildApp(env: AppEnv): Hono {
     : new ConsoleMailAdapter();
 
   const activationTokens = new D1ActivationTokenRepository(env.DB, users);
+  const passwordResetTokens = new D1PasswordResetTokenRepository(env.DB);
+  const passwordController = new PasswordController(
+    users,
+    passwordResetTokens,
+    mailer,
+    env.WEB_BASE_URL || 'http://localhost:3000',
+  );
+
+  const forgotPasswordLimiter = new KvRateLimiter(env.RATE_LIMIT_KV, {
+    windowMs: 60 * 60_000,
+    maxAttempts: 3,
+    lockoutMs: 60 * 60_000,
+    prefix: 'rl:forgot:',
+  });
 
   const registrationEmitter: RegistrationEventEmitter = buildRegistrationMailHandler({
     users,
@@ -127,6 +143,8 @@ function buildApp(env: AppEnv): Hono {
     registerLimiter,
     activateController,
     activateLimiter,
+    passwordController,
+    forgotPasswordLimiter,
     cookieSameSite: parseCookieSameSite(env.COOKIE_SAMESITE),
     allowedOrigins: env.ALLOWED_ORIGINS,
     // If ALLOWED_ORIGINS is configured, enforce strict validation — an invalid
