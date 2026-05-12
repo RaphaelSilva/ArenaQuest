@@ -13,6 +13,7 @@ Thank you for your interest in contributing to ArenaQuest! This document describ
 - [Commit Convention](#-commit-convention)
 - [Pull Request Guidelines](#-pull-request-guidelines)
 - [Local Development Setup](#-local-development-setup)
+- [Local Test Accounts](#-local-test-accounts)
 - [Code Style](#-code-style)
 - [Reporting Issues](#-reporting-issues)
 
@@ -161,6 +162,44 @@ Run `make help` to see the full list of available commands.
 - **Prettier** is used for formatting in `apps/api` (see `.prettierrc`).
 - Avoid commented-out code. Remove dead code before merging.
 - Write meaningful variable and function names — code is read more than it is written.
+
+---
+
+## 🧪 Local Test Accounts
+
+> **WARNING:** These accounts are for **local development only**. Never seed them in staging or production.
+
+Three pre-configured accounts are available for manual testing and cover all three access personas.
+
+### Credentials
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@arenaquest.dev` | `Admin1234!` |
+| Student | `student@arenaquest.dev` | `Student1234!` |
+| Professor (tutor + content_creator) | `professor@arenaquest.dev` | `Professor1234!` |
+
+### Provisioning
+
+After running the standard migrations, apply the seed:
+
+```bash
+make db-migrations-dev   # apply production schema migrations first
+make db-seed-dev         # insert the three test accounts
+```
+
+`make db-seed-dev` is idempotent — running it multiple times produces no duplicates or errors.
+
+### Regenerating password hashes
+
+If the seed passwords are changed, regenerate the PBKDF2 hashes and update `apps/api/migrations/seed/0001_test_users.sql`:
+
+```bash
+cd apps/api
+npx tsx scripts/generate-seed-hashes.ts
+```
+
+Copy the output hashes into the migration file. Only commit the hashes — **never commit plain-text passwords**.
 
 ---
 

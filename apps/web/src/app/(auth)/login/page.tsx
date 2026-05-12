@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useState, useEffect, type FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@web/hooks/use-auth';
 import { authApi, AuthApiError, type ValidationFieldError } from '@web/lib/auth-api';
@@ -256,9 +257,9 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             </div>
             Lembrar de mim
           </label>
-          <a href="#" style={{ fontSize: 12, color: 'var(--aq-accent)', textDecoration: 'none', fontWeight: 500 }}>
+          <Link href="/forgot-password" style={{ fontSize: 12, color: 'var(--aq-accent)', textDecoration: 'none', fontWeight: 500 }}>
             Esqueci a senha
-          </a>
+          </Link>
         </div>
 
         <button
@@ -628,13 +629,21 @@ function LoginPageInner() {
   // activation. Initialize the banner from the URL directly (no
   // synchronous setState in an effect) and schedule dismissal after 6s.
   const initiallyActivated = searchParams?.get('activated') === '1';
+  const initiallyPasswordReset = searchParams?.get('passwordReset') === '1';
   const [activatedBannerVisible, setActivatedBannerVisible] = useState(initiallyActivated);
+  const [passwordResetBannerVisible, setPasswordResetBannerVisible] = useState(initiallyPasswordReset);
 
   useEffect(() => {
     if (!initiallyActivated) return;
     const t = setTimeout(() => setActivatedBannerVisible(false), 6000);
     return () => clearTimeout(t);
   }, [initiallyActivated]);
+
+  useEffect(() => {
+    if (!initiallyPasswordReset) return;
+    const t = setTimeout(() => setPasswordResetBannerVisible(false), 6000);
+    return () => clearTimeout(t);
+  }, [initiallyPasswordReset]);
 
   if (isLoading) {
     return (
@@ -700,6 +709,12 @@ function LoginPageInner() {
         {activatedBannerVisible && (
           <div role="status" style={{ marginBottom: 18, padding: '10px 14px', borderRadius: 9, background: 'oklch(0.68 0.17 150 / 0.15)', border: '1px solid var(--aq-accent3)', fontSize: 13, color: 'var(--aq-accent3)' }}>
             Conta ativada! Faça login para continuar.
+          </div>
+        )}
+
+        {passwordResetBannerVisible && (
+          <div role="status" style={{ marginBottom: 18, padding: '10px 14px', borderRadius: 9, background: 'oklch(0.68 0.17 150 / 0.15)', border: '1px solid var(--aq-accent3)', fontSize: 13, color: 'var(--aq-accent3)' }}>
+            Senha redefinida com sucesso! Faça login com sua nova senha.
           </div>
         )}
 

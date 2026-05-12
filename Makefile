@@ -7,7 +7,7 @@
 .PHONY: help install dev dev-web dev-api build build-web build-api \
         lint lint-web lint-shared test test-api \
         cf-typegen \
-        db-migrations-dev db-migrations-staging db-migrations-prod \
+        db-migrations-dev db-migrations-staging db-migrations-prod db-seed-dev \
         deploy-api deploy-web bootstrap-admin \
         clean clean-cache clean-all
 
@@ -159,6 +159,10 @@ db-migrations-staging: ## Apply all D1 migrations to remote staging DB (arenaque
 
 db-migrations-prod: ## Apply all D1 migrations to remote production DB (arenaquest-db)
 	pnpm --filter api db:apply:migrations --remote
+
+# WARNING: LOCAL DEVELOPMENT ONLY — never run against staging or production.
+db-seed-dev: ## Seed local D1 with test accounts (Admin, Student, Professor) — DEV ONLY
+	pnpm wrangler d1 execute arenaquest-db --local --file ./apps/api/migrations/seed/0001_test_users.sql
 
 # ==============================================================================
 # 🧹 CLEAN
