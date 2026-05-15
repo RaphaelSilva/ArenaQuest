@@ -1,6 +1,6 @@
 # Task 04 — Badge Data Layer + Seeded Catalog + Admin CRUD
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -31,10 +31,10 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Seed migration produces the 8 badges from `Dashboard.html` with matching slugs and emojis.
-- [ ] `POST /admin/badges` rejects unknown `rule_kind` with `400`.
-- [ ] Awarding the same badge to the same user twice is a no-op (DB-level unique enforced; repository returns the existing row).
-- [ ] No provider-specific imports outside adapters.
+- [x] Seed migration produces the 8 badges from `Dashboard.html` with matching slugs and emojis.
+- [x] `POST /admin/badges` rejects unknown `rule_kind` with `400`.
+- [x] Awarding the same badge to the same user twice is a no-op (DB-level unique enforced; repository returns the existing row).
+- [x] No provider-specific imports outside adapters.
 
 ## Verification Plan
 

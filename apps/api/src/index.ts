@@ -29,6 +29,9 @@ import { GoogleOAuthController } from '@api/controllers/google-oauth.controller'
 import { D1ProgressRepository } from '@api/adapters/db/d1-progress-repository';
 import { D1EnrollmentRepository } from '@api/adapters/db/d1-enrollment-repository';
 import { D1QuestRepository } from '@api/adapters/db/d1-quest-repository';
+import { D1BadgeRepository } from '@api/adapters/db/d1-badge-repository';
+import { D1GamificationRepository } from '@api/adapters/db/d1-gamification-repository';
+import { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
 import { ConsoleMailAdapter } from '@api/adapters/mail/console-mail-adapter';
@@ -61,6 +64,9 @@ function buildApp(env: AppEnv): Hono {
   const progressRepo = new D1ProgressRepository(env.DB);
   const enrollmentRepo = new D1EnrollmentRepository(env.DB);
   const questRepo = new D1QuestRepository(env.DB);
+  const badgeRepo = new D1BadgeRepository(env.DB);
+  const gamificationRepo = new D1GamificationRepository(env.DB);
+  const xpEngine = new XpEngine(gamificationRepo, (env as unknown as Record<string, string>)['GAMIFICATION_ENABLED'] !== 'false');
   const storage = new R2StorageAdapter({
     bucket: env.R2,
     s3Endpoint: env.R2_S3_ENDPOINT,
@@ -160,6 +166,8 @@ function buildApp(env: AppEnv): Hono {
     progressRepo,
     enrollmentRepo,
     questRepo,
+    badgeRepo,
+    xpEngine,
     authService,
     loginLimiter,
     registerController,

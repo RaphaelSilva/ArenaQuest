@@ -9,6 +9,7 @@ import type {
   ITaskLinkingRepository,
   ITopicNodeRepository,
 } from '@arenaquest/shared/ports';
+import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 
 const CACHE_CONTROL = 'private, max-age=15';
 
@@ -34,6 +35,7 @@ export function buildProgressTaskRouter(
   stages: ITaskStageRepository,
   links: ITaskLinkingRepository,
   topics: ITopicNodeRepository,
+  xpEngine?: XpEngine,
 ): Hono {
   const router = new Hono();
   const service = buildService(progress, enrollment, tasks, stages, links, topics);
@@ -42,13 +44,21 @@ export function buildProgressTaskRouter(
 
   router.post('/:id/stages/:stageId/check-in', async (c) => {
     const userId = c.get('user').sub;
+    const stageId = c.req.param('stageId');
     const result = await service.stageCheckIn(
       userId,
       c.req.param('id'),
-      c.req.param('stageId'),
+      stageId,
     );
     if (!result.ok) {
       return c.json({ error: result.error, ...result.meta }, result.status as 403 | 404 | 409);
+    }
+    if (result.data.changed && xpEngine) {
+      try {
+        await xpEngine.award({ userId, action: 'stage_checkin', sourceKind: 'stage', sourceId: stageId });
+      } catch (err) {
+        console.error('[XP] stage_checkin award failed:', err);
+      }
     }
     const status = result.data.changed ? 201 : 200;
     return c.json(result.data, status as 200 | 201);
@@ -68,6 +78,7 @@ export function buildProgressTopicRouter(
   stages: ITaskStageRepository,
   links: ITaskLinkingRepository,
   topics: ITopicNodeRepository,
+  xpEngine?: XpEngine,
 ): Hono {
   const router = new Hono();
   const service = buildService(progress, enrollment, tasks, stages, links, topics);
@@ -85,9 +96,17 @@ export function buildProgressTopicRouter(
 
   router.post('/:id/complete', async (c) => {
     const userId = c.get('user').sub;
-    const result = await service.completeTopic(userId, c.req.param('id'));
+    const topicId = c.req.param('id');
+    const result = await service.completeTopic(userId, topicId);
     if (!result.ok) {
       return c.json({ error: result.error }, result.status as 403 | 404);
+    }
+    if (result.data.changed && xpEngine) {
+      try {
+        await xpEngine.award({ userId, action: 'topic_complete', sourceKind: 'topic', sourceId: topicId });
+      } catch (err) {
+        console.error('[XP] topic_complete award failed:', err);
+      }
     }
     return c.json(result.data);
   });

@@ -17,4 +17,6 @@ export * from './i-password-reset-token-repository';
 export * from './i-oauth-account-repository';
 export * from './i-gamification-repository';
 export * from './i-quest-repository';
+export * from './i-badge-repository';
+export * from './i-comment-repository';
 // i-database-adapter defines the full future IDatabaseAdapter contract (not yet implemented)

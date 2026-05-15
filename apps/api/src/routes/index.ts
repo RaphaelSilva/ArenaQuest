@@ -19,6 +19,7 @@ import {
 import { buildAdminEnrollmentRouter } from './admin-enrollment.router';
 import { buildAccountRouter } from './account.router';
 import { buildOAuthRouter } from './oauth.router';
+import { buildAdminBadgesRouter } from './admin-badges.router';
 import type { AccountController } from '@api/controllers/account.controller';
 import type { GoogleOAuthController } from '@api/controllers/google-oauth.controller';
 import { getHealth } from '@api/controllers/health.controller';
@@ -39,8 +40,10 @@ import type {
   IProgressRepository,
   IEnrollmentRepository,
   IQuestRepository,
+  IBadgeRepository,
 } from '@arenaquest/shared/ports';
 import type { AuthService } from '@api/core/auth/auth-service';
+import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 
 /**
  * Main application router configuration.
@@ -69,6 +72,8 @@ export class AppRouter {
       progressRepo: IProgressRepository;
       enrollmentRepo: IEnrollmentRepository;
       questRepo: IQuestRepository;
+      badgeRepo: IBadgeRepository;
+      xpEngine?: XpEngine;
       authService: AuthService;
       loginLimiter: IRateLimiter;
       registerController: RegisterController;
@@ -89,7 +94,7 @@ export class AppRouter {
       strictCors: boolean;
     },
   ): void {
-    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, questRepo: _questRepo, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
+    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, questRepo: _questRepo, badgeRepo, xpEngine, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
     // Build origin matcher from config — strict in prod, lenient in dev.
     const originRules = parseAllowedOrigins(allowedOrigins, { strict: strictCors });
 
@@ -136,13 +141,14 @@ export class AppRouter {
     app.route('/admin/topics', buildAdminMediaRouter(topics, media, storage));
     app.route('/admin/tasks', buildAdminTasksRouter(taskRepo, taskStages, taskLinks, topics));
     app.route('/tasks', buildTasksRouter(taskRepo, taskStages, taskLinks, topics, enrollmentRepo));
-    app.route('/tasks', buildProgressTaskRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
-    app.route('/topics', buildTopicsRouter(topics, media, storage, enrollmentRepo));
-    app.route('/topics', buildProgressTopicRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
+    app.route('/tasks', buildProgressTaskRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics, xpEngine));
+    app.route('/topics', buildTopicsRouter(topics, media, storage, enrollmentRepo, xpEngine));
+    app.route('/topics', buildProgressTopicRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics, xpEngine));
     app.route('/me', buildMeProgressRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
     app.route('/admin', buildAdminEnrollmentRouter(enrollmentRepo, users, topics));
     app.route('/account', buildAccountRouter(accountController));
     app.route('/auth', buildOAuthRouter(googleOAuthController, cookieSameSite));
+    app.route('/admin/badges', buildAdminBadgesRouter(badgeRepo));
 
     // Sanity demo — development only, can be removed post-milestone.
     app.get('/protected/ping', authGuard, (c) =>

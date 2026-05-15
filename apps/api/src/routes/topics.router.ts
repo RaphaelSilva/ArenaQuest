@@ -8,6 +8,7 @@ import type {
   IStorageAdapter,
   IEnrollmentRepository,
 } from '@arenaquest/shared/ports';
+import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 
 const CACHE_CONTROL = 'private, max-age=30';
 
@@ -16,6 +17,7 @@ export function buildTopicsRouter(
   media: IMediaRepository,
   storage: IStorageAdapter,
   enrollment: IEnrollmentRepository,
+  xpEngine?: XpEngine,
 ): Hono {
   const router = new Hono();
   const controller = new TopicsController(topics, media, storage, enrollment);
@@ -43,6 +45,37 @@ export function buildTopicsRouter(
     if (!result.ok) return c.json({ error: result.error }, result.status as 404);
     c.header('Cache-Control', CACHE_CONTROL);
     return c.json(result.data);
+  });
+
+  // POST /topics/:id/videos/:videoId/watched — mark video as watched and award XP
+  router.post('/:id/videos/:videoId/watched', async (c) => {
+    const user = c.get('user');
+    const topicId = c.req.param('id');
+    const videoId = c.req.param('videoId');
+    const isAdmin = user.roles.includes(ROLES.ADMIN) || user.roles.includes(ROLES.CONTENT_CREATOR);
+
+    // Verify topic exists and is accessible
+    const topicResult = await controller.getPublishedById(topicId, isAdmin ? undefined : user.sub);
+    if (!topicResult.ok) {
+      return c.json({ error: topicResult.error }, topicResult.status as 404);
+    }
+
+    let xpAwarded: number | null = null;
+    if (xpEngine) {
+      try {
+        const event = await xpEngine.award({
+          userId: user.sub,
+          action: 'video_watched',
+          sourceKind: 'video',
+          sourceId: videoId,
+        });
+        xpAwarded = event?.points ?? null;
+      } catch (err) {
+        console.error('[XP] video_watched award failed:', err);
+      }
+    }
+
+    return c.json({ xpAwarded });
   });
 
   return router;
