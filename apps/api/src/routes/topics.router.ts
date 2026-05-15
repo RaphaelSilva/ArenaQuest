@@ -9,6 +9,7 @@ import type {
   IEnrollmentRepository,
 } from '@arenaquest/shared/ports';
 import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
+import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
 
 const CACHE_CONTROL = 'private, max-age=30';
 
@@ -18,6 +19,7 @@ export function buildTopicsRouter(
   storage: IStorageAdapter,
   enrollment: IEnrollmentRepository,
   xpEngine?: XpEngine,
+  streakEngine?: StreakEngine,
 ): Hono {
   const router = new Hono();
   const controller = new TopicsController(topics, media, storage, enrollment);
@@ -72,6 +74,13 @@ export function buildTopicsRouter(
         xpAwarded = event?.points ?? null;
       } catch (err) {
         console.error('[XP] video_watched award failed:', err);
+      }
+    }
+    if (streakEngine) {
+      try {
+        await streakEngine.recordActivity(user.sub, new Date());
+      } catch (err) {
+        console.error('[streak] video_watched recordActivity failed:', err);
       }
     }
 
