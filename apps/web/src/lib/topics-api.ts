@@ -16,6 +16,11 @@ async function apiFetch(path: string, token: string, init?: RequestInit): Promis
 
 export type TopicProgressStatus = 'not_started' | 'in_progress' | 'completed';
 
+export type TopicProgressEntry = {
+  topicNodeId: string;
+  status: TopicProgressStatus;
+};
+
 export const topicsApi = {
   async list(token: string): Promise<TopicNode[]> {
     const res = await apiFetch('/topics', token);
@@ -39,6 +44,17 @@ export const topicsApi = {
       await apiFetch(`/topics/${id}/visit`, token, { method: 'POST' });
     } catch {
       // intentionally silent — beacon must not block rendering
+    }
+  },
+
+  async listProgress(token: string): Promise<TopicProgressEntry[]> {
+    try {
+      const res = await apiFetch('/me/progress/topics', token);
+      if (!res.ok) return [];
+      const body = (await res.json()) as { data: TopicProgressEntry[] };
+      return body.data;
+    } catch {
+      return [];
     }
   },
 

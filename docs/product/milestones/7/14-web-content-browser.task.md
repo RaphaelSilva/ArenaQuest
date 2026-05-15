@@ -1,6 +1,6 @@
 # Task 14 — Web: Content Browser Redesign
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -32,12 +32,12 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Sidebar tree expand/collapse persists in URL state.
-- [ ] Search narrows the visible items in real time without blocking the UI thread.
-- [ ] Selecting a topic deep-links to `/catalog/[topicId]` and the main column updates without a full page reload.
-- [ ] Role pill renders only for `instructor`/`admin`; Participant preview hides edit/delete buttons.
-- [ ] Layout matches the wireframe at ≥ 1280 px within ±8 px in light and dark themes.
-- [ ] `make lint` passes; RTL covers expand/collapse and search filter.
+- [x] Sidebar tree expand/collapse persists in URL state.
+- [x] Search narrows the visible items in real time without blocking the UI thread.
+- [x] Selecting a topic deep-links to `/catalog/[topicId]` and the main column updates without a full page reload.
+- [x] Role pill renders only for `instructor`/`admin`; Participant preview hides edit/delete buttons.
+- [x] Layout matches the wireframe at ≥ 1280 px within ±8 px in light and dark themes.
+- [x] `make lint` passes; RTL covers expand/collapse and search filter.
 
 ## Verification Plan
 
