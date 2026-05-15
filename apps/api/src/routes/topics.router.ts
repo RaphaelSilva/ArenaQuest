@@ -10,6 +10,7 @@ import type {
 } from '@arenaquest/shared/ports';
 import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
+import type { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
 
 const CACHE_CONTROL = 'private, max-age=30';
 
@@ -20,6 +21,7 @@ export function buildTopicsRouter(
   enrollment: IEnrollmentRepository,
   xpEngine?: XpEngine,
   streakEngine?: StreakEngine,
+  questEvaluator?: QuestEvaluator,
 ): Hono {
   const router = new Hono();
   const controller = new TopicsController(topics, media, storage, enrollment);
@@ -81,6 +83,13 @@ export function buildTopicsRouter(
         await streakEngine.recordActivity(user.sub, new Date());
       } catch (err) {
         console.error('[streak] video_watched recordActivity failed:', err);
+      }
+    }
+    if (questEvaluator) {
+      try {
+        await questEvaluator.evaluate(user.sub, 'video', new Date());
+      } catch (err) {
+        console.error('[quest] video_watched evaluate failed:', err);
       }
     }
 

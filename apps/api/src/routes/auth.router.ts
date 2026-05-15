@@ -10,6 +10,7 @@ import { buildPasswordRouter } from '@api/routes/password.router';
 import type { PasswordController } from '@api/controllers/password.controller';
 import type { IRateLimiter } from '@arenaquest/shared/ports';
 import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
+import type { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
 
 const COOKIE_NAME = 'refresh_token';
 const COOKIE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
@@ -52,6 +53,7 @@ export interface AuthRouterDeps {
   passwordController: PasswordController;
   forgotPasswordLimiter: IRateLimiter;
   streakEngine?: StreakEngine;
+  questEvaluator?: QuestEvaluator;
 }
 
 /**
@@ -69,7 +71,7 @@ function extractIp(header: string | undefined): string {
 }
 
 export function buildAuthRouter(deps: AuthRouterDeps): Hono {
-  const { authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, streakEngine } = deps;
+  const { authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, streakEngine, questEvaluator } = deps;
   const controller = new AuthController(authService);
   const router = new Hono();
 
@@ -121,6 +123,14 @@ export function buildAuthRouter(deps: AuthRouterDeps): Hono {
         await streakEngine.recordActivity(result.data.user.id, new Date());
       } catch (err) {
         console.error('[streak] login recordActivity failed:', err);
+      }
+    }
+
+    if (questEvaluator) {
+      try {
+        await questEvaluator.evaluate(result.data.user.id, 'login', new Date());
+      } catch (err) {
+        console.error('[quest] login evaluate failed:', err);
       }
     }
 

@@ -8,6 +8,7 @@ export interface XpAwardParams {
   sourceKind: string;
   sourceId?: string | null;
   version?: string;
+  customPoints?: number;
 }
 
 export class XpEngine {
@@ -18,8 +19,8 @@ export class XpEngine {
 
   async award(params: XpAwardParams): Promise<XpEventRecord | null> {
     if (!this.enabled) return null;
-    const { userId, action, sourceKind, sourceId, version = 'v1' } = params;
-    const points = XP_POINTS[action];
+    const { userId, action, sourceKind, sourceId, version = 'v1', customPoints } = params;
+    const points = customPoints ?? XP_POINTS[action];
     const idempotencyKey = `${sourceKind}:${sourceId ?? 'none'}:${version}`;
     return this.repo.appendXpEvent({ userId, sourceKind, sourceId: sourceId ?? null, points, idempotencyKey });
   }

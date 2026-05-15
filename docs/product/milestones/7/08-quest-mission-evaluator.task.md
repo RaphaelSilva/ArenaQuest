@@ -1,6 +1,6 @@
 # Task 08 — Quest & Mission Evaluator
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -33,11 +33,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A daily quest "Complete 1 subtopic" goes from 0 → 1 on the first topic-complete event and is marked completed.
-- [ ] The same quest on the same local day stays completed but does not re-credit XP on subsequent events.
-- [ ] Crossing local midnight reopens the quest at progress 0 for the new period.
-- [ ] A mission with `end_at` in the past does not progress even if a matching event arrives.
-- [ ] Reward XP is recorded as its own `xp_event` exactly once.
+- [x] A daily quest "Complete 1 subtopic" goes from 0 → 1 on the first topic-complete event and is marked completed.
+- [x] The same quest on the same local day stays completed but does not re-credit XP on subsequent events.
+- [x] Crossing local midnight reopens the quest at progress 0 for the new period.
+- [x] A mission with `end_at` in the past does not progress even if a matching event arrives.
+- [x] Reward XP is recorded as its own `xp_event` exactly once.
 
 ## Verification Plan
 
