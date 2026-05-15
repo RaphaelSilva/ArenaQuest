@@ -37,6 +37,20 @@
   }
 }
 
+/* Light theme override — toggled via data-theme="light" on <html> */
+[data-theme="light"] {
+  --aq-bg: #F0F2F8;
+  --aq-bg2: #FFFFFF;
+  --aq-bg3: #E8EBF4;
+  --aq-bg4: #DDE1EF;
+  --aq-border: rgba(0,0,0,0.07);
+  --aq-border2: rgba(0,0,0,0.13);
+  --aq-border3: rgba(0,0,0,0.22);
+  --aq-text: #0F1523;
+  --aq-text2: #4A5068;
+  --aq-text3: #8B92A8;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
