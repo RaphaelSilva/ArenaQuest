@@ -11,6 +11,7 @@ import type {
 import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
 import type { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
+import type { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
 
 const CACHE_CONTROL = 'private, max-age=30';
 
@@ -22,6 +23,7 @@ export function buildTopicsRouter(
   xpEngine?: XpEngine,
   streakEngine?: StreakEngine,
   questEvaluator?: QuestEvaluator,
+  badgeEngine?: BadgeEngine,
 ): Hono {
   const router = new Hono();
   const controller = new TopicsController(topics, media, storage, enrollment);
@@ -90,6 +92,14 @@ export function buildTopicsRouter(
         await questEvaluator.evaluate(user.sub, 'video', new Date());
       } catch (err) {
         console.error('[quest] video_watched evaluate failed:', err);
+      }
+    }
+
+    if (badgeEngine) {
+      try {
+        await badgeEngine.evaluate(user.sub, new Date());
+      } catch (err) {
+        console.error('[badge] video_watched evaluate failed:', err);
       }
     }
 

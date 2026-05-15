@@ -1,6 +1,6 @@
 # Task 09 — Badge Unlock Engine
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -30,10 +30,10 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Reaching `streak_days = 7` awards "Semana Perfeita" exactly once.
-- [ ] Completing topic X awards a `topic_completed` badge targeting X; re-completing X does not re-award.
-- [ ] A `total_xp ≥ 500` badge awards at the moment the threshold is crossed.
-- [ ] Disabling a badge (`active = 0`) excludes it from future evaluations but does not revoke prior awards.
+- [x] Reaching `streak_days = 7` awards "Semana Perfeita" exactly once.
+- [x] Completing topic X awards a `topic_completed` badge targeting X; re-completing X does not re-award.
+- [x] A `total_xp ≥ 500` badge awards at the moment the threshold is crossed.
+- [x] Disabling a badge (`active = 0`) excludes it from future evaluations but does not revoke prior awards.
 
 ## Verification Plan
 

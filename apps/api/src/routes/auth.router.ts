@@ -11,6 +11,7 @@ import type { PasswordController } from '@api/controllers/password.controller';
 import type { IRateLimiter } from '@arenaquest/shared/ports';
 import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
 import type { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
+import type { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
 
 const COOKIE_NAME = 'refresh_token';
 const COOKIE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
@@ -54,6 +55,7 @@ export interface AuthRouterDeps {
   forgotPasswordLimiter: IRateLimiter;
   streakEngine?: StreakEngine;
   questEvaluator?: QuestEvaluator;
+  badgeEngine?: BadgeEngine;
 }
 
 /**
@@ -71,7 +73,7 @@ function extractIp(header: string | undefined): string {
 }
 
 export function buildAuthRouter(deps: AuthRouterDeps): Hono {
-  const { authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, streakEngine, questEvaluator } = deps;
+  const { authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, streakEngine, questEvaluator, badgeEngine } = deps;
   const controller = new AuthController(authService);
   const router = new Hono();
 
@@ -131,6 +133,14 @@ export function buildAuthRouter(deps: AuthRouterDeps): Hono {
         await questEvaluator.evaluate(result.data.user.id, 'login', new Date());
       } catch (err) {
         console.error('[quest] login evaluate failed:', err);
+      }
+    }
+
+    if (badgeEngine) {
+      try {
+        await badgeEngine.evaluate(result.data.user.id, new Date());
+      } catch (err) {
+        console.error('[badge] login evaluate failed:', err);
       }
     }
 

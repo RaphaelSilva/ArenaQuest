@@ -46,6 +46,7 @@ import type { AuthService } from '@api/core/auth/auth-service';
 import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
 import type { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
+import type { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
 
 /**
  * Main application router configuration.
@@ -78,6 +79,7 @@ export class AppRouter {
       xpEngine?: XpEngine;
       streakEngine?: StreakEngine;
       questEvaluator?: QuestEvaluator;
+      badgeEngine?: BadgeEngine;
       authService: AuthService;
       loginLimiter: IRateLimiter;
       registerController: RegisterController;
@@ -98,7 +100,7 @@ export class AppRouter {
       strictCors: boolean;
     },
   ): void {
-    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, questRepo: _questRepo, badgeRepo, xpEngine, streakEngine, questEvaluator, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
+    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, questRepo: _questRepo, badgeRepo, xpEngine, streakEngine, questEvaluator, badgeEngine, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
     // Build origin matcher from config — strict in prod, lenient in dev.
     const originRules = parseAllowedOrigins(allowedOrigins, { strict: strictCors });
 
@@ -139,15 +141,15 @@ export class AppRouter {
     );
 
     // Feature routes
-    app.route('/auth', buildAuthRouter({ authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, streakEngine, questEvaluator }));
+    app.route('/auth', buildAuthRouter({ authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, streakEngine, questEvaluator, badgeEngine }));
     app.route('/admin/users', buildAdminUsersRouter(users, auth, tokens));
     app.route('/admin/topics', buildAdminTopicsRouter(topics, tags));
     app.route('/admin/topics', buildAdminMediaRouter(topics, media, storage));
     app.route('/admin/tasks', buildAdminTasksRouter(taskRepo, taskStages, taskLinks, topics));
     app.route('/tasks', buildTasksRouter(taskRepo, taskStages, taskLinks, topics, enrollmentRepo));
-    app.route('/tasks', buildProgressTaskRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics, xpEngine, streakEngine, questEvaluator));
-    app.route('/topics', buildTopicsRouter(topics, media, storage, enrollmentRepo, xpEngine, streakEngine, questEvaluator));
-    app.route('/topics', buildProgressTopicRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics, xpEngine, streakEngine, questEvaluator));
+    app.route('/tasks', buildProgressTaskRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics, xpEngine, streakEngine, questEvaluator, badgeEngine));
+    app.route('/topics', buildTopicsRouter(topics, media, storage, enrollmentRepo, xpEngine, streakEngine, questEvaluator, badgeEngine));
+    app.route('/topics', buildProgressTopicRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics, xpEngine, streakEngine, questEvaluator, badgeEngine));
     app.route('/me', buildMeProgressRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
     app.route('/admin', buildAdminEnrollmentRouter(enrollmentRepo, users, topics));
     app.route('/account', buildAccountRouter(accountController));

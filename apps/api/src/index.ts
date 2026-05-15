@@ -34,6 +34,7 @@ import { D1GamificationRepository } from '@api/adapters/db/d1-gamification-repos
 import { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 import { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
 import { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
+import { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
 import { D1MissionRepository } from '@api/adapters/db/d1-mission-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
@@ -76,6 +77,7 @@ function buildApp(env: AppEnv): Hono {
   );
   const missionRepo = new D1MissionRepository(env.DB);
   const questEvaluator = new QuestEvaluator(questRepo, missionRepo, xpEngine);
+  const badgeEngine = new BadgeEngine(badgeRepo, gamificationRepo, missionRepo, xpEngine);
   const storage = new R2StorageAdapter({
     bucket: env.R2,
     s3Endpoint: env.R2_S3_ENDPOINT,
@@ -179,6 +181,7 @@ function buildApp(env: AppEnv): Hono {
     xpEngine,
     streakEngine,
     questEvaluator,
+    badgeEngine,
     authService,
     loginLimiter,
     registerController,
