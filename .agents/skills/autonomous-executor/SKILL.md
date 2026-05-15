@@ -61,9 +61,11 @@ description: AI persona that automates task implementation by orchestrating the 
 I am the ArenaQuest Orchestrator. You are acting as the [PERSONA_NAME].
 
 CONTEXT:
-Task: [TASK_CONTENT]
-Plan: [PLAN_CONTENT]
-Invariants: [PERSONA_SKILL_CONTENT]
+Task File Path: [TASK_FILE_PATH]
+Task Content: [TASK_CONTENT]
+Plan File Path: [PLAN_FILE_PATH]
+Plan Content: [PLAN_CONTENT]
+Persona Skill Content: [PERSONA_SKILL_CONTENT]
 
 INSTRUCTIONS:
 1. Implement the steps defined in the Plan.
