@@ -9,6 +9,7 @@ import { buildAdminUsersRouter } from './admin-users.router';
 import { buildAdminTopicsRouter } from './admin-topics.router';
 import { buildAdminMediaRouter } from './admin-media.router';
 import { buildAdminTasksRouter } from './admin-tasks.router';
+import { buildAdminMissionsRouter } from './admin-missions.router';
 import { buildTasksRouter } from './tasks.router';
 import { buildTopicsRouter } from './topics.router';
 import {
@@ -19,6 +20,10 @@ import {
 import { buildAdminEnrollmentRouter } from './admin-enrollment.router';
 import { buildAccountRouter } from './account.router';
 import { buildOAuthRouter } from './oauth.router';
+import { buildAdminBadgesRouter } from './admin-badges.router';
+import { buildMeGamificationRouter } from './me-gamification.router';
+import { buildLeaderboardRouter } from './leaderboard.router';
+import { buildCommentsRouter } from './comments.router';
 import type { AccountController } from '@api/controllers/account.controller';
 import type { GoogleOAuthController } from '@api/controllers/google-oauth.controller';
 import { getHealth } from '@api/controllers/health.controller';
@@ -38,8 +43,17 @@ import type {
   ITaskLinkingRepository,
   IProgressRepository,
   IEnrollmentRepository,
+  IQuestRepository,
+  IBadgeRepository,
+  IGamificationRepository,
+  ICommentRepository,
 } from '@arenaquest/shared/ports';
+import type { IMissionRepository } from '@arenaquest/shared/ports';
 import type { AuthService } from '@api/core/auth/auth-service';
+import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
+import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
+import type { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
+import type { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
 
 /**
  * Main application router configuration.
@@ -67,6 +81,15 @@ export class AppRouter {
       taskLinks: ITaskLinkingRepository;
       progressRepo: IProgressRepository;
       enrollmentRepo: IEnrollmentRepository;
+      questRepo: IQuestRepository;
+      badgeRepo: IBadgeRepository;
+      gamificationRepo: IGamificationRepository;
+      missionRepo: IMissionRepository;
+      commentRepo: ICommentRepository;
+      xpEngine?: XpEngine;
+      streakEngine?: StreakEngine;
+      questEvaluator?: QuestEvaluator;
+      badgeEngine?: BadgeEngine;
       authService: AuthService;
       loginLimiter: IRateLimiter;
       registerController: RegisterController;
@@ -87,7 +110,7 @@ export class AppRouter {
       strictCors: boolean;
     },
   ): void {
-    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
+    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, questRepo: _questRepo, badgeRepo, gamificationRepo, missionRepo, commentRepo, xpEngine, streakEngine, questEvaluator, badgeEngine, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
     // Build origin matcher from config — strict in prod, lenient in dev.
     const originRules = parseAllowedOrigins(allowedOrigins, { strict: strictCors });
 
@@ -128,19 +151,24 @@ export class AppRouter {
     );
 
     // Feature routes
-    app.route('/auth', buildAuthRouter({ authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter }));
+    app.route('/auth', buildAuthRouter({ authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, streakEngine, questEvaluator, badgeEngine }));
     app.route('/admin/users', buildAdminUsersRouter(users, auth, tokens));
     app.route('/admin/topics', buildAdminTopicsRouter(topics, tags));
     app.route('/admin/topics', buildAdminMediaRouter(topics, media, storage));
     app.route('/admin/tasks', buildAdminTasksRouter(taskRepo, taskStages, taskLinks, topics));
     app.route('/tasks', buildTasksRouter(taskRepo, taskStages, taskLinks, topics, enrollmentRepo));
-    app.route('/tasks', buildProgressTaskRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
-    app.route('/topics', buildTopicsRouter(topics, media, storage, enrollmentRepo));
-    app.route('/topics', buildProgressTopicRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
+    app.route('/tasks', buildProgressTaskRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics, xpEngine, streakEngine, questEvaluator, badgeEngine));
+    app.route('/topics', buildTopicsRouter(topics, media, storage, enrollmentRepo, xpEngine, streakEngine, questEvaluator, badgeEngine));
+    app.route('/topics', buildProgressTopicRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics, xpEngine, streakEngine, questEvaluator, badgeEngine));
     app.route('/me', buildMeProgressRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
+    app.route('/me', buildMeGamificationRouter(gamificationRepo, _questRepo, badgeRepo, missionRepo));
+    app.route('/leaderboard', buildLeaderboardRouter(gamificationRepo, users));
+    app.route('/', buildCommentsRouter(commentRepo, enrollmentRepo, xpEngine));
     app.route('/admin', buildAdminEnrollmentRouter(enrollmentRepo, users, topics));
     app.route('/account', buildAccountRouter(accountController));
     app.route('/auth', buildOAuthRouter(googleOAuthController, cookieSameSite));
+    app.route('/admin/badges', buildAdminBadgesRouter(badgeRepo));
+    app.route('/admin/missions', buildAdminMissionsRouter(missionRepo));
 
     // Sanity demo — development only, can be removed post-milestone.
     app.get('/protected/ping', authGuard, (c) =>

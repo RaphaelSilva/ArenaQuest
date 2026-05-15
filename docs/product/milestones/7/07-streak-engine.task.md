@@ -1,6 +1,6 @@
 # Task 07 — Streak Engine
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -31,11 +31,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Two activities on the same local day keep `current_days` unchanged.
-- [ ] Activity on day N+1 increments `current_days` and updates `last_active_local_date`.
-- [ ] Activity after a 2-day gap resets `current_days` to 1.
-- [ ] `best_days` only moves forward (never decreases).
-- [ ] A user in `America/Sao_Paulo` who acts at 23:30 local and again at 00:30 local crosses the day boundary correctly.
+- [x] Two activities on the same local day keep `current_days` unchanged.
+- [x] Activity on day N+1 increments `current_days` and updates `last_active_local_date`.
+- [x] Activity after a 2-day gap resets `current_days` to 1.
+- [x] `best_days` only moves forward (never decreases).
+- [x] A user in `America/Sao_Paulo` who acts at 23:30 local and again at 00:30 local crosses the day boundary correctly.
 
 ## Verification Plan
 

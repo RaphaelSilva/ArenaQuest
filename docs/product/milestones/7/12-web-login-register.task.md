@@ -1,6 +1,6 @@
 # Task 12 — Web: Login & Register Redesign
 
-**Status:** 🚧 In Progress
+**Status:** ✅ Done
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -44,10 +44,10 @@ Out:
 - [x] Password strength meter colours and labels match the wireframe.
 - [x] Google OAuth button still completes the M6 OAuth flow successfully on staging.
 - [x] Post-register success screen instructs the user to confirm their e-mail and offers a path back to login (replaces the original `/dashboard` redirect to align with the M6 activation flow).
-- [ ] Hero panel collapses to a single-column layout under 768 px.
-- [ ] Shared components (`HeroPanel`, `AuthTabs`, `PasswordStrength`, `RoleSelect`, `RegisterSuccess`) extracted from `login/page.tsx` into reusable modules.
-- [ ] Unused `telefone` field removed from the register form.
-- [ ] `make lint` passes; component-level RTL test covers step navigation.
+- [x] Hero panel collapses to a single-column layout under 768 px.
+- [x] Shared components (`HeroPanel`, `AuthTabs`, `PasswordStrength`, `RoleSelect`, `RegisterSuccess`) extracted from `login/page.tsx` into reusable modules.
+- [x] Unused `telefone` field removed from the register form.
+- [x] `make lint` passes; component-level RTL test covers step navigation.
 
 ## Verification Plan
 

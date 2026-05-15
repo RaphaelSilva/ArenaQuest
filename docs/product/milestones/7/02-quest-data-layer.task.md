@@ -1,6 +1,6 @@
 # Task 02 — Quest Data Layer
 
-**Status:** ⏳ Pending
+**Status:** ✅ Completed
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -31,10 +31,10 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Migrations apply cleanly; seed creates ≥ 4 daily and ≥ 3 weekly quests aligned with the wireframe copy.
-- [ ] Repeated upserts on the same `(user_id, quest_id, period_key)` are idempotent and never duplicate rows.
-- [ ] Querying "active quests for user U on date D" filters by `active = 1` and returns each definition with the user's current progress for the local period.
-- [ ] No provider-specific imports outside the adapter folder.
+- [x] Migrations apply cleanly; seed creates ≥ 4 daily and ≥ 3 weekly quests aligned with the wireframe copy.
+- [x] Repeated upserts on the same `(user_id, quest_id, period_key)` are idempotent and never duplicate rows.
+- [x] Querying "active quests for user U on date D" filters by `active = 1` and returns each definition with the user's current progress for the local period.
+- [x] No provider-specific imports outside the adapter folder.
 
 ## Verification Plan
 

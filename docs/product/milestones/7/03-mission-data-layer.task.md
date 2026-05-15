@@ -1,6 +1,6 @@
 # Task 03 — Mission Data Layer + Admin CRUD API
 
-**Status:** ⏳ Pending
+**Status:** ✅ Completed
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -33,11 +33,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `POST /admin/missions` rejects payloads where `end_at <= start_at` with `400`.
-- [ ] Non-admin callers receive `403`.
-- [ ] `PATCH /admin/missions/:id` allows updating `end_at` to extend a running mission but rejects shortening it below `now`.
-- [ ] `DELETE /admin/missions/:id` sets `active = 0` (soft); the row remains for audit.
-- [ ] No provider-specific imports outside adapters.
+- [x] `POST /admin/missions` rejects payloads where `end_at <= start_at` with `400`.
+- [x] Non-admin callers receive `403`.
+- [x] `PATCH /admin/missions/:id` allows updating `end_at` to extend a running mission but rejects shortening it below `now`.
+- [x] `DELETE /admin/missions/:id` sets `active = 0` (soft); the row remains for audit.
+- [x] No provider-specific imports outside adapters.
 
 ## Verification Plan
 

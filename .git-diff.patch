@@ -1,0 +1,793 @@
+diff --git a/apps/api/migrations/0014_create_xp_events.sql b/apps/api/migrations/0014_create_xp_events.sql
+new file mode 100644
+index 0000000..d00b568
+--- /dev/null
++++ b/apps/api/migrations/0014_create_xp_events.sql
+@@ -0,0 +1,19 @@
++-- Migration 0014: append-only XP event log
++-- Milestone 7 — Gamification Data Layer (Task 01)
++-- unique(user_id, source_kind, idempotency_key) prevents double-crediting the same source event.
++
++CREATE TABLE IF NOT EXISTS xp_events (
++  id               TEXT    NOT NULL PRIMARY KEY,
++  user_id          TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
++  source_kind      TEXT    NOT NULL,
++  source_id        TEXT,
++  points           INTEGER NOT NULL,
++  idempotency_key  TEXT    NOT NULL,
++  earned_at        TEXT    NOT NULL DEFAULT (datetime('now'))
++);
++
++CREATE UNIQUE INDEX IF NOT EXISTS uniq_xp_events_idempotency
++  ON xp_events(user_id, source_kind, idempotency_key);
++
++CREATE INDEX IF NOT EXISTS idx_xp_events_user
++  ON xp_events(user_id);
+diff --git a/apps/api/migrations/0015_create_user_xp.sql b/apps/api/migrations/0015_create_user_xp.sql
+new file mode 100644
+index 0000000..1852687
+--- /dev/null
++++ b/apps/api/migrations/0015_create_user_xp.sql
+@@ -0,0 +1,9 @@
++-- Migration 0015: denormalized XP read model
++-- Milestone 7 — Gamification Data Layer (Task 01)
++-- Kept in sync atomically when an xp_events row is successfully inserted.
++
++CREATE TABLE IF NOT EXISTS user_xp (
++  user_id    TEXT    NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
++  total_xp   INTEGER NOT NULL DEFAULT 0,
++  updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
++);
+diff --git a/apps/api/migrations/0016_create_user_streak.sql b/apps/api/migrations/0016_create_user_streak.sql
+new file mode 100644
+index 0000000..b31d8a9
+--- /dev/null
++++ b/apps/api/migrations/0016_create_user_streak.sql
+@@ -0,0 +1,11 @@
++-- Migration 0016: streak read model
++-- Milestone 7 — Gamification Data Layer (Task 01)
++-- Upserted by the streak evaluator (Task 07). last_activity_date is a local YYYY-MM-DD date string.
++
++CREATE TABLE IF NOT EXISTS user_streak (
++  user_id             TEXT    NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
++  current_streak      INTEGER NOT NULL DEFAULT 0,
++  longest_streak      INTEGER NOT NULL DEFAULT 0,
++  last_activity_date  TEXT,
++  updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
++);
+diff --git a/apps/api/migrations/0017_seed_level_definitions.sql b/apps/api/migrations/0017_seed_level_definitions.sql
+new file mode 100644
+index 0000000..249a1ef
+--- /dev/null
++++ b/apps/api/migrations/0017_seed_level_definitions.sql
+@@ -0,0 +1,43 @@
++-- Migration 0017: level definitions table + seed
++-- Milestone 7 — Gamification Data Layer (Task 01)
++-- XP curve: min_xp(level) = (level - 1)^2 * 50 + (level - 1) * 50
++-- Rank titles aligned with Dashboard wireframe.
++
++CREATE TABLE IF NOT EXISTS level_definitions (
++  level      INTEGER NOT NULL PRIMARY KEY,
++  rank_title TEXT    NOT NULL,
++  min_xp     INTEGER NOT NULL,
++  max_xp     INTEGER          -- NULL for the final level
++);
++
++INSERT OR IGNORE INTO level_definitions (level, rank_title, min_xp, max_xp) VALUES
++  (1,  'Aspirante',        0,     100),
++  (2,  'Aspirante',        100,   300),
++  (3,  'Aspirante',        300,   600),
++  (4,  'Aspirante',        600,   1000),
++  (5,  'Treinador Júnior', 1000,  1500),
++  (6,  'Treinador Júnior', 1500,  2100),
++  (7,  'Treinador Júnior', 2100,  2800),
++  (8,  'Treinador Júnior', 2800,  3600),
++  (9,  'Treinador Júnior', 3600,  4500),
++  (10, 'Treinador',        4500,  5500),
++  (11, 'Treinador',        5500,  6600),
++  (12, 'Treinador',        6600,  7800),
++  (13, 'Treinador',        7800,  9100),
++  (14, 'Treinador',        9100,  10500),
++  (15, 'Treinador Sênior', 10500, 12000),
++  (16, 'Treinador Sênior', 12000, 13600),
++  (17, 'Treinador Sênior', 13600, 15300),
++  (18, 'Treinador Sênior', 15300, 17100),
++  (19, 'Treinador Sênior', 17100, 19000),
++  (20, 'Especialista',     19000, 21000),
++  (21, 'Especialista',     21000, 23100),
++  (22, 'Especialista',     23100, 25300),
++  (23, 'Especialista',     25300, 27600),
++  (24, 'Especialista',     27600, 30000),
++  (25, 'Mestre',           30000, 32500),
++  (26, 'Mestre',           32500, 35100),
++  (27, 'Mestre',           35100, 37800),
++  (28, 'Mestre',           37800, 40600),
++  (29, 'Mestre',           40600, 43500),
++  (30, 'Grão-Mestre',      43500, NULL);
+diff --git a/apps/api/src/adapters/db/d1-gamification-repository.ts b/apps/api/src/adapters/db/d1-gamification-repository.ts
+new file mode 100644
+index 0000000..d84eb42
+--- /dev/null
++++ b/apps/api/src/adapters/db/d1-gamification-repository.ts
+@@ -0,0 +1,177 @@
++import type {
++  IGamificationRepository,
++  XpEventRecord,
++  UserXpRecord,
++  UserStreakRecord,
++  LevelDefinitionRecord,
++  AppendXpEventParams,
++  UpsertUserStreakParams,
++} from '@arenaquest/shared/ports';
++
++type XpEventRow = {
++  id: string;
++  user_id: string;
++  source_kind: string;
++  source_id: string | null;
++  points: number;
++  idempotency_key: string;
++  earned_at: string;
++};
++
++type UserXpRow = {
++  user_id: string;
++  total_xp: number;
++  updated_at: string;
++};
++
++type UserStreakRow = {
++  user_id: string;
++  current_streak: number;
++  longest_streak: number;
++  last_activity_date: string | null;
++  updated_at: string;
++};
++
++type LevelDefinitionRow = {
++  level: number;
++  rank_title: string;
++  min_xp: number;
++  max_xp: number | null;
++};
++
++function rowToXpEvent(row: XpEventRow): XpEventRecord {
++  return {
++    id: row.id,
++    userId: row.user_id,
++    sourceKind: row.source_kind,
++    sourceId: row.source_id,
++    points: row.points,
++    idempotencyKey: row.idempotency_key,
++    earnedAt: row.earned_at,
++  };
++}
++
++function rowToUserXp(row: UserXpRow): UserXpRecord {
++  return {
++    userId: row.user_id,
++    totalXp: row.total_xp,
++    updatedAt: row.updated_at,
++  };
++}
++
++function rowToUserStreak(row: UserStreakRow): UserStreakRecord {
++  return {
++    userId: row.user_id,
++    currentStreak: row.current_streak,
++    longestStreak: row.longest_streak,
++    lastActivityDate: row.last_activity_date,
++    updatedAt: row.updated_at,
++  };
++}
++
++function rowToLevelDefinition(row: LevelDefinitionRow): LevelDefinitionRecord {
++  return {
++    level: row.level,
++    rankTitle: row.rank_title,
++    minXp: row.min_xp,
++    maxXp: row.max_xp,
++  };
++}
++
++export class D1GamificationRepository implements IGamificationRepository {
++  constructor(private readonly db: D1Database) {}
++
++  // ---------------------------------------------------------------------------
++  // XP events
++  // ---------------------------------------------------------------------------
++
++  async appendXpEvent(params: AppendXpEventParams): Promise<XpEventRecord> {
++    const id = crypto.randomUUID();
++
++    const result = await this.db
++      .prepare(
++        `INSERT OR IGNORE INTO xp_events (id, user_id, source_kind, source_id, points, idempotency_key)
++         VALUES (?, ?, ?, ?, ?, ?)`,
++      )
++      .bind(id, params.userId, params.sourceKind, params.sourceId ?? null, params.points, params.idempotencyKey)
++      .run();
++
++    if (result.meta.changes > 0) {
++      await this.db
++        .prepare(
++          `INSERT INTO user_xp (user_id, total_xp)
++           VALUES (?, ?)
++           ON CONFLICT(user_id) DO UPDATE SET
++             total_xp   = total_xp + excluded.total_xp,
++             updated_at = datetime('now')`,
++        )
++        .bind(params.userId, params.points)
++        .run();
++    }
++
++    const row = await this.db
++      .prepare(
++        `SELECT * FROM xp_events
++         WHERE user_id = ? AND source_kind = ? AND idempotency_key = ?`,
++      )
++      .bind(params.userId, params.sourceKind, params.idempotencyKey)
++      .first<XpEventRow>();
++
++    if (!row) throw new Error('D1GamificationRepository: xp_event not found after insert');
++    return rowToXpEvent(row);
++  }
++
++  // ---------------------------------------------------------------------------
++  // User XP read model
++  // ---------------------------------------------------------------------------
++
++  async getUserXp(userId: string): Promise<UserXpRecord | null> {
++    const row = await this.db
++      .prepare('SELECT * FROM user_xp WHERE user_id = ?')
++      .bind(userId)
++      .first<UserXpRow>();
++    return row ? rowToUserXp(row) : null;
++  }
++
++  // ---------------------------------------------------------------------------
++  // Streak
++  // ---------------------------------------------------------------------------
++
++  async getUserStreak(userId: string): Promise<UserStreakRecord | null> {
++    const row = await this.db
++      .prepare('SELECT * FROM user_streak WHERE user_id = ?')
++      .bind(userId)
++      .first<UserStreakRow>();
++    return row ? rowToUserStreak(row) : null;
++  }
++
++  async upsertUserStreak(userId: string, params: UpsertUserStreakParams): Promise<UserStreakRecord> {
++    await this.db
++      .prepare(
++        `INSERT INTO user_streak (user_id, current_streak, longest_streak, last_activity_date)
++         VALUES (?, ?, ?, ?)
++         ON CONFLICT(user_id) DO UPDATE SET
++           current_streak      = excluded.current_streak,
++           longest_streak      = excluded.longest_streak,
++           last_activity_date  = excluded.last_activity_date,
++           updated_at          = datetime('now')`,
++      )
++      .bind(userId, params.currentStreak, params.longestStreak, params.lastActivityDate)
++      .run();
++
++    const row = await this.getUserStreak(userId);
++    if (!row) throw new Error('D1GamificationRepository: streak not found after upsert');
++    return row;
++  }
++
++  // ---------------------------------------------------------------------------
++  // Level definitions
++  // ---------------------------------------------------------------------------
++
++  async listLevelDefinitions(): Promise<LevelDefinitionRecord[]> {
++    const { results } = await this.db
++      .prepare('SELECT * FROM level_definitions ORDER BY level ASC')
++      .all<LevelDefinitionRow>();
++    return results.map(rowToLevelDefinition);
++  }
++}
+diff --git a/apps/api/test/db/d1-gamification-repository.spec.ts b/apps/api/test/db/d1-gamification-repository.spec.ts
+new file mode 100644
+index 0000000..622bbaa
+--- /dev/null
++++ b/apps/api/test/db/d1-gamification-repository.spec.ts
+@@ -0,0 +1,270 @@
++import { env } from 'cloudflare:test';
++import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
++import { D1GamificationRepository } from '@api/adapters/db/d1-gamification-repository';
++
++const MIGRATION_STATEMENTS = [
++  `CREATE TABLE IF NOT EXISTS users (
++    id    TEXT NOT NULL PRIMARY KEY,
++    email TEXT NOT NULL UNIQUE
++  )`,
++  `CREATE TABLE IF NOT EXISTS xp_events (
++    id               TEXT    NOT NULL PRIMARY KEY,
++    user_id          TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
++    source_kind      TEXT    NOT NULL,
++    source_id        TEXT,
++    points           INTEGER NOT NULL,
++    idempotency_key  TEXT    NOT NULL,
++    earned_at        TEXT    NOT NULL DEFAULT (datetime('now'))
++  )`,
++  `CREATE UNIQUE INDEX IF NOT EXISTS uniq_xp_events_idempotency
++    ON xp_events(user_id, source_kind, idempotency_key)`,
++  `CREATE INDEX IF NOT EXISTS idx_xp_events_user ON xp_events(user_id)`,
++  `CREATE TABLE IF NOT EXISTS user_xp (
++    user_id    TEXT    NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
++    total_xp   INTEGER NOT NULL DEFAULT 0,
++    updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
++  )`,
++  `CREATE TABLE IF NOT EXISTS user_streak (
++    user_id             TEXT    NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
++    current_streak      INTEGER NOT NULL DEFAULT 0,
++    longest_streak      INTEGER NOT NULL DEFAULT 0,
++    last_activity_date  TEXT,
++    updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
++  )`,
++  `CREATE TABLE IF NOT EXISTS level_definitions (
++    level      INTEGER NOT NULL PRIMARY KEY,
++    rank_title TEXT    NOT NULL,
++    min_xp     INTEGER NOT NULL,
++    max_xp     INTEGER
++  )`,
++];
++
++const LEVEL_SEED = [
++  [1,  'Aspirante',        0,     100],
++  [2,  'Aspirante',        100,   300],
++  [3,  'Aspirante',        300,   600],
++  [4,  'Aspirante',        600,   1000],
++  [5,  'Treinador Júnior', 1000,  1500],
++  [6,  'Treinador Júnior', 1500,  2100],
++  [7,  'Treinador Júnior', 2100,  2800],
++  [8,  'Treinador Júnior', 2800,  3600],
++  [9,  'Treinador Júnior', 3600,  4500],
++  [10, 'Treinador',        4500,  5500],
++  [11, 'Treinador',        5500,  6600],
++  [12, 'Treinador',        6600,  7800],
++  [13, 'Treinador',        7800,  9100],
++  [14, 'Treinador',        9100,  10500],
++  [15, 'Treinador Sênior', 10500, 12000],
++  [16, 'Treinador Sênior', 12000, 13600],
++  [17, 'Treinador Sênior', 13600, 15300],
++  [18, 'Treinador Sênior', 15300, 17100],
++  [19, 'Treinador Sênior', 17100, 19000],
++  [20, 'Especialista',     19000, 21000],
++  [21, 'Especialista',     21000, 23100],
++  [22, 'Especialista',     23100, 25300],
++  [23, 'Especialista',     25300, 27600],
++  [24, 'Especialista',     27600, 30000],
++  [25, 'Mestre',           30000, 32500],
++  [26, 'Mestre',           32500, 35100],
++  [27, 'Mestre',           35100, 37800],
++  [28, 'Mestre',           37800, 40600],
++  [29, 'Mestre',           40600, 43500],
++  [30, 'Grão-Mestre',      43500, null],
++] as const;
++
++describe('D1GamificationRepository', () => {
++  let repo: D1GamificationRepository;
++  let userId: string;
++
++  beforeAll(async () => {
++    await env.DB.batch(MIGRATION_STATEMENTS.map((sql) => env.DB.prepare(sql)));
++
++    const seedStmts = LEVEL_SEED.map(([level, rankTitle, minXp, maxXp]) =>
++      env.DB
++        .prepare('INSERT OR IGNORE INTO level_definitions (level, rank_title, min_xp, max_xp) VALUES (?, ?, ?, ?)')
++        .bind(level, rankTitle, minXp, maxXp),
++    );
++    await env.DB.batch(seedStmts);
++
++    repo = new D1GamificationRepository(env.DB);
++  });
++
++  beforeEach(async () => {
++    userId = crypto.randomUUID();
++    await env.DB
++      .prepare('INSERT INTO users (id, email) VALUES (?, ?)')
++      .bind(userId, `u-${userId}@test.com`)
++      .run();
++  });
++
++  // ---------------------------------------------------------------------------
++  // appendXpEvent — idempotency
++  // ---------------------------------------------------------------------------
++
++  describe('appendXpEvent', () => {
++    it('inserts a new xp_event and credits user_xp', async () => {
++      const event = await repo.appendXpEvent({
++        userId,
++        sourceKind: 'task_complete',
++        sourceId: 'task-1',
++        points: 50,
++        idempotencyKey: 'key-1',
++      });
++
++      expect(event.userId).toBe(userId);
++      expect(event.sourceKind).toBe('task_complete');
++      expect(event.points).toBe(50);
++      expect(event.idempotencyKey).toBe('key-1');
++
++      const xp = await repo.getUserXp(userId);
++      expect(xp?.totalXp).toBe(50);
++    });
++
++    it('is idempotent — duplicate call returns same event, no double credit', async () => {
++      const params = {
++        userId,
++        sourceKind: 'task_complete',
++        sourceId: 'task-2',
++        points: 30,
++        idempotencyKey: 'key-2',
++      };
++
++      const first = await repo.appendXpEvent(params);
++      const second = await repo.appendXpEvent(params);
++
++      expect(first.id).toBe(second.id);
++
++      const xp = await repo.getUserXp(userId);
++      expect(xp?.totalXp).toBe(30);
++
++      const rows = await env.DB
++        .prepare('SELECT COUNT(*) AS n FROM xp_events WHERE user_id = ?')
++        .bind(userId)
++        .first<{ n: number }>();
++      expect(rows?.n).toBe(1);
++    });
++
++    it('accumulates total_xp across multiple distinct events', async () => {
++      await repo.appendXpEvent({ userId, sourceKind: 'task_complete', points: 100, idempotencyKey: 'a' });
++      await repo.appendXpEvent({ userId, sourceKind: 'topic_complete', points: 75, idempotencyKey: 'b' });
++      await repo.appendXpEvent({ userId, sourceKind: 'streak_bonus', points: 25, idempotencyKey: 'c' });
++
++      const xp = await repo.getUserXp(userId);
++      expect(xp?.totalXp).toBe(200);
++    });
++
++    it('allows same idempotency_key for different source_kind', async () => {
++      await repo.appendXpEvent({ userId, sourceKind: 'task_complete', points: 40, idempotencyKey: 'shared-key' });
++      await repo.appendXpEvent({ userId, sourceKind: 'topic_complete', points: 60, idempotencyKey: 'shared-key' });
++
++      const xp = await repo.getUserXp(userId);
++      expect(xp?.totalXp).toBe(100);
++    });
++  });
++
++  // ---------------------------------------------------------------------------
++  // getUserXp
++  // ---------------------------------------------------------------------------
++
++  describe('getUserXp', () => {
++    it('returns null for a user with no XP events', async () => {
++      const xp = await repo.getUserXp(userId);
++      expect(xp).toBeNull();
++    });
++
++    it('returns the correct record after events', async () => {
++      await repo.appendXpEvent({ userId, sourceKind: 'task_complete', points: 80, idempotencyKey: 'q1' });
++      const xp = await repo.getUserXp(userId);
++      expect(xp?.userId).toBe(userId);
++      expect(xp?.totalXp).toBe(80);
++      expect(typeof xp?.updatedAt).toBe('string');
++    });
++  });
++
++  // ---------------------------------------------------------------------------
++  // upsertUserStreak / getUserStreak
++  // ---------------------------------------------------------------------------
++
++  describe('upsertUserStreak / getUserStreak', () => {
++    it('returns null when no streak record exists', async () => {
++      const streak = await repo.getUserStreak(userId);
++      expect(streak).toBeNull();
++    });
++
++    it('creates a streak record on first upsert', async () => {
++      const streak = await repo.upsertUserStreak(userId, {
++        currentStreak: 3,
++        longestStreak: 3,
++        lastActivityDate: '2026-05-13',
++      });
++
++      expect(streak.userId).toBe(userId);
++      expect(streak.currentStreak).toBe(3);
++      expect(streak.longestStreak).toBe(3);
++      expect(streak.lastActivityDate).toBe('2026-05-13');
++    });
++
++    it('updates streak values on subsequent upsert', async () => {
++      await repo.upsertUserStreak(userId, {
++        currentStreak: 5,
++        longestStreak: 5,
++        lastActivityDate: '2026-05-12',
++      });
++
++      const updated = await repo.upsertUserStreak(userId, {
++        currentStreak: 6,
++        longestStreak: 6,
++        lastActivityDate: '2026-05-13',
++      });
++
++      expect(updated.currentStreak).toBe(6);
++      expect(updated.longestStreak).toBe(6);
++      expect(updated.lastActivityDate).toBe('2026-05-13');
++    });
++
++    it('preserves longest_streak when current_streak resets', async () => {
++      await repo.upsertUserStreak(userId, {
++        currentStreak: 10,
++        longestStreak: 10,
++        lastActivityDate: '2026-05-01',
++      });
++
++      const reset = await repo.upsertUserStreak(userId, {
++        currentStreak: 1,
++        longestStreak: 10,
++        lastActivityDate: '2026-05-13',
++      });
++
++      expect(reset.currentStreak).toBe(1);
++      expect(reset.longestStreak).toBe(10);
++    });
++  });
++
++  // ---------------------------------------------------------------------------
++  // listLevelDefinitions
++  // ---------------------------------------------------------------------------
++
++  describe('listLevelDefinitions', () => {
++    it('returns all 30 level definitions ordered by level', async () => {
++      const levels = await repo.listLevelDefinitions();
++      expect(levels).toHaveLength(30);
++      expect(levels[0].level).toBe(1);
++      expect(levels[29].level).toBe(30);
++    });
++
++    it('level 1 starts at 0 XP and last level has null maxXp', async () => {
++      const levels = await repo.listLevelDefinitions();
++      expect(levels[0].minXp).toBe(0);
++      expect(levels[0].rankTitle).toBe('Aspirante');
++      expect(levels[29].maxXp).toBeNull();
++      expect(levels[29].rankTitle).toBe('Grão-Mestre');
++    });
++
++    it('XP boundaries are strictly ascending', async () => {
++      const levels = await repo.listLevelDefinitions();
++      for (let i = 1; i < levels.length; i++) {
++        expect(levels[i].minXp).toBeGreaterThan(levels[i - 1].minXp);
++      }
++    });
++  });
++});
+diff --git a/docs/product/milestones/7/planing/01-gamification-data-layer.plan.md b/docs/product/milestones/7/planing/01-gamification-data-layer.plan.md
+new file mode 100644
+index 0000000..d2d09e8
+--- /dev/null
++++ b/docs/product/milestones/7/planing/01-gamification-data-layer.plan.md
+@@ -0,0 +1,75 @@
++# Plan — 01-gamification-data-layer
++
++**Task:** [01-gamification-data-layer.task.md](../01-gamification-data-layer.task.md)
++**Milestone:** 7
++**Assigned persona:** backend-developer
++**Branch:** feature/m7/01-gamification-data-layer.task (from feature/m7/candidate)
++
++## Objective
++
++Add the persistence foundation for XP, levels, and streaks in ArenaQuest. Four D1 migrations introduce `xp_events` (append-only idempotent log), `user_xp` (denormalized read model), `user_streak` (read model), and `level_definitions` (seeded with 30 levels). A new `IGamificationRepository` port is added to `packages/shared/ports`, a `LevelTable` value object lands in shared domain, and a `D1GamificationRepository` adapter implements the port. No HTTP routes or controllers are introduced — those come in Tasks 06–10.
++
++## Affected Areas
++
++**New files:**
++- `apps/api/migrations/0014_create_xp_events.sql`
++- `apps/api/migrations/0015_create_user_xp.sql`
++- `apps/api/migrations/0016_create_user_streak.sql`
++- `apps/api/migrations/0017_seed_level_definitions.sql`
++- `packages/shared/ports/i-gamification-repository.ts`
++- `packages/shared/domain/gamification/level-table.ts`
++- `apps/api/src/adapters/db/d1-gamification-repository.ts`
++- `apps/api/test/db/d1-gamification-repository.spec.ts`
++
++**Modified files:**
++- `packages/shared/types/entities.ts` — append `Entities.Gamification` namespace
++- `packages/shared/ports/index.ts` — barrel-export the new port
++
++**Explicitly out of scope:**
++- `apps/api/src/index.ts` — wiring deferred to Task 10 (no consumer yet)
++- `apps/api/src/routes/` — routes deferred to Task 10
++- XP-awarding logic (Task 06), streak evaluator (Task 07)
++
++## Step-by-Step
++
++1. **`Entities.Gamification` namespace** — append to `packages/shared/types/entities.ts`: `XpEvent`, `UserXp`, `UserStreak`, `LevelDefinition` interfaces.
++
++2. **Port `IGamificationRepository`** — create `packages/shared/ports/i-gamification-repository.ts` with flat record DTOs (`XpEventRecord`, `UserXpRecord`, `UserStreakRecord`, `LevelDefinitionRecord`) and the interface with five methods: `appendXpEvent` (idempotent), `getUserXp`, `getUserStreak`, `upsertUserStreak`, `listLevelDefinitions`. Re-export from `ports/index.ts`.
++
++3. **`LevelTable` value object** — create `packages/shared/domain/gamification/level-table.ts`; pure class, no DB dependency; `forXp(totalXp)` returns `{ definition, xpToNext }`.
++
++4. **Migrations 0014–0017** — one logical change per file; idempotent (`IF NOT EXISTS`, `INSERT OR IGNORE`); `xp_events` unique index on `(user_id, source_kind, idempotency_key)`; `level_definitions` seeded with 30 rows (quadratic XP curve, Portuguese rank titles).
++
++5. **D1 adapter** — `apps/api/src/adapters/db/d1-gamification-repository.ts`; private snake_case row types; row→record converters; idempotency via `INSERT OR IGNORE` + `meta.changes` check + conditional `user_xp` update; read-after-write on every mutating method.
++
++6. **Vitest spec** — `apps/api/test/db/d1-gamification-repository.spec.ts`; Layer 2 (real D1); inline `MIGRATION_STATEMENTS`; `beforeAll` schema + seed; `beforeEach` fresh userId; covers idempotency, XP accumulation, streak upsert, level listing.
++
++## Acceptance Criteria Mapping
++
++| AC | Plan step(s) | Verification |
++|---|---|---|
++| All four migrations apply cleanly | Step 4 | `make db-migrations-dev` |
++| Same `(user_id, source_kind, idempotency_key)` twice → 1 row, 1 XP credit | Steps 5 + 6 | Vitest idempotency test |
++| `user_xp.total_xp = SUM(xp_events.points)` | Steps 5 + 6 | Vitest accumulation test |
++| Given `total_xp` → level, rank_title, XP delta | Steps 3 + 4 | `LevelTable.forXp()` + Vitest level listing |
++| No provider-specific imports outside `apps/api/src/adapters/db/` | Step 5 | `make lint` |
++
++## Risks & Open Questions
++
++- **`meta.changes` on D1 `INSERT OR IGNORE`**: confirmed supported by Workers D1. If `meta.changes === 0` (duplicate), skip the `user_xp` update entirely.
++- **Rank titles**: using "Aspirante", "Treinador Júnior", "Treinador", "Treinador Sênior", "Especialista", "Mestre", "Grão-Mestre" based on task description; verify against `docs/product/web/wire/Dashboard.html` if needed.
++
++## Verification
++
++```bash
++make db-migrations-dev   # migrations apply without error
++make test-api            # all gamification spec tests pass
++make lint                # TypeScript strict, no cross-boundary imports
++```
++
++## Out of Scope
++
++- XP-awarding decisions (Task 06)
++- Streak evaluator logic (Task 07)
++- Any read endpoint (Task 10)
++- Wiring into `buildApp(env)` / `AppRouter` (Task 10)
+diff --git a/packages/shared/domain/gamification/level-table.ts b/packages/shared/domain/gamification/level-table.ts
+new file mode 100644
+index 0000000..f2b4e95
+--- /dev/null
++++ b/packages/shared/domain/gamification/level-table.ts
+@@ -0,0 +1,31 @@
++import type { LevelDefinitionRecord } from '../../ports/i-gamification-repository';
++
++export class LevelTable {
++  private readonly sorted: LevelDefinitionRecord[];
++
++  constructor(definitions: LevelDefinitionRecord[]) {
++    this.sorted = [...definitions].sort((a, b) => a.minXp - b.minXp);
++  }
++
++  forXp(totalXp: number): { definition: LevelDefinitionRecord; xpToNext: number | null } {
++    if (this.sorted.length === 0) {
++      throw new Error('LevelTable: no level definitions loaded');
++    }
++
++    let current = this.sorted[0];
++    for (const def of this.sorted) {
++      if (def.minXp <= totalXp) {
++        current = def;
++      } else {
++        break;
++      }
++    }
++
++    const idx = this.sorted.indexOf(current);
++    const next = this.sorted[idx + 1] ?? null;
++    return {
++      definition: current,
++      xpToNext: next ? next.minXp - totalXp : null,
++    };
++  }
++}
+diff --git a/packages/shared/ports/i-gamification-repository.ts b/packages/shared/ports/i-gamification-repository.ts
+new file mode 100644
+index 0000000..3db8c92
+--- /dev/null
++++ b/packages/shared/ports/i-gamification-repository.ts
+@@ -0,0 +1,50 @@
++import type { Entities } from '../types/entities';
++
++export interface XpEventRecord {
++  id: string;
++  userId: string;
++  sourceKind: string;
++  sourceId: string | null;
++  points: number;
++  idempotencyKey: string;
++  earnedAt: string;
++}
++
++export interface UserXpRecord {
++  userId: string;
++  totalXp: number;
++  updatedAt: string;
++}
++
++export interface UserStreakRecord {
++  userId: string;
++  currentStreak: number;
++  longestStreak: number;
++  lastActivityDate: string | null;
++  updatedAt: string;
++}
++
++export type LevelDefinitionRecord = Entities.Gamification.LevelDefinition;
++
++export interface AppendXpEventParams {
++  userId: string;
++  sourceKind: string;
++  sourceId?: string | null;
++  points: number;
++  idempotencyKey: string;
++}
++
++export interface UpsertUserStreakParams {
++  currentStreak: number;
++  longestStreak: number;
++  lastActivityDate: string;
++}
++
++export interface IGamificationRepository {
++  /** Idempotent — same (userId, sourceKind, idempotencyKey) returns the existing event. */
++  appendXpEvent(params: AppendXpEventParams): Promise<XpEventRecord>;
++  getUserXp(userId: string): Promise<UserXpRecord | null>;
++  getUserStreak(userId: string): Promise<UserStreakRecord | null>;
++  upsertUserStreak(userId: string, params: UpsertUserStreakParams): Promise<UserStreakRecord>;
++  listLevelDefinitions(): Promise<LevelDefinitionRecord[]>;
++}
+diff --git a/packages/shared/ports/index.ts b/packages/shared/ports/index.ts
+index f727c73..82fc53a 100644
+--- a/packages/shared/ports/index.ts
++++ b/packages/shared/ports/index.ts
+@@ -15,4 +15,5 @@ export * from './i-progress-repository';
+ export * from './i-enrollment-repository';
+ export * from './i-password-reset-token-repository';
+ export * from './i-oauth-account-repository';
++export * from './i-gamification-repository';
+ // i-database-adapter defines the full future IDatabaseAdapter contract (not yet implemented)
+\ No newline at end of file
+diff --git a/packages/shared/types/entities.ts b/packages/shared/types/entities.ts
+index 2716519..3350f3a 100644
+--- a/packages/shared/types/entities.ts
++++ b/packages/shared/types/entities.ts
+@@ -185,4 +185,37 @@ export namespace Entities {
+             createdAt: Date;
+         }
+     }
++
++    export namespace Gamification {
++        export interface XpEvent {
++            id: string;
++            userId: string;
++            sourceKind: string;
++            sourceId: string | null;
++            points: number;
++            idempotencyKey: string;
++            earnedAt: Date;
++        }
++
++        export interface UserXp {
++            userId: string;
++            totalXp: number;
++            updatedAt: Date;
++        }
++
++        export interface UserStreak {
++            userId: string;
++            currentStreak: number;
++            longestStreak: number;
++            lastActivityDate: string | null;
++            updatedAt: Date;
++        }
++
++        export interface LevelDefinition {
++            level: number;
++            rankTitle: string;
++            minXp: number;
++            maxXp: number | null;
++        }
++    }
+ }
+\ No newline at end of file

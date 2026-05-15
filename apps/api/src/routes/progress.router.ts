@@ -9,6 +9,10 @@ import type {
   ITaskLinkingRepository,
   ITopicNodeRepository,
 } from '@arenaquest/shared/ports';
+import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
+import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
+import type { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
+import type { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
 
 const CACHE_CONTROL = 'private, max-age=15';
 
@@ -34,6 +38,10 @@ export function buildProgressTaskRouter(
   stages: ITaskStageRepository,
   links: ITaskLinkingRepository,
   topics: ITopicNodeRepository,
+  xpEngine?: XpEngine,
+  streakEngine?: StreakEngine,
+  questEvaluator?: QuestEvaluator,
+  badgeEngine?: BadgeEngine,
 ): Hono {
   const router = new Hono();
   const service = buildService(progress, enrollment, tasks, stages, links, topics);
@@ -42,13 +50,42 @@ export function buildProgressTaskRouter(
 
   router.post('/:id/stages/:stageId/check-in', async (c) => {
     const userId = c.get('user').sub;
+    const stageId = c.req.param('stageId');
     const result = await service.stageCheckIn(
       userId,
       c.req.param('id'),
-      c.req.param('stageId'),
+      stageId,
     );
     if (!result.ok) {
       return c.json({ error: result.error, ...result.meta }, result.status as 403 | 404 | 409);
+    }
+    if (result.data.changed && xpEngine) {
+      try {
+        await xpEngine.award({ userId, action: 'stage_checkin', sourceKind: 'stage', sourceId: stageId });
+      } catch (err) {
+        console.error('[XP] stage_checkin award failed:', err);
+      }
+    }
+    if (result.data.changed && streakEngine) {
+      try {
+        await streakEngine.recordActivity(userId, new Date());
+      } catch (err) {
+        console.error('[streak] stage_checkin recordActivity failed:', err);
+      }
+    }
+    if (result.data.changed && questEvaluator) {
+      try {
+        await questEvaluator.evaluate(userId, 'stage', new Date());
+      } catch (err) {
+        console.error('[quest] stage_checkin evaluate failed:', err);
+      }
+    }
+    if (result.data.changed && badgeEngine) {
+      try {
+        await badgeEngine.evaluate(userId, new Date());
+      } catch (err) {
+        console.error('[badge] stage_checkin evaluate failed:', err);
+      }
     }
     const status = result.data.changed ? 201 : 200;
     return c.json(result.data, status as 200 | 201);
@@ -68,6 +105,10 @@ export function buildProgressTopicRouter(
   stages: ITaskStageRepository,
   links: ITaskLinkingRepository,
   topics: ITopicNodeRepository,
+  xpEngine?: XpEngine,
+  streakEngine?: StreakEngine,
+  questEvaluator?: QuestEvaluator,
+  badgeEngine?: BadgeEngine,
 ): Hono {
   const router = new Hono();
   const service = buildService(progress, enrollment, tasks, stages, links, topics);
@@ -85,9 +126,38 @@ export function buildProgressTopicRouter(
 
   router.post('/:id/complete', async (c) => {
     const userId = c.get('user').sub;
-    const result = await service.completeTopic(userId, c.req.param('id'));
+    const topicId = c.req.param('id');
+    const result = await service.completeTopic(userId, topicId);
     if (!result.ok) {
       return c.json({ error: result.error }, result.status as 403 | 404);
+    }
+    if (result.data.changed && xpEngine) {
+      try {
+        await xpEngine.award({ userId, action: 'topic_complete', sourceKind: 'topic', sourceId: topicId });
+      } catch (err) {
+        console.error('[XP] topic_complete award failed:', err);
+      }
+    }
+    if (result.data.changed && streakEngine) {
+      try {
+        await streakEngine.recordActivity(userId, new Date());
+      } catch (err) {
+        console.error('[streak] topic_complete recordActivity failed:', err);
+      }
+    }
+    if (result.data.changed && questEvaluator) {
+      try {
+        await questEvaluator.evaluate(userId, 'topic', new Date());
+      } catch (err) {
+        console.error('[quest] topic_complete evaluate failed:', err);
+      }
+    }
+    if (result.data.changed && badgeEngine) {
+      try {
+        await badgeEngine.evaluate(userId, new Date());
+      } catch (err) {
+        console.error('[badge] topic_complete evaluate failed:', err);
+      }
     }
     return c.json(result.data);
   });

@@ -1,6 +1,6 @@
 # Task 06 — XP Engine & Controller Hooks
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -31,11 +31,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Replaying a stage check-in produces one XP event regardless of retries.
-- [ ] Completing a topic awards XP exactly once per topic per user.
-- [ ] The video-watched endpoint requires the topic to be granted (existing access-aware filter from M5) and awards XP once per `(user, video)` pair.
-- [ ] Disabling the engine in the env (`GAMIFICATION_ENABLED=false`) makes all calls no-op without errors.
-- [ ] No provider-specific imports outside `apps/api/src/adapters/`.
+- [x] Replaying a stage check-in produces one XP event regardless of retries.
+- [x] Completing a topic awards XP exactly once per topic per user.
+- [x] The video-watched endpoint requires the topic to be granted (existing access-aware filter from M5) and awards XP once per `(user, video)` pair.
+- [x] Disabling the engine in the env (`GAMIFICATION_ENABLED=false`) makes all calls no-op without errors.
+- [x] No provider-specific imports outside `apps/api/src/adapters/`.
 
 ## Verification Plan
 
