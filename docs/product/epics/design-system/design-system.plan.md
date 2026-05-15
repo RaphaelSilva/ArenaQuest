@@ -9,64 +9,72 @@
 
 ## Executive Summary
 
-The ArenaQuest application currently exhibits **inconsistent styling and design patterns** across admin pages, with the **Catalog page** (`/catalog/[id]`) serving as the reference implementation. This epic standardizes the entire UI by:
+The ArenaQuest application has a **comprehensive design system spec** (`docs/product/web/design-system-spec.md`), but several admin pages are **not following it**. The **Catalog page** (`/catalog/[id]`) correctly implements the spec. This epic standardizes the entire UI by:
 
-1. Establishing design tokens (colors, typography, spacing)
-2. Creating reusable component library
-3. Refactoring 5 admin/user pages to match the catalog design
-4. Documenting the design system for future consistency
+1. Auditing existing pages against the design spec
+2. Creating missing reusable components (Button, Badge, Table, Input)
+3. Refactoring 5 non-compliant pages to match the spec
+4. Ensuring all pages use design tokens consistently
 
-**Reference Design:** `/catalog/[id]` (best-in-class styling)
+**Reference Design:** `/catalog/[id]` (correctly implements `design-system-spec.md`)  
+**Source of Truth:** `docs/product/web/design-system-spec.md` (already defined)
 
 ---
 
-## Design Tokens (Canonical)
+## Design Tokens & References
 
-### Colors
-| Token | Value | Usage |
-|-------|-------|-------|
-| Primary Accent | `oklch(0.74 0.19 52)` (Laranja) | Buttons, primary CTAs, focus states |
-| Secondary Accent | `oklch(0.765 0.177 163)` (Ciano) | Status badges (published/active), secondary links |
-| Status: Archived | Orange | Consistent with primary accent |
-| Status: Draft | Default text color | Gray/neutral |
-| Status: Inactive User | Red | Danger state |
-| Danger Action | Red | Delete, deactivate, destructive actions |
-| Background Dark | `rgb(11, 14, 23)` | Page background |
-| Background Card | `rgb(19, 24, 37)` | Card/container background |
-| Border | `rgb(82, 82, 90)` (zinc-800) | Subtle borders |
-| Text Primary | `rgb(250, 250, 250)` (near white) | Body text |
+**Canonical source:** `docs/product/web/design-system-spec.md` (sections 2–6)
 
-### Typography
-| Element | Font | Size | Weight | Tracking |
-|---------|------|------|--------|----------|
-| Page Heading | Arial/Helvetica | 28px | 700 | Normal |
-| Section Label | Arial/Helvetica | 14px | 700 | Uppercase, +0.05em |
-| Body Text | Arial/Helvetica | 16px | 400 | Normal |
-| Button Text | Arial/Helvetica | 14px | 600 | Normal |
+### Key tokens (from spec)
+- **Primary accent:** `--accent` = `oklch(0.74 0.19 52)` (amber)
+- **Secondary accents:** `--accent2` (blue), `--accent3` (green)
+- **Surfaces:** `--bg` (deepest), `--bg2` (cards), `--bg3` (inputs), `--bg4` (inactive), `--bg5` (elevated)
+- **Typography:** Space Grotesk (headings, numbers) · DM Sans (body, inputs)
+- **Spacing scale:** 2–4–6–8–10–12–14–16–18–20–22–24–28–32–40–48–56–60–64 px
+- **Radius scale:** 3–4 px (xs), 6 px (sm), 7–10 px (md), 12 px (lg), 14–16 px (xl), 20 px (pill)
+- **Status system:** three canonical states only (done/inprog/locked)
 
-### Spacing & Borders
-| Token | Value |
-|-------|-------|
-| Button border-radius | 16px |
-| Input border-radius | 8px |
-| Card border-radius | 8px |
-| Standard gap/padding | 16px |
+### Typography specifics (from spec §5)
+| Role | Size | Weight | Font |
+|------|------|--------|------|
+| `display-lg` | 28 px | 700 | Space Grotesk |
+| `display-sm` | 22 px | 700 | Space Grotesk |
+| `section-title` | 13 px | 600 | Space Grotesk |
+| `body` | 13 px | 400 | DM Sans |
+| `button-cta` | 15 px | 700 | Space Grotesk |
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Design Tokens & CSS Variables
-**Priority:** CRITICAL (blocks all other phases)
+### Phase 1: Component Library & Reusable UI Kit
+**Priority:** HIGH (enables consistent refactoring across pages)
 
-**Deliverable:** `apps/web/src/styles/design-system.css`
+**Deliverable:** `apps/web/src/components/design-system/` folder with exported components
 
-1. Create centralized CSS variables for colors, typography, spacing
-2. Export as `@layer utilities` for Tailwind integration
-3. Document token usage in comments
-4. No component changes yet — tokens only
+Design tokens already exist in `design-system-spec.md` and CSS. This phase creates **React component wrappers** that enforce consistent styling:
 
-**Verification:** `make lint` passes, no visual changes in browser
+**Components to create/audit:**
+
+1. **Button.tsx** — Primary, secondary, danger variants
+   - Section 6.4: primary uses `var(--accent)` with shadow, secondary uses `var(--bg3)`
+   - Verify against spec, adapt if needed
+
+2. **Badge.tsx** — Status badges (done, inprog, locked, archived, published)
+   - Section 6.3: status system with glow backgrounds
+   - Create variants matching spec
+
+3. **Table.tsx** — Header & row components
+   - Uppercase headers with 1–1.2 px tracking (§5.3, eyebrow style)
+   - Row hover: 150 ms transition to `var(--bg3)` (§6.4)
+
+4. **Input.tsx** — Form inputs with focus states
+   - 40–44 px tall, 11 px leading icon, 3 px focus ring (§6.6)
+
+5. **Card.tsx** — Standard card surface
+   - `background: var(--bg2); border: 1px solid var(--border); border-radius: 14–16px;` (§6.2)
+
+**Verification:** Storybook/visual inspection, `make lint`
 
 ---
 
@@ -238,16 +246,16 @@ Create a new `src/components/design-system/` folder with:
 
 ## Acceptance Criteria
 
-- [x] **AC1:** Design tokens defined and exported as CSS variables
-- [x] **AC2:** Button component created with primary/secondary/danger variants
-- [x] **AC3:** Badge component created with status variants
-- [x] **AC4:** Topic Tree Admin page refactored (orange buttons, consistent spacing)
-- [x] **AC5:** User Management page refactored (orange buttons, consistent table)
-- [x] **AC6:** Admin Tasks page refactored (orange buttons, status badges)
-- [x] **AC7:** User Tasks page refactored (heading alignment, button colors)
-- [x] **AC8:** Design system documented in `docs/design-system.md`
-- [x] **AC9:** All pages pass responsive design QA (mobile/tablet/desktop)
-- [x] **AC10:** No visual regressions in other pages
+- [ ] **AC1:** Button component created with primary/secondary/danger variants (follows spec §6.4)
+- [ ] **AC2:** Badge component created with status variants (follows spec §6.3)
+- [ ] **AC3:** Table component with uppercase headers and row hover (follows spec, eyebrow style §5.3)
+- [ ] **AC4:** Input component with focus states and error handling (follows spec §6.6)
+- [ ] **AC5:** Topic Tree Admin page refactored to use Button + Badge components, spacing aligned
+- [ ] **AC6:** User Management page refactored with Table component, consistent styling
+- [ ] **AC7:** Admin Tasks page refactored with Button + Badge components, status colors aligned
+- [ ] **AC8:** User Tasks page refactored with Button component, heading alignment
+- [ ] **AC9:** All 4 refactored pages tested in browser (desktop, tablet, mobile)
+- [ ] **AC10:** No visual regressions in Catalog, Login, or other pages
 
 ---
 
