@@ -38,6 +38,7 @@ import type {
   ITaskLinkingRepository,
   IProgressRepository,
   IEnrollmentRepository,
+  IQuestRepository,
 } from '@arenaquest/shared/ports';
 import type { AuthService } from '@api/core/auth/auth-service';
 
@@ -67,6 +68,7 @@ export class AppRouter {
       taskLinks: ITaskLinkingRepository;
       progressRepo: IProgressRepository;
       enrollmentRepo: IEnrollmentRepository;
+      questRepo: IQuestRepository;
       authService: AuthService;
       loginLimiter: IRateLimiter;
       registerController: RegisterController;
@@ -87,7 +89,7 @@ export class AppRouter {
       strictCors: boolean;
     },
   ): void {
-    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
+    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, questRepo: _questRepo, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
     // Build origin matcher from config — strict in prod, lenient in dev.
     const originRules = parseAllowedOrigins(allowedOrigins, { strict: strictCors });
 
