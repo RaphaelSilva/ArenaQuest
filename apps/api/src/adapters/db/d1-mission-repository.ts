@@ -28,6 +28,105 @@ type MissionProgressRow = {
 
 export class D1MissionRepository implements IMissionRepository {
   constructor(private readonly db: D1Database) {}
+  
+  async findById(id: string): Promise<Mission | null> {
+    const row = await this.db
+      .prepare('SELECT * FROM missions WHERE id = ?')
+      .bind(id)
+      .first<MissionRow>();
+    return row ? this.rowToMission(row) : null;
+  }
+
+  async create(mission: Omit<Mission, 'id' | 'createdAt' | 'updatedAt'>): Promise<Mission> {
+    const id = crypto.randomUUID();
+    await this.db
+      .prepare(
+        `INSERT INTO missions (id, title, description, start_at, end_at, predicate_kind, predicate_params, xp_reward, badge_id, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        id,
+        mission.title,
+        mission.description,
+        mission.startAt,
+        mission.endAt,
+        mission.predicateKind,
+        mission.predicateParams,
+        mission.xpReward,
+        mission.badgeId,
+        mission.active ? 1 : 0
+      )
+      .run();
+
+    const created = await this.findById(id);
+    if (!created) throw new Error('D1MissionRepository: failed to fetch mission after create');
+    return created;
+  }
+
+  async update(id: string, mission: Partial<Omit<Mission, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Mission> {
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (mission.title !== undefined) {
+      updates.push('title = ?');
+      values.push(mission.title);
+    }
+    if (mission.description !== undefined) {
+      updates.push('description = ?');
+      values.push(mission.description);
+    }
+    if (mission.startAt !== undefined) {
+      updates.push('start_at = ?');
+      values.push(mission.startAt);
+    }
+    if (mission.endAt !== undefined) {
+      updates.push('end_at = ?');
+      values.push(mission.endAt);
+    }
+    if (mission.predicateKind !== undefined) {
+      updates.push('predicate_kind = ?');
+      values.push(mission.predicateKind);
+    }
+    if (mission.predicateParams !== undefined) {
+      updates.push('predicate_params = ?');
+      values.push(mission.predicateParams);
+    }
+    if (mission.xpReward !== undefined) {
+      updates.push('xp_reward = ?');
+      values.push(mission.xpReward);
+    }
+    if (mission.badgeId !== undefined) {
+      updates.push('badge_id = ?');
+      values.push(mission.badgeId);
+    }
+    if (mission.active !== undefined) {
+      updates.push('active = ?');
+      values.push(mission.active ? 1 : 0);
+    }
+
+    if (updates.length === 0) {
+      const existing = await this.findById(id);
+      if (!existing) throw new Error('D1MissionRepository: mission not found for update');
+      return existing;
+    }
+
+    updates.push("updated_at = datetime('now')");
+    values.push(id);
+
+    await this.db
+      .prepare(`UPDATE missions SET ${updates.join(', ')} WHERE id = ?`)
+      .bind(...values)
+      .run();
+
+    const updated = await this.findById(id);
+    if (!updated) throw new Error('D1MissionRepository: failed to fetch mission after update');
+    return updated;
+  }
+
+  async listAll(): Promise<Mission[]> {
+    const { results } = await this.db.prepare('SELECT * FROM missions ORDER BY created_at DESC').all<MissionRow>();
+    return results.map((row) => this.rowToMission(row));
+  }
 
   private rowToMission(row: MissionRow): Mission {
     return {

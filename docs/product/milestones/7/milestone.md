@@ -131,9 +131,9 @@ All under `authGuard`. Admin/content-creator routes use `requireRole(...)`.
 
 | # | Task File | Status |
 |---|-----------|--------|
-| 01 | [Gamification Data Layer (XP events + user XP + streak + level table)](./01-gamification-data-layer.task.md) | ⏳ Pending |
-| 02 | [Quest Data Layer (daily/weekly definitions + per-user progress)](./02-quest-data-layer.task.md) | ⏳ Pending |
-| 03 | [Mission Data Layer + Admin CRUD API](./03-mission-data-layer.task.md) | ⏳ Pending |
+| 01 | [Gamification Data Layer (XP events + user XP + streak + level table)](./01-gamification-data-layer.task.md) | ✅ Done |
+| 02 | [Quest Data Layer (daily/weekly definitions + per-user progress)](./02-quest-data-layer.task.md) | ✅ Done |
+| 03 | [Mission Data Layer + Admin CRUD API](./03-mission-data-layer.task.md) | ✅ Done |
 | 04 | [Badge Data Layer + seeded catalog + Admin CRUD API](./04-badge-data-layer.task.md) | ⏳ Pending |
 | 05 | [Discussion Data Layer (comments + likes)](./05-discussion-data-layer.task.md) | ⏳ Pending |
 | 06 | [XP Engine & event hooks on existing controllers](./06-xp-engine.task.md) | ⏳ Pending |
