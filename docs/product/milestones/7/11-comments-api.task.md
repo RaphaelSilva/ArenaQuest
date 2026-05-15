@@ -1,6 +1,6 @@
 # Task 11 — Comments API
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -33,11 +33,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A reply to a reply (`parentCommentId` points at a non-top-level comment) returns `400 NESTED_REPLY_FORBIDDEN`.
-- [ ] Deleting another user's comment returns `403` (unless caller is admin).
-- [ ] Listing returns deleted comments with `body: null` and preserves the reply tree.
-- [ ] `liked_by_me` reflects the caller's like state.
-- [ ] Posting a comment in a topic the user is not enrolled in returns `403`.
+- [x] A reply to a reply (`parentCommentId` points at a non-top-level comment) returns `400 NESTED_REPLY_FORBIDDEN`.
+- [x] Deleting another user's comment returns `403` (unless caller is admin).
+- [x] Listing returns deleted comments with `body: null` and preserves the reply tree.
+- [x] `liked_by_me` reflects the caller's like state.
+- [x] Posting a comment in a topic the user is not enrolled in returns `403`.
 
 ## Verification Plan
 
