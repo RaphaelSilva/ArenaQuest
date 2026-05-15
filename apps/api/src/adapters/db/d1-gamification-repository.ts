@@ -6,6 +6,10 @@ import type {
   LevelDefinitionRecord,
   AppendXpEventParams,
   UpsertUserStreakParams,
+  LeaderboardRow,
+  GetLeaderboardParams,
+  GetUserRankParams,
+  UserRankRecord,
 } from '@arenaquest/shared/ports';
 
 type XpEventRow = {
@@ -199,4 +203,284 @@ export class D1GamificationRepository implements IGamificationRepository {
       .first<{ cnt: number }>();
     return row?.cnt ?? 0;
   }
+
+  // ---------------------------------------------------------------------------
+  // Leaderboard
+  // ---------------------------------------------------------------------------
+
+  async getLeaderboard(params: GetLeaderboardParams): Promise<{ rows: LeaderboardRow[]; total: number }> {
+    const { scope, topicId, period, weekStart, limit, offset } = params;
+
+    const enrollmentFilter =
+      scope === 'topic' && topicId
+        ? `AND ux.user_id IN (
+             SELECT user_id FROM enrollments_user WHERE topic_node_id = ?1
+             UNION
+             SELECT ugm.user_id FROM enrollments_user_group eug
+             JOIN user_group_members ugm ON ugm.group_id = eug.group_id
+             WHERE eug.topic_node_id = ?1
+           )`
+        : '';
+
+    if (period === 'all_time') {
+      const rowsSql = `
+        SELECT
+          ux.user_id,
+          ux.total_xp,
+          COALESCE(ld.level, 1) AS level,
+          COALESCE(ld.rank_title, 'Aspirante') AS rank_title,
+          COALESCE(MAX(xe.earned_at), '1970-01-01T00:00:00Z') AS last_xp_event_at
+        FROM user_xp ux
+        LEFT JOIN xp_events xe ON xe.user_id = ux.user_id
+        LEFT JOIN level_definitions ld ON ld.level = (
+          SELECT MAX(ld2.level) FROM level_definitions ld2 WHERE ld2.min_xp <= ux.total_xp
+        )
+        WHERE 1=1 ${enrollmentFilter}
+        GROUP BY ux.user_id, ux.total_xp, ld.level, ld.rank_title
+        ORDER BY ux.total_xp DESC, COALESCE(MAX(xe.earned_at), '1970-01-01T00:00:00Z') ASC
+        LIMIT ?2 OFFSET ?3`;
+
+      const countSql = `
+        SELECT COUNT(*) AS cnt FROM user_xp ux WHERE 1=1 ${enrollmentFilter}`;
+
+      if (scope === 'topic' && topicId) {
+        const [rowsResult, countResult] = await Promise.all([
+          this.db.prepare(rowsSql).bind(topicId, limit, offset).all<LeaderboardDbRow>(),
+          this.db.prepare(countSql).bind(topicId).first<{ cnt: number }>(),
+        ]);
+        return {
+          rows: rowsResult.results.map(rowToLeaderboardRow),
+          total: countResult?.cnt ?? 0,
+        };
+      } else {
+        const simpleRowsSql = `
+          SELECT
+            ux.user_id,
+            ux.total_xp,
+            COALESCE(ld.level, 1) AS level,
+            COALESCE(ld.rank_title, 'Aspirante') AS rank_title,
+            COALESCE(MAX(xe.earned_at), '1970-01-01T00:00:00Z') AS last_xp_event_at
+          FROM user_xp ux
+          LEFT JOIN xp_events xe ON xe.user_id = ux.user_id
+          LEFT JOIN level_definitions ld ON ld.level = (
+            SELECT MAX(ld2.level) FROM level_definitions ld2 WHERE ld2.min_xp <= ux.total_xp
+          )
+          GROUP BY ux.user_id, ux.total_xp, ld.level, ld.rank_title
+          ORDER BY ux.total_xp DESC, COALESCE(MAX(xe.earned_at), '1970-01-01T00:00:00Z') ASC
+          LIMIT ? OFFSET ?`;
+        const [rowsResult, countResult] = await Promise.all([
+          this.db.prepare(simpleRowsSql).bind(limit, offset).all<LeaderboardDbRow>(),
+          this.db.prepare('SELECT COUNT(*) AS cnt FROM user_xp').first<{ cnt: number }>(),
+        ]);
+        return {
+          rows: rowsResult.results.map(rowToLeaderboardRow),
+          total: countResult?.cnt ?? 0,
+        };
+      }
+    } else {
+      // period = 'week'
+      if (!weekStart) throw new Error('weekStart is required for period=week');
+
+      if (scope === 'topic' && topicId) {
+        const rowsSql = `
+          SELECT
+            xe.user_id,
+            SUM(xe.points) AS total_xp,
+            COALESCE(ld.level, 1) AS level,
+            COALESCE(ld.rank_title, 'Aspirante') AS rank_title,
+            MAX(xe.earned_at) AS last_xp_event_at
+          FROM xp_events xe
+          LEFT JOIN user_xp ux ON ux.user_id = xe.user_id
+          LEFT JOIN level_definitions ld ON ld.level = (
+            SELECT MAX(ld2.level) FROM level_definitions ld2 WHERE ld2.min_xp <= COALESCE(ux.total_xp, 0)
+          )
+          WHERE xe.earned_at >= ?
+            AND xe.user_id IN (
+              SELECT user_id FROM enrollments_user WHERE topic_node_id = ?
+              UNION
+              SELECT ugm.user_id FROM enrollments_user_group eug
+              JOIN user_group_members ugm ON ugm.group_id = eug.group_id
+              WHERE eug.topic_node_id = ?
+            )
+          GROUP BY xe.user_id, ld.level, ld.rank_title
+          ORDER BY total_xp DESC, last_xp_event_at ASC
+          LIMIT ? OFFSET ?`;
+        const countSql = `
+          SELECT COUNT(DISTINCT xe.user_id) AS cnt
+          FROM xp_events xe
+          WHERE xe.earned_at >= ?
+            AND xe.user_id IN (
+              SELECT user_id FROM enrollments_user WHERE topic_node_id = ?
+              UNION
+              SELECT ugm.user_id FROM enrollments_user_group eug
+              JOIN user_group_members ugm ON ugm.group_id = eug.group_id
+              WHERE eug.topic_node_id = ?
+            )`;
+        const [rowsResult, countResult] = await Promise.all([
+          this.db.prepare(rowsSql).bind(weekStart, topicId, topicId, limit, offset).all<LeaderboardDbRow>(),
+          this.db.prepare(countSql).bind(weekStart, topicId, topicId).first<{ cnt: number }>(),
+        ]);
+        return {
+          rows: rowsResult.results.map(rowToLeaderboardRow),
+          total: countResult?.cnt ?? 0,
+        };
+      } else {
+        const rowsSql = `
+          SELECT
+            xe.user_id,
+            SUM(xe.points) AS total_xp,
+            COALESCE(ld.level, 1) AS level,
+            COALESCE(ld.rank_title, 'Aspirante') AS rank_title,
+            MAX(xe.earned_at) AS last_xp_event_at
+          FROM xp_events xe
+          LEFT JOIN user_xp ux ON ux.user_id = xe.user_id
+          LEFT JOIN level_definitions ld ON ld.level = (
+            SELECT MAX(ld2.level) FROM level_definitions ld2 WHERE ld2.min_xp <= COALESCE(ux.total_xp, 0)
+          )
+          WHERE xe.earned_at >= ?
+          GROUP BY xe.user_id, ld.level, ld.rank_title
+          ORDER BY total_xp DESC, last_xp_event_at ASC
+          LIMIT ? OFFSET ?`;
+        const countSql = `
+          SELECT COUNT(DISTINCT user_id) AS cnt FROM xp_events WHERE earned_at >= ?`;
+        const [rowsResult, countResult] = await Promise.all([
+          this.db.prepare(rowsSql).bind(weekStart, limit, offset).all<LeaderboardDbRow>(),
+          this.db.prepare(countSql).bind(weekStart).first<{ cnt: number }>(),
+        ]);
+        return {
+          rows: rowsResult.results.map(rowToLeaderboardRow),
+          total: countResult?.cnt ?? 0,
+        };
+      }
+    }
+  }
+
+  async getUserRank(userId: string, params: GetUserRankParams): Promise<UserRankRecord> {
+    const { scope, topicId, period, weekStart } = params;
+
+    if (period === 'all_time') {
+      const userXpRow = await this.db
+        .prepare('SELECT * FROM user_xp WHERE user_id = ?')
+        .bind(userId)
+        .first<UserXpRow>();
+      const totalXp = userXpRow?.total_xp ?? 0;
+
+      const enrollmentFilter =
+        scope === 'topic' && topicId
+          ? `AND user_id IN (
+               SELECT user_id FROM enrollments_user WHERE topic_node_id = ?
+               UNION
+               SELECT ugm.user_id FROM enrollments_user_group eug
+               JOIN user_group_members ugm ON ugm.group_id = eug.group_id
+               WHERE eug.topic_node_id = ?
+             )`
+          : '';
+
+      let rankRow: { cnt: number } | null;
+      if (scope === 'topic' && topicId) {
+        rankRow = await this.db
+          .prepare(`SELECT COUNT(*) + 1 AS cnt FROM user_xp WHERE total_xp > ? ${enrollmentFilter}`)
+          .bind(totalXp, topicId, topicId)
+          .first<{ cnt: number }>();
+      } else {
+        rankRow = await this.db
+          .prepare('SELECT COUNT(*) + 1 AS cnt FROM user_xp WHERE total_xp > ?')
+          .bind(totalXp)
+          .first<{ cnt: number }>();
+      }
+
+      const levelRow = await this.db
+        .prepare('SELECT level, rank_title FROM level_definitions WHERE min_xp <= ? ORDER BY level DESC LIMIT 1')
+        .bind(totalXp)
+        .first<{ level: number; rank_title: string }>();
+
+      return {
+        rank: rankRow?.cnt ?? 1,
+        totalXp,
+        level: levelRow?.level ?? 1,
+        rankTitle: levelRow?.rank_title ?? 'Aspirante',
+      };
+    } else {
+      // period = 'week'
+      if (!weekStart) throw new Error('weekStart is required for period=week');
+
+      const userWeekXpRow = await this.db
+        .prepare('SELECT SUM(points) AS total_xp FROM xp_events WHERE user_id = ? AND earned_at >= ?')
+        .bind(userId, weekStart)
+        .first<{ total_xp: number | null }>();
+      const totalXp = userWeekXpRow?.total_xp ?? 0;
+
+      const enrollmentFilter =
+        scope === 'topic' && topicId
+          ? `AND user_id IN (
+               SELECT user_id FROM enrollments_user WHERE topic_node_id = ?
+               UNION
+               SELECT ugm.user_id FROM enrollments_user_group eug
+               JOIN user_group_members ugm ON ugm.group_id = eug.group_id
+               WHERE eug.topic_node_id = ?
+             )`
+          : '';
+
+      let rankRow: { cnt: number } | null;
+      const higherXpSql = scope === 'topic' && topicId
+        ? `SELECT COUNT(*) + 1 AS cnt FROM (
+             SELECT user_id, SUM(points) AS week_xp FROM xp_events
+             WHERE earned_at >= ? ${enrollmentFilter}
+             GROUP BY user_id
+           ) WHERE week_xp > ?`
+        : `SELECT COUNT(*) + 1 AS cnt FROM (
+             SELECT user_id, SUM(points) AS week_xp FROM xp_events
+             WHERE earned_at >= ?
+             GROUP BY user_id
+           ) WHERE week_xp > ?`;
+
+      if (scope === 'topic' && topicId) {
+        rankRow = await this.db
+          .prepare(higherXpSql)
+          .bind(weekStart, topicId, topicId, totalXp)
+          .first<{ cnt: number }>();
+      } else {
+        rankRow = await this.db
+          .prepare(higherXpSql)
+          .bind(weekStart, totalXp)
+          .first<{ cnt: number }>();
+      }
+
+      const userAllTimeXpRow = await this.db
+        .prepare('SELECT total_xp FROM user_xp WHERE user_id = ?')
+        .bind(userId)
+        .first<{ total_xp: number }>();
+      const allTimeXp = userAllTimeXpRow?.total_xp ?? 0;
+
+      const levelRow = await this.db
+        .prepare('SELECT level, rank_title FROM level_definitions WHERE min_xp <= ? ORDER BY level DESC LIMIT 1')
+        .bind(allTimeXp)
+        .first<{ level: number; rank_title: string }>();
+
+      return {
+        rank: rankRow?.cnt ?? 1,
+        totalXp,
+        level: levelRow?.level ?? 1,
+        rankTitle: levelRow?.rank_title ?? 'Aspirante',
+      };
+    }
+  }
+}
+
+type LeaderboardDbRow = {
+  user_id: string;
+  total_xp: number;
+  level: number;
+  rank_title: string;
+  last_xp_event_at: string | null;
+};
+
+function rowToLeaderboardRow(row: LeaderboardDbRow): LeaderboardRow {
+  return {
+    userId: row.user_id,
+    totalXp: row.total_xp,
+    level: row.level,
+    rankTitle: row.rank_title,
+    lastXpEventAt: row.last_xp_event_at === '1970-01-01T00:00:00Z' ? null : row.last_xp_event_at,
+  };
 }
