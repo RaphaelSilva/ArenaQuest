@@ -7,12 +7,7 @@ import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useAuth, useHasRole } from '@web/hooks/use-auth';
 import { Spinner } from '@web/components/spinner';
 import { adminTasksApi, type Task } from '@web/lib/admin-tasks-api';
-
-const STATUS_STYLES: Record<Task['status'], string> = {
-  draft: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200',
-  published: 'bg-emerald-200 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
-  archived: 'bg-amber-200 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-};
+import { Button, Badge } from '@web/components/design-system';
 
 export default function AdminTasksPage() {
   const router = useRouter();
@@ -72,13 +67,15 @@ export default function AdminTasksPage() {
     <main className="mx-auto w-full max-w-5xl px-6 py-8">
       <header className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Tasks</h1>
-        <button
+        <Button
           onClick={handleCreate}
           disabled={creating}
-          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          variant="primary"
+          size="md"
+          isLoading={creating}
         >
           {creating ? 'Creating…' : 'New Task'}
-        </button>
+        </Button>
       </header>
 
       {error && (
@@ -104,26 +101,28 @@ export default function AdminTasksPage() {
                 >
                   {task.title}
                 </Link>
-                <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_STYLES[task.status]}`}>
+                <Badge status={task.status as 'draft' | 'published' | 'archived'} size="sm">
                   {task.status}
-                </span>
+                </Badge>
               </div>
               <span className="text-xs text-zinc-500">{new Date(task.updatedAt).toLocaleDateString()}</span>
               {task.status !== 'archived' && (
                 confirmingArchive === task.id ? (
                   <span className="flex items-center gap-2">
-                    <button
+                    <Button
                       onClick={() => handleArchive(task.id)}
-                      className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
+                      variant="danger"
+                      size="sm"
                     >
                       Confirm
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => setConfirmingArchive(null)}
-                      className="text-xs text-zinc-500 hover:text-zinc-900"
+                      variant="secondary"
+                      size="sm"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </span>
                 ) : (
                   <button
