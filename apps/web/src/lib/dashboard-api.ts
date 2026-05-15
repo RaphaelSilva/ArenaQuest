@@ -1,7 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 // ---------------------------------------------------------------------------
-// Types
+// Types — frontend shape (consumed by components)
 // ---------------------------------------------------------------------------
 
 export type DashboardXp = {
@@ -160,14 +160,227 @@ export const DASHBOARD_FIXTURE: DashboardPayload = {
 };
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// Returns a boolean[7] for the last 7 calendar days (index 0 = 6 days ago, index 6 = today).
+// A day is true if it falls within the streak window ending on lastActivityDate.
+export function computeWeekPips(
+  lastActivityDate: string | null,
+  currentStreak: number,
+): boolean[] {
+  if (!lastActivityDate || currentStreak <= 0) return Array(7).fill(false) as boolean[];
+
+  const last = new Date(lastActivityDate);
+  last.setUTCHours(0, 0, 0, 0);
+
+  const streakStart = new Date(last);
+  streakStart.setUTCDate(streakStart.getUTCDate() - (currentStreak - 1));
+
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  const pips: boolean[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const day = new Date(today);
+    day.setUTCDate(day.getUTCDate() - i);
+    pips.push(day >= streakStart && day <= last);
+  }
+  return pips;
+}
+
+async function safeFetch<T>(url: string, headers: Record<string, string>): Promise<T | null> {
+  try {
+    const res = await fetch(url, { headers, cache: 'no-store' });
+    if (!res.ok) return null;
+    return res.json() as Promise<T>;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Raw API types (minimal, only what we read)
+// ---------------------------------------------------------------------------
+
+type ApiXp = { totalXp: number; level: number; rankTitle: string; xpToNext: number | null; xpInLevel: number };
+type ApiStreak = { currentStreak: number; longestStreak: number; lastActivityDate: string | null };
+type ApiBadgeEntry = { badge: { id: string; iconEmoji: string; name: string; xpReward: number }; earnedAt: string };
+type ApiQuestEntry = { id: string; title: string; xpReward: number; progress: { currentValue: number; targetValue: number; completed: boolean } | null };
+type ApiMissionEntry = {
+  mission: { id: string; title: string; description: string; endAt: string; xpReward: number; badgeId: string | null };
+  progress: { currentValue: number; targetValue: number } | null;
+};
+
+type ApiDashboardShape = {
+  xp: ApiXp | null;
+  streak: ApiStreak | null;
+  badges: ApiBadgeEntry[] | null;
+  questsDaily: ApiQuestEntry[] | null;
+  questsWeekly: ApiQuestEntry[] | null;
+  missions: ApiMissionEntry[] | null;
+};
+
+type ApiLeaderboardResponse = {
+  rows: Array<{ userId: string; totalXp: number }>;
+  me: { rank: number; totalXp: number };
+  total: number;
+};
+
+type ApiTopicsResponse = {
+  data: Array<{ id: string; parentId: string | null; title: string }>;
+};
+
+type ApiTopicProgressResponse = {
+  data: Array<{ topicNodeId: string; status: 'not_started' | 'in_progress' | 'completed' }>;
+};
+
+// ---------------------------------------------------------------------------
+// Adapters
+// ---------------------------------------------------------------------------
+
+function adaptXp(raw: ApiXp | null): DashboardXp {
+  if (!raw) return { totalXp: 0, level: 1, rankTitle: '', xpInLevel: 0, xpToNextLevel: 0 };
+  return {
+    totalXp: raw.totalXp,
+    level: raw.level,
+    rankTitle: raw.rankTitle,
+    xpInLevel: raw.xpInLevel,
+    xpToNextLevel: raw.xpToNext ?? 0,
+  };
+}
+
+function adaptStreak(raw: ApiStreak | null): DashboardStreak {
+  if (!raw) return { currentDays: 0, longestDays: 0, weekPips: Array(7).fill(false) as boolean[] };
+  return {
+    currentDays: raw.currentStreak,
+    longestDays: raw.longestStreak,
+    weekPips: computeWeekPips(raw.lastActivityDate, raw.currentStreak),
+  };
+}
+
+function adaptDaily(raw: ApiQuestEntry[] | null): DailyQuest[] {
+  if (!raw) return [];
+  return raw.map((q) => ({
+    id: q.id,
+    title: q.title,
+    xpReward: q.xpReward,
+    currentValue: q.progress?.currentValue ?? 0,
+    targetValue: q.progress?.targetValue ?? 1,
+    completed: q.progress?.completed ?? false,
+  }));
+}
+
+function adaptWeekly(raw: ApiQuestEntry[] | null): WeeklyChallenge[] {
+  if (!raw) return [];
+  return raw.map((q) => ({
+    id: q.id,
+    title: q.title,
+    xpReward: q.xpReward,
+    currentValue: q.progress?.currentValue ?? 0,
+    targetValue: q.progress?.targetValue ?? 1,
+  }));
+}
+
+function adaptMissions(raw: ApiMissionEntry[] | null): DashboardMission[] | null {
+  if (!raw || raw.length === 0) return null;
+  return raw.map((entry) => {
+    const { mission, progress } = entry;
+    const progressPct =
+      progress && progress.targetValue > 0
+        ? Math.min(100, Math.round((progress.currentValue / progress.targetValue) * 100))
+        : 0;
+    return {
+      id: mission.id,
+      name: mission.title,
+      icon: '🎯',
+      description: mission.description,
+      progressPct,
+      deadlineAt: mission.endAt,
+      rewardXp: mission.xpReward,
+      rewardBadge: mission.badgeId ?? null,
+    };
+  });
+}
+
+function adaptBadges(raw: ApiBadgeEntry[] | null): { earned: DashboardBadge[]; locked: DashboardBadge[] } {
+  if (!raw) return { earned: [], locked: [] };
+  const earned = raw.map((entry) => ({
+    id: entry.badge.id,
+    emoji: entry.badge.iconEmoji,
+    name: entry.badge.name,
+    xpReward: entry.badge.xpReward,
+    earned: true as const,
+  }));
+  return { earned, locked: [] };
+}
+
+function adaptLeaderboard(
+  raw: ApiLeaderboardResponse | null,
+): { rows: LeaderboardEntry[]; myRank: number; totalPlayers: number } {
+  if (!raw) return { rows: [], myRank: 0, totalPlayers: 0 };
+
+  const maxXp = raw.rows[0]?.totalXp ?? 1;
+  const myRank = raw.me.rank;
+
+  const rows: LeaderboardEntry[] = raw.rows.map((r, i) => ({
+    rank: i + 1,
+    initials: r.userId.slice(0, 2).toUpperCase(),
+    name: r.userId.slice(0, 8),
+    totalXp: r.totalXp,
+    pct: maxXp > 0 ? Math.round((r.totalXp / maxXp) * 100) : 0,
+    isMe: i + 1 === myRank,
+  }));
+
+  return { rows, myRank, totalPlayers: raw.total };
+}
+
+function adaptRoadmap(
+  topicsRaw: ApiTopicsResponse | null,
+  progressRaw: ApiTopicProgressResponse | null,
+): RoadmapNode[] {
+  if (!topicsRaw) return [];
+
+  const roots = topicsRaw.data.filter((t) => t.parentId === null);
+  const progressMap = new Map(
+    (progressRaw?.data ?? []).map((p) => [p.topicNodeId, p.status]),
+  );
+
+  return roots.map((t) => {
+    const status = progressMap.get(t.id) ?? 'not_started';
+    const pct = status === 'completed' ? 100 : status === 'in_progress' ? 50 : 0;
+    return { id: t.id, emoji: '📚', name: t.title, pct, status };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Fetch
 // ---------------------------------------------------------------------------
 
 export async function getDashboard(token: string): Promise<DashboardPayload> {
-  const res = await fetch(`${API_URL}/me/dashboard`, {
-    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-  if (!res.ok) throw new Error(`Failed to load dashboard (${res.status})`);
-  return res.json() as Promise<DashboardPayload>;
+  const headers = { Accept: 'application/json', Authorization: `Bearer ${token}` };
+
+  const [dashRaw, lbRaw, topicsRaw, progressRaw] = await Promise.all([
+    fetch(`${API_URL}/me/dashboard`, { headers, cache: 'no-store' }).then(async (r) => {
+      if (!r.ok) throw new Error(`Failed to load dashboard (${r.status})`);
+      return r.json() as Promise<ApiDashboardShape>;
+    }),
+    safeFetch<ApiLeaderboardResponse>(
+      `${API_URL}/leaderboard?scope=global&period=all_time&limit=5`,
+      headers,
+    ),
+    safeFetch<ApiTopicsResponse>(`${API_URL}/topics`, headers),
+    safeFetch<ApiTopicProgressResponse>(`${API_URL}/me/progress/topics`, headers),
+  ]);
+
+  return {
+    xp: adaptXp(dashRaw.xp),
+    streak: adaptStreak(dashRaw.streak),
+    daily: adaptDaily(dashRaw.questsDaily),
+    weekly: adaptWeekly(dashRaw.questsWeekly),
+    missions: adaptMissions(dashRaw.missions),
+    badges: adaptBadges(dashRaw.badges),
+    leaderboard: adaptLeaderboard(lbRaw),
+    roadmap: adaptRoadmap(topicsRaw, progressRaw),
+  };
 }
