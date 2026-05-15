@@ -10,6 +10,7 @@ import type {
   ITopicNodeRepository,
 } from '@arenaquest/shared/ports';
 import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
+import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
 
 const CACHE_CONTROL = 'private, max-age=15';
 
@@ -36,6 +37,7 @@ export function buildProgressTaskRouter(
   links: ITaskLinkingRepository,
   topics: ITopicNodeRepository,
   xpEngine?: XpEngine,
+  streakEngine?: StreakEngine,
 ): Hono {
   const router = new Hono();
   const service = buildService(progress, enrollment, tasks, stages, links, topics);
@@ -60,6 +62,13 @@ export function buildProgressTaskRouter(
         console.error('[XP] stage_checkin award failed:', err);
       }
     }
+    if (result.data.changed && streakEngine) {
+      try {
+        await streakEngine.recordActivity(userId, new Date());
+      } catch (err) {
+        console.error('[streak] stage_checkin recordActivity failed:', err);
+      }
+    }
     const status = result.data.changed ? 201 : 200;
     return c.json(result.data, status as 200 | 201);
   });
@@ -79,6 +88,7 @@ export function buildProgressTopicRouter(
   links: ITaskLinkingRepository,
   topics: ITopicNodeRepository,
   xpEngine?: XpEngine,
+  streakEngine?: StreakEngine,
 ): Hono {
   const router = new Hono();
   const service = buildService(progress, enrollment, tasks, stages, links, topics);
@@ -106,6 +116,13 @@ export function buildProgressTopicRouter(
         await xpEngine.award({ userId, action: 'topic_complete', sourceKind: 'topic', sourceId: topicId });
       } catch (err) {
         console.error('[XP] topic_complete award failed:', err);
+      }
+    }
+    if (result.data.changed && streakEngine) {
+      try {
+        await streakEngine.recordActivity(userId, new Date());
+      } catch (err) {
+        console.error('[streak] topic_complete recordActivity failed:', err);
       }
     }
     return c.json(result.data);

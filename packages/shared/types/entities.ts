@@ -52,6 +52,7 @@ export namespace Entities {
             roles: Security.Role[];
             groups: UserGroup[];
             createdAt: Date;
+            timezone: string;
         }
 
         export interface Profile {
