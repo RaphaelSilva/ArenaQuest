@@ -9,6 +9,7 @@ import { buildAdminUsersRouter } from './admin-users.router';
 import { buildAdminTopicsRouter } from './admin-topics.router';
 import { buildAdminMediaRouter } from './admin-media.router';
 import { buildAdminTasksRouter } from './admin-tasks.router';
+import { buildAdminMissionsRouter } from './admin-missions.router';
 import { buildTasksRouter } from './tasks.router';
 import { buildTopicsRouter } from './topics.router';
 import {
@@ -167,6 +168,7 @@ export class AppRouter {
     app.route('/account', buildAccountRouter(accountController));
     app.route('/auth', buildOAuthRouter(googleOAuthController, cookieSameSite));
     app.route('/admin/badges', buildAdminBadgesRouter(badgeRepo));
+    app.route('/admin/missions', buildAdminMissionsRouter(missionRepo));
 
     // Sanity demo — development only, can be removed post-milestone.
     app.get('/protected/ping', authGuard, (c) =>
