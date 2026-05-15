@@ -1,6 +1,6 @@
 # Task 15 — Web: Topic Detail Page
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -33,12 +33,12 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Layout matches the wireframe at ≥ 1280 px within ±8 px.
-- [ ] Switching the media tabs preserves video playback state when returning to the Videos tab in the same session.
-- [ ] Marking as done updates the progress bar to 100 % and the right-sidebar entry without a full reload.
-- [ ] Posting a comment optimistically appends it and rolls back if the API call fails.
-- [ ] The 90 %-watched trigger fires exactly once per video per user (server-side enforced by the XP idempotency key).
-- [ ] `make lint` passes; RTL covers tab switching and comment optimistic update.
+- [x] Layout matches the wireframe at ≥ 1280 px within ±8 px.
+- [x] Switching the media tabs preserves video playback state when returning to the Videos tab in the same session.
+- [x] Marking as done updates the progress bar to 100 % and the right-sidebar entry without a full reload.
+- [x] Posting a comment optimistically appends it and rolls back if the API call fails.
+- [x] The 90 %-watched trigger fires exactly once per video per user (server-side enforced by the XP idempotency key).
+- [x] `make lint` passes; RTL covers tab switching and comment optimistic update.
 
 ## Verification Plan
 
