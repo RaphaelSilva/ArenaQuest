@@ -246,16 +246,16 @@ Create a new `src/components/design-system/` folder with:
 
 ## Acceptance Criteria
 
-- [ ] **AC1:** Button component created with primary/secondary/danger variants (follows spec §6.4)
-- [ ] **AC2:** Badge component created with status variants (follows spec §6.3)
-- [ ] **AC3:** Table component with uppercase headers and row hover (follows spec, eyebrow style §5.3)
-- [ ] **AC4:** Input component with focus states and error handling (follows spec §6.6)
-- [ ] **AC5:** Topic Tree Admin page refactored to use Button + Badge components, spacing aligned
-- [ ] **AC6:** User Management page refactored with Table component, consistent styling
-- [ ] **AC7:** Admin Tasks page refactored with Button + Badge components, status colors aligned
-- [ ] **AC8:** User Tasks page refactored with Button component, heading alignment
-- [ ] **AC9:** All 4 refactored pages tested in browser (desktop, tablet, mobile)
-- [ ] **AC10:** No visual regressions in Catalog, Login, or other pages
+- [x] **AC1:** Button component created with primary/secondary/danger variants (follows spec §6.4)
+- [x] **AC2:** Badge component created with status variants (follows spec §6.3)
+- [x] **AC3:** Table component with uppercase headers and row hover (follows spec, eyebrow style §5.3)
+- [x] **AC4:** Input component with focus states and error handling (follows spec §6.6)
+- [x] **AC5:** Topic Tree Admin page refactored to use Button + Badge components, spacing aligned
+- [x] **AC6:** User Management page refactored with Table component, consistent styling
+- [x] **AC7:** Admin Tasks page refactored with Button + Badge components, status colors aligned
+- [x] **AC8:** User Tasks page refactored with Button component, heading alignment
+- [ ] **AC9:** All 4 refactored pages tested in browser (desktop, tablet, mobile) — PENDING MANUAL QA
+- [ ] **AC10:** No visual regressions in Catalog, Login, or other pages — PENDING MANUAL QA
 
 ---
 
