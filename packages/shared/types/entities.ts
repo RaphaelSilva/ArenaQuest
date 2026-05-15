@@ -185,4 +185,37 @@ export namespace Entities {
             createdAt: Date;
         }
     }
+
+    export namespace Gamification {
+        export interface XpEvent {
+            id: string;
+            userId: string;
+            sourceKind: string;
+            sourceId: string | null;
+            points: number;
+            idempotencyKey: string;
+            earnedAt: Date;
+        }
+
+        export interface UserXp {
+            userId: string;
+            totalXp: number;
+            updatedAt: Date;
+        }
+
+        export interface UserStreak {
+            userId: string;
+            currentStreak: number;
+            longestStreak: number;
+            lastActivityDate: string | null;
+            updatedAt: Date;
+        }
+
+        export interface LevelDefinition {
+            level: number;
+            rankTitle: string;
+            minXp: number;
+            maxXp: number | null;
+        }
+    }
 }
