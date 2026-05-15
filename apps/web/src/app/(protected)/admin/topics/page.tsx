@@ -13,6 +13,7 @@ import { adminMediaApi, type Media } from '@web/lib/admin-media-api';
 import { MediaUploader } from '@web/components/admin/MediaUploader';
 import { MediaList } from '@web/components/admin/MediaList';
 import { Spinner } from '@web/components/spinner';
+import { Button, Badge } from '@web/components/design-system';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,10 +64,10 @@ function getDropPosition(e: React.DragEvent<HTMLElement>): DropPosition {
 // Constants
 // ---------------------------------------------------------------------------
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 ring-1 ring-inset ring-zinc-200 dark:ring-zinc-700',
-  published: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 ring-1 ring-inset ring-emerald-200 dark:ring-emerald-500/20',
-  archived: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 ring-1 ring-inset ring-amber-200 dark:ring-amber-500/20',
+const STATUS_BADGE_MAP: Record<string, 'draft' | 'published' | 'archived'> = {
+  draft: 'draft',
+  published: 'published',
+  archived: 'archived',
 };
 
 // ---------------------------------------------------------------------------
@@ -128,21 +129,23 @@ function CreateModal({ parentId, onSubmit, onClose }: CreateModalProps) {
           {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button
+            <Button
               type="button"
               onClick={onClose}
-              className="rounded px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400"
+              variant="secondary"
+              size="md"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={submitting}
-              className="flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              variant="primary"
+              size="md"
+              isLoading={submitting}
             >
-              {submitting && <Spinner className="h-4 w-4" />}
               Create
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -173,18 +176,20 @@ function ConfirmDialog({
       <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
         <p className="mb-4 text-sm text-zinc-700 dark:text-zinc-300">{message}</p>
         <div className="flex justify-end gap-3">
-          <button
+          <Button
             onClick={onCancel}
-            className="rounded px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400"
+            variant="secondary"
+            size="md"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onConfirm}
-            className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            variant="danger"
+            size="md"
           >
             Confirm
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -556,11 +561,9 @@ export default function AdminTopicsPage() {
             )}
 
             {/* Status badge */}
-            <span
-              className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[node.status] ?? ''}`}
-            >
+            <Badge status={STATUS_BADGE_MAP[node.status] || 'draft'} size="sm">
               {node.status}
-            </span>
+            </Badge>
 
             {/* Add child */}
             <button
@@ -622,12 +625,13 @@ export default function AdminTopicsPage() {
           <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Topic Tree</h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">Build and organize your educational hierarchy</p>
         </div>
-        <button
+        <Button
           onClick={() => { setCreateParentId(null); setShowCreate(true); }}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-indigo-500/25 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
+          variant="primary"
+          size="md"
         >
           New Root Topic
-        </button>
+        </Button>
       </div>
 
       {/* Body */}
@@ -671,9 +675,9 @@ export default function AdminTopicsPage() {
                   </h2>
                   <p className="text-sm text-zinc-500">Topic ID: <code className="font-mono text-xs">{selectedId}</code></p>
                 </div>
-                <div className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${STATUS_COLORS[detailStatus]}`}>
+                <Badge status={STATUS_BADGE_MAP[detailStatus] || 'draft'}>
                   {detailStatus}
-                </div>
+                </Badge>
               </div>
 
               <form onSubmit={handleDetailSave} className="space-y-6 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50" noValidate>
@@ -767,14 +771,15 @@ export default function AdminTopicsPage() {
               )}
 
               <div className="flex items-center gap-3 pt-2">
-                <button
+                <Button
                   type="submit"
                   disabled={detailSaving}
-                  className="flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  variant="primary"
+                  size="md"
+                  isLoading={detailSaving}
                 >
-                  {detailSaving && <Spinner className="h-4 w-4" />}
                   Save changes
-                </button>
+                </Button>
               </div>
             </form>
 
