@@ -1,6 +1,6 @@
 # Task 13 — Web: Gamified Dashboard
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -32,12 +32,12 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Layout matches the wireframe at ≥ 1280 px within ±8 px.
-- [ ] All seven sections render against a seeded test fixture.
-- [ ] Empty states never display "NaN", `undefined`, or broken bars when data is null.
-- [ ] Theme toggle persists in `localStorage` and applies on next visit.
-- [ ] No client-side request waterfall — the page renders from one `/me/dashboard` payload.
-- [ ] `make lint` passes; RTL covers at least the level card and the daily-task list.
+- [x] Layout matches the wireframe at ≥ 1280 px within ±8 px.
+- [x] All seven sections render against a seeded test fixture.
+- [x] Empty states never display "NaN", `undefined`, or broken bars when data is null.
+- [x] Theme toggle persists in `localStorage` and applies on next visit.
+- [x] No client-side request waterfall — the page renders from one `/me/dashboard` payload.
+- [x] `make lint` passes; RTL covers at least the level card and the daily-task list.
 
 ## Verification Plan
 

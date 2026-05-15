@@ -28,6 +28,7 @@ export class MeGamificationController {
         level: definition.level,
         rankTitle: definition.rankTitle,
         xpToNext,
+        xpInLevel: xpRecord.totalXp - definition.minXp,
       },
     };
   }

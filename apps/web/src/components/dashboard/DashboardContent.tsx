@@ -88,30 +88,32 @@ export function DashboardContent() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCardLevel xp={data.xp} />
             <StatCardStreak streak={data.streak} />
-            <StatCardRanking
-              rows={data.leaderboard.rows}
-              myRank={data.leaderboard.myRank}
-              totalPlayers={data.leaderboard.totalPlayers}
-            />
+            {data.leaderboard.rows.length > 0 && (
+              <StatCardRanking
+                rows={data.leaderboard.rows}
+                myRank={data.leaderboard.myRank}
+                totalPlayers={data.leaderboard.totalPlayers}
+              />
+            )}
           </div>
 
           {/* Main 2-col grid */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Left column */}
             <div className="flex flex-col gap-4">
-              <DailyTasks tasks={data.daily} />
-              <MissionsList missions={data.missions} />
+              {data.daily.length > 0 && <DailyTasks tasks={data.daily} />}
+              {data.missions !== null && <MissionsList missions={data.missions} />}
             </div>
 
             {/* Right column */}
             <div className="flex flex-col gap-4">
-              <WeeklyChallenges challenges={data.weekly} />
-              <BadgesGrid badges={data.badges} />
+              {data.weekly.length > 0 && <WeeklyChallenges challenges={data.weekly} />}
+              {data.badges.earned.length > 0 && <BadgesGrid badges={data.badges} />}
             </div>
           </div>
 
           {/* Roadmap */}
-          <Roadmap nodes={data.roadmap} />
+          {data.roadmap.length > 0 && <Roadmap nodes={data.roadmap} />}
         </>
       )}
     </div>

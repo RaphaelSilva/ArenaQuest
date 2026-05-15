@@ -7,6 +7,7 @@ export interface DashboardXp {
   level: number;
   rankTitle: string;
   xpToNext: number | null;
+  xpInLevel: number;
 }
 
 export interface DashboardStreak {
