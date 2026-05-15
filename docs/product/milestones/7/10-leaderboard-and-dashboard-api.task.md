@@ -1,6 +1,6 @@
 # Task 10 — Leaderboard API + `/me/dashboard` Aggregate
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -29,11 +29,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `/leaderboard` returns `rows` sorted by `total_xp DESC` and breaks ties on `last_xp_event_at ASC`.
-- [ ] `/leaderboard` `me.rank` is the global rank, not the page-relative rank.
-- [ ] `/me/dashboard` returns `null` for empty sections (no missions active, etc.) rather than 404.
-- [ ] Unauthenticated callers receive `401` on all endpoints.
-- [ ] No provider-specific imports outside adapters.
+- [x] `/leaderboard` returns `rows` sorted by `total_xp DESC` and breaks ties on `last_xp_event_at ASC`.
+- [x] `/leaderboard` `me.rank` is the global rank, not the page-relative rank.
+- [x] `/me/dashboard` returns `null` for empty sections (no missions active, etc.) rather than 404.
+- [x] Unauthenticated callers receive `401` on all endpoints.
+- [x] No provider-specific imports outside adapters.
 
 ## Verification Plan
 

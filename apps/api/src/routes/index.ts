@@ -20,6 +20,8 @@ import { buildAdminEnrollmentRouter } from './admin-enrollment.router';
 import { buildAccountRouter } from './account.router';
 import { buildOAuthRouter } from './oauth.router';
 import { buildAdminBadgesRouter } from './admin-badges.router';
+import { buildMeGamificationRouter } from './me-gamification.router';
+import { buildLeaderboardRouter } from './leaderboard.router';
 import type { AccountController } from '@api/controllers/account.controller';
 import type { GoogleOAuthController } from '@api/controllers/google-oauth.controller';
 import { getHealth } from '@api/controllers/health.controller';
@@ -41,7 +43,9 @@ import type {
   IEnrollmentRepository,
   IQuestRepository,
   IBadgeRepository,
+  IGamificationRepository,
 } from '@arenaquest/shared/ports';
+import type { IMissionRepository } from '@arenaquest/shared/ports';
 import type { AuthService } from '@api/core/auth/auth-service';
 import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
@@ -76,6 +80,8 @@ export class AppRouter {
       enrollmentRepo: IEnrollmentRepository;
       questRepo: IQuestRepository;
       badgeRepo: IBadgeRepository;
+      gamificationRepo: IGamificationRepository;
+      missionRepo: IMissionRepository;
       xpEngine?: XpEngine;
       streakEngine?: StreakEngine;
       questEvaluator?: QuestEvaluator;
@@ -100,7 +106,7 @@ export class AppRouter {
       strictCors: boolean;
     },
   ): void {
-    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, questRepo: _questRepo, badgeRepo, xpEngine, streakEngine, questEvaluator, badgeEngine, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
+    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, questRepo: _questRepo, badgeRepo, gamificationRepo, missionRepo, xpEngine, streakEngine, questEvaluator, badgeEngine, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
     // Build origin matcher from config — strict in prod, lenient in dev.
     const originRules = parseAllowedOrigins(allowedOrigins, { strict: strictCors });
 
@@ -151,6 +157,8 @@ export class AppRouter {
     app.route('/topics', buildTopicsRouter(topics, media, storage, enrollmentRepo, xpEngine, streakEngine, questEvaluator, badgeEngine));
     app.route('/topics', buildProgressTopicRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics, xpEngine, streakEngine, questEvaluator, badgeEngine));
     app.route('/me', buildMeProgressRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
+    app.route('/me', buildMeGamificationRouter(gamificationRepo, _questRepo, badgeRepo, missionRepo));
+    app.route('/leaderboard', buildLeaderboardRouter(gamificationRepo, users));
     app.route('/admin', buildAdminEnrollmentRouter(enrollmentRepo, users, topics));
     app.route('/account', buildAccountRouter(accountController));
     app.route('/auth', buildOAuthRouter(googleOAuthController, cookieSameSite));

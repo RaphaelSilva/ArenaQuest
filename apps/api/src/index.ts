@@ -178,6 +178,8 @@ function buildApp(env: AppEnv): Hono {
     enrollmentRepo,
     questRepo,
     badgeRepo,
+    gamificationRepo,
+    missionRepo,
     xpEngine,
     streakEngine,
     questEvaluator,
