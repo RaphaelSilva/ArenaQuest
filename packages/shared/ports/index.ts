@@ -16,4 +16,5 @@ export * from './i-enrollment-repository';
 export * from './i-password-reset-token-repository';
 export * from './i-oauth-account-repository';
 export * from './i-gamification-repository';
+export * from './i-quest-repository';
 // i-database-adapter defines the full future IDatabaseAdapter contract (not yet implemented)

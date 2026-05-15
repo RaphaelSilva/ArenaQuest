@@ -34,6 +34,7 @@ Run these steps in order. Stop and ask if any precondition fails.
 1. Read the target `.task.md` end-to-end.
 2. Extract: milestone number (`<N>`), task slug, summary, dependencies, acceptance criteria, verification plan.
 3. Decide assignment (`frontend-developer` vs `backend-developer`) using Scope/Technical Constraints. If ambiguous, ask once.
+4. **Migration Check**: If the task involves a data layer/migrations, scan all branches matching `feature/m<N>/*` and check their `apps/api/migrations/` directory. Identify the true "next" migration number to prevent collisions with parallel tasks that haven't been merged to `candidate` yet.
 
 ### 3.2 Prepare branches
 
@@ -85,7 +86,9 @@ When the user signals implementation is done:
 1. Verify `make lint` (and `make test` if the task requires) pass.
 2. Stage and commit code changes using Conventional Commits per file area.
 3. `git push` the task branch.
-4. Ask: "Open PR `feature/m<N>/<task_slug>.task` → `feature/m<N>/candidate` now?" Only run `gh pr create` after explicit "yes".
+4. **Integration**: Ask: "Merge `feature/m<N>/<task_slug>.task` into `feature/m<N>/candidate` now?". 
+   - If "yes": Perform a local merge into `candidate`, push the updated `candidate` branch, and offer to delete the local task branch.
+   - If "no": Ask "Open PR `feature/m<N>/<task_slug>.task` → `feature/m<N>/candidate` now?" and run `gh pr create` only after explicit "yes".
 5. PR body links the plan file and lists the AC checkboxes from the task.
 
 ### 3.7 Final output
