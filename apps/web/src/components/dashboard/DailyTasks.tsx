@@ -1,5 +1,3 @@
-'use client';
-
 import type { DailyQuest } from '@web/lib/dashboard-api';
 
 type Props = { tasks: DailyQuest[] };

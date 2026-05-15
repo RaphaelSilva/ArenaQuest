@@ -21,7 +21,7 @@ export function StatCardStreak({ streak }: Props) {
         </span>
         <span
           className="flex h-8 w-8 items-center justify-center rounded-[9px] text-base"
-          style={{ background: 'oklch(0.68 0.17 150 / 0.18)' }}
+          style={{ background: 'var(--aq-accent3-glow)' }}
           aria-hidden
         >
           🔥
@@ -52,7 +52,7 @@ export function StatCardStreak({ streak }: Props) {
               className="h-3 w-3 rounded-full transition-colors duration-300"
               style={{
                 background: active ? 'var(--aq-accent3)' : 'var(--aq-bg4)',
-                boxShadow: active ? '0 0 6px oklch(0.68 0.17 150 / 0.5)' : 'none',
+                boxShadow: active ? '0 0 6px var(--aq-accent3-glow)' : 'none',
               }}
               aria-label={`${DAYS[i]}: ${active ? 'active' : 'inactive'}`}
             />

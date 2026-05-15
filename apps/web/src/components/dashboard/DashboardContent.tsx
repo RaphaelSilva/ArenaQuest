@@ -14,15 +14,15 @@ import { Roadmap } from './Roadmap';
 import { DashboardSkeleton } from './DashboardSkeleton';
 import { ThemeToggle } from './ThemeToggle';
 
-function greeting(): string {
-  const h = new Date().getHours();
+function getGreeting(now: Date): string {
+  const h = now.getHours();
   if (h < 12) return 'Good morning';
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
 }
 
 export function DashboardContent() {
-  const { accessToken, user } = useAuth();
+  const { accessToken, user, isLoading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,16 +30,19 @@ export function DashboardContent() {
   const firstName = user?.name?.split(' ')[0] ?? '';
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (authLoading) return;
+    if (!accessToken) return; // protected layout redirects before this persists
     getDashboard(accessToken)
       .then(setData)
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : 'Failed to load dashboard.');
       })
       .finally(() => setLoading(false));
-  }, [accessToken]);
+  }, [accessToken, authLoading]);
 
   if (loading) return <DashboardSkeleton />;
+
+  const now = new Date();
 
   return (
     <div className="flex flex-col gap-6" style={{ padding: '28px 32px 40px' }}>
@@ -50,7 +53,7 @@ export function DashboardContent() {
             className="text-[22px] font-bold tracking-tight"
             style={{ color: 'var(--aq-text)', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.3px' }}
           >
-            {greeting()}{firstName ? `, ${firstName}` : ''} 👋
+            {getGreeting(now)}{firstName ? `, ${firstName}` : ''} 👋
           </h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--aq-text2)' }}>
             Track your progress and keep the momentum going.
@@ -60,9 +63,9 @@ export function DashboardContent() {
           <time
             className="hidden text-right text-xs sm:block"
             style={{ color: 'var(--aq-text3)' }}
-            dateTime={new Date().toISOString().slice(0, 10)}
+            dateTime={now.toISOString().slice(0, 10)}
           >
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'short' })}
+            {now.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'short' })}
           </time>
           <ThemeToggle />
         </div>

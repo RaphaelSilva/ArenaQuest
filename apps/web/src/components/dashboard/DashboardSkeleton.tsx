@@ -1,4 +1,6 @@
-function ShimmerBlock({ className, style }: { className?: string; style?: React.CSSProperties }) {
+import type { CSSProperties } from 'react';
+
+function ShimmerBlock({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
     <div
       className={`animate-pulse rounded-2xl ${className ?? ''}`}

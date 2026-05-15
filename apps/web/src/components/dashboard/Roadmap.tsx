@@ -43,7 +43,8 @@ export function Roadmap({ nodes }: Props) {
       </div>
 
       <div className="overflow-x-auto px-5 py-4">
-        <ol className="flex gap-4" style={{ minWidth: `${nodes.length * 160}px` }}>
+        {/* 140px card + 24px connector + 16px gap, minus trailing connector */}
+        <ol className="flex gap-4" style={{ minWidth: `${nodes.length * 140 + (nodes.length - 1) * 40}px` }}>
           {nodes.map((node, idx) => {
             const color = STATUS_COLORS[node.status];
             return (

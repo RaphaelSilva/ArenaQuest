@@ -23,7 +23,7 @@ export function StatCardRanking({ rows, myRank, totalPlayers }: Props) {
         </span>
         <span
           className="flex h-8 w-8 items-center justify-center rounded-[9px] text-base"
-          style={{ background: 'oklch(0.65 0.16 240 / 0.18)' }}
+          style={{ background: 'var(--aq-accent2-glow)' }}
           aria-hidden
         >
           🏆
@@ -76,6 +76,7 @@ export function StatCardRanking({ rows, myRank, totalPlayers }: Props) {
                   className="mt-0.5 h-1 overflow-hidden rounded-full"
                   style={{ background: 'var(--aq-bg4)' }}
                   role="progressbar"
+                  aria-label={`${entry.name}: ${entry.pct}%`}
                   aria-valuenow={entry.pct}
                   aria-valuemin={0}
                   aria-valuemax={100}
