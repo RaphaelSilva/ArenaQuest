@@ -50,6 +50,14 @@ function rowToCommentWithMeta(row: CommentWithMetaRow, _viewerUserId: string): C
 export class D1CommentRepository implements ICommentRepository {
   constructor(private readonly db: D1Database) {}
 
+  async findById(id: string): Promise<CommentRecord | null> {
+    const row = await this.db
+      .prepare('SELECT * FROM topic_comments WHERE id = ?')
+      .bind(id)
+      .first<CommentRow>();
+    return row ? rowToComment(row) : null;
+  }
+
   async listByTopic(topicNodeId: string, viewerUserId: string): Promise<CommentWithMeta[]> {
     const { results } = await this.db
       .prepare(

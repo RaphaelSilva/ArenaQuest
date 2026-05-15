@@ -22,6 +22,7 @@ import { buildOAuthRouter } from './oauth.router';
 import { buildAdminBadgesRouter } from './admin-badges.router';
 import { buildMeGamificationRouter } from './me-gamification.router';
 import { buildLeaderboardRouter } from './leaderboard.router';
+import { buildCommentsRouter } from './comments.router';
 import type { AccountController } from '@api/controllers/account.controller';
 import type { GoogleOAuthController } from '@api/controllers/google-oauth.controller';
 import { getHealth } from '@api/controllers/health.controller';
@@ -44,6 +45,7 @@ import type {
   IQuestRepository,
   IBadgeRepository,
   IGamificationRepository,
+  ICommentRepository,
 } from '@arenaquest/shared/ports';
 import type { IMissionRepository } from '@arenaquest/shared/ports';
 import type { AuthService } from '@api/core/auth/auth-service';
@@ -82,6 +84,7 @@ export class AppRouter {
       badgeRepo: IBadgeRepository;
       gamificationRepo: IGamificationRepository;
       missionRepo: IMissionRepository;
+      commentRepo: ICommentRepository;
       xpEngine?: XpEngine;
       streakEngine?: StreakEngine;
       questEvaluator?: QuestEvaluator;
@@ -106,7 +109,7 @@ export class AppRouter {
       strictCors: boolean;
     },
   ): void {
-    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, questRepo: _questRepo, badgeRepo, gamificationRepo, missionRepo, xpEngine, streakEngine, questEvaluator, badgeEngine, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
+    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, questRepo: _questRepo, badgeRepo, gamificationRepo, missionRepo, commentRepo, xpEngine, streakEngine, questEvaluator, badgeEngine, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
     // Build origin matcher from config — strict in prod, lenient in dev.
     const originRules = parseAllowedOrigins(allowedOrigins, { strict: strictCors });
 
@@ -159,6 +162,7 @@ export class AppRouter {
     app.route('/me', buildMeProgressRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
     app.route('/me', buildMeGamificationRouter(gamificationRepo, _questRepo, badgeRepo, missionRepo));
     app.route('/leaderboard', buildLeaderboardRouter(gamificationRepo, users));
+    app.route('/', buildCommentsRouter(commentRepo, enrollmentRepo, xpEngine));
     app.route('/admin', buildAdminEnrollmentRouter(enrollmentRepo, users, topics));
     app.route('/account', buildAccountRouter(accountController));
     app.route('/auth', buildOAuthRouter(googleOAuthController, cookieSameSite));

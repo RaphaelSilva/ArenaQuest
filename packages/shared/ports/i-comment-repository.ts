@@ -21,6 +21,7 @@ export interface InsertCommentParams {
 }
 
 export interface ICommentRepository {
+  findById(id: string): Promise<CommentRecord | null>;
   listByTopic(topicNodeId: string, viewerUserId: string): Promise<CommentWithMeta[]>;
   insert(params: InsertCommentParams): Promise<CommentRecord>;
   softDelete(commentId: string): Promise<CommentRecord | null>;

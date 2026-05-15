@@ -36,6 +36,7 @@ import { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engi
 import { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
 import { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
 import { D1MissionRepository } from '@api/adapters/db/d1-mission-repository';
+import { D1CommentRepository } from '@api/adapters/db/d1-comment-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
 import { ConsoleMailAdapter } from '@api/adapters/mail/console-mail-adapter';
@@ -76,6 +77,7 @@ function buildApp(env: AppEnv): Hono {
     (userId) => users.findById(userId).then(u => u?.timezone ?? null),
   );
   const missionRepo = new D1MissionRepository(env.DB);
+  const commentRepo = new D1CommentRepository(env.DB);
   const questEvaluator = new QuestEvaluator(questRepo, missionRepo, xpEngine);
   const badgeEngine = new BadgeEngine(badgeRepo, gamificationRepo, missionRepo, xpEngine);
   const storage = new R2StorageAdapter({
@@ -180,6 +182,7 @@ function buildApp(env: AppEnv): Hono {
     badgeRepo,
     gamificationRepo,
     missionRepo,
+    commentRepo,
     xpEngine,
     streakEngine,
     questEvaluator,
