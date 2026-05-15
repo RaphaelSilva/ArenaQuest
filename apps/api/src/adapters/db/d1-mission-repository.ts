@@ -114,4 +114,12 @@ export class D1MissionRepository implements IMissionRepository {
     if (!progress) throw new Error(`D1MissionRepository: failed to fetch progress after markCompleted (userId=${userId}, missionId=${missionId})`);
     return progress;
   }
+
+  async countCompletedMissions(userId: string): Promise<number> {
+    const row = await this.db
+      .prepare('SELECT COUNT(*) as cnt FROM mission_progress WHERE user_id = ? AND completed = 1')
+      .bind(userId)
+      .first<{ cnt: number }>();
+    return row?.cnt ?? 0;
+  }
 }

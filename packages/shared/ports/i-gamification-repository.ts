@@ -47,4 +47,6 @@ export interface IGamificationRepository {
   getUserStreak(userId: string): Promise<UserStreakRecord | null>;
   upsertUserStreak(userId: string, params: UpsertUserStreakParams): Promise<UserStreakRecord>;
   listLevelDefinitions(): Promise<LevelDefinitionRecord[]>;
+  countXpEventsBySource(userId: string, sourceKind: string, since?: string): Promise<number>;
+  countAllCompletedTopics(userId: string): Promise<number>;
 }

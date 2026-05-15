@@ -174,4 +174,29 @@ export class D1GamificationRepository implements IGamificationRepository {
       .all<LevelDefinitionRow>();
     return results.map(rowToLevelDefinition);
   }
+
+  // ---------------------------------------------------------------------------
+  // Badge evaluation helpers
+  // ---------------------------------------------------------------------------
+
+  async countXpEventsBySource(userId: string, sourceKind: string, since?: string): Promise<number> {
+    const row = since
+      ? await this.db
+          .prepare('SELECT COUNT(*) as cnt FROM xp_events WHERE user_id = ? AND source_kind = ? AND earned_at >= ?')
+          .bind(userId, sourceKind, since)
+          .first<{ cnt: number }>()
+      : await this.db
+          .prepare('SELECT COUNT(*) as cnt FROM xp_events WHERE user_id = ? AND source_kind = ?')
+          .bind(userId, sourceKind)
+          .first<{ cnt: number }>();
+    return row?.cnt ?? 0;
+  }
+
+  async countAllCompletedTopics(userId: string): Promise<number> {
+    const row = await this.db
+      .prepare("SELECT COUNT(*) as cnt FROM topic_progress WHERE user_id = ? AND status = 'completed'")
+      .bind(userId)
+      .first<{ cnt: number }>();
+    return row?.cnt ?? 0;
+  }
 }

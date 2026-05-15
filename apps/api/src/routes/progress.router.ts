@@ -12,6 +12,7 @@ import type {
 import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
 import type { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
+import type { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
 
 const CACHE_CONTROL = 'private, max-age=15';
 
@@ -40,6 +41,7 @@ export function buildProgressTaskRouter(
   xpEngine?: XpEngine,
   streakEngine?: StreakEngine,
   questEvaluator?: QuestEvaluator,
+  badgeEngine?: BadgeEngine,
 ): Hono {
   const router = new Hono();
   const service = buildService(progress, enrollment, tasks, stages, links, topics);
@@ -78,6 +80,13 @@ export function buildProgressTaskRouter(
         console.error('[quest] stage_checkin evaluate failed:', err);
       }
     }
+    if (result.data.changed && badgeEngine) {
+      try {
+        await badgeEngine.evaluate(userId, new Date());
+      } catch (err) {
+        console.error('[badge] stage_checkin evaluate failed:', err);
+      }
+    }
     const status = result.data.changed ? 201 : 200;
     return c.json(result.data, status as 200 | 201);
   });
@@ -99,6 +108,7 @@ export function buildProgressTopicRouter(
   xpEngine?: XpEngine,
   streakEngine?: StreakEngine,
   questEvaluator?: QuestEvaluator,
+  badgeEngine?: BadgeEngine,
 ): Hono {
   const router = new Hono();
   const service = buildService(progress, enrollment, tasks, stages, links, topics);
@@ -140,6 +150,13 @@ export function buildProgressTopicRouter(
         await questEvaluator.evaluate(userId, 'topic', new Date());
       } catch (err) {
         console.error('[quest] topic_complete evaluate failed:', err);
+      }
+    }
+    if (result.data.changed && badgeEngine) {
+      try {
+        await badgeEngine.evaluate(userId, new Date());
+      } catch (err) {
+        console.error('[badge] topic_complete evaluate failed:', err);
       }
     }
     return c.json(result.data);

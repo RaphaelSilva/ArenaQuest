@@ -5,4 +5,5 @@ export interface IMissionRepository {
   findProgress(userId: string, missionId: string): Promise<MissionProgress | null>;
   upsertProgress(userId: string, missionId: string, increment: number, target: number): Promise<MissionProgress>;
   markCompleted(userId: string, missionId: string): Promise<MissionProgress>;
+  countCompletedMissions(userId: string): Promise<number>;
 }
