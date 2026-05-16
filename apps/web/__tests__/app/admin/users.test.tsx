@@ -57,6 +57,7 @@ function makeUser(overrides: Partial<Entities.Identity.User> = {}): Entities.Ide
     status: 'active' as Entities.Config.UserStatus,
     roles: [{ id: 'role-admin', name: 'admin', description: 'Admin', createdAt: new Date() }],
     groups: [],
+    timezone: '',
     createdAt: new Date('2025-01-01'),
     ...overrides,
   };

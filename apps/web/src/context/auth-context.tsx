@@ -45,6 +45,7 @@ function userFromClaims(claims: {
       createdAt: new Date(0),
     })),
     groups: [],
+    timezone: '',
     createdAt: new Date(0),
   };
 }
@@ -96,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status: 'active' as Entities.Config.UserStatus,
       roles: apiUser.roles,
       groups: [],
+      timezone: '',
       createdAt: new Date(),
     });
   }, []);
