@@ -8,14 +8,14 @@ export function StudentTaskCard({ task }: { task: TaskSummary }) {
     <Link
       href={`/tasks/${task.id}`}
       data-testid={`task-card-${task.id}`}
-      className="flex flex-col gap-2 rounded-md border border-zinc-200 bg-white p-4 transition hover:border-emerald-400 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-emerald-500"
+      className="flex flex-col gap-2 rounded-[12px] border border-[color:var(--border)] bg-[color:var(--bg2)] p-4 transition hover:border-[color:var(--accent)] hover:shadow-sm dark:hover:shadow-sm"
     >
-      <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{task.title}</h3>
-      <p className="text-xs text-zinc-500">
+      <h3 className="text-base font-semibold text-[color:var(--text)]">{task.title}</h3>
+      <p className="text-xs text-[color:var(--text2)]">
         {task.stageCount} {task.stageCount === 1 ? 'stage' : 'stages'} · {task.topicCount}{' '}
         {task.topicCount === 1 ? 'topic' : 'topics'}
       </p>
-      <span className="mt-2 self-start text-sm font-medium text-emerald-600 hover:text-emerald-700">
+      <span className="mt-2 self-start text-sm font-medium text-[color:var(--accent)] hover:opacity-80 transition-opacity">
         Explore →
       </span>
     </Link>

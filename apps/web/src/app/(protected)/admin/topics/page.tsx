@@ -13,6 +13,7 @@ import { adminMediaApi, type Media } from '@web/lib/admin-media-api';
 import { MediaUploader } from '@web/components/admin/MediaUploader';
 import { MediaList } from '@web/components/admin/MediaList';
 import { Spinner } from '@web/components/spinner';
+import { Button, Badge } from '@web/components/design-system';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,10 +64,10 @@ function getDropPosition(e: React.DragEvent<HTMLElement>): DropPosition {
 // Constants
 // ---------------------------------------------------------------------------
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 ring-1 ring-inset ring-zinc-200 dark:ring-zinc-700',
-  published: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 ring-1 ring-inset ring-emerald-200 dark:ring-emerald-500/20',
-  archived: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 ring-1 ring-inset ring-amber-200 dark:ring-amber-500/20',
+const STATUS_BADGE_MAP: Record<string, 'draft' | 'published' | 'archived'> = {
+  draft: 'draft',
+  published: 'published',
+  archived: 'archived',
 };
 
 // ---------------------------------------------------------------------------
@@ -128,21 +129,23 @@ function CreateModal({ parentId, onSubmit, onClose }: CreateModalProps) {
           {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button
+            <Button
               type="button"
               onClick={onClose}
-              className="rounded px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400"
+              variant="secondary"
+              size="md"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={submitting}
-              className="flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              variant="primary"
+              size="md"
+              isLoading={submitting}
             >
-              {submitting && <Spinner className="h-4 w-4" />}
               Create
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -173,18 +176,20 @@ function ConfirmDialog({
       <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
         <p className="mb-4 text-sm text-zinc-700 dark:text-zinc-300">{message}</p>
         <div className="flex justify-end gap-3">
-          <button
+          <Button
             onClick={onCancel}
-            className="rounded px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400"
+            variant="secondary"
+            size="md"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onConfirm}
-            className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            variant="danger"
+            size="md"
           >
             Confirm
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -543,12 +548,12 @@ export default function AdminTopicsPage() {
             ) : (
               <button
                 type="button"
-                onClick={(e) => {
+                onDoubleClick={(e) => {
                   e.stopPropagation();
                   setInlineEditId(node.id);
                   setInlineTitle(node.title);
                 }}
-                className="min-w-0 flex-1 truncate text-left font-medium text-zinc-900 hover:text-indigo-700 dark:text-zinc-100 dark:hover:text-indigo-300"
+                className="min-w-0 flex-1 truncate text-left font-medium text-zinc-900 hover:text-indigo-700 dark:text-zinc-100 dark:hover:text-indigo-300 cursor-text"
                 data-testid={`title-btn-${node.id}`}
               >
                 {node.title}
@@ -556,11 +561,9 @@ export default function AdminTopicsPage() {
             )}
 
             {/* Status badge */}
-            <span
-              className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[node.status] ?? ''}`}
-            >
+            <Badge status={STATUS_BADGE_MAP[node.status] || 'draft'} size="sm">
               {node.status}
-            </span>
+            </Badge>
 
             {/* Add child */}
             <button
@@ -615,25 +618,26 @@ export default function AdminTopicsPage() {
   const tree = buildTree(nodes);
 
   return (
-    <main className="flex h-[calc(100vh-57px)] flex-col bg-zinc-50 dark:bg-zinc-950">
+    <main className="flex flex-col h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-zinc-200/80 bg-white/50 px-6 py-4 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/50">
+      <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900 flex-shrink-0">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Topic Tree</h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Build and organize your educational hierarchy</p>
+          <h1 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>Topic Tree</h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">Build and organize your educational hierarchy</p>
         </div>
-        <button
+        <Button
           onClick={() => { setCreateParentId(null); setShowCreate(true); }}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-indigo-500/25 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
+          variant="primary"
+          size="md"
         >
           New Root Topic
-        </button>
+        </Button>
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--aq-bg)' }}>
         {/* Left: tree panel */}
-        <div className="w-80 flex-shrink-0 overflow-y-auto border-r border-zinc-200/80 bg-white/30 backdrop-blur-sm p-4 dark:border-zinc-800/80 dark:bg-zinc-900/10">
+        <div className="w-[620px] flex-shrink-0 overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
           {fetchError && (
             <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{fetchError}</p>
           )}
@@ -652,31 +656,31 @@ export default function AdminTopicsPage() {
         </div>
 
         {/* Right: detail pane */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-6 md:p-8">
           {!selectedNode ? (
-            <div className="flex h-full flex-col items-center justify-center space-y-4 opacity-40">
-              <div className="rounded-full bg-zinc-100 p-6 dark:bg-zinc-800">
-                <svg className="h-12 w-12 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="flex h-full flex-col items-center justify-center space-y-4">
+              <div className="rounded-full bg-zinc-100 p-6 dark:bg-zinc-800/50">
+                <svg className="h-12 w-12 text-zinc-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <p className="text-sm font-medium text-zinc-500">Select a topic to edit its details</p>
+              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Select a topic to edit its details</p>
             </div>
           ) : (
             <div className="mx-auto max-w-3xl space-y-8">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <h2 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>
                     {detailTitle || 'Untitled Topic'}
                   </h2>
-                  <p className="text-sm text-zinc-500">Topic ID: <code className="font-mono text-xs">{selectedId}</code></p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Topic ID: <code className="font-mono text-xs">{selectedId}</code></p>
                 </div>
-                <div className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${STATUS_COLORS[detailStatus]}`}>
+                <Badge status={STATUS_BADGE_MAP[detailStatus] || 'draft'}>
                   {detailStatus}
-                </div>
+                </Badge>
               </div>
 
-              <form onSubmit={handleDetailSave} className="space-y-6 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50" noValidate>
+              <form onSubmit={handleDetailSave} className="space-y-6" noValidate>
 
               <div>
                 <label htmlFor="dp-title" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -767,21 +771,22 @@ export default function AdminTopicsPage() {
               )}
 
               <div className="flex items-center gap-3 pt-2">
-                <button
+                <Button
                   type="submit"
                   disabled={detailSaving}
-                  className="flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  variant="primary"
+                  size="md"
+                  isLoading={detailSaving}
                 >
-                  {detailSaving && <Spinner className="h-4 w-4" />}
                   Save changes
-                </button>
+                </Button>
               </div>
             </form>
 
             <div className="mt-12 space-y-6">
               <div>
                 <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Media Attachments</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">Upload and manage files associated with this topic.</p>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">Upload and manage files associated with this topic.</p>
               </div>
 
               {accessToken && selectedId && (

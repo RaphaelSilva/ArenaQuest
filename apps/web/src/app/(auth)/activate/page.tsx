@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authApi, AuthApiError } from '@web/lib/auth-api';
 import { Spinner } from '@web/components/spinner';
+import { Logo } from '@web/components/design-system';
 
 type ActivateState =
   | { kind: 'pending' }
@@ -53,14 +54,7 @@ function ActivateInner() {
       </div>
 
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 440, padding: '40px 36px', background: 'var(--aq-bg2)', border: '1px solid var(--aq-border)', borderRadius: 16, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }} className="aq-anim">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--aq-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: '#0B0E17' }}>
-            AQ
-          </div>
-          <div style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: '-0.3px' }}>
-            Arena<span style={{ color: 'var(--aq-accent)' }}>Quest</span>
-          </div>
-        </div>
+        <Logo className="mb-2" />
 
         {state.kind === 'pending' && (
           <>

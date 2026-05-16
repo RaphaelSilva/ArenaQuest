@@ -23,6 +23,28 @@
   --aq-accent3-glow: oklch(0.68 0.17 150 / 0.18);
   --aq-error: oklch(0.65 0.22 15);
   --aq-error-bg: oklch(0.65 0.22 15 / 0.12);
+
+  /* Design System Token Aliases (for design-system components) */
+  /* These map short names to --aq-* names for component compatibility */
+  --accent: var(--aq-accent);
+  --accent2: var(--aq-accent2);
+  --accent3: var(--aq-accent3);
+  --accent-glow: var(--aq-accent-glow);
+  --accent2-glow: var(--aq-accent2-glow);
+  --accent3-glow: var(--aq-accent3-glow);
+  --bg: var(--aq-bg);
+  --bg2: var(--aq-bg2);
+  --bg3: var(--aq-bg3);
+  --bg4: var(--aq-bg4);
+  --bg5: var(--aq-bg4);
+  --border: var(--aq-border);
+  --border2: var(--aq-border2);
+  --border3: var(--aq-border3);
+  --text: var(--aq-text);
+  --text2: var(--aq-text2);
+  --text3: var(--aq-text3);
+  --error: var(--aq-error);
+  --error-bg: var(--aq-error-bg);
 }
 
 @theme inline {
@@ -54,9 +76,9 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--aq-bg);
+  color: var(--aq-text);
+  font-family: 'DM Sans', var(--font-geist-sans), sans-serif;
 }
 
 /* ArenaQuest auth page animations */

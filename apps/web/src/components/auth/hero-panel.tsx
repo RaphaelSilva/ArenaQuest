@@ -1,13 +1,10 @@
+import { Logo } from '@web/components/design-system';
+
 export function HeroPanel() {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '60px 64px', position: 'relative', zIndex: 1, maxWidth: 520 }} className="aq-hero-panel">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 56 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--aq-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#0B0E17', boxShadow: '0 0 24px oklch(0.74 0.19 52 / 0.4)' }}>
-          AQ
-        </div>
-        <div style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, letterSpacing: '-0.4px' }}>
-          Arena<span style={{ color: 'var(--aq-accent)' }}>Quest</span>
-        </div>
+      <div style={{ marginBottom: 56 }}>
+        <Logo size="lg" />
       </div>
 
       <div style={{ marginBottom: 48 }}>
