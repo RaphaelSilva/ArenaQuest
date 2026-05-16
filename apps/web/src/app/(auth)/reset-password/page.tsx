@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authApi, AuthApiError } from '@web/lib/auth-api';
 import { Spinner } from '@web/components/spinner';
+import { Logo } from '@web/components/design-system';
 
 const LockIcon = () => (
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -189,10 +190,7 @@ export default function ResetPasswordPage() {
     <Suspense fallback={<div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--aq-bg)' }}><Spinner className="h-8 w-8" /></div>}>
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--aq-bg)', color: 'var(--aq-text)', fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif', padding: 24 }}>
         <div style={{ width: '100%', maxWidth: 420, background: 'var(--aq-bg2)', borderRadius: 16, border: '1px solid var(--aq-border)', padding: '40px 40px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 36 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--aq-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-space-grotesk)', fontWeight: 700, fontSize: 15, color: '#0B0E17' }}>AQ</div>
-            <span style={{ fontFamily: 'var(--font-space-grotesk)', fontWeight: 700, fontSize: 18 }}>Arena<span style={{ color: 'var(--aq-accent)' }}>Quest</span></span>
-          </div>
+          <Logo className="mb-9" />
           <ResetPasswordInner />
         </div>
       </div>

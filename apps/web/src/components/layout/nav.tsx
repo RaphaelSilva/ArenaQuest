@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { CanView } from '@web/components/auth/can-view';
 import { useAuth, useHasRole } from '@web/hooks/use-auth';
+import { Logo } from '@web/components/design-system';
 
 export function Nav() {
   const { logout } = useAuth();
@@ -11,7 +12,7 @@ export function Nav() {
 
   return (
     <nav className="flex items-center gap-6 border-b border-zinc-200 bg-white px-6 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-      <span className="font-semibold text-zinc-900 dark:text-zinc-50">ArenaQuest</span>
+      <Logo size="sm" />
 
       <div className="flex flex-1 items-center gap-4 text-sm">
         <Link
