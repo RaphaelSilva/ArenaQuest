@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { DashboardClient } from '@web/components/dashboard/dashboard-client';
+import { DashboardContent } from '@web/components/dashboard/DashboardContent';
 
 export const metadata: Metadata = { title: 'Dashboard — ArenaQuest' };
 
 export default function DashboardPage() {
-  return <DashboardClient />;
+  return <DashboardContent />;
 }

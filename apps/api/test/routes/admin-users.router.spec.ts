@@ -15,7 +15,8 @@ const MIGRATION_SQL = [
     email         TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    timezone      TEXT NOT NULL DEFAULT 'UTC'
   )`,
   `CREATE TABLE IF NOT EXISTS roles (
     id          TEXT NOT NULL PRIMARY KEY,
@@ -39,6 +40,13 @@ const MIGRATION_SQL = [
     ('3318927d-8b5e-52d9-a145-2e4323919ed6', 'content_creator', 'Can create/edit content'),
     ('32a5cab1-e66f-5d23-a80d-80cfa927d057', 'tutor',           'Can monitor student progress'),
     ('bf3d0f1d-7d77-5151-922e-b87dff0fa7ad', 'student',         'Can consume content and tasks')`,
+  `CREATE TABLE IF NOT EXISTS user_streak (
+    user_id             TEXT    NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    current_streak      INTEGER NOT NULL DEFAULT 0,
+    longest_streak      INTEGER NOT NULL DEFAULT 0,
+    last_activity_date  TEXT,
+    updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
+  )`,
 ];
 
 // Admin token signed with the test JWT_SECRET — avoids a real login round-trip.

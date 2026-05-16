@@ -14,7 +14,8 @@ const MIGRATION_SQL = [
     email         TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    timezone      TEXT NOT NULL DEFAULT 'UTC'
   )`,
   `CREATE TABLE IF NOT EXISTS roles (
     id          TEXT NOT NULL PRIMARY KEY,
@@ -45,6 +46,13 @@ const MIGRATION_SQL = [
     expires_at   INTEGER NOT NULL,
     consumed_at  INTEGER,
     created_at   INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS user_streak (
+    user_id             TEXT    NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    current_streak      INTEGER NOT NULL DEFAULT 0,
+    longest_streak      INTEGER NOT NULL DEFAULT 0,
+    last_activity_date  TEXT,
+    updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
   )`,
 ];
 

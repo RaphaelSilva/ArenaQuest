@@ -19,6 +19,8 @@
   --aq-accent2: oklch(0.65 0.16 240);
   --aq-accent3: oklch(0.68 0.17 150);
   --aq-accent-glow: oklch(0.74 0.19 52 / 0.18);
+  --aq-accent2-glow: oklch(0.65 0.16 240 / 0.18);
+  --aq-accent3-glow: oklch(0.68 0.17 150 / 0.18);
   --aq-error: oklch(0.65 0.22 15);
   --aq-error-bg: oklch(0.65 0.22 15 / 0.12);
 }
@@ -35,6 +37,20 @@
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+}
+
+/* Light theme override — toggled via data-theme="light" on <html> */
+[data-theme="light"] {
+  --aq-bg: #F0F2F8;
+  --aq-bg2: #FFFFFF;
+  --aq-bg3: #E8EBF4;
+  --aq-bg4: #DDE1EF;
+  --aq-border: rgba(0,0,0,0.07);
+  --aq-border2: rgba(0,0,0,0.13);
+  --aq-border3: rgba(0,0,0,0.22);
+  --aq-text: #0F1523;
+  --aq-text2: #4A5068;
+  --aq-text3: #8B92A8;
 }
 
 body {

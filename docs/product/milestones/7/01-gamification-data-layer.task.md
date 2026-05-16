@@ -1,6 +1,6 @@
 # Task 01 — Gamification Data Layer
 
-**Status:** ⏳ Pending
+**Status:** ✅ Completed
 **Milestone:** [7](./milestone.md)
 
 ## Summary
@@ -35,11 +35,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] All four migrations apply cleanly with `make db-migrations-dev`.
-- [ ] Inserting the same `(user_id, source_kind, idempotency_key)` twice yields exactly one `xp_events` row and a single XP credit on `user_xp`.
-- [ ] `user_xp.total_xp` equals `SUM(xp_events.points)` after any sequence of awards (test enforced).
-- [ ] `level_definitions` exposes a stable lookup: given a `total_xp`, the repository returns `level`, `rank_title`, and the XP delta to next level.
-- [ ] No provider-specific imports outside `apps/api/src/adapters/db/`.
+- [x] All four migrations apply cleanly with `make db-migrations-dev`.
+- [x] Inserting the same `(user_id, source_kind, idempotency_key)` twice yields exactly one `xp_events` row and a single XP credit on `user_xp`.
+- [x] `user_xp.total_xp` equals `SUM(xp_events.points)` after any sequence of awards (test enforced).
+- [x] `level_definitions` exposes a stable lookup: given a `total_xp`, the repository returns `level`, `rank_title`, and the XP delta to next level.
+- [x] No provider-specific imports outside `apps/api/src/adapters/db/`.
 
 ## Verification Plan
 
