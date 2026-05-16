@@ -12,31 +12,14 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  {
-    label: 'Users',
-    href: '/admin/users',
-    requiredRoles: [ROLES.ADMIN],
-  },
-  {
-    label: 'Topics',
-    href: '/admin/topics',
-    requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR],
-  },
-  {
-    label: 'Tasks',
-    href: '/admin/tasks',
-    requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR],
-  },
-  {
-    label: 'Groups',
-    href: '/admin/groups',
-    requiredRoles: [ROLES.ADMIN],
-  },
+  { label: 'Users', href: '/admin/users', requiredRoles: [ROLES.ADMIN] },
+  { label: 'Topics', href: '/admin/topics', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
+  { label: 'Tasks', href: '/admin/tasks', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
+  { label: 'Groups', href: '/admin/groups', requiredRoles: [ROLES.ADMIN] },
 ];
 
 function NavItem({ item, isActive }: { item: NavItem; isActive: boolean }) {
   const hasRequiredRole = useHasRole(...(item.requiredRoles || []));
-
   if (item.requiredRoles && !hasRequiredRole) return null;
 
   return (
@@ -59,7 +42,7 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-48 border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
+    <aside className="hidden md:block w-48 border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
       <nav className="flex flex-col p-4">
         <h2 className="mb-4 px-3 text-sm font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
           Admin

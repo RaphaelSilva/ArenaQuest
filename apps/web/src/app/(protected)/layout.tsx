@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@web/hooks/use-auth';
 import { Spinner } from '@web/components/spinner';
 import { Nav } from '@web/components/layout/nav';
+import { SidebarProvider } from '@web/context/sidebar-context';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -27,9 +28,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   if (user === null) return null;
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Nav />
-      <div className="flex flex-1 flex-col">{children}</div>
-    </div>
+    <SidebarProvider>
+      <div className="flex h-dvh flex-col overflow-hidden">
+        <Nav />
+        <div className="flex flex-1 flex-col overflow-hidden">{children}</div>
+      </div>
+    </SidebarProvider>
   );
 }

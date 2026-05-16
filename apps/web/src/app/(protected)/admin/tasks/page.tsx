@@ -134,7 +134,7 @@ export default function AdminTasksPage() {
   if (!canAuthor) return null;
 
   return (
-    <main className="flex flex-col h-screen">
+    <main className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900 flex-shrink-0">
         <div>
@@ -152,8 +152,8 @@ export default function AdminTasksPage() {
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--aq-bg)' }}>
-        {/* Left: task list */}
-        <div className="w-[620px] flex-shrink-0 overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        {/* Left: task list — full width on mobile, fixed on desktop */}
+        <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:w-[620px] flex-shrink-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
           {error && (
             <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{error}</p>
           )}
@@ -232,7 +232,19 @@ export default function AdminTasksPage() {
         </div>
 
         {/* Right: detail pane */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+        <div className={`${selectedId ? 'flex' : 'hidden md:flex'} flex-1 flex-col overflow-y-auto p-6 md:p-8`}>
+          {/* Mobile back button */}
+          {selectedTask && (
+            <button
+              onClick={() => setSelectedId(null)}
+              className="mb-4 flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 md:hidden"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to tasks
+            </button>
+          )}
           {!selectedTask ? (
             <div className="flex h-full flex-col items-center justify-center space-y-4">
               <div className="rounded-full bg-zinc-100 p-6 dark:bg-zinc-800/50">
