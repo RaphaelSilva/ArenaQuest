@@ -548,12 +548,12 @@ export default function AdminTopicsPage() {
             ) : (
               <button
                 type="button"
-                onClick={(e) => {
+                onDoubleClick={(e) => {
                   e.stopPropagation();
                   setInlineEditId(node.id);
                   setInlineTitle(node.title);
                 }}
-                className="min-w-0 flex-1 truncate text-left font-medium text-zinc-900 hover:text-indigo-700 dark:text-zinc-100 dark:hover:text-indigo-300"
+                className="min-w-0 flex-1 truncate text-left font-medium text-zinc-900 hover:text-indigo-700 dark:text-zinc-100 dark:hover:text-indigo-300 cursor-text"
                 data-testid={`title-btn-${node.id}`}
               >
                 {node.title}
@@ -618,12 +618,12 @@ export default function AdminTopicsPage() {
   const tree = buildTree(nodes);
 
   return (
-    <main className="flex h-[calc(100vh-57px)] flex-col bg-zinc-50 dark:bg-zinc-950">
+    <main className="flex flex-col h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-zinc-200/80 bg-white/50 px-6 py-4 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/50">
+      <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900 flex-shrink-0">
         <div>
-          <h1 className="text-[28px] font-bold tracking-tight text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>Topic Tree</h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Build and organize your educational hierarchy</p>
+          <h1 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>Topic Tree</h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">Build and organize your educational hierarchy</p>
         </div>
         <Button
           onClick={() => { setCreateParentId(null); setShowCreate(true); }}
@@ -635,9 +635,9 @@ export default function AdminTopicsPage() {
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--aq-bg)' }}>
         {/* Left: tree panel */}
-        <div className="w-[280px] flex-shrink-0 overflow-y-auto border-r border-zinc-200/80 bg-white/30 backdrop-blur-sm p-4 dark:border-zinc-800/80 dark:bg-zinc-900/10">
+        <div className="w-[620px] flex-shrink-0 overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
           {fetchError && (
             <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{fetchError}</p>
           )}
@@ -656,15 +656,15 @@ export default function AdminTopicsPage() {
         </div>
 
         {/* Right: detail pane */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-6 md:p-8">
           {!selectedNode ? (
-            <div className="flex h-full flex-col items-center justify-center space-y-4 opacity-40">
-              <div className="rounded-full bg-zinc-100 p-6 dark:bg-zinc-800">
-                <svg className="h-12 w-12 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="flex h-full flex-col items-center justify-center space-y-4">
+              <div className="rounded-full bg-zinc-100 p-6 dark:bg-zinc-800/50">
+                <svg className="h-12 w-12 text-zinc-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <p className="text-sm font-medium text-zinc-500">Select a topic to edit its details</p>
+              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Select a topic to edit its details</p>
             </div>
           ) : (
             <div className="mx-auto max-w-3xl space-y-8">
@@ -673,14 +673,14 @@ export default function AdminTopicsPage() {
                   <h2 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>
                     {detailTitle || 'Untitled Topic'}
                   </h2>
-                  <p className="text-sm text-zinc-500">Topic ID: <code className="font-mono text-xs">{selectedId}</code></p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Topic ID: <code className="font-mono text-xs">{selectedId}</code></p>
                 </div>
                 <Badge status={STATUS_BADGE_MAP[detailStatus] || 'draft'}>
                   {detailStatus}
                 </Badge>
               </div>
 
-              <form onSubmit={handleDetailSave} className="space-y-6 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50" noValidate>
+              <form onSubmit={handleDetailSave} className="space-y-6" noValidate>
 
               <div>
                 <label htmlFor="dp-title" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -786,7 +786,7 @@ export default function AdminTopicsPage() {
             <div className="mt-12 space-y-6">
               <div>
                 <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Media Attachments</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">Upload and manage files associated with this topic.</p>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">Upload and manage files associated with this topic.</p>
               </div>
 
               {accessToken && selectedId && (
