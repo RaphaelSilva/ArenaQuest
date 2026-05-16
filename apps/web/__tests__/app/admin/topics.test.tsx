@@ -322,14 +322,14 @@ describe('Detail pane', () => {
 // ---------------------------------------------------------------------------
 
 describe('Inline title editing', () => {
-  it('activates inline edit when the title button is clicked', async () => {
+  it('activates inline edit when the title button is double-clicked', async () => {
     setupAdminAuth();
     const user = userEvent.setup();
     render(<AdminTopicsPage />);
     await waitFor(() => screen.getByText('Root Topic A'));
 
     const titleBtn = screen.getByTestId('title-btn-topic-1');
-    await user.click(titleBtn);
+    await user.dblClick(titleBtn);
 
     expect(screen.getByTestId('inline-edit-topic-1')).toBeInTheDocument();
   });
@@ -340,7 +340,7 @@ describe('Inline title editing', () => {
     render(<AdminTopicsPage />);
     await waitFor(() => screen.getByText('Root Topic A'));
 
-    await user.click(screen.getByTestId('title-btn-topic-1'));
+    await user.dblClick(screen.getByTestId('title-btn-topic-1'));
 
     const input = screen.getByTestId('inline-edit-topic-1');
     await user.clear(input);
@@ -357,7 +357,7 @@ describe('Inline title editing', () => {
     render(<AdminTopicsPage />);
     await waitFor(() => screen.getByText('Root Topic A'));
 
-    await user.click(screen.getByTestId('title-btn-topic-1'));
+    await user.dblClick(screen.getByTestId('title-btn-topic-1'));
     const input = screen.getByTestId('inline-edit-topic-1');
     await user.type(input, '{Escape}');
 

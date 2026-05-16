@@ -329,7 +329,7 @@ export default function AdminTasksPage() {
         >
           <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
             <p className="mb-4 text-sm text-zinc-700 dark:text-zinc-300">
-              Archive "{archiveTarget.title}"? This action cannot be undone.
+              Archive &ldquo;{archiveTarget.title}&rdquo;? This action cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
               <Button

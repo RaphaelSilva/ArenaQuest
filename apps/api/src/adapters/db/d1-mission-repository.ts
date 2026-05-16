@@ -65,7 +65,7 @@ export class D1MissionRepository implements IMissionRepository {
 
   async update(id: string, mission: Partial<Omit<Mission, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Mission> {
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | null)[] = [];
 
     if (mission.title !== undefined) {
       updates.push('title = ?');

@@ -2,6 +2,7 @@ import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:
 import { describe, it, expect, beforeAll } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
+import type { Mission } from '@arenaquest/shared/domain/mission';
 
 // ---------------------------------------------------------------------------
 // DB bootstrap
@@ -54,7 +55,7 @@ const MIGRATION_SQL = [
 ];
 
 let adminToken: string;
-let contentCreatorToken: string;
+let _contentCreatorToken: string;
 let studentToken: string;
 
 beforeAll(async () => {
@@ -62,7 +63,7 @@ beforeAll(async () => {
 
   const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
 
-  [adminToken, contentCreatorToken, studentToken] = await Promise.all([
+  [adminToken, _contentCreatorToken, studentToken] = await Promise.all([
     adapter.signAccessToken({ sub: 'admin-missions-test', email: 'admin@missions.test', roles: ['admin'] }),
     adapter.signAccessToken({ sub: 'cc-missions-test', email: 'cc@missions.test', roles: ['content_creator'] }),
     adapter.signAccessToken({ sub: 'student-missions-test', email: 'student@missions.test', roles: ['student'] }),
@@ -165,7 +166,7 @@ describe('Admin Missions CRUD', () => {
 
     const res = await req('GET', '/admin/missions', { token: adminToken });
     expect(res.status).toBe(200);
-    const body = await res.json<{ data: any[] }>();
+    const body = await res.json<{ data: Mission[] }>();
     expect(body.data.length).toBeGreaterThan(0);
   });
 
@@ -237,7 +238,7 @@ describe('Admin Missions CRUD', () => {
 
     // Verify it's inactive but still exists
     const listRes = await req('GET', '/admin/missions', { token: adminToken });
-    const list = (await listRes.json<{ data: any[] }>()).data;
+    const list = (await listRes.json<{ data: Mission[] }>()).data;
     const deleted = list.find(m => m.id === mission.id);
     expect(deleted).toBeDefined();
     expect(deleted.active).toBe(false);
