@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@arenaquest/shared": "workspace:*",
+    "@tailwindcss/typography": "^0.5.19",
     "next": "15.5.2",
     "react": "19.0.0",
     "react-dom": "19.0.0"

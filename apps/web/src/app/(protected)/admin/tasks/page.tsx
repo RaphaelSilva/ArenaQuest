@@ -5,8 +5,17 @@ import { useRouter } from 'next/navigation';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useAuth, useHasRole } from '@web/hooks/use-auth';
 import { Spinner } from '@web/components/spinner';
-import { adminTasksApi, type Task } from '@web/lib/admin-tasks-api';
+import { MarkdownViewer } from '@web/components/catalog/MarkdownViewer';
+import { TaskTopicPicker } from '@web/components/tasks/task-topic-picker';
+import { StageEditor } from '@web/components/tasks/stage-editor';
+import { adminTasksApi, AdminTasksApiError, type Task, type TaskDetail, type TaskStatus } from '@web/lib/admin-tasks-api';
+import { adminTopicsApi, type TopicNode } from '@web/lib/admin-topics-api';
 import { Button, Badge } from '@web/components/design-system';
+
+const PUBLISH_REASONS: Record<string, string> = {
+  NO_STAGES: 'Add at least one stage before publishing.',
+  LINKED_TOPIC_NOT_PUBLISHED: 'Every linked topic must itself be published.',
+};
 
 export default function AdminTasksPage() {
   const router = useRouter();
@@ -24,10 +33,14 @@ export default function AdminTasksPage() {
   const [inlineTitle, setInlineTitle] = useState('');
 
   // Detail pane
+  const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null);
+  const [topics, setTopics] = useState<TopicNode[]>([]);
   const [detailTitle, setDetailTitle] = useState('');
-  const [detailStatus, setDetailStatus] = useState<'draft' | 'published' | 'archived'>('draft');
+  const [detailDescription, setDetailDescription] = useState('');
+  const [detailStatus, setDetailStatus] = useState<TaskStatus>('draft');
   const [detailError, setDetailError] = useState('');
   const [detailSaving, setDetailSaving] = useState(false);
+  const [publishErrors, setPublishErrors] = useState<string[]>([]);
 
   // Archive confirm
   const [archiveTarget, setArchiveTarget] = useState<Task | null>(null);
@@ -46,6 +59,21 @@ export default function AdminTasksPage() {
     }
   }, [token]);
 
+  const reloadDetail = useCallback(async (id: string) => {
+    if (!token) return;
+    try {
+      const [detail, topicList] = await Promise.all([
+        adminTasksApi.getById(token, id),
+        adminTopicsApi.list(token),
+      ]);
+      setTaskDetail(detail);
+      setTopics(topicList);
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, title: detail.title, status: detail.status } : t)));
+    } catch (e) {
+      setDetailError(e instanceof Error ? e.message : 'Failed to load task detail');
+    }
+  }, [token]);
+
   useEffect(() => {
     if (!authLoading && !canAuthor) {
       router.replace('/dashboard');
@@ -59,14 +87,26 @@ export default function AdminTasksPage() {
   const selectedTask = tasks.find((t) => t.id === selectedId) ?? null;
 
   useEffect(() => {
-    if (!selectedTask) {
+    if (!selectedId) {
+      setTaskDetail(null);
       setDetailTitle('');
+      setDetailDescription('');
       setDetailStatus('draft');
+      setPublishErrors([]);
       return;
     }
-    setDetailTitle(selectedTask.title);
-    setDetailStatus(selectedTask.status as 'draft' | 'published' | 'archived');
-  }, [selectedId, selectedTask]);
+    setTaskDetail(null);
+    setDetailError('');
+    setPublishErrors([]);
+    void reloadDetail(selectedId);
+  }, [selectedId, reloadDetail]);
+
+  useEffect(() => {
+    if (!taskDetail) return;
+    setDetailTitle(taskDetail.title);
+    setDetailDescription(taskDetail.description);
+    setDetailStatus(taskDetail.status);
+  }, [taskDetail]);
 
   const handleCreate = async () => {
     if (!token) return;
@@ -99,15 +139,48 @@ export default function AdminTasksPage() {
     setDetailError('');
     setDetailSaving(true);
     try {
-      const updated = await adminTasksApi.update(token, selectedId, {
+      await adminTasksApi.update(token, selectedId, {
         title: detailTitle,
-        status: detailStatus,
+        description: detailDescription,
       });
-      setTasks((prev) => prev.map((t) => (t.id === selectedId ? updated : t)));
+      await reloadDetail(selectedId);
     } catch (e) {
       setDetailError(e instanceof Error ? e.message : 'Failed to save changes');
     } finally {
       setDetailSaving(false);
+    }
+  };
+
+  const handleSetStatus = async (status: TaskStatus) => {
+    if (!selectedId || !token) return;
+    setPublishErrors([]);
+    setDetailError('');
+    try {
+      await adminTasksApi.update(token, selectedId, { status });
+      await reloadDetail(selectedId);
+    } catch (e) {
+      if (e instanceof AdminTasksApiError && e.code === 'TASK_NOT_PUBLISHABLE') {
+        const reasons = (e.details.reasons as string[] | undefined) ?? [];
+        setPublishErrors(reasons);
+      } else if (e instanceof AdminTasksApiError && e.code === 'INVALID_TRANSITION') {
+        setDetailError('That status transition is not allowed.');
+      } else {
+        setDetailError(e instanceof Error ? e.message : 'Failed to update status');
+      }
+    }
+  };
+
+  const handleTopicsChange = async (next: string[]) => {
+    if (!selectedId || !token) return;
+    try {
+      await adminTasksApi.setTaskTopics(token, selectedId, next);
+      await reloadDetail(selectedId);
+    } catch (e) {
+      if (e instanceof AdminTasksApiError && e.code === 'LINKED_TOPIC_NOT_PUBLISHED') {
+        setDetailError('All linked topics must be published while the task is published.');
+      } else {
+        setDetailError(e instanceof Error ? e.message : 'Failed to update topic links');
+      }
     }
   };
 
@@ -254,8 +327,13 @@ export default function AdminTasksPage() {
               </div>
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Select a task to edit its details</p>
             </div>
+          ) : !taskDetail ? (
+            <div className="flex items-center justify-center py-24">
+              <Spinner className="h-6 w-6 text-zinc-400" />
+            </div>
           ) : (
-            <div className="space-y-8">
+            <div className="space-y-6">
+              {/* Header */}
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>
@@ -268,52 +346,118 @@ export default function AdminTasksPage() {
                 </Badge>
               </div>
 
-              <form onSubmit={(e) => { e.preventDefault(); handleDetailSave(); }} className="space-y-6" noValidate>
-                <div>
-                  <label htmlFor="task-title" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    Title
-                  </label>
+              {detailError && (
+                <div role="alert" className="rounded-md bg-red-100 px-4 py-3 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-200">
+                  {detailError}
+                </div>
+              )}
+
+              {publishErrors.length > 0 && (
+                <div role="alert" className="rounded-md bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+                  <p className="font-medium">Cannot publish this task yet:</p>
+                  <ul className="mt-1 list-inside list-disc">
+                    {publishErrors.map((r) => (
+                      <li key={r}>{PUBLISH_REASONS[r] ?? r}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Meta: title + description */}
+              <section className="space-y-4 rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                <label className="block">
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">Title</span>
                   <input
-                    id="task-title"
                     type="text"
                     value={detailTitle}
                     onChange={(e) => setDetailTitle(e.target.value)}
-                    className="w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+                    className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
                   />
-                </div>
+                </label>
 
-                <div>
-                  <label htmlFor="task-status" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    Status
-                  </label>
-                  <select
-                    id="task-status"
-                    value={detailStatus}
-                    onChange={(e) => setDetailStatus(e.target.value as typeof detailStatus)}
-                    className="w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="published">Published</option>
-                    <option value="archived">Archived</option>
-                  </select>
-                </div>
+                <label className="block">
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">Description (Markdown)</span>
+                  <textarea
+                    value={detailDescription}
+                    onChange={(e) => setDetailDescription(e.target.value)}
+                    rows={6}
+                    className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                  />
+                </label>
 
-                {detailError && (
-                  <p role="alert" className="text-sm text-red-600 dark:text-red-400">{detailError}</p>
+                {detailDescription && (
+                  <div>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Preview</p>
+                    <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-950">
+                      <MarkdownViewer content={detailDescription} />
+                    </div>
+                  </div>
                 )}
 
-                <div className="flex items-center gap-3 pt-2">
+                <div className="flex justify-end">
                   <Button
-                    type="submit"
+                    onClick={handleDetailSave}
                     disabled={detailSaving}
                     variant="primary"
                     size="md"
                     isLoading={detailSaving}
                   >
-                    Save changes
+                    Save
                   </Button>
                 </div>
-              </form>
+              </section>
+
+              {/* Linked Topics */}
+              <section className="rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">Linked Topics</h3>
+                <TaskTopicPicker
+                  topics={topics}
+                  allowDrafts={detailStatus === 'draft'}
+                  selected={taskDetail.taskTopicIds}
+                  onChange={handleTopicsChange}
+                />
+              </section>
+
+              {/* Stages */}
+              <section className="rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">Stages</h3>
+                <StageEditor
+                  task={taskDetail}
+                  topics={topics}
+                  onChange={() => reloadDetail(selectedId!)}
+                />
+              </section>
+
+              {/* Status transitions */}
+              <section className="rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+                <h3 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">Status</h3>
+                <div className="flex gap-2">
+                  {detailStatus !== 'draft' && (
+                    <button
+                      onClick={() => handleSetStatus('draft')}
+                      className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                    >
+                      Move to Draft
+                    </button>
+                  )}
+                  {detailStatus === 'draft' && (
+                    <button
+                      onClick={() => handleSetStatus('published')}
+                      className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+                    >
+                      Publish
+                    </button>
+                  )}
+                  {detailStatus !== 'archived' && (
+                    <button
+                      onClick={() => handleSetStatus('archived')}
+                      className="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
+                    >
+                      Archive
+                    </button>
+                  )}
+                </div>
+              </section>
             </div>
           )}
         </div>
