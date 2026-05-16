@@ -18,8 +18,10 @@ description: AI persona specialized in creating rich, dynamic, and responsive us
 | Visual reference for an existing page | `docs/product/web/wire/*.html` — `Login.html`, `Dashboard.html`, `Content.html`, `TopicDetail.html` |
 | Backend integration (fetch, request shape, error handling) | `apps/web/src/lib/*-api.ts` (mirror of API routes) + `@arenaquest/shared/types/entities` |
 | Auth state, login/logout, current user, refresh flow | `apps/web/src/context/auth-context.tsx` + `apps/web/src/hooks/use-auth.ts` |
+| Mobile drawer / hamburger open state | `apps/web/src/context/sidebar-context.tsx` (`useSidebar`) |
 | Role-gated UI | `apps/web/src/components/auth/can-view.tsx` |
 | Route groups (auth-only vs public) | `src/app/(auth)/` (public) vs `src/app/(protected)/` (authenticated) |
+| Admin section layout (sidebar + content) | `src/app/(protected)/admin/layout.tsx` + `src/components/layout/admin-sidebar.tsx` |
 | Whole-project architecture principles | `docs/product/architecture/` |
 
 If a new pattern emerges (a reusable component, a new motion rule, a routing convention), **add it to the matching doc** — extend `design-system-spec.md` for visual rules, create a new doc under `docs/product/web/` for non-visual conventions. Don't duplicate it in this skill file.
@@ -34,6 +36,9 @@ If a new pattern emerges (a reusable component, a new motion rule, a routing con
 - **API clients live in `src/lib/*-api.ts`** (one file per backend area: `auth-api.ts`, `admin-topics-api.ts`, `admin-media-api.ts`, `admin-users-api.ts`, `topics-api.ts`). New backend area → new file, mirroring the route prefix.
 - **Auth state through context, not duplicate fetches.** Use `useAuth()` from `src/hooks/use-auth.ts` — don't re-implement token storage or `/auth/me` calls per-page.
 - **Route groups carry the auth contract.** `(auth)` is anonymous-only (login, future password reset); `(protected)` requires a session (gated in its `layout.tsx`).
+- **Full-viewport layout chain.** The protected layout uses `h-dvh overflow-hidden` (not `min-h-screen`) so nested layouts can fill the remaining height with `flex-1 overflow-hidden`. Every layout and page in the chain must propagate `flex-1 overflow-hidden` — a single missing node breaks the fill. Use `h-dvh` (not `h-screen` / `100vh`) to handle the iOS Safari dynamic toolbar correctly.
+- **Two-column admin pages (sidebar + detail).** Use `flex flex-1 overflow-hidden` as the body wrapper; the left panel is `flex-shrink-0` with a fixed width (e.g. `w-[620px]`); the right panel is `flex-1 overflow-y-auto`. On mobile, show only one panel at a time: hide the list when an item is selected (`hidden md:flex` / conditional `flex`) and add a "← Back" button in the detail pane (`md:hidden`) so the user can return to the list.
+- **Mobile nav drawer.** The `Nav` component renders a hamburger button on mobile (`md:hidden`) that toggles the `useSidebar()` context. The drawer (`MobileDrawer` inside `nav.tsx`) contains all nav links and the admin section links. The desktop `AdminSidebar` is `hidden md:block` only — never render a second drawer from it.
 - **No `utils`/`helpers` folders.** Logic colocates with the component, hook, or feature directory. Real cross-cutting → `@arenaquest/shared`.
 - **Path alias:** `@web/*` → `apps/web/src/*`. Use it instead of long relative paths (`../../../`).
 - **Tailwind v4.** Theme tokens live in CSS via `@theme` — no `tailwind.config.js`. Avoid inline `style={{...}}` and arbitrary values when a token exists.

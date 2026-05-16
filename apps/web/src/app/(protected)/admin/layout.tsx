@@ -29,9 +29,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!canAccessAdmin) return null;
 
   return (
-    <div className="flex flex-1">
+    <div className="flex flex-1 overflow-hidden">
       <AdminSidebar />
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="flex flex-1 flex-col overflow-hidden">{children}</main>
     </div>
   );
 }
