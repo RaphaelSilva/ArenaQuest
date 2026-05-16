@@ -679,7 +679,7 @@ export default function AdminTopicsPage() {
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Select a topic to edit its details</p>
             </div>
           ) : (
-            <div className="mx-auto max-w-3xl space-y-8">
+            <div className="space-y-8">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>
