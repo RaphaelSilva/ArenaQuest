@@ -1,0 +1,21 @@
+# ArenaQuest — QA test accounts (NEVER commit this file)
+# Used exclusively by the qa-tester skill for manual E2E validation.
+
+# Local dev URLs
+QA_WEB_URL=http://localhost:3000
+QA_API_URL=http://localhost:8787
+
+# Test account
+QA_ADMIN_EMAIL=eng.raphaelsn@gmail.com
+QA_ADMIN_PASSWORD=Qwerty@123
+
+QA_INSTRUCTOR_EMAIL=
+QA_INSTRUCTOR_PASSWORD=
+
+QA_PARTICIPANT_EMAIL=
+QA_PARTICIPANT_PASSWORD=
+
+QA_NEW_USER_EMAIL=
+QA_NEW_USER_PASSWORD=
+
+QA_GOOGLE_OAUTH_EMAIL=

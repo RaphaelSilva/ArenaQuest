@@ -622,7 +622,7 @@ export default function AdminTopicsPage() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-200/80 bg-white/50 px-6 py-4 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/50">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Topic Tree</h1>
+          <h1 className="text-[28px] font-bold tracking-tight text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>Topic Tree</h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">Build and organize your educational hierarchy</p>
         </div>
         <Button
@@ -637,7 +637,7 @@ export default function AdminTopicsPage() {
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left: tree panel */}
-        <div className="w-80 flex-shrink-0 overflow-y-auto border-r border-zinc-200/80 bg-white/30 backdrop-blur-sm p-4 dark:border-zinc-800/80 dark:bg-zinc-900/10">
+        <div className="w-[280px] flex-shrink-0 overflow-y-auto border-r border-zinc-200/80 bg-white/30 backdrop-blur-sm p-4 dark:border-zinc-800/80 dark:bg-zinc-900/10">
           {fetchError && (
             <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{fetchError}</p>
           )}
@@ -670,7 +670,7 @@ export default function AdminTopicsPage() {
             <div className="mx-auto max-w-3xl space-y-8">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <h2 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>
                     {detailTitle || 'Untitled Topic'}
                   </h2>
                   <p className="text-sm text-zinc-500">Topic ID: <code className="font-mono text-xs">{selectedId}</code></p>

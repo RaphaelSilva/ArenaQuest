@@ -64,9 +64,9 @@ export default function AdminTasksPage() {
   if (!canAuthor) return null;
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-8">
+    <main className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6 md:py-8">
       <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Tasks</h1>
+        <h1 className="text-[22px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.3px' }}>Tasks</h1>
         <Button
           onClick={handleCreate}
           disabled={creating}
