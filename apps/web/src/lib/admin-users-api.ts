@@ -1,5 +1,6 @@
 import type { Entities } from '@arenaquest/shared/types/entities';
 import type { RoleName } from '@arenaquest/shared/constants/roles';
+import { fetchWithAuth, type FetchWithAuthOptions } from './fetch-with-auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
@@ -16,21 +17,36 @@ export type UpdateUserInput = {
   status?: Entities.Config.UserStatus;
 };
 
-async function apiFetch(path: string, token: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
+async function apiFetch(
+  path: string,
+  token: string,
+  refreshFn: () => Promise<string | null>,
+  onTokenUpdate: (token: string) => void,
+  onSessionExpired: () => void,
+  init?: FetchWithAuthOptions,
+): Promise<Response> {
+  return fetchWithAuth(
+    `${API_URL}${path}`,
+    {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers ?? {}),
+      },
     },
-  });
-  return res;
+    token,
+    refreshFn,
+    onTokenUpdate,
+    onSessionExpired,
+  );
 }
 
 export const adminUsersApi = {
   async list(
     token: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
     page = 1,
     pageSize = 20,
   ): Promise<{ data: Entities.Identity.User[]; total: number }> {
@@ -38,13 +54,22 @@ export const adminUsersApi = {
     const res = await apiFetch(
       `/admin/users?limit=${pageSize}&offset=${offset}`,
       token,
+      refreshFn,
+      onTokenUpdate,
+      onSessionExpired,
     );
     if (!res.ok) throw new Error(`Failed to list users (${res.status})`);
     return res.json();
   },
 
-  async create(token: string, data: CreateUserInput): Promise<Entities.Identity.User> {
-    const res = await apiFetch('/admin/users', token, {
+  async create(
+    token: string,
+    data: CreateUserInput,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+  ): Promise<Entities.Identity.User> {
+    const res = await apiFetch('/admin/users', token, refreshFn, onTokenUpdate, onSessionExpired, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -59,8 +84,11 @@ export const adminUsersApi = {
     token: string,
     id: string,
     data: Partial<UpdateUserInput>,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
   ): Promise<Entities.Identity.User> {
-    const res = await apiFetch(`/admin/users/${id}`, token, {
+    const res = await apiFetch(`/admin/users/${id}`, token, refreshFn, onTokenUpdate, onSessionExpired, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -71,8 +99,14 @@ export const adminUsersApi = {
     return res.json();
   },
 
-  async deactivate(token: string, id: string): Promise<void> {
-    const res = await apiFetch(`/admin/users/${id}`, token, {
+  async deactivate(
+    token: string,
+    id: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+  ): Promise<void> {
+    const res = await apiFetch(`/admin/users/${id}`, token, refreshFn, onTokenUpdate, onSessionExpired, {
       method: 'DELETE',
     });
     if (!res.ok && res.status !== 204) {

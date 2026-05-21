@@ -61,6 +61,9 @@ export interface AuthContextValue {
   login(email: string, password: string): Promise<void>;
   loginWithAccessToken(token: string): void;
   logout(): Promise<void>;
+  refreshSession(): Promise<string | null>;
+  setAccessToken(token: string | null): void;
+  onSessionExpired(): void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -114,8 +117,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(null);
   }, []);
 
+  const refreshSession = useCallback(async () => {
+    try {
+      const result = await authApi.refresh();
+      if (!result) return null;
+
+      setAccessToken(result.accessToken);
+      const claims = decodeJwtClaims(result.accessToken);
+      if (claims) setUser(userFromClaims(claims));
+
+      return result.accessToken;
+    } catch {
+      setUser(null);
+      setAccessToken(null);
+      return null;
+    }
+  }, []);
+
+  const onSessionExpired = useCallback(() => {
+    setUser(null);
+    setAccessToken(null);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, accessToken, isLoading, login, loginWithAccessToken, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        accessToken,
+        isLoading,
+        login,
+        loginWithAccessToken,
+        logout,
+        refreshSession,
+        setAccessToken,
+        onSessionExpired,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

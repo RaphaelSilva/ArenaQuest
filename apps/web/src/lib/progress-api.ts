@@ -1,3 +1,5 @@
+import { fetchWithAuth } from './fetch-with-auth';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 export type ProgressSummary = {
@@ -21,28 +23,54 @@ export type TaskProgressItem = {
   updatedAt: string;
 };
 
-async function apiFetch(path: string, token: string): Promise<Response> {
-  return fetch(`${API_URL}${path}`, {
-    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-  });
+async function apiFetch(
+  path: string,
+  token: string,
+  refreshFn: () => Promise<string | null>,
+  onTokenUpdate: (token: string) => void,
+  onSessionExpired: () => void,
+): Promise<Response> {
+  return fetchWithAuth(
+    `${API_URL}${path}`,
+    { headers: { Accept: 'application/json' } },
+    token,
+    refreshFn,
+    onTokenUpdate,
+    onSessionExpired,
+  );
 }
 
 export const progressApi = {
-  async getSummary(token: string): Promise<ProgressSummary> {
-    const res = await apiFetch('/me/progress/summary', token);
+  async getSummary(
+    token: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+  ): Promise<ProgressSummary> {
+    const res = await apiFetch('/me/progress/summary', token, refreshFn, onTokenUpdate, onSessionExpired);
     if (!res.ok) throw new Error(`Failed to load progress summary (${res.status})`);
     return res.json();
   },
 
-  async getTopics(token: string): Promise<TopicProgressItem[]> {
-    const res = await apiFetch('/me/progress/topics', token);
+  async getTopics(
+    token: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+  ): Promise<TopicProgressItem[]> {
+    const res = await apiFetch('/me/progress/topics', token, refreshFn, onTokenUpdate, onSessionExpired);
     if (!res.ok) throw new Error(`Failed to load topic progress (${res.status})`);
     const body = (await res.json()) as { data: TopicProgressItem[] };
     return body.data;
   },
 
-  async getTasks(token: string): Promise<TaskProgressItem[]> {
-    const res = await apiFetch('/me/progress/tasks', token);
+  async getTasks(
+    token: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+  ): Promise<TaskProgressItem[]> {
+    const res = await apiFetch('/me/progress/tasks', token, refreshFn, onTokenUpdate, onSessionExpired);
     if (!res.ok) throw new Error(`Failed to load task progress (${res.status})`);
     const body = (await res.json()) as { data: TaskProgressItem[] };
     return body.data;

@@ -1,7 +1,7 @@
 # Task: Session Expiry — Silent Token Refresh and Login Redirect
 
 ## Metadata
-- **Status:** Pending
+- **Status:** ✅ Done
 - **Complexity:** Medium
 - **Priority:** High
 - **Category:** Security / Authentication
@@ -92,14 +92,14 @@ Replace the direct `fetch` calls that use `Authorization: Bearer` headers in all
 
 ## Acceptance Criteria
 
-- [ ] When the access token expires mid-session, the next API call triggers a silent `POST /auth/refresh` before any error is shown to the user.
-- [ ] If the refresh succeeds, the original request is retried and the UI receives the expected data with no visible error.
-- [ ] If the refresh fails (expired or missing refresh-token cookie), the user is redirected to `/login` with no stale "Failed to load" errors displayed.
-- [ ] Concurrent expired-token requests trigger exactly one refresh call, not N parallel calls.
-- [ ] The `AuthContext` `accessToken` state is updated with the new token after a successful refresh so subsequent requests use it immediately.
-- [ ] The `(protected)/layout.tsx` load-time redirect remains intact and unmodified.
-- [ ] `make lint` passes with no errors.
-- [ ] No regressions in existing login, logout, and registration flows.
+- [x] When the access token expires mid-session, the next API call triggers a silent `POST /auth/refresh` before any error is shown to the user.
+- [x] If the refresh succeeds, the original request is retried and the UI receives the expected data with no visible error.
+- [x] If the refresh fails (expired or missing refresh-token cookie), the user is redirected to `/login` with no stale "Failed to load" errors displayed.
+- [x] Concurrent expired-token requests trigger exactly one refresh call, not N parallel calls.
+- [x] The `AuthContext` `accessToken` state is updated with the new token after a successful refresh so subsequent requests use it immediately.
+- [x] The `(protected)/layout.tsx` load-time redirect remains intact and unmodified.
+- [x] `make lint` passes with no errors.
+- [x] No regressions in existing login, logout, and registration flows.
 
 ---
 

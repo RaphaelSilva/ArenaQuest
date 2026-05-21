@@ -1,3 +1,5 @@
+import { fetchWithAuth, type FetchWithAuthOptions } from './fetch-with-auth';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 export type UserGrant = {
@@ -16,29 +18,55 @@ export type GroupGrant = {
   grantedAt: string;
 };
 
-async function apiFetch(path: string, token: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
+async function apiFetch(
+  path: string,
+  token: string,
+  refreshFn: () => Promise<string | null>,
+  onTokenUpdate: (token: string) => void,
+  onSessionExpired: () => void,
+  init?: FetchWithAuthOptions,
+): Promise<Response> {
+  return fetchWithAuth(
+    `${API_URL}${path}`,
+    {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers ?? {}),
+      },
     },
-  });
+    token,
+    refreshFn,
+    onTokenUpdate,
+    onSessionExpired,
+  );
 }
 
 export const adminEnrollmentApi = {
   // --- User enrollment ---
 
-  async listUserGrants(token: string, userId: string): Promise<UserGrant[]> {
-    const res = await apiFetch(`/admin/users/${userId}/enrollments`, token);
+  async listUserGrants(
+    token: string,
+    userId: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+  ): Promise<UserGrant[]> {
+    const res = await apiFetch(`/admin/users/${userId}/enrollments`, token, refreshFn, onTokenUpdate, onSessionExpired);
     if (!res.ok) throw new Error(`Failed to list user grants (${res.status})`);
     const body = (await res.json()) as { data: UserGrant[] };
     return body.data;
   },
 
-  async grantUserTopic(token: string, userId: string, topicNodeId: string): Promise<{ grant: UserGrant; created: boolean }> {
-    const res = await apiFetch(`/admin/users/${userId}/enrollments`, token, {
+  async grantUserTopic(
+    token: string,
+    userId: string,
+    topicNodeId: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+  ): Promise<{ grant: UserGrant; created: boolean }> {
+    const res = await apiFetch(`/admin/users/${userId}/enrollments`, token, refreshFn, onTokenUpdate, onSessionExpired, {
       method: 'POST',
       body: JSON.stringify({ topicNodeId }),
     });
@@ -50,9 +78,17 @@ export const adminEnrollmentApi = {
     return { grant, created: res.status === 201 };
   },
 
-  async revokeUserTopic(token: string, userId: string, topicId: string, cascade = false): Promise<void> {
+  async revokeUserTopic(
+    token: string,
+    userId: string,
+    topicId: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+    cascade = false,
+  ): Promise<void> {
     const qs = cascade ? '?cascade=true' : '';
-    const res = await apiFetch(`/admin/users/${userId}/enrollments/${topicId}${qs}`, token, {
+    const res = await apiFetch(`/admin/users/${userId}/enrollments/${topicId}${qs}`, token, refreshFn, onTokenUpdate, onSessionExpired, {
       method: 'DELETE',
     });
     if (!res.ok && res.status !== 204) {
@@ -62,15 +98,28 @@ export const adminEnrollmentApi = {
 
   // --- Group enrollment ---
 
-  async listGroupGrants(token: string, groupId: string): Promise<GroupGrant[]> {
-    const res = await apiFetch(`/admin/groups/${groupId}/enrollments`, token);
+  async listGroupGrants(
+    token: string,
+    groupId: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+  ): Promise<GroupGrant[]> {
+    const res = await apiFetch(`/admin/groups/${groupId}/enrollments`, token, refreshFn, onTokenUpdate, onSessionExpired);
     if (!res.ok) throw new Error(`Failed to list group grants (${res.status})`);
     const body = (await res.json()) as { data: GroupGrant[] };
     return body.data;
   },
 
-  async grantGroupTopic(token: string, groupId: string, topicNodeId: string): Promise<{ grant: GroupGrant; created: boolean }> {
-    const res = await apiFetch(`/admin/groups/${groupId}/enrollments`, token, {
+  async grantGroupTopic(
+    token: string,
+    groupId: string,
+    topicNodeId: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+  ): Promise<{ grant: GroupGrant; created: boolean }> {
+    const res = await apiFetch(`/admin/groups/${groupId}/enrollments`, token, refreshFn, onTokenUpdate, onSessionExpired, {
       method: 'POST',
       body: JSON.stringify({ topicNodeId }),
     });
@@ -82,9 +131,17 @@ export const adminEnrollmentApi = {
     return { grant, created: res.status === 201 };
   },
 
-  async revokeGroupTopic(token: string, groupId: string, topicId: string, cascade = false): Promise<void> {
+  async revokeGroupTopic(
+    token: string,
+    groupId: string,
+    topicId: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+    cascade = false,
+  ): Promise<void> {
     const qs = cascade ? '?cascade=true' : '';
-    const res = await apiFetch(`/admin/groups/${groupId}/enrollments/${topicId}${qs}`, token, {
+    const res = await apiFetch(`/admin/groups/${groupId}/enrollments/${topicId}${qs}`, token, refreshFn, onTokenUpdate, onSessionExpired, {
       method: 'DELETE',
     });
     if (!res.ok && res.status !== 204) {

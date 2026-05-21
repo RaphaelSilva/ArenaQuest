@@ -1,3 +1,5 @@
+import { fetchWithAuth } from './fetch-with-auth';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 // ---------------------------------------------------------------------------
@@ -189,9 +191,22 @@ export function computeWeekPips(
   return pips;
 }
 
-async function safeFetch<T>(url: string, headers: Record<string, string>): Promise<T | null> {
+async function safeFetch<T>(
+  url: string,
+  token: string,
+  refreshFn: () => Promise<string | null>,
+  onTokenUpdate: (token: string) => void,
+  onSessionExpired: () => void,
+): Promise<T | null> {
   try {
-    const res = await fetch(url, { headers, cache: 'no-store' });
+    const res = await fetchWithAuth(
+      url,
+      { cache: 'no-store' },
+      token,
+      refreshFn,
+      onTokenUpdate,
+      onSessionExpired,
+    );
     if (!res.ok) return null;
     return res.json() as Promise<T>;
   } catch {
@@ -357,20 +372,45 @@ function adaptRoadmap(
 // Fetch
 // ---------------------------------------------------------------------------
 
-export async function getDashboard(token: string): Promise<DashboardPayload> {
-  const headers = { Accept: 'application/json', Authorization: `Bearer ${token}` };
-
+export async function getDashboard(
+  token: string,
+  refreshFn: () => Promise<string | null>,
+  onTokenUpdate: (token: string) => void,
+  onSessionExpired: () => void,
+): Promise<DashboardPayload> {
   const [dashRaw, lbRaw, topicsRaw, progressRaw] = await Promise.all([
-    fetch(`${API_URL}/me/dashboard`, { headers, cache: 'no-store' }).then(async (r) => {
+    fetchWithAuth(
+      `${API_URL}/me/dashboard`,
+      { cache: 'no-store' },
+      token,
+      refreshFn,
+      onTokenUpdate,
+      onSessionExpired,
+    ).then(async (r) => {
       if (!r.ok) throw new Error(`Failed to load dashboard (${r.status})`);
       return r.json() as Promise<ApiDashboardShape>;
     }),
     safeFetch<ApiLeaderboardResponse>(
       `${API_URL}/leaderboard?scope=global&period=all_time&limit=5`,
-      headers,
+      token,
+      refreshFn,
+      onTokenUpdate,
+      onSessionExpired,
     ),
-    safeFetch<ApiTopicsResponse>(`${API_URL}/topics`, headers),
-    safeFetch<ApiTopicProgressResponse>(`${API_URL}/me/progress/topics`, headers),
+    safeFetch<ApiTopicsResponse>(
+      `${API_URL}/topics`,
+      token,
+      refreshFn,
+      onTokenUpdate,
+      onSessionExpired,
+    ),
+    safeFetch<ApiTopicProgressResponse>(
+      `${API_URL}/me/progress/topics`,
+      token,
+      refreshFn,
+      onTokenUpdate,
+      onSessionExpired,
+    ),
   ]);
 
   return {
