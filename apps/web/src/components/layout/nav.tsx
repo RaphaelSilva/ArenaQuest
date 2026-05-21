@@ -9,6 +9,7 @@ import { useSidebar } from '@web/context/sidebar-context';
 
 const navLinks = [
   { label: 'Dashboard', href: '/dashboard' },
+  { label: 'Catalog', href: '/catalog' },
   { label: 'Tasks', href: '/tasks' },
   { label: 'Settings', href: '/settings' },
 ];
@@ -49,21 +50,24 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
 
         <nav className="flex flex-1 flex-col overflow-y-auto p-4">
           <ul className="space-y-1">
-            {navLinks.map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  onClick={onClose}
-                  className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                    pathname === link.href
-                      ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50'
-                      : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/50'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
+            {navLinks.map((link) => {
+              const isActive = pathname === link.href || (link.href === '/catalog' && pathname.startsWith('/catalog/'));
+              return (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    onClick={onClose}
+                    className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50'
+                        : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/50'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
 
           {canAccessAdmin && (
@@ -112,6 +116,7 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
 }
 
 export function Nav() {
+  const pathname = usePathname();
   const { logout } = useAuth();
   const canAccessAdmin = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
   const { isOpen, toggle, close } = useSidebar();
@@ -134,18 +139,33 @@ export function Nav() {
 
         {/* Desktop links */}
         <div className="hidden flex-1 items-center gap-4 text-sm md:flex">
-          <Link href="/dashboard" className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
+          <Link
+            href="/dashboard"
+            className={pathname === '/dashboard' ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
+          >
             Dashboard
+          </Link>
+          <Link
+            href="/catalog"
+            className={(pathname === '/catalog' || pathname.startsWith('/catalog/')) ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
+          >
+            Catalog
           </Link>
           {canAccessAdmin && (
             <Link href="/admin" className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
               Admin
             </Link>
           )}
-          <Link href="/tasks" className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
+          <Link
+            href="/tasks"
+            className={pathname === '/tasks' ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
+          >
             Tasks
           </Link>
-          <Link href="/settings" className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
+          <Link
+            href="/settings"
+            className={pathname === '/settings' ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
+          >
             Settings
           </Link>
         </div>
