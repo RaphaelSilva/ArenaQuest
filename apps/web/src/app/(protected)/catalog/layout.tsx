@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@web/hooks/use-auth';
 import { topicsApi, type TopicNode, type TopicProgressEntry, type TopicProgressStatus } from '@web/lib/topics-api';
 import { CatalogSidebar } from '@web/components/catalog/CatalogSidebar';
+import { MobileSearchBar } from '@web/components/catalog/MobileSearchBar';
 
 function SidebarSkeleton() {
   return (
@@ -53,35 +54,44 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
 
   return (
     <div
-      className="flex flex-1 overflow-hidden"
+      className="flex flex-1 flex-col overflow-hidden"
       style={{ background: 'var(--aq-bg)' }}
     >
-      {/* Sidebar */}
-      <aside
-        className="flex flex-shrink-0 flex-col overflow-hidden"
-        style={{
-          width: 280,
-          background: 'var(--aq-bg2)',
-          borderRight: '1px solid var(--aq-border)',
-        }}
-      >
-        <Suspense fallback={<SidebarSkeleton />}>
-          <CatalogSidebar
-            topics={topics}
-            progressMap={progressMap}
-            globalProgress={globalProgress}
-            isInstructor={isInstructor}
-          />
+      {/* Mobile search bar — visible only on md and below */}
+      <div className="hidden md:block">
+        <Suspense>
+          <MobileSearchBar />
         </Suspense>
-      </aside>
+      </div>
 
-      {/* Main content */}
-      <main
-        className="flex-1 overflow-y-auto"
-        style={{ background: 'var(--aq-bg)' }}
-      >
-        {children}
-      </main>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar — hidden on md and below, visible on lg and up */}
+        <aside
+          className="hidden flex-shrink-0 flex-col overflow-hidden lg:flex"
+          style={{
+            width: 280,
+            background: 'var(--aq-bg2)',
+            borderRight: '1px solid var(--aq-border)',
+          }}
+        >
+          <Suspense fallback={<SidebarSkeleton />}>
+            <CatalogSidebar
+              topics={topics}
+              progressMap={progressMap}
+              globalProgress={globalProgress}
+              isInstructor={isInstructor}
+            />
+          </Suspense>
+        </aside>
+
+        {/* Main content */}
+        <main
+          className="flex-1 overflow-y-auto"
+          style={{ background: 'var(--aq-bg)' }}
+        >
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

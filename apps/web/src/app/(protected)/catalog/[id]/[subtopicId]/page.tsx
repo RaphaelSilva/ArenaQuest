@@ -9,6 +9,7 @@ import { topicsApi, type TopicNode, type TopicProgressStatus } from '@web/lib/to
 import { MediaTabs } from '@web/components/catalog/MediaTabs';
 import { Comments } from '@web/components/catalog/Comments';
 import { SubtopicSidebar } from '@web/components/catalog/SubtopicSidebar';
+import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
 import { Spinner } from '@web/components/spinner';
 import type { Media } from '@web/lib/admin-media-api';
 
@@ -111,22 +112,22 @@ export default function SubtopicDetailPage({ params }: PageProps) {
   const siblingIndex = siblings.findIndex((s) => s.id === subtopicId);
   const progressPct = status === 'completed' ? 100 : status === 'in_progress' ? 35 : 0;
 
+  const currentIndex = siblings.findIndex((s) => s.id === subtopicId);
+  const prev = currentIndex > 0 ? siblings[currentIndex - 1] : null;
+  const next = currentIndex < siblings.length - 1 ? siblings[currentIndex + 1] : null;
+
   return (
     <div className="flex h-full overflow-hidden">
       {/* Main content */}
-      <div className="flex-1 overflow-y-auto" style={{ padding: '32px 40px 48px' }}>
+      <div className="flex-1 overflow-y-auto" style={{ padding: '32px 20px 48px md:px-10 lg:px-10', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
         {/* Breadcrumb */}
-        <nav className="mb-5 flex flex-wrap items-center gap-1.5 text-[12px]" style={{ color: 'var(--aq-text3)' }}>
-          <Link href="/catalog" className="transition-colors hover:text-[var(--aq-accent)]" style={{ color: 'var(--aq-text3)' }}>
-            Catalogue
-          </Link>
-          <span>›</span>
-          <Link href={`/catalog/${topicId}`} className="transition-colors hover:text-[var(--aq-accent)]" style={{ color: 'var(--aq-text3)' }}>
-            {parentTopic.title}
-          </Link>
-          <span>›</span>
-          <span className="font-medium" style={{ color: 'var(--aq-text2)' }}>{subtopic.title}</span>
-        </nav>
+        <CatalogBreadcrumb
+          items={[
+            { label: 'Catalogue', href: '/catalog' },
+            { label: parentTopic.title, href: `/catalog/${topicId}` },
+            { label: subtopic.title },
+          ]}
+        />
 
         {/* Header */}
         <div className="mb-6">
@@ -261,6 +262,83 @@ export default function SubtopicDetailPage({ params }: PageProps) {
           initialComments={comments}
           accessToken={accessToken ?? ''}
         />
+
+        {/* Children list — if subtopic has children */}
+        {subtopic.children.length > 0 && (
+          <div className="mt-12">
+            <div className="mb-4 h-[1px]" style={{ background: 'var(--aq-border)' }} />
+            <p className="mb-4 text-[13px] font-semibold uppercase tracking-widest" style={{ color: 'var(--aq-text3)' }}>
+              Próximos tópicos
+            </p>
+            <div className="space-y-2">
+              {subtopic.children.map((child, i) => {
+                const childStatus = progressMap.get(child.id) ?? 'not_started';
+                return (
+                  <Link
+                    key={child.id}
+                    href={`/catalog/${topicId}/${child.id}`}
+                    className="flex items-center gap-3 rounded-[8px] border px-4 py-3 transition-colors hover:bg-[var(--aq-bg3)]"
+                    style={{
+                      borderColor: 'var(--aq-border)',
+                      background: 'var(--aq-bg2)',
+                    }}
+                  >
+                    <div
+                      className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-[8px] text-[12px] font-bold"
+                      style={
+                        childStatus === 'completed'
+                          ? { background: 'var(--aq-accent3)', color: 'white' }
+                          : { background: 'var(--aq-bg3)', color: 'var(--aq-text3)', border: '1px solid var(--aq-border2)' }
+                      }
+                    >
+                      {childStatus === 'completed' ? '✓' : i + 1}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px]" style={{ color: 'var(--aq-text)' }}>
+                        {child.title}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Mobile bottom navigation — visible only on md and below */}
+        <div className="mt-12 block md:hidden">
+          <div className="mb-4 h-[1px]" style={{ background: 'var(--aq-border)' }} />
+          <div className="flex gap-2">
+            {prev ? (
+              <Link
+                href={`/catalog/${topicId}/${prev.id}`}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-2 text-[12px] font-medium transition-colors hover:bg-[var(--aq-bg3)]"
+                style={{ border: '1px solid var(--aq-border2)', color: 'var(--aq-text2)' }}
+              >
+                ← Anterior
+              </Link>
+            ) : (
+              <div className="flex-1" />
+            )}
+            {next ? (
+              <Link
+                href={`/catalog/${topicId}/${next.id}`}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-2 text-[12px] font-medium transition-colors hover:bg-[var(--aq-bg3)]"
+                style={{ border: '1px solid var(--aq-border2)', color: 'var(--aq-text2)' }}
+              >
+                Próximo →
+              </Link>
+            ) : (
+              <Link
+                href={`/catalog/${topicId}`}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-2 text-[12px] font-medium transition-colors"
+                style={{ background: 'var(--aq-accent-glow)', border: '1px solid var(--aq-accent)', color: 'var(--aq-accent)' }}
+              >
+                Concluído ✓
+              </Link>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Right sidebar */}

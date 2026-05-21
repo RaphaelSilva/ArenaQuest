@@ -22,7 +22,7 @@ export function SubtopicSidebar({ topicId, topicTitle, subtopicId, siblings, pro
 
   return (
     <aside
-      className="flex flex-shrink-0 flex-col overflow-hidden"
+      className="hidden flex-shrink-0 flex-col overflow-hidden lg:flex"
       style={{
         width: 280,
         background: 'var(--aq-bg2)',
