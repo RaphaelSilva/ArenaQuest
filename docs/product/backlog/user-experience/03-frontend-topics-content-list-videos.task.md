@@ -1,7 +1,7 @@
 # Task 03: Topic Root Content Display & Media Gallery
 
 ## Metadata
-- **Status:** Pending
+- **Status:** ✅ Done
 - **Complexity:** Medium
 - **Milestone:** Phase 5 (Participant Experience)
 - **Dependencies:** Existing catalog page and topic structure at `/protected/catalog/:id`
@@ -157,22 +157,22 @@ Modify `apps/web/src/app/(protected)/catalog/[id]/page.tsx`:
 
 ## Acceptance Criteria
 
-- [ ] Markdown content from `content` field renders on topic detail page
-- [ ] Content section displays ONLY if content is not null/empty
-- [ ] Markdown is sanitized (no script injections or XSS vulnerabilities)
-- [ ] Media files associated with root topic display in a gallery
-- [ ] Media section displays ONLY if media files exist
-- [ ] Video player (HTML5 `<video>`) works with play, pause, fullscreen, volume controls
-- [ ] All media types (video, PDF, image, document) have appropriate viewers/handlers
-- [ ] Media metadata (filename, type) is visible
-- [ ] Layout is responsive on mobile, tablet, and desktop
-- [ ] Dark mode styling applied and readable
-- [ ] No console errors or TypeScript violations
-- [ ] Lazy loading implemented (media not loaded until visible)
-- [ ] Accessibility: alt text, semantic HTML, keyboard navigation work
-- [ ] Existing topic structure preserved (header metadata, subtopic list unchanged)
-- [ ] `make lint` passes
-- [ ] No regressions in existing topic/catalog flows
+- [x] Markdown content from `content` field renders on topic detail page
+- [x] Content section displays ONLY if content is not null/empty
+- [x] Markdown is sanitized (no script injections or XSS vulnerabilities)
+- [x] Media files associated with root topic display in a gallery
+- [x] Media section displays ONLY if media files exist
+- [x] Video player (HTML5 `<video>`) works with play, pause, fullscreen, volume controls
+- [x] All media types (video, PDF, image, document) have appropriate viewers/handlers
+- [x] Media metadata (filename, type) is visible
+- [x] Layout is responsive on mobile, tablet, and desktop
+- [x] Dark mode styling applied and readable
+- [x] No console errors or TypeScript violations
+- [x] Lazy loading implemented (media not loaded until visible)
+- [x] Accessibility: alt text, semantic HTML, keyboard navigation work
+- [x] Existing topic structure preserved (header metadata, subtopic list unchanged)
+- [x] `make lint` passes
+- [x] No regressions in existing topic/catalog flows
 
 ---
 
