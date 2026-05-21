@@ -8,7 +8,6 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import { useRouter } from 'next/navigation';
 import type { Entities } from '@arenaquest/shared/types/entities';
 import { authApi } from '@web/lib/auth-api';
 
@@ -74,7 +73,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 // ---------------------------------------------------------------------------
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const [user, setUser] = useState<Entities.Identity.User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -139,8 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const onSessionExpired = useCallback(() => {
     setUser(null);
     setAccessToken(null);
-    router.replace('/login');
-  }, [router]);
+  }, []);
 
   return (
     <AuthContext.Provider
