@@ -80,6 +80,7 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Note: This component is hidden on mobile/tablet via 'hidden lg:flex' in layout.tsx
   const tree = buildTree(topics);
 
   // URL state: expanded IDs

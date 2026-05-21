@@ -11,6 +11,7 @@ import { BadgesStrip } from '@web/components/catalog/BadgesStrip';
 import { SubtopicCard } from '@web/components/catalog/SubtopicCard';
 import { ContentSection } from '@web/components/catalog/ContentSection';
 import { MediaGallery } from '@web/components/catalog/MediaGallery';
+import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
 import { Spinner } from '@web/components/spinner';
 
 type CatalogTopicPageProps = {
@@ -94,19 +95,15 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   const pct = subtopicTotal > 0 ? Math.round((subtopicDone / subtopicTotal) * 100) : 0;
 
   return (
-    <div style={{ padding: '32px 40px 48px', maxWidth: 900, margin: '0 auto' }}>
+    <div className="mx-auto max-w-[900px] px-4 py-8 md:px-6 lg:px-10">
       {/* Breadcrumb */}
-      <nav className="mb-6 flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--aq-text3)' }}>
-        <Link
-          href="/catalog"
-          className="transition-colors hover:text-[var(--aq-accent)]"
-          style={{ color: 'var(--aq-text3)' }}
-        >
-          Catalogue
-        </Link>
-        <span>›</span>
-        <span style={{ color: 'var(--aq-text2)' }}>{topic.title}</span>
-      </nav>
+      <CatalogBreadcrumb
+        items={[
+          { label: 'Catalogue', href: '/catalog' },
+          { label: topic.title },
+        ]}
+        backHref="/catalog"
+      />
 
       {/* Topic header */}
       <TopicHeader topic={topic} pct={pct} />

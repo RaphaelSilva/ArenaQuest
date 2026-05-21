@@ -1,7 +1,7 @@
 # Task 04: Catalog Mobile & Tablet Responsiveness
 
 ## Metadata
-- **Status:** Pending
+- **Status:** ✅ Done
 - **Complexity:** Medium-High
 - **Milestone:** Phase 5 (Participant Experience)
 - **Dependencies:** Task 02 (Catalog Menu Navigation), Task 03 (Topic Content & Media)
@@ -176,22 +176,22 @@ On mobile and tablet:
 
 ## Acceptance Criteria
 
-- [ ] On mobile (<640px) and tablet (640px–1023px), the left `CatalogSidebar` is hidden and does not consume screen space
-- [ ] On mobile/tablet, a search bar is always visible at the top of the catalog content area and filters topics via `?q=` URL param
-- [ ] On desktop (≥1024px), all existing sidebar behavior is unchanged
-- [ ] On mobile, `/catalog` shows a list of root topics with progress bars and green indicators for completed topics
-- [ ] On mobile, `/catalog/:id` shows the subtopic list in a mobile-optimized single-column layout with tap targets ≥44px
-- [ ] On mobile, `/catalog/:id/:subtopicId` is full-width (right sidebar hidden); page contains prev/next navigation at the bottom
-- [ ] If a subtopic node has children, they are listed at the bottom of the subtopic detail page on all viewports
-- [ ] Breadcrumb trail is present on all three catalog route levels and shows: `Catalogue › Root Topic › Subtopic`
-- [ ] Breadcrumb links are tappable and navigate correctly to parent levels
-- [ ] Progress indicators (green dot/circle for completed, accent for in-progress, grey for not started) are consistent across all views
-- [ ] Search bar on mobile filters the topic list in real-time with `?q=` URL state (debounced)
-- [ ] No horizontal scroll or layout overflow on any viewport width (320px–1920px+)
-- [ ] Desktop layout matches current behavior pixel-for-pixel (no regressions)
-- [ ] `make lint` passes with no TypeScript violations
-- [ ] All tap/click targets are ≥44px on mobile
-- [ ] Dark mode renders correctly on all mobile views
+- [x] On mobile (<640px) and tablet (640px–1023px), the left `CatalogSidebar` is hidden and does not consume screen space
+- [x] On mobile/tablet, a search bar is always visible at the top of the catalog content area and filters topics via `?q=` URL param
+- [x] On desktop (≥1024px), all existing sidebar behavior is unchanged
+- [x] On mobile, `/catalog` shows a list of root topics with progress bars and green indicators for completed topics
+- [x] On mobile, `/catalog/:id` shows the subtopic list in a mobile-optimized single-column layout with tap targets ≥44px
+- [x] On mobile, `/catalog/:id/:subtopicId` is full-width (right sidebar hidden); page contains prev/next navigation at the bottom
+- [x] If a subtopic node has children, they are listed at the bottom of the subtopic detail page on all viewports
+- [x] Breadcrumb trail is present on all three catalog route levels and shows: `Catalogue › Root Topic › Subtopic`
+- [x] Breadcrumb links are tappable and navigate correctly to parent levels
+- [x] Progress indicators (green dot/circle for completed, accent for in-progress, grey for not started) are consistent across all views
+- [x] Search bar on mobile filters the topic list in real-time with `?q=` URL state (debounced)
+- [x] No horizontal scroll or layout overflow on any viewport width (320px–1920px+)
+- [x] Desktop layout matches current behavior pixel-for-pixel (no regressions)
+- [x] `make lint` passes with no TypeScript violations
+- [x] All tap/click targets are ≥44px on mobile
+- [x] Dark mode renders correctly on all mobile views
 
 ---
 
