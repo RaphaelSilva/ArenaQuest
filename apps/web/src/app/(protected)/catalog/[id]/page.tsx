@@ -5,10 +5,12 @@ export const runtime = 'edge';
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@web/hooks/use-auth';
-import { topicsApi, type TopicNode, type TopicProgressStatus } from '@web/lib/topics-api';
+import { topicsApi, type TopicProgressStatus, type TopicWithMedia } from '@web/lib/topics-api';
 import { TopicHeader } from '@web/components/catalog/TopicHeader';
 import { BadgesStrip } from '@web/components/catalog/BadgesStrip';
 import { SubtopicCard } from '@web/components/catalog/SubtopicCard';
+import { ContentSection } from '@web/components/catalog/ContentSection';
+import { MediaGallery } from '@web/components/catalog/MediaGallery';
 import { Spinner } from '@web/components/spinner';
 
 type CatalogTopicPageProps = {
@@ -21,7 +23,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   const { id } = use(params);
   const { accessToken, user } = useAuth();
 
-  const [topic, setTopic] = useState<(TopicNode & { children: TopicNode[] }) | null>(null);
+  const [topic, setTopic] = useState<TopicWithMedia | null>(null);
   const [progressMap, setProgressMap] = useState<Map<string, TopicProgressStatus>>(new Map());
   const [badges, setBadges] = useState<BadgeItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,6 +135,12 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
 
       {/* Badges strip */}
       {badges.length > 0 && <BadgesStrip badges={badges} />}
+
+      {/* Content section */}
+      <ContentSection content={topic.content} />
+
+      {/* Media gallery */}
+      <MediaGallery media={topic.media || []} />
 
       {/* Subtopics */}
       <div>

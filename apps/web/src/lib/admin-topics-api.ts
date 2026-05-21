@@ -1,4 +1,5 @@
 import type { Media } from './admin-media-api';
+export type { Media };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
