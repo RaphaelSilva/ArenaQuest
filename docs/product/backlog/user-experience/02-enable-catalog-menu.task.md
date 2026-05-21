@@ -1,7 +1,7 @@
 # Task 02: Enable Catalog Menu Navigation
 
 ## Metadata
-- **Status:** Pending
+- **Status:** ✅ Done
 - **Complexity:** Low
 - **Milestone:** Phase 5 (Engagement and Student Progress)
 - **Dependencies:** None (Catalog page already exists at `/protected/catalog`)
@@ -103,18 +103,18 @@ Modify `apps/web/src/components/layout/nav.tsx`:
 
 ## Acceptance Criteria
 
-- [ ] "Catalog" link appears in desktop navigation bar
-- [ ] "Catalog" link appears in mobile navigation drawer
-- [ ] Desktop link correctly navigates to `/catalog`
-- [ ] Mobile link correctly navigates to `/catalog`
-- [ ] Active state (highlighted styling) appears when user is on `/catalog` or `/catalog/*`
-- [ ] Links are styled consistently with existing nav items (color, hover, dark mode)
-- [ ] Mobile drawer closes after clicking "Catalog"
-- [ ] No console errors or TypeScript type violations
-- [ ] Responsive design maintained (no layout shifts or broken styles)
-- [ ] Dark mode styling applied correctly
-- [ ] `make lint` passes
-- [ ] No regressions in existing navigation flows (Dashboard, Tasks, Settings, Admin remain functional)
+- [x] "Catalog" link appears in desktop navigation bar
+- [x] "Catalog" link appears in mobile navigation drawer
+- [x] Desktop link correctly navigates to `/catalog`
+- [x] Mobile link correctly navigates to `/catalog`
+- [x] Active state (highlighted styling) appears when user is on `/catalog` or `/catalog/*`
+- [x] Links are styled consistently with existing nav items (color, hover, dark mode)
+- [x] Mobile drawer closes after clicking "Catalog"
+- [x] No console errors or TypeScript type violations
+- [x] Responsive design maintained (no layout shifts or broken styles)
+- [x] Dark mode styling applied correctly
+- [x] `make lint` passes
+- [x] No regressions in existing navigation flows (Dashboard, Tasks, Settings, Admin remain functional)
 
 ---
 
