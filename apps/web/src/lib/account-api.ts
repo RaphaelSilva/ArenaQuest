@@ -1,3 +1,5 @@
+import { fetchWithAuth } from './fetch-with-auth';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 export type AccountApiErrorCode =
@@ -26,18 +28,27 @@ export const accountApi = {
     accessToken: string,
     currentPassword: string,
     newPassword: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
   ): Promise<void> {
     let res: Response;
     try {
-      res = await fetch(`${API_URL}/account/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
+      res = await fetchWithAuth(
+        `${API_URL}/account/change-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ currentPassword, newPassword }),
         },
-        credentials: 'include',
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
+        accessToken,
+        refreshFn,
+        onTokenUpdate,
+        onSessionExpired,
+      );
     } catch {
       throw new AccountApiError('NetworkError', 0, 'Falha de rede.');
     }

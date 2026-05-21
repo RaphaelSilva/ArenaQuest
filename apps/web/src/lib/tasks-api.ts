@@ -1,3 +1,5 @@
+import { fetchWithAuth, type FetchWithAuthOptions } from './fetch-with-auth';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 export type TaskSummary = {
@@ -23,15 +25,28 @@ export type PublicTaskDetail = {
   stages: PublicStage[];
 };
 
-async function apiFetch(path: string, token: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
+async function apiFetch(
+  path: string,
+  token: string,
+  refreshFn: () => Promise<string | null>,
+  onTokenUpdate: (token: string) => void,
+  onSessionExpired: () => void,
+  init?: FetchWithAuthOptions,
+): Promise<Response> {
+  return fetchWithAuth(
+    `${API_URL}${path}`,
+    {
+      ...init,
+      headers: {
+        Accept: 'application/json',
+        ...(init?.headers ?? {}),
+      },
     },
-  });
+    token,
+    refreshFn,
+    onTokenUpdate,
+    onSessionExpired,
+  );
 }
 
 export type CheckInResult = {
@@ -46,15 +61,26 @@ export type CheckInError =
   | { type: 'UNKNOWN'; message: string };
 
 export const tasksApi = {
-  async list(token: string): Promise<TaskSummary[]> {
-    const res = await apiFetch('/tasks', token);
+  async list(
+    token: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+  ): Promise<TaskSummary[]> {
+    const res = await apiFetch('/tasks', token, refreshFn, onTokenUpdate, onSessionExpired);
     if (!res.ok) throw new Error(`Failed to list tasks (${res.status})`);
     const body = (await res.json()) as { data: TaskSummary[] };
     return body.data;
   },
 
-  async getById(token: string, id: string): Promise<PublicTaskDetail> {
-    const res = await apiFetch(`/tasks/${id}`, token);
+  async getById(
+    token: string,
+    id: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
+  ): Promise<PublicTaskDetail> {
+    const res = await apiFetch(`/tasks/${id}`, token, refreshFn, onTokenUpdate, onSessionExpired);
     if (!res.ok) throw new Error(`Failed to load task (${res.status})`);
     return res.json();
   },
@@ -63,10 +89,18 @@ export const tasksApi = {
     token: string,
     taskId: string,
     stageId: string,
+    refreshFn: () => Promise<string | null>,
+    onTokenUpdate: (token: string) => void,
+    onSessionExpired: () => void,
   ): Promise<{ result: CheckInResult; created: boolean } | { error: CheckInError }> {
-    const res = await apiFetch(`/tasks/${taskId}/stages/${stageId}/check-in`, token, {
-      method: 'POST',
-    });
+    const res = await apiFetch(
+      `/tasks/${taskId}/stages/${stageId}/check-in`,
+      token,
+      refreshFn,
+      onTokenUpdate,
+      onSessionExpired,
+      { method: 'POST' },
+    );
     if (res.ok) {
       const body = (await res.json()) as CheckInResult;
       return { result: body, created: res.status === 201 };

@@ -8,6 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Entities } from '@arenaquest/shared/types/entities';
 import { authApi } from '@web/lib/auth-api';
 
@@ -61,6 +62,9 @@ export interface AuthContextValue {
   login(email: string, password: string): Promise<void>;
   loginWithAccessToken(token: string): void;
   logout(): Promise<void>;
+  refreshSession(): Promise<string | null>;
+  setAccessToken(token: string | null): void;
+  onSessionExpired(): void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -70,6 +74,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 // ---------------------------------------------------------------------------
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<Entities.Identity.User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -114,8 +119,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(null);
   }, []);
 
+  const refreshSession = useCallback(async () => {
+    try {
+      const result = await authApi.refresh();
+      if (!result) return null;
+
+      setAccessToken(result.accessToken);
+      const claims = decodeJwtClaims(result.accessToken);
+      if (claims) setUser(userFromClaims(claims));
+
+      return result.accessToken;
+    } catch {
+      setUser(null);
+      setAccessToken(null);
+      return null;
+    }
+  }, []);
+
+  const onSessionExpired = useCallback(() => {
+    setUser(null);
+    setAccessToken(null);
+    router.replace('/login');
+  }, [router]);
+
   return (
-    <AuthContext.Provider value={{ user, accessToken, isLoading, login, loginWithAccessToken, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        accessToken,
+        isLoading,
+        login,
+        loginWithAccessToken,
+        logout,
+        refreshSession,
+        setAccessToken,
+        onSessionExpired,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
