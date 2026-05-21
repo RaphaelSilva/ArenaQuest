@@ -102,6 +102,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
           { label: 'Catalogue', href: '/catalog' },
           { label: topic.title },
         ]}
+        backHref="/catalog"
       />
 
       {/* Topic header */}

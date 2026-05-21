@@ -127,6 +127,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
             { label: parentTopic.title, href: `/catalog/${topicId}` },
             { label: subtopic.title },
           ]}
+          backHref={`/catalog/${topicId}`}
         />
 
         {/* Header */}
