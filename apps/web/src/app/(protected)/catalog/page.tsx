@@ -38,7 +38,7 @@ export default function CatalogIndexPage() {
   }, [accessToken]);
 
   return (
-    <div style={{ padding: '32px 20px 48px md:px-10 lg:px-10', maxWidth: '900px', margin: '0 auto' }}>
+    <div className="mx-auto max-w-[900px] px-4 py-8 md:px-6 lg:px-10">
       {/* Breadcrumb */}
       <CatalogBreadcrumb items={[{ label: 'Catalogue' }]} />
 

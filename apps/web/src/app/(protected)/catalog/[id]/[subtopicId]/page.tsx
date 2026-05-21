@@ -119,7 +119,8 @@ export default function SubtopicDetailPage({ params }: PageProps) {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Main content */}
-      <div className="flex-1 overflow-y-auto" style={{ padding: '32px 20px 48px md:px-10 lg:px-10', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
+      <div className="flex-1 overflow-y-auto" style={{ width: '100%' }}>
+        <div className="mx-auto max-w-[900px] px-4 py-8 md:px-6 lg:px-10">
         {/* Breadcrumb */}
         <CatalogBreadcrumb
           items={[
@@ -339,6 +340,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
               </Link>
             )}
           </div>
+        </div>
         </div>
       </div>
 
