@@ -1,5 +1,5 @@
-import type { TopicNode } from './admin-topics-api';
-export type { TopicNode };
+import type { TopicNode, Media } from './admin-topics-api';
+export type { TopicNode, Media };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
@@ -21,6 +21,11 @@ export type TopicProgressEntry = {
   status: TopicProgressStatus;
 };
 
+export type TopicWithMedia = TopicNode & {
+  children: TopicNode[];
+  media: Media[];
+};
+
 export const topicsApi = {
   async list(token: string): Promise<TopicNode[]> {
     const res = await apiFetch('/topics', token);
@@ -29,7 +34,7 @@ export const topicsApi = {
     return body.data;
   },
 
-  async getById(token: string, id: string): Promise<TopicNode & { children: TopicNode[] }> {
+  async getById(token: string, id: string): Promise<TopicWithMedia> {
     const res = await apiFetch(`/topics/${id}`, token);
     if (!res.ok) {
       if (res.status === 404) throw new Error('Topic not found or not published');
