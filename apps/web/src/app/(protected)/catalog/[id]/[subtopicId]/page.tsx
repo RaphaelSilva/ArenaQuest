@@ -4,6 +4,7 @@ export const runtime = 'edge';
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { renderMarkdown } from '@arenaquest/shared/utils/sanitize-markdown';
 import { useAuth } from '@web/hooks/use-auth';
 import { topicsApi, type TopicNode, type TopicProgressStatus } from '@web/lib/topics-api';
 import { MediaTabs } from '@web/components/catalog/MediaTabs';
@@ -248,10 +249,19 @@ export default function SubtopicDetailPage({ params }: PageProps) {
           <div className="mb-8">
             <div className="mb-8 h-[1px]" style={{ background: 'var(--aq-border)' }} />
             <div
-              className="prose max-w-none rounded-[14px] p-6"
-              style={{ background: 'var(--aq-bg2)', border: '1px solid var(--aq-border)', color: 'var(--aq-text2)' }}
+              className="prose prose-sm dark:prose-invert max-w-none rounded-[14px] p-6"
+              style={{
+                background: 'var(--aq-bg2)',
+                border: '1px solid var(--aq-border)',
+                color: 'var(--aq-text2)',
+                '--tw-prose-body': 'var(--aq-text2)',
+                '--tw-prose-headings': 'var(--aq-text1)',
+                '--tw-prose-links': 'var(--aq-accent)',
+                '--tw-prose-code': 'var(--aq-accent)',
+                '--tw-prose-hr': 'var(--aq-border)',
+              } as React.CSSProperties}
             >
-              <pre className="whitespace-pre-wrap text-[13px] leading-relaxed">{subtopic.content}</pre>
+              <div dangerouslySetInnerHTML={{ __html: renderMarkdown(subtopic.content) }} />
             </div>
           </div>
         )}
