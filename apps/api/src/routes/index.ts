@@ -151,6 +151,7 @@ export class AppRouter {
     );
 
     // Feature routes
+    app.route('/', buildCommentsRouter(commentRepo, enrollmentRepo, xpEngine));
     app.route('/auth', buildAuthRouter({ authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, streakEngine, questEvaluator, badgeEngine }));
     app.route('/admin/users', buildAdminUsersRouter(users, auth, tokens));
     app.route('/admin/topics', buildAdminTopicsRouter(topics, tags));
@@ -163,7 +164,6 @@ export class AppRouter {
     app.route('/me', buildMeProgressRouter(progressRepo, enrollmentRepo, taskRepo, taskStages, taskLinks, topics));
     app.route('/me', buildMeGamificationRouter(gamificationRepo, _questRepo, badgeRepo, missionRepo));
     app.route('/leaderboard', buildLeaderboardRouter(gamificationRepo, users));
-    app.route('/', buildCommentsRouter(commentRepo, enrollmentRepo, xpEngine));
     app.route('/admin', buildAdminEnrollmentRouter(enrollmentRepo, users, topics));
     app.route('/account', buildAccountRouter(accountController));
     app.route('/auth', buildOAuthRouter(googleOAuthController, cookieSameSite));
