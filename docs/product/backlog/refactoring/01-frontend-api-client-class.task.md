@@ -11,7 +11,7 @@
 
 ## Progress Report
 
-### Phase A (Complete) — Infrastructure Foundation
+### Phase A (✅ Complete) — Infrastructure Foundation
 **Commit:** `889f108` — "refactor(web): Phase A - introduce ApiClient class and useApiClient hook"
 
 ✅ **Completed:**
@@ -45,33 +45,43 @@
    - This prevents import errors during Phase B migration and guides developers to `useApiClient()` hook
    - Deprecation messages: "Use useApiClient() hook instead: const client = useApiClient(); await client.topics.list()"
 
-### Phase B (Pending) — Consumer Migration
-**Scope:** 20+ consumer files across pages, components, and hooks
+### Phase B (🟠 In Progress ~20%) — Consumer Migration
+**Scope:** 20 consumer files across pages, components, and hooks
+**Latest Commit:** `5844bcd` — "refactor(web): Phase B - migrate admin tasks pages to useApiClient"
 
-⏳ **Required before build/tests can pass:**
-1. Migrate all page components in `apps/web/src/app/(protected)/`
-   - `admin/topics/page.tsx`
-   - `admin/tasks/page.tsx` + `[id]/page.tsx`
-   - `admin/users/page.tsx` + `[userId]/page.tsx`
-   - `catalog/layout.tsx`, `page.tsx`, `[id]/page.tsx`, `[id]/[subtopicId]/page.tsx`
-   - `settings/page.tsx`
-   - `tasks/page.tsx` + `[id]/page.tsx`
+✅ **Completed (2 files):**
+1. `apps/web/src/app/(protected)/admin/tasks/[id]/page.tsx` — ✅ Full migration, uses `client.adminTasks.*` and `client.adminTopics.list()`
+2. `apps/web/src/app/(protected)/admin/tasks/page.tsx` — ✅ Full migration, uses `client.adminTasks.*`
 
-2. Migrate components in `apps/web/src/components/`
-   - `admin/MediaUploader.tsx`, `MediaList.tsx`
-   - `enrollment/enrollments-tab.tsx`
-   - `tasks/stage-editor.tsx`, `student-task-detail.tsx`
-   - `dashboard/DashboardContent.tsx`
-   - `hooks/use-media-loader.ts`, `use-topics-loader.ts`
+⏳ **Remaining (18 files):**
 
-3. Rewrite 5 API-mocking tests
-   - Create shared mock helper: `apps/web/__tests__/helpers/mock-api-client.ts`
-   - Rewrite test files listed in "Impact on Existing Tests" section
+**Pages (10 files):**
+- `admin/topics/page.tsx` — Currently failing: line 267 argument mismatch
+- `admin/users/page.tsx` + `[userId]/page.tsx`
+- `catalog/layout.tsx`, `page.tsx`, `[id]/page.tsx`, `[id]/[subtopicId]/page.tsx`
+- `settings/page.tsx`
+- `tasks/page.tsx` + `[id]/page.tsx`
+
+**Components (6 files):**
+- `components/admin/MediaUploader.tsx`, `MediaList.tsx`
+- `components/enrollment/enrollments-tab.tsx`
+- `components/tasks/stage-editor.tsx`, `student-task-detail.tsx`
+- `components/dashboard/DashboardContent.tsx`
+
+**Tests (2 files):**
+- `components/tasks/__tests__/student-task-detail.test.tsx`
+- `components/tasks/__tests__/stage-editor.test.tsx`
+
+**Notes on remaining work:**
+- Pattern is fully established in completed files - remaining migrations are mechanical
+- Each file needs: (1) add `useApiClient` import, (2) call `const client = useApiClient()`, (3) replace all `apiModule.method(token, ...)` → `client.domain.method(...)`
+- Keep all type imports and error handling unchanged
+- No business logic changes required
 
 ### Current Build Status
-- **Compilation:** Fails at page runtime (e.g., `admin/tasks/[id]/page.tsx:49`) because old code still calls deprecated `adminTasksApi.getById(token, taskId, ...)` 
-- **Root cause:** Deprecation stubs don't accept arguments; they throw errors to guide migration
-- **Mitigation:** Backward-compatibility stubs allow imports to succeed but fail at runtime if old calling convention is used
+- **TypeScript:** Type error in `admin/topics/page.tsx:267` (argument mismatch)
+- **Root cause:** Partially migrated pages still reference deprecated APIs or have token argument mismatches
+- **Next steps:** Complete remaining 18 file migrations to restore full build
 
 ---
 
