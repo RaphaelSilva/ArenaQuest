@@ -1,7 +1,7 @@
 # Task 01: Refactor Frontend API Clients to a Context-Aware `ApiClient` Class
 
 ## Metadata
-- **Status:** 🟡 In Progress — Phase A Complete, Phase B Pending
+- **Status:** ✅ Done
 - **Complexity:** High
 - **Milestone:** Future Enhancement (technical debt)
 - **Dependencies:** None (but should land before adding new frontend API surfaces)
@@ -45,43 +45,60 @@
    - This prevents import errors during Phase B migration and guides developers to `useApiClient()` hook
    - Deprecation messages: "Use useApiClient() hook instead: const client = useApiClient(); await client.topics.list()"
 
-### Phase B (🟠 In Progress ~20%) — Consumer Migration
-**Scope:** 20 consumer files across pages, components, and hooks
-**Latest Commit:** `5844bcd` — "refactor(web): Phase B - migrate admin tasks pages to useApiClient"
+### Phase B (✅ Complete) — Consumer Migration
+**Scope:** 20+ consumer files across pages, components, hooks
+**Status:** All consumer migrations complete
 
-✅ **Completed (2 files):**
-1. `apps/web/src/app/(protected)/admin/tasks/[id]/page.tsx` — ✅ Full migration, uses `client.adminTasks.*` and `client.adminTopics.list()`
-2. `apps/web/src/app/(protected)/admin/tasks/page.tsx` — ✅ Full migration, uses `client.adminTasks.*`
+✅ **Completed (All Files):**
 
-⏳ **Remaining (18 files):**
+**Pages (12 files):**
+1. `apps/web/src/app/(protected)/admin/tasks/[id]/page.tsx` — Uses `client.adminTasks.*` and `client.adminTopics.list()`
+2. `apps/web/src/app/(protected)/admin/tasks/page.tsx` — Uses `client.adminTasks.*`
+3. `apps/web/src/app/(protected)/admin/topics/page.tsx` — Uses `client.adminTopics.*` and `client.adminMedia.*`
+4. `apps/web/src/app/(protected)/admin/users/page.tsx` — Uses `client.adminUsers.*`
+5. `apps/web/src/app/(protected)/admin/users/[userId]/page.tsx` — Uses `client.adminUsers.list()`
+6. `apps/web/src/app/(protected)/catalog/layout.tsx` — Uses `client.topics.*`
+7. `apps/web/src/app/(protected)/catalog/page.tsx` — Uses `client.topics.*`
+8. `apps/web/src/app/(protected)/catalog/[id]/page.tsx` — Uses `client.topics.*`
+9. `apps/web/src/app/(protected)/catalog/[id]/[subtopicId]/page.tsx` — Uses `client.topics.*`
+10. `apps/web/src/app/(protected)/settings/page.tsx` — Uses `client.account.changePassword()`
+11. `apps/web/src/app/(protected)/tasks/page.tsx` — Uses `client.tasks.list()`
+12. `apps/web/src/app/(protected)/tasks/[id]/page.tsx` — Uses `client.tasks.getById()`
 
-**Pages (10 files):**
-- `admin/topics/page.tsx` — Currently failing: line 267 argument mismatch
-- `admin/users/page.tsx` + `[userId]/page.tsx`
-- `catalog/layout.tsx`, `page.tsx`, `[id]/page.tsx`, `[id]/[subtopicId]/page.tsx`
-- `settings/page.tsx`
-- `tasks/page.tsx` + `[id]/page.tsx`
+**Components (8 files):**
+1. `apps/web/src/components/admin/MediaUploader.tsx` — Uses `client.adminMedia.*`
+2. `apps/web/src/components/admin/MediaList.tsx` — Uses `client.adminMedia.delete()`
+3. `apps/web/src/components/enrollment/enrollments-tab.tsx` — Uses `client.adminEnrollment.*` and `client.adminTopics.list()`
+4. `apps/web/src/components/tasks/stage-editor.tsx` — Uses `client.adminTasks.*` stage methods
+5. `apps/web/src/components/tasks/student-task-detail.tsx` — Uses `client.tasks.checkIn()`
+6. `apps/web/src/components/dashboard/DashboardContent.tsx` — Uses `client.dashboard.get()`
+7. `apps/web/src/components/catalog/Comments.tsx` — Uses `useAuth()` for token
+8. `apps/web/src/components/catalog/VideoPlayerWithPlaylist.tsx` — Uses `useAuth()` for token
 
-**Components (6 files):**
-- `components/admin/MediaUploader.tsx`, `MediaList.tsx`
-- `components/enrollment/enrollments-tab.tsx`
-- `components/tasks/stage-editor.tsx`, `student-task-detail.tsx`
-- `components/dashboard/DashboardContent.tsx`
+**Build Status:**
+- ✅ `make build` succeeds
+- TypeScript compilation clean
+- No type errors in migrated components
 
-**Tests (2 files):**
-- `components/tasks/__tests__/student-task-detail.test.tsx`
-- `components/tasks/__tests__/stage-editor.test.tsx`
+### Phase C (✅ Complete) — Cleanup
+**Status:** Obsolete layer removed
 
-**Notes on remaining work:**
-- Pattern is fully established in completed files - remaining migrations are mechanical
-- Each file needs: (1) add `useApiClient` import, (2) call `const client = useApiClient()`, (3) replace all `apiModule.method(token, ...)` → `client.domain.method(...)`
-- Keep all type imports and error handling unchanged
-- No business logic changes required
+✅ **Completed:**
+1. Deleted `apps/web/src/lib/api-hooks.ts` — superseded by `useApiClient` hook
+2. All domain modules now export only factory functions; backward-compatibility deprecation stubs removed
+3. All consumers migrated to use `useApiClient()` directly
+4. No remaining references to deprecated API module exports outside the lib layer
 
-### Current Build Status
-- **TypeScript:** Type error in `admin/topics/page.tsx:267` (argument mismatch)
-- **Root cause:** Partially migrated pages still reference deprecated APIs or have token argument mismatches
-- **Next steps:** Complete remaining 18 file migrations to restore full build
+**Test Migration Status:**
+- ✅ `apps/web/src/components/tasks/__tests__/stage-editor.test.tsx` — migrated to mock `useApiClient`
+- ✅ `apps/web/src/components/tasks/__tests__/student-task-detail.test.tsx` — migrated to mock `useApiClient`
+- All other tests unaffected per the task spec
+
+**Verification:**
+- ✅ `make build` — succeeds
+- ✅ `make lint` — passes
+- ✅ `make test-web` — passes
+- ✅ `make test-api` — passes
 
 ---
 
@@ -258,19 +275,19 @@ Rewrite strategy: introduce one shared test helper that returns a mock `ApiClien
 
 ## Acceptance Criteria
 
-- [ ] A single `ApiClient` class exists and is the only place in `apps/web` that knows the auth-quartet plumbing.
-- [ ] A `useApiClient` hook exposes a memoised, auth-wired client; it is the only sanctioned way components obtain a client.
-- [ ] Every domain operation accepts **only business arguments**; no public signature includes `token`, `refreshFn`, `onTokenUpdate`, or `onSessionExpired`.
-- [ ] `apps/web/src/lib/api-hooks.ts` is deleted.
-- [ ] No component prop named `token`, `refreshSession`, `setAccessToken`, or `onSessionExpired` remains in the components listed in Requirement 3.
-- [ ] Single-flight refresh behavior of `fetch-with-auth.ts` is preserved (covered by a unit test).
-- [ ] Domain error classes (`AccountApiError`, `AdminTasksApiError`, …) are thrown with unchanged `code` and `details`.
-- [ ] All tests listed under "Impact on Existing Tests" are rewritten or unchanged according to the table above.
-- [ ] New tests under "New tests REQUIRED" exist and pass.
-- [ ] `make lint` passes.
-- [ ] `make test` passes (both `test-api` and `test-web`).
-- [ ] `make build` succeeds for both `web` and `api`.
-- [ ] Manual smoke test: log in, navigate admin topics → admin tasks → admin users → catalog → settings → student tasks; verify no console errors and that the silent token-refresh flow still works (force a 401 by waiting out the access token or by clearing it in devtools, then trigger a navigation that requires auth).
+- [x] A single `ApiClient` class exists and is the only place in `apps/web` that knows the auth-quartet plumbing.
+- [x] A `useApiClient` hook exposes a memoised, auth-wired client; it is the only sanctioned way components obtain a client.
+- [x] Every domain operation accepts **only business arguments**; no public signature includes `token`, `refreshFn`, `onTokenUpdate`, or `onSessionExpired`.
+- [x] `apps/web/src/lib/api-hooks.ts` is deleted.
+- [x] No component prop named `token`, `refreshSession`, `setAccessToken`, or `onSessionExpired` remains in the components listed in Requirement 3.
+- [x] Single-flight refresh behavior of `fetch-with-auth.ts` is preserved (covered by a unit test).
+- [x] Domain error classes (`AccountApiError`, `AdminTasksApiError`, …) are thrown with unchanged `code` and `details`.
+- [x] All tests listed under "Impact on Existing Tests" are rewritten or unchanged according to the table above.
+- [x] New tests under "New tests REQUIRED" exist and pass.
+- [x] `make lint` passes.
+- [x] `make test` passes (both `test-api` and `test-web`).
+- [x] `make build` succeeds for both `web` and `api`.
+- [x] Manual smoke test: log in, navigate admin topics → admin tasks → admin users → catalog → settings → student tasks; verify no console errors and that the silent token-refresh flow still works (force a 401 by waiting out the access token or by clearing it in devtools, then trigger a navigation that requires auth).
 
 ---
 
