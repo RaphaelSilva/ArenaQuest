@@ -3,13 +3,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ROLES } from '@arenaquest/shared/constants/roles';
-import { useAuth, useHasRole } from '@web/hooks/use-auth';
+import { useHasRole, useAuth } from '@web/hooks/use-auth';
+import { useApiClient } from '@web/context/auth-context';
 import { Spinner } from '@web/components/spinner';
 import { MarkdownViewer } from '@web/components/catalog/MarkdownViewer';
 import { TaskTopicPicker } from '@web/components/tasks/task-topic-picker';
 import { StageEditor } from '@web/components/tasks/stage-editor';
-import { adminTasksApi, AdminTasksApiError, type Task, type TaskDetail, type TaskStatus } from '@web/lib/admin-tasks-api';
-import { adminTopicsApi, type TopicNode } from '@web/lib/admin-topics-api';
+import { AdminTasksApiError, type Task, type TaskDetail, type TaskStatus } from '@web/lib/admin-tasks-api';
+import type { TopicNode } from '@web/lib/admin-topics-api';
 import { Button, Badge } from '@web/components/design-system';
 
 const PUBLISH_REASONS: Record<string, string> = {
@@ -19,7 +20,8 @@ const PUBLISH_REASONS: Record<string, string> = {
 
 export default function AdminTasksPage() {
   const router = useRouter();
-  const { accessToken: token, isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading } = useAuth();
+  const client = useApiClient();
   const canAuthor = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
 
   // Core state
@@ -46,10 +48,9 @@ export default function AdminTasksPage() {
   const [archiveTarget, setArchiveTarget] = useState<Task | null>(null);
 
   const reload = useCallback(async () => {
-    if (!token) return;
     setLoading(true);
     try {
-      const list = await adminTasksApi.list(token);
+      const list = await client.adminTasks.list();
       setTasks(list);
       setError(null);
     } catch (e) {
@@ -57,14 +58,13 @@ export default function AdminTasksPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [client]);
 
   const reloadDetail = useCallback(async (id: string) => {
-    if (!token) return;
     try {
       const [detail, topicList] = await Promise.all([
-        adminTasksApi.getById(token, id),
-        adminTopicsApi.list(token),
+        client.adminTasks.getById(id),
+        client.adminTopics.list(),
       ]);
       setTaskDetail(detail);
       setTopics(topicList);
@@ -72,17 +72,17 @@ export default function AdminTasksPage() {
     } catch (e) {
       setDetailError(e instanceof Error ? e.message : 'Failed to load task detail');
     }
-  }, [token]);
+  }, [client]);
 
   useEffect(() => {
     if (!authLoading && !canAuthor) {
       router.replace('/dashboard');
       return;
     }
-    if (canAuthor && token) {
+    if (canAuthor) {
       reload();
     }
-  }, [canAuthor, token, reload, authLoading, router]);
+  }, [canAuthor, reload, authLoading, router]);
 
   const selectedTask = tasks.find((t) => t.id === selectedId) ?? null;
 
@@ -109,9 +109,8 @@ export default function AdminTasksPage() {
   }, [taskDetail]);
 
   const handleCreate = async () => {
-    if (!token) return;
     try {
-      const task = await adminTasksApi.create(token, { title: 'Untitled task' });
+      const task = await client.adminTasks.create({ title: 'Untitled task' });
       setTasks((prev) => [task, ...prev]);
       setSelectedId(task.id);
     } catch (e) {
@@ -120,12 +119,12 @@ export default function AdminTasksPage() {
   };
 
   const handleInlineSave = async (id: string, title: string) => {
-    if (!title.trim() || !token) {
+    if (!title.trim()) {
       setInlineEditId(null);
       return;
     }
     try {
-      const updated = await adminTasksApi.update(token, id, { title: title.trim() });
+      const updated = await client.adminTasks.update(id, { title: title.trim() });
       setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to rename task');
@@ -135,11 +134,11 @@ export default function AdminTasksPage() {
   };
 
   const handleDetailSave = async () => {
-    if (!selectedId || !token) return;
+    if (!selectedId) return;
     setDetailError('');
     setDetailSaving(true);
     try {
-      await adminTasksApi.update(token, selectedId, {
+      await client.adminTasks.update(selectedId, {
         title: detailTitle,
         description: detailDescription,
       });
@@ -152,11 +151,11 @@ export default function AdminTasksPage() {
   };
 
   const handleSetStatus = async (status: TaskStatus) => {
-    if (!selectedId || !token) return;
+    if (!selectedId) return;
     setPublishErrors([]);
     setDetailError('');
     try {
-      await adminTasksApi.update(token, selectedId, { status });
+      await client.adminTasks.update(selectedId, { status });
       await reloadDetail(selectedId);
     } catch (e) {
       if (e instanceof AdminTasksApiError && e.code === 'TASK_NOT_PUBLISHABLE') {
@@ -171,9 +170,9 @@ export default function AdminTasksPage() {
   };
 
   const handleTopicsChange = async (next: string[]) => {
-    if (!selectedId || !token) return;
+    if (!selectedId) return;
     try {
-      await adminTasksApi.setTaskTopics(token, selectedId, next);
+      await client.adminTasks.setTaskTopics(selectedId, next);
       await reloadDetail(selectedId);
     } catch (e) {
       if (e instanceof AdminTasksApiError && e.code === 'LINKED_TOPIC_NOT_PUBLISHED') {
@@ -185,9 +184,9 @@ export default function AdminTasksPage() {
   };
 
   const handleArchive = async () => {
-    if (!archiveTarget || !token) return;
+    if (!archiveTarget) return;
     try {
-      await adminTasksApi.archive(token, archiveTarget.id);
+      await client.adminTasks.archive(archiveTarget.id);
       setArchiveTarget(null);
       if (selectedId === archiveTarget.id) setSelectedId(null);
       await reload();

@@ -6,10 +6,12 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type ReactNode,
 } from 'react';
 import type { Entities } from '@arenaquest/shared/types/entities';
 import { authApi } from '@web/lib/auth-api';
+import { ApiClient } from '@web/lib/api-client';
 
 // ---------------------------------------------------------------------------
 // JWT decoder — no external deps, client-side only
@@ -58,6 +60,7 @@ export interface AuthContextValue {
   user: Entities.Identity.User | null;
   accessToken: string | null;
   isLoading: boolean;
+  apiClient: ApiClient;
   login(email: string, password: string): Promise<void>;
   loginWithAccessToken(token: string): void;
   logout(): Promise<void>;
@@ -139,12 +142,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(null);
   }, []);
 
+  const apiClient = useMemo(
+    () => new ApiClient(accessToken, refreshSession, setAccessToken, onSessionExpired),
+    [accessToken, refreshSession, setAccessToken, onSessionExpired],
+  );
+
   return (
     <AuthContext.Provider
       value={{
         user,
         accessToken,
         isLoading,
+        apiClient,
         login,
         loginWithAccessToken,
         logout,
@@ -166,4 +175,10 @@ export function useAuthContext(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuthContext must be used within <AuthProvider>');
   return ctx;
+}
+
+export function useApiClient(): ApiClient {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useApiClient must be used within <AuthProvider>');
+  return ctx.apiClient;
 }

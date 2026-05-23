@@ -1,6 +1,5 @@
-import { fetchWithAuth } from './fetch-with-auth';
+import type { HttpTransport } from './api-client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 // ---------------------------------------------------------------------------
 // Types — frontend shape (consumed by components)
@@ -191,22 +190,9 @@ export function computeWeekPips(
   return pips;
 }
 
-async function safeFetch<T>(
-  url: string,
-  token: string,
-  refreshFn: () => Promise<string | null>,
-  onTokenUpdate: (token: string) => void,
-  onSessionExpired: () => void,
-): Promise<T | null> {
+async function safeFetch<T>(http: HttpTransport, path: string): Promise<T | null> {
   try {
-    const res = await fetchWithAuth(
-      url,
-      { cache: 'no-store' },
-      token,
-      refreshFn,
-      onTokenUpdate,
-      onSessionExpired,
-    );
+    const res = await http('GET', path);
     if (!res.ok) return null;
     return res.json() as Promise<T>;
   } catch {
@@ -372,55 +358,33 @@ function adaptRoadmap(
 // Fetch
 // ---------------------------------------------------------------------------
 
-export async function getDashboard(
-  token: string,
-  refreshFn: () => Promise<string | null>,
-  onTokenUpdate: (token: string) => void,
-  onSessionExpired: () => void,
-): Promise<DashboardPayload> {
-  const [dashRaw, lbRaw, topicsRaw, progressRaw] = await Promise.all([
-    fetchWithAuth(
-      `${API_URL}/me/dashboard`,
-      { cache: 'no-store' },
-      token,
-      refreshFn,
-      onTokenUpdate,
-      onSessionExpired,
-    ).then(async (r) => {
-      if (!r.ok) throw new Error(`Failed to load dashboard (${r.status})`);
-      return r.json() as Promise<ApiDashboardShape>;
-    }),
-    safeFetch<ApiLeaderboardResponse>(
-      `${API_URL}/leaderboard?scope=global&period=all_time&limit=5`,
-      token,
-      refreshFn,
-      onTokenUpdate,
-      onSessionExpired,
-    ),
-    safeFetch<ApiTopicsResponse>(
-      `${API_URL}/topics`,
-      token,
-      refreshFn,
-      onTokenUpdate,
-      onSessionExpired,
-    ),
-    safeFetch<ApiTopicProgressResponse>(
-      `${API_URL}/me/progress/topics`,
-      token,
-      refreshFn,
-      onTokenUpdate,
-      onSessionExpired,
-    ),
-  ]);
-
+export function createDashboardApi(http: HttpTransport) {
   return {
-    xp: adaptXp(dashRaw.xp),
-    streak: adaptStreak(dashRaw.streak),
-    daily: adaptDaily(dashRaw.questsDaily),
-    weekly: adaptWeekly(dashRaw.questsWeekly),
-    missions: adaptMissions(dashRaw.missions),
-    badges: adaptBadges(dashRaw.badges),
-    leaderboard: adaptLeaderboard(lbRaw),
-    roadmap: adaptRoadmap(topicsRaw, progressRaw),
+    async get(): Promise<DashboardPayload> {
+      const [dashRaw, lbRaw, topicsRaw, progressRaw] = await Promise.all([
+        http('GET', '/me/dashboard').then(async (r) => {
+          if (!r.ok) throw new Error(`Failed to load dashboard (${r.status})`);
+          return r.json() as Promise<ApiDashboardShape>;
+        }),
+        safeFetch<ApiLeaderboardResponse>(http, '/leaderboard?scope=global&period=all_time&limit=5'),
+        safeFetch<ApiTopicsResponse>(http, '/topics'),
+        safeFetch<ApiTopicProgressResponse>(http, '/me/progress/topics'),
+      ]);
+
+      return {
+        xp: adaptXp(dashRaw.xp),
+        streak: adaptStreak(dashRaw.streak),
+        daily: adaptDaily(dashRaw.questsDaily),
+        weekly: adaptWeekly(dashRaw.questsWeekly),
+        missions: adaptMissions(dashRaw.missions),
+        badges: adaptBadges(dashRaw.badges),
+        leaderboard: adaptLeaderboard(lbRaw),
+        roadmap: adaptRoadmap(topicsRaw, progressRaw),
+      };
+    },
   };
+}
+
+export async function getDashboard(): Promise<never> {
+  throw new Error('getDashboard is deprecated. Use useApiClient() hook instead: const client = useApiClient(); await client.dashboard.get()');
 }
