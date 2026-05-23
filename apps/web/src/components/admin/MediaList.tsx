@@ -9,17 +9,20 @@ type MediaListProps = {
   token: string;
   media: Media[];
   onMediaDeleted: () => void;
+  refreshSession: () => Promise<string | null>;
+  setAccessToken: (token: string | null) => void;
+  onSessionExpired: () => void;
 };
 
-export function MediaList({ topicId, token, media, onMediaDeleted }: MediaListProps) {
+export function MediaList({ topicId, token, media, onMediaDeleted, refreshSession, setAccessToken, onSessionExpired }: MediaListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this media?')) return;
-    
+
     setDeletingId(id);
     try {
-      await adminMediaApi.delete(token, topicId, id);
+      await adminMediaApi.delete(token, topicId, id, refreshSession, setAccessToken, onSessionExpired);
       onMediaDeleted();
     } catch {
       alert('Failed to delete media');

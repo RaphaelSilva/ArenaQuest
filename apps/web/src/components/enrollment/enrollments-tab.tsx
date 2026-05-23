@@ -158,9 +158,12 @@ function RevokeDialog({ topicTitle, onConfirm, onCancel }: RevokeDialogProps) {
 export type EnrollmentsTabProps = {
   userId: string;
   token: string;
+  refreshSession: () => Promise<string | null>;
+  setAccessToken: (token: string | null) => void;
+  onSessionExpired: () => void;
 };
 
-export function EnrollmentsTab({ userId, token }: EnrollmentsTabProps) {
+export function EnrollmentsTab({ userId, token, refreshSession, setAccessToken, onSessionExpired }: EnrollmentsTabProps) {
   const [grants, setGrants] = useState<UserGrant[]>([]);
   const [allTopics, setAllTopics] = useState<TopicNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -173,8 +176,8 @@ export function EnrollmentsTab({ userId, token }: EnrollmentsTabProps) {
     setLoading(true);
     try {
       const [g, t] = await Promise.all([
-        adminEnrollmentApi.listUserGrants(token, userId),
-        adminTopicsApi.list(token),
+        adminEnrollmentApi.listUserGrants(token, userId, refreshSession, setAccessToken, onSessionExpired),
+        adminTopicsApi.list(token, refreshSession, setAccessToken, onSessionExpired),
       ]);
       setGrants(g);
       setAllTopics(t);
@@ -183,7 +186,7 @@ export function EnrollmentsTab({ userId, token }: EnrollmentsTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [token, userId]);
+  }, [token, userId, refreshSession, setAccessToken, onSessionExpired]);
 
   useEffect(() => {
     void load();
@@ -196,7 +199,7 @@ export function EnrollmentsTab({ userId, token }: EnrollmentsTabProps) {
     setShowPicker(false);
     setBusy(true);
     try {
-      const { grant } = await adminEnrollmentApi.grantUserTopic(token, userId, topicId);
+      const { grant } = await adminEnrollmentApi.grantUserTopic(token, userId, topicId, refreshSession, setAccessToken, onSessionExpired);
       setGrants((prev) => [...prev.filter((g) => g.topicNodeId !== topicId), grant]);
     } catch {
       setError('Failed to grant access.');
@@ -211,7 +214,7 @@ export function EnrollmentsTab({ userId, token }: EnrollmentsTabProps) {
     setRevokeTarget(null);
     setBusy(true);
     try {
-      await adminEnrollmentApi.revokeUserTopic(token, userId, target.topicNodeId, cascade);
+      await adminEnrollmentApi.revokeUserTopic(token, userId, target.topicNodeId, refreshSession, setAccessToken, onSessionExpired, cascade);
       setGrants((prev) => prev.filter((g) => g.id !== target.id));
     } catch {
       setError('Failed to revoke access.');

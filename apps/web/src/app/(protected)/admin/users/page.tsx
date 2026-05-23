@@ -242,7 +242,7 @@ function ConfirmDialog({
 export default function AdminUsersPage() {
   const router = useRouter();
   const isAdmin = useHasRole(ROLES.ADMIN);
-  const { accessToken, isLoading: authLoading } = useAuth();
+  const { accessToken, isLoading: authLoading, refreshSession, setAccessToken, onSessionExpired } = useAuth();
 
   const [users, setUsers] = useState<Entities.Identity.User[]>([]);
   const [total, setTotal] = useState(0);
@@ -267,7 +267,7 @@ export default function AdminUsersPage() {
     setLoading(true);
     setError('');
     try {
-      const result = await adminUsersApi.list(accessToken, page, pageSize);
+      const result = await adminUsersApi.list(accessToken, refreshSession, setAccessToken, onSessionExpired, page, pageSize);
       setUsers(result.data);
       setTotal(result.total);
     } catch {
@@ -275,25 +275,25 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, page, pageSize]);
+  }, [accessToken, refreshSession, setAccessToken, onSessionExpired, page, pageSize]);
 
   useEffect(() => {
     if (isAdmin && accessToken) fetchUsers();
   }, [isAdmin, accessToken, fetchUsers]);
 
   async function handleCreate(data: CreateUserInput | Partial<UpdateUserInput>) {
-    await adminUsersApi.create(accessToken!, data as CreateUserInput);
+    await adminUsersApi.create(accessToken!, data as CreateUserInput, refreshSession, setAccessToken, onSessionExpired);
     setPage(1);
     await fetchUsers();
   }
 
   async function handleUpdate(data: CreateUserInput | Partial<UpdateUserInput>) {
-    await adminUsersApi.update(accessToken!, editTarget!.id, data as Partial<UpdateUserInput>);
+    await adminUsersApi.update(accessToken!, editTarget!.id, data as Partial<UpdateUserInput>, refreshSession, setAccessToken, onSessionExpired);
     await fetchUsers();
   }
 
   async function handleDeactivate() {
-    await adminUsersApi.deactivate(accessToken!, deactivateTarget!.id);
+    await adminUsersApi.deactivate(accessToken!, deactivateTarget!.id, refreshSession, setAccessToken, onSessionExpired);
     setDeactivateTarget(undefined);
     await fetchUsers();
   }

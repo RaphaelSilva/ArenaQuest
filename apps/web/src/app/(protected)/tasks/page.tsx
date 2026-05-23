@@ -2,24 +2,26 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@web/hooks/use-auth';
+import { useTasksApi } from '@web/lib/api-hooks';
 import { Spinner } from '@web/components/spinner';
 import { StudentTaskCard } from '@web/components/tasks/student-task-card';
-import { tasksApi, type TaskSummary } from '@web/lib/tasks-api';
+import { type TaskSummary } from '@web/lib/tasks-api';
 
 export default function StudentTasksPage() {
   const { accessToken: token } = useAuth();
+  const tasksApiHook = useTasksApi();
   const [tasks, setTasks] = useState<TaskSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!token) return;
     try {
-      const list = await tasksApi.list(token);
+      const list = await tasksApiHook.list();
       setTasks(list);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load tasks');
     }
-  }, [token]);
+  }, [token, tasksApiHook]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch is the canonical use case

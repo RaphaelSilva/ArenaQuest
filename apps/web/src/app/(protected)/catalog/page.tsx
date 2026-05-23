@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@web/hooks/use-auth';
-import { topicsApi, type TopicNode, type TopicProgressStatus } from '@web/lib/topics-api';
+import { type TopicNode, type TopicProgressStatus } from '@web/lib/topics-api';
+import { useTopicsApi } from '@web/lib/api-hooks';
 import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
 import { Spinner } from '@web/components/spinner';
 
 export default function CatalogIndexPage() {
   const { accessToken } = useAuth();
+  const topicsApiHook = useTopicsApi();
   const [topics, setTopics] = useState<TopicNode[]>([]);
   const [progressMap, setProgressMap] = useState<Map<string, TopicProgressStatus>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -18,8 +20,8 @@ export default function CatalogIndexPage() {
     let active = true;
 
     Promise.all([
-      topicsApi.list(accessToken),
-      topicsApi.listProgress(accessToken),
+      topicsApiHook.list(),
+      topicsApiHook.listProgress(),
     ]).then(([nodes, progressEntries]) => {
       if (!active) return;
       // Filter to root topics only (parentId === null)

@@ -20,7 +20,7 @@ export default function AdminUserDetailPage({ params }: Props) {
   const { userId } = use(params);
   const router = useRouter();
   const isAdmin = useHasRole(ROLES.ADMIN);
-  const { accessToken, isLoading: authLoading } = useAuth();
+  const { accessToken, isLoading: authLoading, refreshSession, setAccessToken, onSessionExpired } = useAuth();
   const [tab, setTab] = useState<Tab>('enrollments');
   const [user, setUser] = useState<Entities.Identity.User | null>(null);
   const [userError, setUserError] = useState('');
@@ -31,14 +31,14 @@ export default function AdminUserDetailPage({ params }: Props) {
 
   useEffect(() => {
     if (!accessToken) return;
-    adminUsersApi.list(accessToken, 1, 100)
+    adminUsersApi.list(accessToken, refreshSession, setAccessToken, onSessionExpired, 1, 100)
       .then((res) => {
         const found = res.data.find((u) => u.id === userId);
         if (!found) setUserError('User not found.');
         else setUser(found);
       })
       .catch(() => setUserError('Failed to load user.'));
-  }, [accessToken, userId]);
+  }, [accessToken, userId, refreshSession, setAccessToken, onSessionExpired]);
 
   if (authLoading) {
     return (
@@ -91,7 +91,7 @@ export default function AdminUserDetailPage({ params }: Props) {
       </nav>
 
       {tab === 'enrollments' && accessToken && (
-        <EnrollmentsTab userId={userId} token={accessToken} />
+        <EnrollmentsTab userId={userId} token={accessToken} refreshSession={refreshSession} setAccessToken={setAccessToken} onSessionExpired={onSessionExpired} />
       )}
 
       {tab === 'profile' && user && (

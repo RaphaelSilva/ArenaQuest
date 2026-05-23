@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef, type FormEvent } from 'react';
+import React, { useEffect, useState, useRef, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useAuth, useHasRole } from '@web/hooks/use-auth';
@@ -9,7 +9,8 @@ import {
   type TopicNode,
   type CreateTopicInput,
 } from '@web/lib/admin-topics-api';
-import { adminMediaApi, type Media } from '@web/lib/admin-media-api';
+import { useTopicsLoader } from '@web/hooks/use-topics-loader';
+import { useMediaLoader } from '@web/hooks/use-media-loader';
 import { MediaUploader } from '@web/components/admin/MediaUploader';
 import { MediaList } from '@web/components/admin/MediaList';
 import { Spinner } from '@web/components/spinner';
@@ -202,18 +203,22 @@ function ConfirmDialog({
 
 export default function AdminTopicsPage() {
   const router = useRouter();
-  const { accessToken, isLoading: authLoading } = useAuth();
+  const { accessToken, isLoading: authLoading, refreshSession, setAccessToken, onSessionExpired } = useAuth();
   const canAccess = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
 
   // ---------------------------------------------------------------------------
-  // Core state
+  // Core state (declare early so hooks can use it)
   // ---------------------------------------------------------------------------
 
-  const [nodes, setNodes] = useState<TopicNode[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState('');
-
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Data loading via hooks
+  const { nodes, loading, error: fetchError, refresh } = useTopicsLoader();
+  const { media: detailMedia, loading: loadingMedia, reload: reloadMedia } = useMediaLoader({
+    topicId: selectedId || null,
+  });
+
+  // Expanded state
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // Inline title editing
@@ -243,8 +248,6 @@ export default function AdminTopicsPage() {
   const [detailPrereqIds, setDetailPrereqIds] = useState('');
   const [detailError, setDetailError] = useState('');
   const [detailSaving, setDetailSaving] = useState(false);
-  const [detailMedia, setDetailMedia] = useState<Media[]>([]);
-  const [loadingMedia, setLoadingMedia] = useState(false);
 
   // ---------------------------------------------------------------------------
   // RBAC guard
@@ -255,27 +258,6 @@ export default function AdminTopicsPage() {
       router.replace('/dashboard');
     }
   }, [authLoading, canAccess, router]);
-
-  // ---------------------------------------------------------------------------
-  // Data loading
-  // ---------------------------------------------------------------------------
-
-  const refresh = useCallback(async () => {
-    if (!accessToken) return;
-    setFetchError('');
-    try {
-      const data = await adminTopicsApi.list(accessToken);
-      setNodes(data);
-    } catch {
-      setFetchError('Failed to load topics.');
-    } finally {
-      setLoading(false);
-    }
-  }, [accessToken]);
-
-  useEffect(() => {
-    if (canAccess && accessToken) refresh();
-  }, [canAccess, accessToken, refresh]);
 
   // ---------------------------------------------------------------------------
   // Sync detail pane when selected node changes
@@ -291,7 +273,6 @@ export default function AdminTopicsPage() {
       setDetailMinutes(0);
       setDetailTagIds('');
       setDetailPrereqIds('');
-      setDetailMedia([]);
       return;
     }
     setDetailTitle(selectedNode.title);
@@ -300,17 +281,7 @@ export default function AdminTopicsPage() {
     setDetailMinutes(selectedNode.estimatedMinutes);
     setDetailTagIds(selectedNode.tags.map((t) => t.id).join(', '));
     setDetailPrereqIds(selectedNode.prerequisiteIds.join(', '));
-    
-    // Load media
-    if (accessToken) {
-      setLoadingMedia(true);
-      adminMediaApi.list(accessToken, selectedNode.id)
-        .then(setDetailMedia)
-        .catch(() => showToast('Failed to load media', 'error'))
-        .finally(() => setLoadingMedia(false));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, accessToken]);
+  }, [selectedId]);
 
   // ---------------------------------------------------------------------------
   // Toast helpers
@@ -337,7 +308,7 @@ export default function AdminTopicsPage() {
   async function handleInlineSave(id: string, title: string) {
     if (!title.trim() || !accessToken) { setInlineEditId(null); return; }
     try {
-      await adminTopicsApi.update(accessToken, id, { title: title.trim() });
+      await adminTopicsApi.update(accessToken, id, { title: title.trim() }, refreshSession, setAccessToken, onSessionExpired);
       await refresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to rename topic', 'error');
@@ -348,7 +319,7 @@ export default function AdminTopicsPage() {
 
   async function handleCreate(data: CreateTopicInput) {
     if (!accessToken) return;
-    await adminTopicsApi.create(accessToken, data);
+    await adminTopicsApi.create(accessToken, data, refreshSession, setAccessToken, onSessionExpired);
     await refresh();
     showToast('Topic created', 'success');
   }
@@ -356,7 +327,7 @@ export default function AdminTopicsPage() {
   async function handleArchive() {
     if (!archiveTarget || !accessToken) return;
     try {
-      await adminTopicsApi.archive(accessToken, archiveTarget.id);
+      await adminTopicsApi.archive(accessToken, archiveTarget.id, refreshSession, setAccessToken, onSessionExpired);
       setArchiveTarget(null);
       if (selectedId === archiveTarget.id) setSelectedId(null);
       await refresh();
@@ -367,7 +338,7 @@ export default function AdminTopicsPage() {
     }
   }
 
-  async function handleDetailSave(e: FormEvent) {
+  async function handleDetailSave(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!selectedId || !accessToken) return;
     setDetailError('');
@@ -388,26 +359,13 @@ export default function AdminTopicsPage() {
         estimatedMinutes: detailMinutes,
         tagIds,
         prerequisiteIds: prereqIds,
-      });
+      }, refreshSession, setAccessToken, onSessionExpired);
       await refresh();
       showToast('Changes saved', 'success');
     } catch (err) {
       setDetailError(err instanceof Error ? err.message : 'Failed to save changes');
     } finally {
       setDetailSaving(false);
-    }
-  }
-
-  async function reloadMedia() {
-    if (!accessToken || !selectedId) return;
-    setLoadingMedia(true);
-    try {
-      const media = await adminMediaApi.list(accessToken, selectedId);
-      setDetailMedia(media);
-    } catch {
-      showToast('Failed to reload media', 'error');
-    } finally {
-      setLoadingMedia(false);
     }
   }
 
@@ -459,7 +417,7 @@ export default function AdminTopicsPage() {
         } else {
           moveArgs = { newParentId: targetNode.parentId, newSortOrder: targetNode.order + 1 };
         }
-        await adminTopicsApi.move(accessToken, sourceId, moveArgs);
+        await adminTopicsApi.move(accessToken, sourceId, moveArgs, refreshSession, setAccessToken, onSessionExpired);
         await refresh();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Move failed';
@@ -806,6 +764,9 @@ export default function AdminTopicsPage() {
                   topicId={selectedId}
                   token={accessToken}
                   onUploadComplete={reloadMedia}
+                  refreshSession={refreshSession}
+                  setAccessToken={setAccessToken}
+                  onSessionExpired={onSessionExpired}
                 />
               )}
 
@@ -820,6 +781,9 @@ export default function AdminTopicsPage() {
                     token={accessToken}
                     media={detailMedia}
                     onMediaDeleted={reloadMedia}
+                    refreshSession={refreshSession}
+                    setAccessToken={setAccessToken}
+                    onSessionExpired={onSessionExpired}
                   />
                 )
               )}

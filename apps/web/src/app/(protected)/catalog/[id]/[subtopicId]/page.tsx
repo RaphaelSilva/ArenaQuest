@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { renderMarkdown } from '@arenaquest/shared/utils/sanitize-markdown';
 import { useAuth } from '@web/hooks/use-auth';
 import { topicsApi, type TopicNode, type TopicProgressStatus } from '@web/lib/topics-api';
+import { useTopicsApi } from '@web/lib/api-hooks';
 import { MediaTabs } from '@web/components/catalog/MediaTabs';
 import { Comments } from '@web/components/catalog/Comments';
 import { SubtopicSidebar } from '@web/components/catalog/SubtopicSidebar';
@@ -29,6 +30,7 @@ type CommentWithMeta = {
 export default function SubtopicDetailPage({ params }: PageProps) {
   const { id: topicId, subtopicId } = use(params);
   const { accessToken } = useAuth();
+  const topicsApiHook = useTopicsApi();
 
   const [parentTopic, setParentTopic] = useState<(TopicNode & { children: TopicNode[] }) | null>(null);
   const [subtopic, setSubtopic] = useState<(TopicNode & { children: TopicNode[] }) | null>(null);
@@ -48,9 +50,9 @@ export default function SubtopicDetailPage({ params }: PageProps) {
     const headers = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' };
 
     Promise.all([
-      topicsApi.getById(accessToken, topicId),
-      topicsApi.getById(accessToken, subtopicId),
-      topicsApi.listProgress(accessToken),
+      topicsApiHook.getById(topicId),
+      topicsApiHook.getById(subtopicId),
+      topicsApiHook.listProgress(),
       fetch(`${API_URL}/topics/${subtopicId}/comments`, { headers, cache: 'no-store' })
         .then(async (r) => {
           if (!r.ok) return [];
@@ -77,10 +79,10 @@ export default function SubtopicDetailPage({ params }: PageProps) {
   }, [accessToken, topicId, subtopicId, API_URL]);
 
   async function handleMarkDone() {
-    if (!accessToken || markingDone || status === 'completed') return;
+    if (markingDone || status === 'completed') return;
     setMarkingDone(true);
     try {
-      const newStatus = await topicsApi.complete(accessToken, subtopicId);
+      const newStatus = await topicsApiHook.complete(subtopicId);
       setStatus(newStatus);
       setProgressMap((prev) => new Map(prev).set(subtopicId, newStatus));
     } finally {

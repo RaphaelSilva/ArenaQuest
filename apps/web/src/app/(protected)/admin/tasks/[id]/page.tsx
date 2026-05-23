@@ -31,7 +31,7 @@ export default function AdminTaskEditorPage() {
   const params = useParams<{ id: string }>();
   const taskId = params.id;
   const router = useRouter();
-  const { accessToken: token } = useAuth();
+  const { accessToken: token, refreshSession, setAccessToken, onSessionExpired } = useAuth();
   const canAuthor = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
 
   const [task, setTask] = useState<TaskDetail | null>(null);
@@ -46,8 +46,8 @@ export default function AdminTaskEditorPage() {
     if (!token || !taskId) return;
     try {
       const [detail, topicList] = await Promise.all([
-        adminTasksApi.getById(token, taskId),
-        adminTopicsApi.list(token),
+        adminTasksApi.getById(token, taskId, refreshSession, setAccessToken, onSessionExpired),
+        adminTopicsApi.list(token, refreshSession, setAccessToken, onSessionExpired),
       ]);
       setTask(detail);
       setTitle(detail.title);
@@ -56,7 +56,7 @@ export default function AdminTaskEditorPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load task');
     }
-  }, [token, taskId]);
+  }, [token, taskId, refreshSession, setAccessToken, onSessionExpired]);
 
   useEffect(() => {
     if (!canAuthor) {
@@ -71,7 +71,7 @@ export default function AdminTaskEditorPage() {
     setSaving(true);
     setError(null);
     try {
-      await adminTasksApi.update(token, task.id, { title, description });
+      await adminTasksApi.update(token, task.id, { title, description }, refreshSession, setAccessToken, onSessionExpired);
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
@@ -85,7 +85,7 @@ export default function AdminTaskEditorPage() {
     setPublishErrors([]);
     setError(null);
     try {
-      await adminTasksApi.update(token, task.id, { status });
+      await adminTasksApi.update(token, task.id, { status }, refreshSession, setAccessToken, onSessionExpired);
       await reload();
     } catch (e) {
       if (e instanceof AdminTasksApiError && e.code === 'TASK_NOT_PUBLISHABLE') {
@@ -102,7 +102,7 @@ export default function AdminTaskEditorPage() {
   const handleTopicsChange = async (next: string[]) => {
     if (!token || !task) return;
     try {
-      await adminTasksApi.setTaskTopics(token, task.id, next);
+      await adminTasksApi.setTaskTopics(token, task.id, next, refreshSession, setAccessToken, onSessionExpired);
       await reload();
     } catch (e) {
       if (e instanceof AdminTasksApiError && e.code === 'LINKED_TOPIC_NOT_PUBLISHED') {

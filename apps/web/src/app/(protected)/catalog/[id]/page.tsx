@@ -6,6 +6,7 @@ import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@web/hooks/use-auth';
 import { topicsApi, type TopicProgressStatus, type TopicWithMedia } from '@web/lib/topics-api';
+import { useTopicsApi } from '@web/lib/api-hooks';
 import { TopicHeader } from '@web/components/catalog/TopicHeader';
 import { BadgesStrip } from '@web/components/catalog/BadgesStrip';
 import { SubtopicCard } from '@web/components/catalog/SubtopicCard';
@@ -23,6 +24,7 @@ type BadgeItem = { id: string; emoji: string; name: string; earned: boolean };
 export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   const { id } = use(params);
   const { accessToken, user } = useAuth();
+  const topicsApiHook = useTopicsApi();
 
   const [topic, setTopic] = useState<TopicWithMedia | null>(null);
   const [progressMap, setProgressMap] = useState<Map<string, TopicProgressStatus>>(new Map());
@@ -47,8 +49,8 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
     const headers = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' };
 
     Promise.all([
-      topicsApi.getById(accessToken, id),
-      topicsApi.listProgress(accessToken),
+      topicsApiHook.getById(id),
+      topicsApiHook.listProgress(),
       fetch(`${API_URL}/me/badges`, { headers, cache: 'no-store' })
         .then(async (r) => {
           if (!r.ok) return [];

@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '@web/hooks/use-auth';
-import { accountApi, AccountApiError } from '@web/lib/account-api';
+import { AccountApiError } from '@web/lib/account-api';
+import { useAccountApi } from '@web/lib/api-hooks';
 
 const LockIcon = () => (
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -59,6 +60,7 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
 
 export default function SettingsPage() {
   const { accessToken } = useAuth();
+  const accountApiHook = useAccountApi();
 
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -83,11 +85,11 @@ export default function SettingsPage() {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate() || !accessToken) return;
     setGeneralError('');
     setLoading(true);
     try {
-      await accountApi.changePassword(accessToken ?? '', currentPw, newPw);
+      await accountApiHook.changePassword(currentPw, newPw);
       setCurrentPw('');
       setNewPw('');
       setConfirmPw('');

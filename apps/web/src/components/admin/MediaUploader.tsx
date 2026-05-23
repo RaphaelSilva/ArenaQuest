@@ -18,9 +18,12 @@ type MediaUploaderProps = {
   topicId: string;
   token: string;
   onUploadComplete: () => void;
+  refreshSession: () => Promise<string | null>;
+  setAccessToken: (token: string | null) => void;
+  onSessionExpired: () => void;
 };
 
-export function MediaUploader({ topicId, token, onUploadComplete }: MediaUploaderProps) {
+export function MediaUploader({ topicId, token, onUploadComplete, refreshSession, setAccessToken, onSessionExpired }: MediaUploaderProps) {
   const [uploads, setUploads] = useState<ActiveUpload[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -68,15 +71,15 @@ export function MediaUploader({ topicId, token, onUploadComplete }: MediaUploade
           throw new Error('File too large (Max 100MB)');
       }
 
-      const { uploadUrl, media } = await adminMediaApi.getPresignedUrl(token, topicId, presignData);
+      const { uploadUrl, media } = await adminMediaApi.getPresignedUrl(token, topicId, presignData, refreshSession, setAccessToken, onSessionExpired);
 
       // 2. Upload to R2
       updateUpload({ state: 'uploading' });
-      
+
       const xhr = new XMLHttpRequest();
       xhr.open('PUT', uploadUrl, true);
       xhr.setRequestHeader('Content-Type', upload.file.type || 'application/octet-stream');
-      
+
       abortController.signal.addEventListener('abort', () => xhr.abort());
 
       const uploadPromise = new Promise<void>((resolve, reject) => {
@@ -104,7 +107,7 @@ export function MediaUploader({ topicId, token, onUploadComplete }: MediaUploade
 
       // 3. Finalize
       updateUpload({ state: 'finalizing', progress: 100 });
-      await adminMediaApi.finalize(token, topicId, media.id);
+      await adminMediaApi.finalize(token, topicId, media.id, refreshSession, setAccessToken, onSessionExpired);
 
       updateUpload({ state: 'success' });
       onUploadComplete();

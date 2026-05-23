@@ -19,7 +19,7 @@ const PUBLISH_REASONS: Record<string, string> = {
 
 export default function AdminTasksPage() {
   const router = useRouter();
-  const { accessToken: token, isLoading: authLoading } = useAuth();
+  const { accessToken: token, isLoading: authLoading, refreshSession, setAccessToken, onSessionExpired } = useAuth();
   const canAuthor = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
 
   // Core state
@@ -49,7 +49,7 @@ export default function AdminTasksPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const list = await adminTasksApi.list(token);
+      const list = await adminTasksApi.list(token, refreshSession, setAccessToken, onSessionExpired);
       setTasks(list);
       setError(null);
     } catch (e) {
@@ -57,14 +57,14 @@ export default function AdminTasksPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, refreshSession, setAccessToken, onSessionExpired]);
 
   const reloadDetail = useCallback(async (id: string) => {
     if (!token) return;
     try {
       const [detail, topicList] = await Promise.all([
-        adminTasksApi.getById(token, id),
-        adminTopicsApi.list(token),
+        adminTasksApi.getById(token, id, refreshSession, setAccessToken, onSessionExpired),
+        adminTopicsApi.list(token, refreshSession, setAccessToken, onSessionExpired),
       ]);
       setTaskDetail(detail);
       setTopics(topicList);
@@ -72,7 +72,7 @@ export default function AdminTasksPage() {
     } catch (e) {
       setDetailError(e instanceof Error ? e.message : 'Failed to load task detail');
     }
-  }, [token]);
+  }, [token, refreshSession, setAccessToken, onSessionExpired]);
 
   useEffect(() => {
     if (!authLoading && !canAuthor) {
@@ -111,7 +111,7 @@ export default function AdminTasksPage() {
   const handleCreate = async () => {
     if (!token) return;
     try {
-      const task = await adminTasksApi.create(token, { title: 'Untitled task' });
+      const task = await adminTasksApi.create(token, { title: 'Untitled task' }, refreshSession, setAccessToken, onSessionExpired);
       setTasks((prev) => [task, ...prev]);
       setSelectedId(task.id);
     } catch (e) {
@@ -125,7 +125,7 @@ export default function AdminTasksPage() {
       return;
     }
     try {
-      const updated = await adminTasksApi.update(token, id, { title: title.trim() });
+      const updated = await adminTasksApi.update(token, id, { title: title.trim() }, refreshSession, setAccessToken, onSessionExpired);
       setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to rename task');
@@ -142,7 +142,7 @@ export default function AdminTasksPage() {
       await adminTasksApi.update(token, selectedId, {
         title: detailTitle,
         description: detailDescription,
-      });
+      }, refreshSession, setAccessToken, onSessionExpired);
       await reloadDetail(selectedId);
     } catch (e) {
       setDetailError(e instanceof Error ? e.message : 'Failed to save changes');
@@ -156,7 +156,7 @@ export default function AdminTasksPage() {
     setPublishErrors([]);
     setDetailError('');
     try {
-      await adminTasksApi.update(token, selectedId, { status });
+      await adminTasksApi.update(token, selectedId, { status }, refreshSession, setAccessToken, onSessionExpired);
       await reloadDetail(selectedId);
     } catch (e) {
       if (e instanceof AdminTasksApiError && e.code === 'TASK_NOT_PUBLISHABLE') {
@@ -173,7 +173,7 @@ export default function AdminTasksPage() {
   const handleTopicsChange = async (next: string[]) => {
     if (!selectedId || !token) return;
     try {
-      await adminTasksApi.setTaskTopics(token, selectedId, next);
+      await adminTasksApi.setTaskTopics(token, selectedId, next, refreshSession, setAccessToken, onSessionExpired);
       await reloadDetail(selectedId);
     } catch (e) {
       if (e instanceof AdminTasksApiError && e.code === 'LINKED_TOPIC_NOT_PUBLISHED') {
@@ -187,7 +187,7 @@ export default function AdminTasksPage() {
   const handleArchive = async () => {
     if (!archiveTarget || !token) return;
     try {
-      await adminTasksApi.archive(token, archiveTarget.id);
+      await adminTasksApi.archive(token, archiveTarget.id, refreshSession, setAccessToken, onSessionExpired);
       setArchiveTarget(null);
       if (selectedId === archiveTarget.id) setSelectedId(null);
       await reload();
