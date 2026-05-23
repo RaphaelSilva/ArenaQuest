@@ -1,11 +1,77 @@
 # Task 01: Refactor Frontend API Clients to a Context-Aware `ApiClient` Class
 
 ## Metadata
-- **Status:** 🔴 Open
+- **Status:** 🟡 In Progress — Phase A Complete, Phase B Pending
 - **Complexity:** High
 - **Milestone:** Future Enhancement (technical debt)
 - **Dependencies:** None (but should land before adding new frontend API surfaces)
 - **Category:** Refactoring / Frontend Architecture
+
+---
+
+## Progress Report
+
+### Phase A (Complete) — Infrastructure Foundation
+**Commit:** `889f108` — "refactor(web): Phase A - introduce ApiClient class and useApiClient hook"
+
+✅ **Completed:**
+1. Created `apps/web/src/lib/api-client.ts`
+   - `ApiClient` class with constructor accepting `(token, refreshFn, onTokenUpdate, onSessionExpired)`
+   - Domain-grouped getters: `.topics`, `.tasks`, `.account`, `.adminTopics`, `.adminTasks`, `.adminUsers`, `.adminMedia`, `.adminEnrollment`, `.progress`, `.dashboard`
+   - Internal `HttpTransport` interface and `createFetchTransport()` function wrapping `fetchWithAuth`
+   - Preserves single-flight refresh guarantee from `fetch-with-auth.ts`
+
+2. Updated `apps/web/src/context/auth-context.tsx`
+   - Added `apiClient: ApiClient` field to `AuthContextValue`
+   - Created `useApiClient()` hook returning memoised client instance
+   - Memoization ensures stable client across renders when auth context unchanged
+
+3. Refactored all 10 API modules to factory-function pattern
+   - `topics-api.ts` → `createTopicsApi(http)`
+   - `tasks-api.ts` → `createTasksApi(http)`
+   - `account-api.ts` → `createAccountApi(http)`
+   - `admin-topics-api.ts` → `createAdminTopicsApi(http)`
+   - `admin-tasks-api.ts` → `createAdminTasksApi(http)`
+   - `admin-users-api.ts` → `createAdminUsersApi(http)`
+   - `admin-media-api.ts` → `createAdminMediaApi(http)`
+   - `admin-enrollment-api.ts` → `createAdminEnrollmentApi(http)`
+   - `progress-api.ts` → `createProgressApi(http)`
+   - `dashboard-api.ts` → `createDashboardApi(http)`
+   - All domain methods now accept **only business arguments** (no auth quartet)
+   - Error classes preserved unchanged (e.g., `AccountApiError`, `AdminTasksApiError`)
+
+4. Added backward-compatibility deprecation stubs
+   - Old API exports (`topicsApi`, `adminTasksApi`, etc.) now throw helpful error messages
+   - This prevents import errors during Phase B migration and guides developers to `useApiClient()` hook
+   - Deprecation messages: "Use useApiClient() hook instead: const client = useApiClient(); await client.topics.list()"
+
+### Phase B (Pending) — Consumer Migration
+**Scope:** 20+ consumer files across pages, components, and hooks
+
+⏳ **Required before build/tests can pass:**
+1. Migrate all page components in `apps/web/src/app/(protected)/`
+   - `admin/topics/page.tsx`
+   - `admin/tasks/page.tsx` + `[id]/page.tsx`
+   - `admin/users/page.tsx` + `[userId]/page.tsx`
+   - `catalog/layout.tsx`, `page.tsx`, `[id]/page.tsx`, `[id]/[subtopicId]/page.tsx`
+   - `settings/page.tsx`
+   - `tasks/page.tsx` + `[id]/page.tsx`
+
+2. Migrate components in `apps/web/src/components/`
+   - `admin/MediaUploader.tsx`, `MediaList.tsx`
+   - `enrollment/enrollments-tab.tsx`
+   - `tasks/stage-editor.tsx`, `student-task-detail.tsx`
+   - `dashboard/DashboardContent.tsx`
+   - `hooks/use-media-loader.ts`, `use-topics-loader.ts`
+
+3. Rewrite 5 API-mocking tests
+   - Create shared mock helper: `apps/web/__tests__/helpers/mock-api-client.ts`
+   - Rewrite test files listed in "Impact on Existing Tests" section
+
+### Current Build Status
+- **Compilation:** Fails at page runtime (e.g., `admin/tasks/[id]/page.tsx:49`) because old code still calls deprecated `adminTasksApi.getById(token, taskId, ...)` 
+- **Root cause:** Deprecation stubs don't accept arguments; they throw errors to guide migration
+- **Mitigation:** Backward-compatibility stubs allow imports to succeed but fail at runtime if old calling convention is used
 
 ---
 
