@@ -4,15 +4,15 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ROLES } from '@arenaquest/shared/constants/roles';
-import { useAuth, useHasRole } from '@web/hooks/use-auth';
+import { useHasRole } from '@web/hooks/use-auth';
+import { useApiClient } from '@web/context/auth-context';
 import { Spinner } from '@web/components/spinner';
 import { MarkdownViewer } from '@web/components/catalog/MarkdownViewer';
 import { TaskTopicPicker } from '@web/components/tasks/task-topic-picker';
 import { StageEditor } from '@web/components/tasks/stage-editor';
-import { adminTopicsApi, type TopicNode } from '@web/lib/admin-topics-api';
+import type { TopicNode } from '@web/lib/admin-topics-api';
 import {
   AdminTasksApiError,
-  adminTasksApi,
   type TaskDetail,
   type TaskStatus,
 } from '@web/lib/admin-tasks-api';
@@ -31,7 +31,7 @@ export default function AdminTaskEditorPage() {
   const params = useParams<{ id: string }>();
   const taskId = params.id;
   const router = useRouter();
-  const { accessToken: token } = useAuth();
+  const client = useApiClient();
   const canAuthor = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
 
   const [task, setTask] = useState<TaskDetail | null>(null);
@@ -43,11 +43,11 @@ export default function AdminTaskEditorPage() {
   const [saving, setSaving] = useState(false);
 
   const reload = useCallback(async () => {
-    if (!token || !taskId) return;
+    if (!taskId) return;
     try {
       const [detail, topicList] = await Promise.all([
-        adminTasksApi.getById(token, taskId),
-        adminTopicsApi.list(token),
+        client.adminTasks.getById(taskId),
+        client.adminTopics.list(),
       ]);
       setTask(detail);
       setTitle(detail.title);
@@ -56,7 +56,7 @@ export default function AdminTaskEditorPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load task');
     }
-  }, [token, taskId]);
+  }, [client, taskId]);
 
   useEffect(() => {
     if (!canAuthor) {
@@ -67,11 +67,11 @@ export default function AdminTaskEditorPage() {
   }, [canAuthor, reload, router]);
 
   const handleSaveMeta = async () => {
-    if (!token || !task) return;
+    if (!task) return;
     setSaving(true);
     setError(null);
     try {
-      await adminTasksApi.update(token, task.id, { title, description });
+      await client.adminTasks.update(task.id, { title, description });
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
@@ -81,11 +81,11 @@ export default function AdminTaskEditorPage() {
   };
 
   const handleSetStatus = async (status: TaskStatus) => {
-    if (!token || !task) return;
+    if (!task) return;
     setPublishErrors([]);
     setError(null);
     try {
-      await adminTasksApi.update(token, task.id, { status });
+      await client.adminTasks.update(task.id, { status });
       await reload();
     } catch (e) {
       if (e instanceof AdminTasksApiError && e.code === 'TASK_NOT_PUBLISHABLE') {
@@ -100,9 +100,9 @@ export default function AdminTaskEditorPage() {
   };
 
   const handleTopicsChange = async (next: string[]) => {
-    if (!token || !task) return;
+    if (!task) return;
     try {
-      await adminTasksApi.setTaskTopics(token, task.id, next);
+      await client.adminTasks.setTaskTopics(task.id, next);
       await reload();
     } catch (e) {
       if (e instanceof AdminTasksApiError && e.code === 'LINKED_TOPIC_NOT_PUBLISHED') {
