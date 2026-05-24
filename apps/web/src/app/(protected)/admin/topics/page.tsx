@@ -4,12 +4,12 @@ import React, { useEffect, useState, useCallback, useRef, type FormEvent } from 
 import { useRouter } from 'next/navigation';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useAuth, useHasRole } from '@web/hooks/use-auth';
-import {
-  adminTopicsApi,
-  type TopicNode,
-  type CreateTopicInput,
+import { useApiClient } from '@web/context/auth-context';
+import type {
+  TopicNode,
+  CreateTopicInput,
 } from '@web/lib/admin-topics-api';
-import { adminMediaApi, type Media } from '@web/lib/admin-media-api';
+import type { Media } from '@web/lib/admin-media-api';
 import { MediaUploader } from '@web/components/admin/MediaUploader';
 import { MediaList } from '@web/components/admin/MediaList';
 import { Spinner } from '@web/components/spinner';
@@ -202,7 +202,8 @@ function ConfirmDialog({
 
 export default function AdminTopicsPage() {
   const router = useRouter();
-  const { accessToken, isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading } = useAuth();
+  const client = useApiClient();
   const canAccess = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
 
   // ---------------------------------------------------------------------------
@@ -261,21 +262,20 @@ export default function AdminTopicsPage() {
   // ---------------------------------------------------------------------------
 
   const refresh = useCallback(async () => {
-    if (!accessToken) return;
     setFetchError('');
     try {
-      const data = await adminTopicsApi.list(accessToken);
+      const data = await client.adminTopics.list();
       setNodes(data);
     } catch {
       setFetchError('Failed to load topics.');
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [client]);
 
   useEffect(() => {
-    if (canAccess && accessToken) refresh();
-  }, [canAccess, accessToken, refresh]);
+    if (canAccess) refresh();
+  }, [canAccess, refresh]);
 
   // ---------------------------------------------------------------------------
   // Sync detail pane when selected node changes
@@ -302,15 +302,13 @@ export default function AdminTopicsPage() {
     setDetailPrereqIds(selectedNode.prerequisiteIds.join(', '));
     
     // Load media
-    if (accessToken) {
-      setLoadingMedia(true);
-      adminMediaApi.list(accessToken, selectedNode.id)
-        .then(setDetailMedia)
-        .catch(() => showToast('Failed to load media', 'error'))
-        .finally(() => setLoadingMedia(false));
-    }
+    setLoadingMedia(true);
+    client.adminMedia.list(selectedNode.id)
+      .then(setDetailMedia)
+      .catch(() => showToast('Failed to load media', 'error'))
+      .finally(() => setLoadingMedia(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, accessToken]);
+  }, [selectedId, client]);
 
   // ---------------------------------------------------------------------------
   // Toast helpers
@@ -335,9 +333,9 @@ export default function AdminTopicsPage() {
   }
 
   async function handleInlineSave(id: string, title: string) {
-    if (!title.trim() || !accessToken) { setInlineEditId(null); return; }
+    if (!title.trim()) { setInlineEditId(null); return; }
     try {
-      await adminTopicsApi.update(accessToken, id, { title: title.trim() });
+      await client.adminTopics.update(id, { title: title.trim() });
       await refresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to rename topic', 'error');
@@ -347,16 +345,15 @@ export default function AdminTopicsPage() {
   }
 
   async function handleCreate(data: CreateTopicInput) {
-    if (!accessToken) return;
-    await adminTopicsApi.create(accessToken, data);
+    await client.adminTopics.create(data);
     await refresh();
     showToast('Topic created', 'success');
   }
 
   async function handleArchive() {
-    if (!archiveTarget || !accessToken) return;
+    if (!archiveTarget) return;
     try {
-      await adminTopicsApi.archive(accessToken, archiveTarget.id);
+      await client.adminTopics.archive(archiveTarget.id);
       setArchiveTarget(null);
       if (selectedId === archiveTarget.id) setSelectedId(null);
       await refresh();
@@ -369,7 +366,7 @@ export default function AdminTopicsPage() {
 
   async function handleDetailSave(e: FormEvent) {
     e.preventDefault();
-    if (!selectedId || !accessToken) return;
+    if (!selectedId) return;
     setDetailError('');
     setDetailSaving(true);
     try {
@@ -381,7 +378,7 @@ export default function AdminTopicsPage() {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-      await adminTopicsApi.update(accessToken, selectedId, {
+      await client.adminTopics.update(selectedId, {
         title: detailTitle,
         content: detailContent,
         status: detailStatus,
@@ -399,10 +396,10 @@ export default function AdminTopicsPage() {
   }
 
   async function reloadMedia() {
-    if (!accessToken || !selectedId) return;
+    if (!selectedId) return;
     setLoadingMedia(true);
     try {
-      const media = await adminMediaApi.list(accessToken, selectedId);
+      const media = await client.adminMedia.list(selectedId);
       setDetailMedia(media);
     } catch {
       showToast('Failed to reload media', 'error');
@@ -448,7 +445,7 @@ export default function AdminTopicsPage() {
       const position = getDropPosition(e);
       setDropTarget(null);
 
-      if (!sourceId || sourceId === targetNode.id || !accessToken) return;
+      if (!sourceId || sourceId === targetNode.id) return;
 
       try {
         let moveArgs: { newParentId: string | null; newSortOrder?: number };
@@ -459,7 +456,7 @@ export default function AdminTopicsPage() {
         } else {
           moveArgs = { newParentId: targetNode.parentId, newSortOrder: targetNode.order + 1 };
         }
-        await adminTopicsApi.move(accessToken, sourceId, moveArgs);
+        await client.adminTopics.move(sourceId, moveArgs);
         await refresh();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Move failed';
@@ -801,10 +798,9 @@ export default function AdminTopicsPage() {
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">Upload and manage files associated with this topic.</p>
               </div>
 
-              {accessToken && selectedId && (
+              {selectedId && (
                 <MediaUploader
                   topicId={selectedId}
-                  token={accessToken}
                   onUploadComplete={reloadMedia}
                 />
               )}
@@ -814,10 +810,9 @@ export default function AdminTopicsPage() {
                   <Spinner className="h-6 w-6 text-zinc-400" />
                 </div>
               ) : (
-                accessToken && selectedId && (
+                selectedId && (
                   <MediaList
                     topicId={selectedId}
-                    token={accessToken}
                     media={detailMedia}
                     onMediaDeleted={reloadMedia}
                   />

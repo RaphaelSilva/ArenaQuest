@@ -25,19 +25,25 @@ vi.mock('@web/hooks/use-auth', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock adminUsersApi
+// Mock useApiClient hook
 // ---------------------------------------------------------------------------
 
-const mockAdminUsersApi = vi.hoisted(() => ({
+const mockAdminUsers = vi.hoisted(() => ({
   list: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
   deactivate: vi.fn(),
 }));
 
-vi.mock('@web/lib/admin-users-api', () => ({
-  adminUsersApi: mockAdminUsersApi,
-}));
+vi.mock('@web/context/auth-context', async () => {
+  const actual = await vi.importActual('@web/context/auth-context');
+  return {
+    ...actual,
+    useApiClient: () => ({
+      adminUsers: mockAdminUsers,
+    }),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Import component AFTER mocks
@@ -99,10 +105,10 @@ function setupStudentContext() {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mockAdminUsersApi.list.mockResolvedValue({ data: MOCK_USERS, total: 2 });
-  mockAdminUsersApi.create.mockResolvedValue(makeUser({ id: 'user-3', name: 'New User', email: 'new@example.com' }));
-  mockAdminUsersApi.update.mockResolvedValue(MOCK_USERS[0]);
-  mockAdminUsersApi.deactivate.mockResolvedValue(undefined);
+  mockAdminUsers.list.mockResolvedValue({ data: MOCK_USERS, total: 2 });
+  mockAdminUsers.create.mockResolvedValue(makeUser({ id: 'user-3', name: 'New User', email: 'new@example.com' }));
+  mockAdminUsers.update.mockResolvedValue(MOCK_USERS[0]);
+  mockAdminUsers.deactivate.mockResolvedValue(undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -137,16 +143,16 @@ describe('AdminUsersPage — table', () => {
     expect(screen.getByText(/actions/i)).toBeInTheDocument();
   });
 
-  it('calls adminUsersApi.list with the access token', async () => {
+  it('calls adminUsers.list on mount', async () => {
     setupAdminContext();
     render(<AdminUsersPage />);
 
-    await waitFor(() => expect(mockAdminUsersApi.list).toHaveBeenCalledWith('mock-token', 1, 20));
+    await waitFor(() => expect(mockAdminUsers.list).toHaveBeenCalled());
   });
 
   it('shows "No users found" when list is empty', async () => {
     setupAdminContext();
-    mockAdminUsersApi.list.mockResolvedValue({ data: [], total: 0 });
+    mockAdminUsers.list.mockResolvedValue({ data: [], total: 0 });
     render(<AdminUsersPage />);
 
     await waitFor(() => expect(screen.getByText(/no users found/i)).toBeInTheDocument());
@@ -187,8 +193,7 @@ describe('AdminUsersPage — Create User', () => {
     await user.click(within(dialog).getByRole('button', { name: /create user/i }));
 
     await waitFor(() => {
-      expect(mockAdminUsersApi.create).toHaveBeenCalledWith(
-        'mock-token',
+      expect(mockAdminUsers.create).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'New User',
           email: 'new@example.com',
@@ -213,7 +218,7 @@ describe('AdminUsersPage — Create User', () => {
     await waitFor(() => {
       expect(within(dialog).getByRole('alert')).toBeInTheDocument();
     });
-    expect(mockAdminUsersApi.create).not.toHaveBeenCalled();
+    expect(mockAdminUsers.create).not.toHaveBeenCalled();
   });
 });
 
@@ -229,7 +234,7 @@ describe('AdminUsersPage — RBAC guard', () => {
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/dashboard');
     });
-    expect(mockAdminUsersApi.list).not.toHaveBeenCalled();
+    expect(mockAdminUsers.list).not.toHaveBeenCalled();
   });
 });
 
@@ -252,7 +257,7 @@ describe('AdminUsersPage — Deactivate', () => {
     await user.click(within(dialog).getByRole('button', { name: /confirm/i }));
 
     await waitFor(() => {
-      expect(mockAdminUsersApi.deactivate).toHaveBeenCalledWith('mock-token', 'user-1');
+      expect(mockAdminUsers.deactivate).toHaveBeenCalledWith('user-1');
     });
   });
 });

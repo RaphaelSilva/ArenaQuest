@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { adminMediaApi, type PresignInput } from '@web/lib/admin-media-api';
+import { useApiClient } from '@web/context/auth-context';
+import type { PresignInput } from '@web/lib/admin-media-api';
 
 type UploadState = 'idle' | 'presigning' | 'uploading' | 'finalizing' | 'success' | 'error';
 
@@ -16,11 +17,11 @@ type ActiveUpload = {
 
 type MediaUploaderProps = {
   topicId: string;
-  token: string;
   onUploadComplete: () => void;
 };
 
-export function MediaUploader({ topicId, token, onUploadComplete }: MediaUploaderProps) {
+export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps) {
+  const client = useApiClient();
   const [uploads, setUploads] = useState<ActiveUpload[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -68,7 +69,7 @@ export function MediaUploader({ topicId, token, onUploadComplete }: MediaUploade
           throw new Error('File too large (Max 100MB)');
       }
 
-      const { uploadUrl, media } = await adminMediaApi.getPresignedUrl(token, topicId, presignData);
+      const { uploadUrl, media } = await client.adminMedia.getPresignedUrl(topicId, presignData);
 
       // 2. Upload to R2
       updateUpload({ state: 'uploading' });
@@ -104,7 +105,7 @@ export function MediaUploader({ topicId, token, onUploadComplete }: MediaUploade
 
       // 3. Finalize
       updateUpload({ state: 'finalizing', progress: 100 });
-      await adminMediaApi.finalize(token, topicId, media.id);
+      await client.adminMedia.finalize(topicId, media.id);
 
       updateUpload({ state: 'success' });
       onUploadComplete();

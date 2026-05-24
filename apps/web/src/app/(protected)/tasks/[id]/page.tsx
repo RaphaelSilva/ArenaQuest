@@ -2,27 +2,27 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { useAuth } from '@web/hooks/use-auth';
+import { useApiClient } from '@web/context/auth-context';
 import { Spinner } from '@web/components/spinner';
 import { StudentTaskDetail } from '@web/components/tasks/student-task-detail';
-import { tasksApi, type PublicTaskDetail } from '@web/lib/tasks-api';
+import type { PublicTaskDetail } from '@web/lib/tasks-api';
 
 export const runtime = 'edge';
 
 export default function StudentTaskDetailPage() {
   const params = useParams<{ id: string }>();
-  const { accessToken: token } = useAuth();
+  const client = useApiClient();
   const [task, setTask] = useState<PublicTaskDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    if (!token || !params.id) return;
+    if (!params.id) return;
     try {
-      setTask(await tasksApi.getById(token, params.id));
+      setTask(await client.tasks.getById(params.id));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load task');
     }
-  }, [token, params.id]);
+  }, [client, params.id]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch is the canonical use case
@@ -39,7 +39,7 @@ export default function StudentTaskDetailPage() {
     );
   }
 
-  if (!task || !token) {
+  if (!task) {
     return (
       <div className="flex items-center justify-center py-24">
         <Spinner className="h-6 w-6 text-zinc-400" />
@@ -47,5 +47,5 @@ export default function StudentTaskDetailPage() {
     );
   }
 
-  return <StudentTaskDetail task={task} token={token} />;
+  return <StudentTaskDetail task={task} />;
 }

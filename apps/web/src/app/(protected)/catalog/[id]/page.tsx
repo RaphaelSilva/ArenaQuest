@@ -5,7 +5,8 @@ export const runtime = 'edge';
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@web/hooks/use-auth';
-import { topicsApi, type TopicProgressStatus, type TopicWithMedia } from '@web/lib/topics-api';
+import { useApiClient } from '@web/context/auth-context';
+import type { TopicProgressStatus, TopicWithMedia } from '@web/lib/topics-api';
 import { TopicHeader } from '@web/components/catalog/TopicHeader';
 import { BadgesStrip } from '@web/components/catalog/BadgesStrip';
 import { SubtopicCard } from '@web/components/catalog/SubtopicCard';
@@ -22,7 +23,8 @@ type BadgeItem = { id: string; emoji: string; name: string; earned: boolean };
 
 export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   const { id } = use(params);
-  const { accessToken, user } = useAuth();
+  const { user, accessToken } = useAuth();
+  const client = useApiClient();
 
   const [topic, setTopic] = useState<TopicWithMedia | null>(null);
   const [progressMap, setProgressMap] = useState<Map<string, TopicProgressStatus>>(new Map());
@@ -40,15 +42,14 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   const showInstructorUI = isInstructor && previewRole === 'instructor';
 
   useEffect(() => {
-    if (!accessToken) return;
     let active = true;
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
     const headers = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' };
 
     Promise.all([
-      topicsApi.getById(accessToken, id),
-      topicsApi.listProgress(accessToken),
+      client.topics.getById(id),
+      client.topics.listProgress(),
       fetch(`${API_URL}/me/badges`, { headers, cache: 'no-store' })
         .then(async (r) => {
           if (!r.ok) return [];
@@ -69,7 +70,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
     });
 
     return () => { active = false; };
-  }, [accessToken, id]);
+  }, [client, accessToken, id]);
 
   if (loading) {
     return (

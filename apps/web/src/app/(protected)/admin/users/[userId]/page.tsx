@@ -4,8 +4,8 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ROLES } from '@arenaquest/shared/constants/roles';
-import { useAuth, useHasRole } from '@web/hooks/use-auth';
-import { adminUsersApi } from '@web/lib/admin-users-api';
+import { useHasRole } from '@web/hooks/use-auth';
+import { useApiClient } from '@web/context/auth-context';
 import { EnrollmentsTab } from '@web/components/enrollment/enrollments-tab';
 import { Spinner } from '@web/components/spinner';
 import type { Entities } from '@arenaquest/shared/types/entities';
@@ -20,33 +20,24 @@ export default function AdminUserDetailPage({ params }: Props) {
   const { userId } = use(params);
   const router = useRouter();
   const isAdmin = useHasRole(ROLES.ADMIN);
-  const { accessToken, isLoading: authLoading } = useAuth();
+  const client = useApiClient();
   const [tab, setTab] = useState<Tab>('enrollments');
   const [user, setUser] = useState<Entities.Identity.User | null>(null);
   const [userError, setUserError] = useState('');
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) router.replace('/dashboard');
-  }, [authLoading, isAdmin, router]);
+    if (!isAdmin) router.replace('/dashboard');
+  }, [isAdmin, router]);
 
   useEffect(() => {
-    if (!accessToken) return;
-    adminUsersApi.list(accessToken, 1, 100)
+    client.adminUsers.list()
       .then((res) => {
         const found = res.data.find((u) => u.id === userId);
         if (!found) setUserError('User not found.');
         else setUser(found);
       })
       .catch(() => setUserError('Failed to load user.'));
-  }, [accessToken, userId]);
-
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Spinner className="h-8 w-8 text-zinc-400" />
-      </div>
-    );
-  }
+  }, [client, userId]);
 
   if (!isAdmin) return null;
 
@@ -90,8 +81,8 @@ export default function AdminUserDetailPage({ params }: Props) {
         ))}
       </nav>
 
-      {tab === 'enrollments' && accessToken && (
-        <EnrollmentsTab userId={userId} token={accessToken} />
+      {tab === 'enrollments' && (
+        <EnrollmentsTab userId={userId} />
       )}
 
       {tab === 'profile' && user && (

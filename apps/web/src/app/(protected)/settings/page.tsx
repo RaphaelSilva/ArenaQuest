@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { useAuth } from '@web/hooks/use-auth';
-import { accountApi, AccountApiError } from '@web/lib/account-api';
+import { useApiClient } from '@web/context/auth-context';
+import { AccountApiError } from '@web/lib/account-api';
 
 const LockIcon = () => (
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -58,7 +58,7 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
 }
 
 export default function SettingsPage() {
-  const { accessToken } = useAuth();
+  const client = useApiClient();
 
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -87,7 +87,7 @@ export default function SettingsPage() {
     setGeneralError('');
     setLoading(true);
     try {
-      await accountApi.changePassword(accessToken ?? '', currentPw, newPw);
+      await client.account.changePassword(currentPw, newPw);
       setCurrentPw('');
       setNewPw('');
       setConfirmPw('');
