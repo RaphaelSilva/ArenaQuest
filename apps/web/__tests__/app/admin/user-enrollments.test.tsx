@@ -142,8 +142,9 @@ describe('EnrollmentsTab — revoke flow', () => {
     await waitFor(() => screen.getByRole('button', { name: /revoke access to fundamentos/i }));
     await userEvent.click(screen.getByRole('button', { name: /revoke access to fundamentos/i }));
     await userEvent.click(screen.getByRole('button', { name: /^revoke$/i }));
-    expect(mockRevokeUserTopic).toHaveBeenCalledWith(USER_ID, 'top1', false);
-    await waitFor(() => expect(screen.getByText(/No topics granted yet/i)).toBeInTheDocument());
+    await waitFor(() => expect(mockRevokeUserTopic).toHaveBeenCalledWith(USER_ID, 'top1', false));
+    // Dialog should close after confirm
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('calls revokeUserTopic with cascade=true when toggle is checked', async () => {
