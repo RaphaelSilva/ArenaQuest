@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useHasRole } from '@web/hooks/use-auth';
 import { useApiClient } from '@web/context/auth-context';
 import { EnrollmentsTab } from '@web/components/enrollment/enrollments-tab';
+import { ResetPasswordModal } from '@web/components/admin/ResetPasswordModal';
 import { Spinner } from '@web/components/spinner';
 import type { Entities } from '@arenaquest/shared/types/entities';
 
@@ -24,20 +25,30 @@ export default function AdminUserDetailPage({ params }: Props) {
   const [tab, setTab] = useState<Tab>('enrollments');
   const [user, setUser] = useState<Entities.Identity.User | null>(null);
   const [userError, setUserError] = useState('');
+  const [showResetModal, setShowResetModal] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) router.replace('/dashboard');
   }, [isAdmin, router]);
 
-  useEffect(() => {
-    client.adminUsers.list()
-      .then((res) => {
-        const found = res.data.find((u) => u.id === userId);
-        if (!found) setUserError('User not found.');
-        else setUser(found);
-      })
-      .catch(() => setUserError('Failed to load user.'));
+  const loadUser = useCallback(async () => {
+    try {
+      const res = await client.adminUsers.list();
+      const found = res.data.find((u) => u.id === userId);
+      if (!found) setUserError('User not found.');
+      else {
+        setUser(found);
+        setUserError('');
+      }
+    } catch {
+      setUserError('Failed to load user.');
+    }
   }, [client, userId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadUser();
+  }, [loadUser]);
 
   if (!isAdmin) return null;
 
@@ -52,9 +63,21 @@ export default function AdminUserDetailPage({ params }: Props) {
           {userError}
         </p>
       ) : user ? (
-        <header className="mt-4 mb-6">
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{user.name}</h1>
-          <p className="text-sm" style={{ color: 'var(--text2)' }}>{user.email}</p>
+        <header className="mt-4 mb-6 flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{user.name}</h1>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>{user.email}</p>
+          </div>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setShowResetModal(true)}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
+              style={{ background: 'var(--error)' }}
+            >
+              Reset Password
+            </button>
+          )}
         </header>
       ) : (
         <div className="mt-8 flex justify-center">
@@ -100,6 +123,14 @@ export default function AdminUserDetailPage({ params }: Props) {
             <dd style={{ color: 'var(--text)' }}>{new Date(user.createdAt).toLocaleDateString('pt-BR')}</dd>
           </div>
         </dl>
+      )}
+
+      {showResetModal && user && (
+        <ResetPasswordModal
+          user={user}
+          onClose={() => setShowResetModal(false)}
+          onSuccess={() => void loadUser()}
+        />
       )}
     </main>
   );

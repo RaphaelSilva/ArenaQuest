@@ -15,6 +15,18 @@ export type UpdateUserInput = {
   status?: Entities.Config.UserStatus;
 };
 
+export type ResetPasswordInput = {
+  sendEmail: boolean;
+  adminNote?: string;
+};
+
+export type ResetPasswordResponse = {
+  userId: string;
+  temporaryPassword: string;
+  emailSent: boolean;
+  resetAt: string;
+};
+
 export function createAdminUsersApi(http: HttpTransport) {
   return {
     async list(page = 1, pageSize = 20): Promise<{ data: Entities.Identity.User[]; total: number }> {
@@ -51,6 +63,24 @@ export function createAdminUsersApi(http: HttpTransport) {
       if (!res.ok && res.status !== 204) {
         throw new Error(`Failed to deactivate user (${res.status})`);
       }
+    },
+
+    async resetPassword(
+      id: string,
+      data: ResetPasswordInput,
+    ): Promise<ResetPasswordResponse> {
+      const res = await http('POST', `/admin/users/${id}/reset-password`, {
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const status = res.status;
+        const error = body.error ?? `Failed to reset password (${status})`;
+        const errorObj = new Error(error) as Error & { status?: number };
+        errorObj.status = status;
+        throw errorObj;
+      }
+      return res.json();
     },
   };
 }
