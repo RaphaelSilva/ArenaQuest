@@ -23,6 +23,7 @@ description: AI persona specialized in creating rich, dynamic, and responsive us
 | Route groups (auth-only vs public) | `src/app/(auth)/` (public) vs `src/app/(protected)/` (authenticated) |
 | Admin section layout (sidebar + content) | `src/app/(protected)/admin/layout.tsx` + `src/components/layout/admin-sidebar.tsx` |
 | Whole-project architecture principles | `docs/product/architecture/` |
+| **API client (centralized)** | `useApiClient()` hook from `@web/context/auth-context` — domain-grouped methods like `client.topics`, `client.adminUsers`, etc. |
 
 If a new pattern emerges (a reusable component, a new motion rule, a routing convention), **add it to the matching doc** — extend `design-system-spec.md` for visual rules, create a new doc under `docs/product/web/` for non-visual conventions. Don't duplicate it in this skill file.
 
@@ -43,7 +44,48 @@ If a new pattern emerges (a reusable component, a new motion rule, a routing con
 - **Path alias:** `@web/*` → `apps/web/src/*`. Use it instead of long relative paths (`../../../`).
 - **Tailwind v4.** Theme tokens live in CSS via `@theme` — no `tailwind.config.js`. Avoid inline `style={{...}}` and arbitrary values when a token exists.
 
-## 4. Project Commands
+## 4. ApiClient — Centralized Domain-Grouped API Access
+
+**Pattern:** All API calls go through `useApiClient()` — a React hook that returns an `ApiClient` instance with domain-grouped methods. Never import individual API modules or pass tokens manually.
+
+**Usage in Client Components:**
+```tsx
+'use client';
+
+import { useApiClient } from '@web/context/auth-context';
+
+export function MyComponent() {
+  const client = useApiClient();
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    client.topics.list().then(setData);
+  }, [client]);
+
+  return <div>{/* render data */}</div>;
+}
+```
+
+**Available API Domains:**
+- `client.topics` — topic catalog (list, getById, visit, listProgress, complete)
+- `client.tasks` — task management (list, getById, checkIn)
+- `client.account` — user account (changePassword)
+- `client.dashboard` — dashboard summary (get)
+- `client.progress` — user progress (getSummary, getTopics, getTasks)
+- `client.adminTopics` — admin topic management (list, create, update, move, archive)
+- `client.adminTasks` — admin task management (list, create, getById, update, archive, setTaskTopics, createStage, updateStage, deleteStage, reorderStages, setStageTopics)
+- `client.adminUsers` — admin user management (list, create, update, deactivate)
+- `client.adminMedia` — admin media management (list, getPresignedUrl, finalize, delete)
+- `client.adminEnrollment` — admin enrollment management (listUserGrants, grantUserTopic, revokeUserTopic, listGroupGrants, grantGroupTopic, revokeGroupTopic)
+
+**Key Invariants:**
+- Token injection is automatic — `useApiClient()` reads from auth context
+- Silent token refresh is built-in — session expiry triggers `onSessionExpired()` callback
+- No need to import `useAuth()` for tokens unless you need the raw token for non-API purposes
+- Each domain returns a factory-created API object — methods are pure and testable
+- HTTP transport is injectable for testing — see `HttpTransport` interface in `src/lib/api-client.ts`
+
+## 5. Project Commands
 
 ```bash
 make dev-web                  # Next.js dev on :3000
@@ -57,7 +99,7 @@ make deploy-web-staging       # Cloudflare Pages staging
 Run a single spec: `cd apps/web && pnpm test <file-substring>` or `pnpm test --grep "<test name>"`.
 Watch mode while iterating: `cd apps/web && pnpm test:watch`.
 
-## 5. Workflow
+## 6. Workflow
 
 1. **Triage & Context Loading** — open the wireframe (if any) and `design-system-spec.md`; identify tokens, components, and motions you'll use. List the API endpoints the page needs.
 2. **Architectural conformity** — choose route group (`(auth)` vs `(protected)`); pick Server vs Client per component (RSC by default); reach the backend through an existing or new `src/lib/*-api.ts` client; pull types from `@arenaquest/shared`.
@@ -66,6 +108,6 @@ Watch mode while iterating: `cd apps/web && pnpm test:watch`.
 5. **Browser check** — start `make dev-web`, verify the feature in the browser (golden path + edge cases), check responsiveness, watch for regressions in adjacent pages. Type-check and tests passing are necessary but not sufficient — UI correctness needs a visual confirmation.
 6. **Close the task** — in the `.task.md`, mark Acceptance Criteria boxes `[x]`; flip `Status: Completed` only when each criterion is verified in the browser and tests are green.
 
-## 6. Documentation Discipline
+## 7. Documentation Discipline
 
 This skill file is an **index + invariants**. Visual rules and component patterns live in `docs/product/web/`. When extending or correcting a pattern: edit the dedicated doc, not this file. When in doubt about which doc owns a topic, use §2.

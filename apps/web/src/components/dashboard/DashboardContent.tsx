@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@web/hooks/use-auth';
-import { getDashboard, type DashboardPayload } from '@web/lib/dashboard-api';
+import { useApiClient } from '@web/context/auth-context';
+import type { DashboardPayload } from '@web/lib/dashboard-api';
 import { StatCardLevel } from './StatCardLevel';
 import { StatCardStreak } from './StatCardStreak';
 import { StatCardRanking } from './StatCardRanking';
@@ -22,7 +23,8 @@ function getGreeting(now: Date): string {
 }
 
 export function DashboardContent() {
-  const { accessToken, user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const client = useApiClient();
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,14 +33,13 @@ export function DashboardContent() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!accessToken) return; // protected layout redirects before this persists
-    getDashboard(accessToken)
+    client.dashboard.get()
       .then(setData)
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : 'Failed to load dashboard.');
       })
       .finally(() => setLoading(false));
-  }, [accessToken, authLoading]);
+  }, [authLoading, client]);
 
   if (loading) return <DashboardSkeleton />;
 

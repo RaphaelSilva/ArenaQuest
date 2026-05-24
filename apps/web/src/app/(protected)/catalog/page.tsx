@@ -2,24 +2,23 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@web/hooks/use-auth';
-import { topicsApi, type TopicNode, type TopicProgressStatus } from '@web/lib/topics-api';
+import { useApiClient } from '@web/context/auth-context';
+import type { TopicNode, TopicProgressStatus } from '@web/lib/topics-api';
 import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
 import { Spinner } from '@web/components/spinner';
 
 export default function CatalogIndexPage() {
-  const { accessToken } = useAuth();
+  const client = useApiClient();
   const [topics, setTopics] = useState<TopicNode[]>([]);
   const [progressMap, setProgressMap] = useState<Map<string, TopicProgressStatus>>(new Map());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!accessToken) return;
     let active = true;
 
     Promise.all([
-      topicsApi.list(accessToken),
-      topicsApi.listProgress(accessToken),
+      client.topics.list(),
+      client.topics.listProgress(),
     ]).then(([nodes, progressEntries]) => {
       if (!active) return;
       // Filter to root topics only (parentId === null)
@@ -35,7 +34,7 @@ export default function CatalogIndexPage() {
     });
 
     return () => { active = false; };
-  }, [accessToken]);
+  }, [client]);
 
   return (
     <div className="mx-auto max-w-[900px] px-4 py-8 md:px-6 lg:px-10">

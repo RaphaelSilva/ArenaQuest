@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@web/hooks/use-auth';
+import { useApiClient } from '@web/context/auth-context';
 import {
   AdminTasksApiError,
-  adminTasksApi,
   type TaskDetail,
   type TaskStage,
 } from '@web/lib/admin-tasks-api';
@@ -23,7 +22,7 @@ const ERROR_HINTS: Record<string, string> = {
 };
 
 export function StageEditor({ task, topics, onChange }: Props) {
-  const { accessToken: token } = useAuth();
+  const client = useApiClient();
   const [stages, setStages] = useState<TaskStage[]>(task.stages);
   const [stageTopics, setStageTopics] = useState<Record<string, string[]>>(task.stageTopicIds);
   const [creating, setCreating] = useState(false);
@@ -53,10 +52,9 @@ export function StageEditor({ task, topics, onChange }: Props) {
   };
 
   const addStage = async () => {
-    if (!token) return;
     setCreating(true);
     try {
-      await adminTasksApi.createStage(token, task.id, `Stage ${stages.length + 1}`);
+      await client.adminTasks.createStage(task.id, `Stage ${stages.length + 1}`);
       await onChange();
     } catch (e) {
       handleApiError(e);
@@ -71,14 +69,13 @@ export function StageEditor({ task, topics, onChange }: Props) {
   };
 
   const commitRename = async (stage: TaskStage) => {
-    if (!token) return;
     const trimmed = editValue.trim();
     if (trimmed === '' || trimmed === stage.label) {
       setEditingId(null);
       return;
     }
     try {
-      await adminTasksApi.updateStage(token, task.id, stage.id, trimmed);
+      await client.adminTasks.updateStage(task.id, stage.id, trimmed);
       setEditingId(null);
       await onChange();
     } catch (e) {
@@ -88,7 +85,6 @@ export function StageEditor({ task, topics, onChange }: Props) {
   };
 
   const move = async (stageId: string, direction: -1 | 1) => {
-    if (!token) return;
     const idx = stages.findIndex((s) => s.id === stageId);
     const target = idx + direction;
     if (idx < 0 || target < 0 || target >= stages.length) return;
@@ -99,7 +95,7 @@ export function StageEditor({ task, topics, onChange }: Props) {
     setStages(next);
 
     try {
-      await adminTasksApi.reorderStages(token, task.id, next.map((s) => s.id));
+      await client.adminTasks.reorderStages(task.id, next.map((s) => s.id));
       await onChange();
     } catch (e) {
       setStages(previous);
@@ -108,9 +104,8 @@ export function StageEditor({ task, topics, onChange }: Props) {
   };
 
   const deleteStage = async (stageId: string) => {
-    if (!token) return;
     try {
-      await adminTasksApi.deleteStage(token, task.id, stageId);
+      await client.adminTasks.deleteStage(task.id, stageId);
       await onChange();
     } catch (e) {
       handleApiError(e);
@@ -118,7 +113,6 @@ export function StageEditor({ task, topics, onChange }: Props) {
   };
 
   const toggleStageTopic = async (stageId: string, topicId: string) => {
-    if (!token) return;
     const current = stageTopics[stageId] ?? [];
     const set = new Set(current);
     if (set.has(topicId)) set.delete(topicId);
@@ -127,7 +121,7 @@ export function StageEditor({ task, topics, onChange }: Props) {
 
     setStageTopics((prev) => ({ ...prev, [stageId]: next }));
     try {
-      await adminTasksApi.setStageTopics(token, task.id, stageId, next);
+      await client.adminTasks.setStageTopics(task.id, stageId, next);
       await onChange();
     } catch (e) {
       setStageTopics((prev) => ({ ...prev, [stageId]: current }));

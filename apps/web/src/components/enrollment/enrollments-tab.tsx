@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { adminEnrollmentApi, type UserGrant } from '@web/lib/admin-enrollment-api';
-import { adminTopicsApi, type TopicNode } from '@web/lib/admin-topics-api';
+import { useApiClient } from '@web/context/auth-context';
+import type { UserGrant } from '@web/lib/admin-enrollment-api';
+import type { TopicNode } from '@web/lib/admin-topics-api';
 import { Spinner } from '@web/components/spinner';
 
 // ---------------------------------------------------------------------------
@@ -157,10 +158,10 @@ function RevokeDialog({ topicTitle, onConfirm, onCancel }: RevokeDialogProps) {
 
 export type EnrollmentsTabProps = {
   userId: string;
-  token: string;
 };
 
-export function EnrollmentsTab({ userId, token }: EnrollmentsTabProps) {
+export function EnrollmentsTab({ userId }: EnrollmentsTabProps) {
+  const client = useApiClient();
   const [grants, setGrants] = useState<UserGrant[]>([]);
   const [allTopics, setAllTopics] = useState<TopicNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -173,8 +174,8 @@ export function EnrollmentsTab({ userId, token }: EnrollmentsTabProps) {
     setLoading(true);
     try {
       const [g, t] = await Promise.all([
-        adminEnrollmentApi.listUserGrants(token, userId),
-        adminTopicsApi.list(token),
+        client.adminEnrollment.listUserGrants(userId),
+        client.adminTopics.list(),
       ]);
       setGrants(g);
       setAllTopics(t);
@@ -183,7 +184,7 @@ export function EnrollmentsTab({ userId, token }: EnrollmentsTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [token, userId]);
+  }, [client, userId]);
 
   useEffect(() => {
     void load();
@@ -196,7 +197,7 @@ export function EnrollmentsTab({ userId, token }: EnrollmentsTabProps) {
     setShowPicker(false);
     setBusy(true);
     try {
-      const { grant } = await adminEnrollmentApi.grantUserTopic(token, userId, topicId);
+      const { grant } = await client.adminEnrollment.grantUserTopic(userId, topicId);
       setGrants((prev) => [...prev.filter((g) => g.topicNodeId !== topicId), grant]);
     } catch {
       setError('Failed to grant access.');
@@ -211,7 +212,7 @@ export function EnrollmentsTab({ userId, token }: EnrollmentsTabProps) {
     setRevokeTarget(null);
     setBusy(true);
     try {
-      await adminEnrollmentApi.revokeUserTopic(token, userId, target.topicNodeId, cascade);
+      await client.adminEnrollment.revokeUserTopic(userId, target.topicNodeId, cascade);
       setGrants((prev) => prev.filter((g) => g.id !== target.id));
     } catch {
       setError('Failed to revoke access.');

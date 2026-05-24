@@ -6,8 +6,9 @@ import Link from 'next/link';
 import type { Entities } from '@arenaquest/shared/types/entities';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import type { RoleName } from '@arenaquest/shared/constants/roles';
-import { useAuth, useHasRole } from '@web/hooks/use-auth';
-import { adminUsersApi, type CreateUserInput, type UpdateUserInput } from '@web/lib/admin-users-api';
+import { useHasRole } from '@web/hooks/use-auth';
+import { useApiClient } from '@web/context/auth-context';
+import type { CreateUserInput, UpdateUserInput } from '@web/lib/admin-users-api';
 import { Spinner } from '@web/components/spinner';
 import { Button, Badge } from '@web/components/design-system';
 
@@ -242,7 +243,7 @@ function ConfirmDialog({
 export default function AdminUsersPage() {
   const router = useRouter();
   const isAdmin = useHasRole(ROLES.ADMIN);
-  const { accessToken, isLoading: authLoading } = useAuth();
+  const client = useApiClient();
 
   const [users, setUsers] = useState<Entities.Identity.User[]>([]);
   const [total, setTotal] = useState(0);
@@ -257,17 +258,16 @@ export default function AdminUsersPage() {
 
   // Redirect non-admins
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    if (!isAdmin) {
       router.replace('/dashboard');
     }
-  }, [authLoading, isAdmin, router]);
+  }, [isAdmin, router]);
 
   const fetchUsers = useCallback(async () => {
-    if (!accessToken) return;
     setLoading(true);
     setError('');
     try {
-      const result = await adminUsersApi.list(accessToken, page, pageSize);
+      const result = await client.adminUsers.list();
       setUsers(result.data);
       setTotal(result.total);
     } catch {
@@ -275,38 +275,30 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, page, pageSize]);
+  }, [client]);
 
   useEffect(() => {
-    if (isAdmin && accessToken) fetchUsers();
-  }, [isAdmin, accessToken, fetchUsers]);
+    if (isAdmin) fetchUsers();
+  }, [isAdmin, fetchUsers]);
 
   async function handleCreate(data: CreateUserInput | Partial<UpdateUserInput>) {
-    await adminUsersApi.create(accessToken!, data as CreateUserInput);
+    await client.adminUsers.create(data as CreateUserInput);
     setPage(1);
     await fetchUsers();
   }
 
   async function handleUpdate(data: CreateUserInput | Partial<UpdateUserInput>) {
-    await adminUsersApi.update(accessToken!, editTarget!.id, data as Partial<UpdateUserInput>);
+    await client.adminUsers.update(editTarget!.id, data as Partial<UpdateUserInput>);
     await fetchUsers();
   }
 
   async function handleDeactivate() {
-    await adminUsersApi.deactivate(accessToken!, deactivateTarget!.id);
+    await client.adminUsers.deactivate(deactivateTarget!.id);
     setDeactivateTarget(undefined);
     await fetchUsers();
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Spinner className="h-8 w-8 text-zinc-600" />
-      </div>
-    );
-  }
 
   if (!isAdmin) return null;
 

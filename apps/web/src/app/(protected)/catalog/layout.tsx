@@ -2,7 +2,8 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@web/hooks/use-auth';
-import { topicsApi, type TopicNode, type TopicProgressEntry, type TopicProgressStatus } from '@web/lib/topics-api';
+import { useApiClient } from '@web/context/auth-context';
+import type { TopicNode, TopicProgressEntry, TopicProgressStatus } from '@web/lib/topics-api';
 import { CatalogSidebar } from '@web/components/catalog/CatalogSidebar';
 import { MobileSearchBar } from '@web/components/catalog/MobileSearchBar';
 
@@ -21,7 +22,8 @@ function SidebarSkeleton() {
 }
 
 export default function CatalogLayout({ children }: { children: React.ReactNode }) {
-  const { accessToken, user } = useAuth();
+  const { user } = useAuth();
+  const client = useApiClient();
   const [topics, setTopics] = useState<TopicNode[]>([]);
   const [progressMap, setProgressMap] = useState<Map<string, TopicProgressStatus>>(new Map());
   const [globalProgress, setGlobalProgress] = useState(0);
@@ -30,10 +32,9 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
     user?.roles.some((r) => r.name === 'instructor' || r.name === 'admin') ?? false;
 
   useEffect(() => {
-    if (!accessToken) return;
     let active = true;
 
-    Promise.all([topicsApi.list(accessToken), topicsApi.listProgress(accessToken)]).then(
+    Promise.all([client.topics.list(), client.topics.listProgress()]).then(
       ([nodes, progressEntries]) => {
         if (!active) return;
         setTopics(nodes);
@@ -50,7 +51,7 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
     ).catch(() => {/* silently skip — sidebar still renders with empty data */});
 
     return () => { active = false; };
-  }, [accessToken]);
+  }, [client]);
 
   return (
     <div

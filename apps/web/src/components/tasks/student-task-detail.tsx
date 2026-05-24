@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { tasksApi, type PublicTaskDetail } from '@web/lib/tasks-api';
+import { useApiClient } from '@web/context/auth-context';
+import type { PublicTaskDetail } from '@web/lib/tasks-api';
 
 type StageState = 'checked' | 'current' | 'locked';
 
@@ -13,7 +14,6 @@ type StageProgress = {
 
 type Props = {
   task: PublicTaskDetail;
-  token: string;
   initialCheckins?: StageProgress[];
 };
 
@@ -38,7 +38,8 @@ function computeStageStates(
   return result;
 }
 
-export function StudentTaskDetail({ task, token, initialCheckins = [] }: Props) {
+export function StudentTaskDetail({ task, initialCheckins = [] }: Props) {
+  const client = useApiClient();
   const [checkins, setCheckins] = useState<StageProgress[]>(initialCheckins);
   const [inflight, setInflight] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -52,7 +53,7 @@ export function StudentTaskDetail({ task, token, initialCheckins = [] }: Props) 
     async (stageId: string) => {
       if (inflight) return;
       setInflight(stageId);
-      const res = await tasksApi.checkIn(token, task.id, stageId);
+      const res = await client.tasks.checkIn(task.id, stageId);
       setInflight(null);
 
       if ('error' in res) {
@@ -74,7 +75,7 @@ export function StudentTaskDetail({ task, token, initialCheckins = [] }: Props) 
         { stageId: checkIn.stageId, checkedInAt: checkIn.checkedInAt },
       ]);
     },
-    [inflight, task, token, showToast],
+    [inflight, task, client, showToast],
   );
 
   const stageStates = computeStageStates(task.stages, checkins);
