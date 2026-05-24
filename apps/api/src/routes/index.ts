@@ -100,6 +100,7 @@ export class AppRouter {
       forgotPasswordLimiter: IRateLimiter;
       accountController: AccountController;
       googleOAuthController: GoogleOAuthController;
+      mailer: import('@arenaquest/shared/ports').IMailer;
       cookieSameSite: CookieSameSite;
       allowedOrigins?: string;
       /**
@@ -110,7 +111,7 @@ export class AppRouter {
       strictCors: boolean;
     },
   ): void {
-    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, questRepo: _questRepo, badgeRepo, gamificationRepo, missionRepo, commentRepo, xpEngine, streakEngine, questEvaluator, badgeEngine, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, cookieSameSite, allowedOrigins, strictCors } = deps;
+    const { auth, users, tokens, topics, tags, media, storage, taskRepo, taskStages, taskLinks, progressRepo, enrollmentRepo, questRepo: _questRepo, badgeRepo, gamificationRepo, missionRepo, commentRepo, xpEngine, streakEngine, questEvaluator, badgeEngine, authService, loginLimiter, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, accountController, googleOAuthController, mailer, cookieSameSite, allowedOrigins, strictCors } = deps;
     // Build origin matcher from config — strict in prod, lenient in dev.
     const originRules = parseAllowedOrigins(allowedOrigins, { strict: strictCors });
 
@@ -153,7 +154,7 @@ export class AppRouter {
     // Feature routes
     app.route('/', buildCommentsRouter(commentRepo, enrollmentRepo, xpEngine));
     app.route('/auth', buildAuthRouter({ authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, streakEngine, questEvaluator, badgeEngine }));
-    app.route('/admin/users', buildAdminUsersRouter(users, auth, tokens));
+    app.route('/admin/users', buildAdminUsersRouter(users, auth, tokens, mailer));
     app.route('/admin/topics', buildAdminTopicsRouter(topics, tags));
     app.route('/admin/topics', buildAdminMediaRouter(topics, media, storage));
     app.route('/admin/tasks', buildAdminTasksRouter(taskRepo, taskStages, taskLinks, topics));

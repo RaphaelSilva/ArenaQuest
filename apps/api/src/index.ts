@@ -197,6 +197,7 @@ function buildApp(env: AppEnv): Hono {
     forgotPasswordLimiter,
     accountController,
     googleOAuthController,
+    mailer,
     cookieSameSite: parseCookieSameSite(env.COOKIE_SAMESITE),
     allowedOrigins: env.ALLOWED_ORIGINS,
     // If ALLOWED_ORIGINS is configured, enforce strict validation — an invalid
