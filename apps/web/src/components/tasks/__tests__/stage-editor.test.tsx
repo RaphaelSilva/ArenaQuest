@@ -10,25 +10,21 @@ const deleteStage = vi.fn();
 const setStageTopics = vi.fn();
 const createStage = vi.fn();
 
-vi.mock('@web/lib/admin-tasks-api', async () => {
-  const actual = await vi.importActual<typeof import('@web/lib/admin-tasks-api')>(
-    '@web/lib/admin-tasks-api',
-  );
+vi.mock('@web/context/auth-context', async () => {
+  const actual = await vi.importActual('@web/context/auth-context');
   return {
     ...actual,
-    adminTasksApi: {
-      updateStage: (...args: unknown[]) => updateStage(...args),
-      reorderStages: (...args: unknown[]) => reorderStages(...args),
-      deleteStage: (...args: unknown[]) => deleteStage(...args),
-      setStageTopics: (...args: unknown[]) => setStageTopics(...args),
-      createStage: (...args: unknown[]) => createStage(...args),
-    },
+    useApiClient: () => ({
+      adminTasks: {
+        updateStage: (...args: unknown[]) => updateStage(...args),
+        reorderStages: (...args: unknown[]) => reorderStages(...args),
+        deleteStage: (...args: unknown[]) => deleteStage(...args),
+        setStageTopics: (...args: unknown[]) => setStageTopics(...args),
+        createStage: (...args: unknown[]) => createStage(...args),
+      },
+    }),
   };
 });
-
-vi.mock('@web/hooks/use-auth', () => ({
-  useAuth: () => ({ accessToken: 'tk' }),
-}));
 
 function stage(id: string, label: string, order: number): TaskStage {
   return { id, taskId: 't1', label, order, createdAt: '' };
@@ -128,6 +124,6 @@ describe('StageEditor', () => {
     render(<StageEditor task={makeTask({ stages: [] })} topics={TOPICS} onChange={onChange} />);
 
     fireEvent.click(screen.getByText('Add Stage'));
-    await waitFor(() => expect(createStage).toHaveBeenCalledWith('tk', 't1', 'Stage 1'));
+    await waitFor(() => expect(createStage).toHaveBeenCalledWith('t1', 'Stage 1'));
   });
 });

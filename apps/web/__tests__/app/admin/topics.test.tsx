@@ -25,10 +25,10 @@ vi.mock('@web/hooks/use-auth', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock adminTopicsApi
+// Mock useApiClient hook
 // ---------------------------------------------------------------------------
 
-const mockApi = vi.hoisted(() => ({
+const mockAdminTopics = vi.hoisted(() => ({
   list: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
@@ -36,9 +36,15 @@ const mockApi = vi.hoisted(() => ({
   archive: vi.fn(),
 }));
 
-vi.mock('@web/lib/admin-topics-api', () => ({
-  adminTopicsApi: mockApi,
-}));
+vi.mock('@web/context/auth-context', async () => {
+  const actual = await vi.importActual('@web/context/auth-context');
+  return {
+    ...actual,
+    useApiClient: () => ({
+      adminTopics: mockAdminTopics,
+    }),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Import component AFTER mocks
@@ -95,11 +101,11 @@ function setupContentCreatorAuth() {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mockApi.list.mockResolvedValue(MOCK_TOPICS);
-  mockApi.create.mockResolvedValue(makeTopic({ id: 'new-topic', title: 'New Root Topic' }));
-  mockApi.update.mockResolvedValue(makeTopic({ id: 'topic-1', title: 'Updated Title' }));
-  mockApi.move.mockResolvedValue(makeTopic({ id: 'topic-1' }));
-  mockApi.archive.mockResolvedValue(undefined);
+  mockAdminTopics.list.mockResolvedValue(MOCK_TOPICS);
+  mockAdminTopics.create.mockResolvedValue(makeTopic({ id: 'new-topic', title: 'New Root Topic' }));
+  mockAdminTopics.update.mockResolvedValue(makeTopic({ id: 'topic-1', title: 'Updated Title' }));
+  mockAdminTopics.move.mockResolvedValue(undefined);
+  mockAdminTopics.archive.mockResolvedValue(undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -140,15 +146,15 @@ describe('Tree rendering', () => {
     });
   });
 
-  it('calls adminTopicsApi.list with the access token', async () => {
+  it('calls adminTopics.list on mount', async () => {
     setupAdminAuth();
     render(<AdminTopicsPage />);
-    await waitFor(() => expect(mockApi.list).toHaveBeenCalledWith('mock-token'));
+    await waitFor(() => expect(mockAdminTopics.list).toHaveBeenCalled());
   });
 
   it('shows empty state when there are no topics', async () => {
     setupAdminAuth();
-    mockApi.list.mockResolvedValue([]);
+    mockAdminTopics.list.mockResolvedValue([]);
     render(<AdminTopicsPage />);
     await waitFor(() => expect(screen.getByText(/no topics yet/i)).toBeInTheDocument());
   });
@@ -208,9 +214,9 @@ describe('Create root topic', () => {
     await user.click(screen.getByRole('button', { name: /create/i }));
 
     await waitFor(() => {
-      expect(mockApi.create).toHaveBeenCalledWith('mock-token', { title: 'Brand New Topic', parentId: null });
+      expect(mockAdminTopics.create).toHaveBeenCalledWith({ title: 'Brand New Topic', parentId: null });
     });
-    expect(mockApi.list).toHaveBeenCalledTimes(2); // initial + after create
+    expect(mockAdminTopics.list).toHaveBeenCalledTimes(2); // initial + after create
   });
 
   it('shows validation error when title is empty', async () => {
@@ -223,7 +229,7 @@ describe('Create root topic', () => {
     await user.click(screen.getByRole('button', { name: /create/i }));
 
     expect(screen.getByRole('alert')).toHaveTextContent(/title is required/i);
-    expect(mockApi.create).not.toHaveBeenCalled();
+    expect(mockAdminTopics.create).not.toHaveBeenCalled();
   });
 });
 
@@ -260,7 +266,7 @@ describe('Create child topic', () => {
     await user.click(screen.getByRole('button', { name: /create/i }));
 
     await waitFor(() => {
-      expect(mockApi.create).toHaveBeenCalledWith('mock-token', { title: 'Child Topic', parentId: 'topic-1' });
+      expect(mockAdminTopics.create).toHaveBeenCalledWith({ title: 'Child Topic', parentId: 'topic-1' });
     });
   });
 });
@@ -308,8 +314,7 @@ describe('Detail pane', () => {
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => {
-      expect(mockApi.update).toHaveBeenCalledWith(
-        'mock-token',
+      expect(mockAdminTopics.update).toHaveBeenCalledWith(
         'topic-1',
         expect.objectContaining({ status: 'published' }),
       );
@@ -347,7 +352,7 @@ describe('Inline title editing', () => {
     await user.type(input, 'Renamed Topic{Enter}');
 
     await waitFor(() => {
-      expect(mockApi.update).toHaveBeenCalledWith('mock-token', 'topic-1', { title: 'Renamed Topic' });
+      expect(mockAdminTopics.update).toHaveBeenCalledWith('topic-1', { title: 'Renamed Topic' });
     });
   });
 
@@ -364,7 +369,7 @@ describe('Inline title editing', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('inline-edit-topic-1')).not.toBeInTheDocument();
     });
-    expect(mockApi.update).not.toHaveBeenCalled();
+    expect(mockAdminTopics.update).not.toHaveBeenCalled();
   });
 });
 
@@ -397,9 +402,9 @@ describe('Archive', () => {
     await user.click(screen.getByRole('button', { name: /^confirm$/i }));
 
     await waitFor(() => {
-      expect(mockApi.archive).toHaveBeenCalledWith('mock-token', 'topic-1');
+      expect(mockAdminTopics.archive).toHaveBeenCalledWith('topic-1');
     });
-    expect(mockApi.list).toHaveBeenCalledTimes(2);
+    expect(mockAdminTopics.list).toHaveBeenCalledTimes(2);
   });
 
   it('cancels archive when Cancel is clicked', async () => {
@@ -413,7 +418,7 @@ describe('Archive', () => {
     await user.click(screen.getByRole('button', { name: /cancel/i }));
 
     expect(screen.queryByRole('dialog', { name: /confirm action/i })).not.toBeInTheDocument();
-    expect(mockApi.archive).not.toHaveBeenCalled();
+    expect(mockAdminTopics.archive).not.toHaveBeenCalled();
   });
 });
 
@@ -443,7 +448,7 @@ describe('Drag and drop', () => {
 
     await waitFor(() => {
       // 'before' position: newParentId = target.parentId (null), newSortOrder = target.order (1)
-      expect(mockApi.move).toHaveBeenCalledWith('mock-token', 'topic-1', {
+      expect(mockAdminTopics.move).toHaveBeenCalledWith('topic-1', {
         newParentId: null,
         newSortOrder: 1,
       });
@@ -482,7 +487,7 @@ describe('Drag and drop', () => {
     }));
 
     await waitFor(() => {
-      expect(mockApi.move).toHaveBeenCalledWith('mock-token', 'topic-1', {
+      expect(mockAdminTopics.move).toHaveBeenCalledWith('topic-1', {
         newParentId: 'topic-2',
       });
     });
@@ -494,7 +499,7 @@ describe('Drag and drop', () => {
 
   it('shows an error toast when move results in a cycle', async () => {
     setupAdminAuth();
-    mockApi.move.mockRejectedValue(new Error('WOULD_CYCLE'));
+    mockAdminTopics.move.mockRejectedValue(new Error('WOULD_CYCLE'));
     render(<AdminTopicsPage />);
     await waitFor(() => screen.getByText('Root Topic A'));
 
@@ -522,6 +527,6 @@ describe('Drag and drop', () => {
     fireEvent.dragOver(sameNode);
     fireEvent.drop(sameNode);
 
-    await waitFor(() => expect(mockApi.move).not.toHaveBeenCalled());
+    await waitFor(() => expect(mockAdminTopics.move).not.toHaveBeenCalled());
   });
 });
