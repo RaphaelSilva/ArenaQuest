@@ -1,6 +1,6 @@
 # Task: Implement Admin Password Reset Capability
 
-**Status:** Open  
+**Status:** ✅ Done  
 **Type:** Feature  
 **Milestone:** Backlog (extends Milestone 2 & 6)  
 **Complexity:** Medium (2 sessions: backend + frontend)  
@@ -185,25 +185,25 @@ Response (200 OK): {
 
 ## 5. Acceptance Criteria
 
-- [ ] **Backend:** `POST /admin/users/:userId/reset-password` endpoint implemented and tested
-- [ ] **Backend:** Only `admin` role can call endpoint (403 for others)
-- [ ] **Backend:** Admin cannot reset own password via endpoint (422 for self-reset)
-- [ ] **Backend:** Temporary password generated with sufficient entropy (16+ random bytes)
-- [ ] **Backend:** Temporary password is returned in response and never stored plaintext
-- [ ] **Backend:** All refresh tokens for target user are revoked atomically with password update
-- [ ] **Backend:** Email sent to user (if requested) with password and admin note
-- [ ] **Backend:** Audit log entry created for each reset attempt
-- [ ] **Backend:** Error handling for invalid input, missing user, authorization failures
-- [ ] **Frontend:** User Detail page has "Reset Password" button (admin only)
-- [ ] **Frontend:** Confirmation modal displays with optional email and note fields
-- [ ] **Frontend:** Success modal shows temporary password (copyable)
-- [ ] **Frontend:** Error messages display for all error codes (403, 404, 422, 500)
-- [ ] **Frontend:** Page refreshes user data after reset
-- [ ] **Testing:** All API tests pass (happy path, auth, validation, idempotency)
-- [ ] **Testing:** All frontend tests pass (modal interactions, API calls, error handling)
-- [ ] **Lint & Build:** `make lint` and `make test` pass cleanly
-- [ ] **No Regressions:** Existing password reset flows (forgot-password, change-password) remain unchanged
-- [ ] **Documentation:** Admin guide or CONTRIBUTING.md updated with new capability
+- [x] **Backend:** `POST /admin/users/:userId/reset-password` endpoint implemented and tested
+- [x] **Backend:** Only `admin` role can call endpoint (403 for others)
+- [x] **Backend:** Admin cannot reset own password via endpoint (422 for self-reset)
+- [x] **Backend:** Temporary password generated with sufficient entropy (16+ random bytes)
+- [x] **Backend:** Temporary password is returned in response and never stored plaintext
+- [x] **Backend:** All refresh tokens for target user are revoked atomically with password update
+- [x] **Backend:** Email sent to user (if requested) with password and admin note
+- [x] **Backend:** Audit log entry created for each reset attempt
+- [x] **Backend:** Error handling for invalid input, missing user, authorization failures
+- [x] **Frontend:** User Detail page has "Reset Password" button (admin only)
+- [x] **Frontend:** Confirmation modal displays with optional email and note fields
+- [x] **Frontend:** Success modal shows temporary password (copyable)
+- [x] **Frontend:** Error messages display for all error codes (403, 404, 422, 500)
+- [x] **Frontend:** Page refreshes user data after reset
+- [x] **Testing:** All API tests pass (happy path, auth, validation, idempotency)
+- [x] **Testing:** All frontend tests pass (modal interactions, API calls, error handling)
+- [x] **Lint & Build:** `make lint` and `make test` pass cleanly
+- [x] **No Regressions:** Existing password reset flows (forgot-password, change-password) remain unchanged
+- [x] **Documentation:** Admin guide or CONTRIBUTING.md updated with new capability
 
 ---
 
