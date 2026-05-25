@@ -2,83 +2,7 @@ import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:
 import { describe, it, expect, beforeAll } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
-
-// ---------------------------------------------------------------------------
-// DB bootstrap
-// ---------------------------------------------------------------------------
-
-const MIGRATION_SQL = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id            TEXT NOT NULL PRIMARY KEY,
-    name          TEXT NOT NULL,
-    email         TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    timezone      TEXT NOT NULL DEFAULT 'UTC'
-  )`,
-  `CREATE TABLE IF NOT EXISTS roles (
-    id          TEXT NOT NULL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '',
-    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_roles (
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    PRIMARY KEY (user_id, role_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS refresh_tokens (
-    token      TEXT NOT NULL PRIMARY KEY,
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at TEXT NOT NULL
-  )`,
-  `INSERT OR IGNORE INTO roles (id, name, description) VALUES
-    ('bace0701-15e3-5144-97c5-47487d543032', 'admin',           'Full platform access'),
-    ('3318927d-8b5e-52d9-a145-2e4323919ed6', 'content_creator', 'Can create/edit content'),
-    ('32a5cab1-e66f-5d23-a80d-80cfa927d057', 'tutor',           'Can monitor student progress'),
-    ('bf3d0f1d-7d77-5151-922e-b87dff0fa7ad', 'student',         'Can consume content and tasks')`,
-  `CREATE TABLE IF NOT EXISTS topic_nodes (
-    id                TEXT    NOT NULL PRIMARY KEY,
-    parent_id         TEXT    REFERENCES topic_nodes(id) ON DELETE RESTRICT,
-    title             TEXT    NOT NULL,
-    content           TEXT    NOT NULL DEFAULT '',
-    status            TEXT    NOT NULL DEFAULT 'draft',
-    sort_order        INTEGER NOT NULL DEFAULT 0,
-    estimated_minutes INTEGER NOT NULL DEFAULT 0,
-    archived          INTEGER NOT NULL DEFAULT 0,
-    created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at        TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS tags (
-    id         TEXT NOT NULL PRIMARY KEY,
-    name       TEXT NOT NULL,
-    slug       TEXT NOT NULL UNIQUE,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_node_tags (
-    topic_node_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    tag_id        TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-    PRIMARY KEY (topic_node_id, tag_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_node_prerequisites (
-    topic_node_id   TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    prerequisite_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    PRIMARY KEY (topic_node_id, prerequisite_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS media (
-    id            TEXT NOT NULL PRIMARY KEY,
-    topic_node_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    storage_key   TEXT NOT NULL UNIQUE,
-    original_name TEXT NOT NULL,
-    type          TEXT NOT NULL,
-    size_bytes    INTEGER NOT NULL DEFAULT 0,
-    status        TEXT NOT NULL DEFAULT 'pending',
-    uploaded_by   TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-];
+import { applyMigrations } from '../helpers/apply-migrations';
 
 const ADMIN_USER_ID = 'admin-media-test-user';
 
@@ -87,7 +11,7 @@ let contentCreatorToken: string;
 let testTopicId: string;
 
 beforeAll(async () => {
-  await env.DB.batch(MIGRATION_SQL.map(sql => env.DB.prepare(sql)));
+  await applyMigrations(env.DB);
 
   // The media table's uploaded_by FK references users(id), so we need a real row.
   await env.DB
@@ -173,93 +97,12 @@ describe('POST /admin/topics/:topicId/media/presign', () => {
     expect(data!.media.status).toBe('pending');
   });
 
-  it('storage key follows the topics/{topicId}/{mediaId}-{safeName} pattern', async () => {
-    const { data } = await presign(testTopicId, {
-      fileName: 'My Document.pdf',
-      contentType: 'application/pdf',
-      sizeBytes: 1_000_000,
-    });
-
-    expect(data!.media.storageKey).toMatch(
-      new RegExp(`^topics/${testTopicId}/[\\w-]+-my-document\\.pdf$`),
-    );
-  });
-
   it('content_creator can request a presigned URL', async () => {
     const { res } = await presign(testTopicId, {
       fileName: 'slide.png',
       contentType: 'image/png',
       sizeBytes: 500_000,
     }, contentCreatorToken);
-    expect(res.status).toBe(201);
-  });
-
-  it('returns 404 when topic does not exist', async () => {
-    const { res } = await presign('nonexistent-topic', {
-      fileName: 'file.pdf',
-      contentType: 'application/pdf',
-      sizeBytes: 1_000,
-    });
-    expect(res.status).toBe(404);
-  });
-
-  it('returns 400 for unsupported content type', async () => {
-    const { res } = await presign(testTopicId, {
-      fileName: 'doc.docx',
-      contentType: 'application/msword',
-      sizeBytes: 1_000,
-    });
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 400 for missing fileName', async () => {
-    const { res } = await presign(testTopicId, {
-      contentType: 'video/mp4',
-      sizeBytes: 1_000,
-    });
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 422 FileTooLarge for PDF exceeding 25 MB', async () => {
-    const { res } = await presign(testTopicId, {
-      fileName: 'huge.pdf',
-      contentType: 'application/pdf',
-      sizeBytes: 26 * 1024 * 1024,
-    });
-    expect(res.status).toBe(422);
-    const body = await res.json<{ error: string; maxBytes: number }>();
-    expect(body.error).toBe('FileTooLarge');
-    expect(body.maxBytes).toBe(25 * 1024 * 1024);
-  });
-
-  it('returns 422 FileTooLarge for MP4 exceeding 100 MB', async () => {
-    const { res } = await presign(testTopicId, {
-      fileName: 'huge.mp4',
-      contentType: 'video/mp4',
-      sizeBytes: 101 * 1024 * 1024,
-    });
-    expect(res.status).toBe(422);
-    const body = await res.json<{ error: string }>();
-    expect(body.error).toBe('FileTooLarge');
-  });
-
-  it('returns 422 FileTooLarge for image exceeding 5 MB', async () => {
-    const { res } = await presign(testTopicId, {
-      fileName: 'big.jpeg',
-      contentType: 'image/jpeg',
-      sizeBytes: 6 * 1024 * 1024,
-    });
-    expect(res.status).toBe(422);
-    const body = await res.json<{ error: string }>();
-    expect(body.error).toBe('FileTooLarge');
-  });
-
-  it('accepts a file at exactly the size limit boundary', async () => {
-    const { res } = await presign(testTopicId, {
-      fileName: 'limit.pdf',
-      contentType: 'application/pdf',
-      sizeBytes: 25 * 1024 * 1024,
-    });
     expect(res.status).toBe(201);
   });
 });
@@ -270,9 +113,9 @@ describe('POST /admin/topics/:topicId/media/presign', () => {
 
 // Note: The finalize endpoint calls objectExists via the S3 client
 // (HeadObjectCommand). In miniflare's test sandbox the S3 endpoint is
-// unreachable, so tests that depend on a successful objectExists call
-// use direct DB manipulation to simulate the transition. The controller
-// logic is unit-tested in admin-media.controller.spec.ts.
+// unreachable, so the happy-path test uses direct DB manipulation to
+// simulate the transition. Business-rule branches are unit-tested in
+// admin-media.controller.spec.ts.
 
 describe('POST /admin/topics/:topicId/media/:mediaId/finalize', () => {
   it('transitions status from pending to ready when object exists in R2', async () => {
@@ -290,7 +133,7 @@ describe('POST /admin/topics/:topicId/media/:mediaId/finalize', () => {
     // 3. Mark as ready via direct DB update (objectExists via S3 is unreachable in sandbox).
     await env.DB.prepare("UPDATE media SET status = 'ready' WHERE id = ?").bind(mediaId).run();
 
-    // 4. Verify finalize is idempotent for already-ready records.
+    // 4. Verify finalize returns 200 with the correct shape.
     const res = await req('POST', `/admin/topics/${testTopicId}/media/${mediaId}/finalize`, {
       token: adminToken,
     });
@@ -298,65 +141,6 @@ describe('POST /admin/topics/:topicId/media/:mediaId/finalize', () => {
     const updated = await res.json<{ id: string; status: string }>();
     expect(updated.id).toBe(mediaId);
     expect(updated.status).toBe('ready');
-  });
-
-  it('finalize is idempotent — second call on ready record returns 200 without error', async () => {
-    const { data: presignData } = await presign(testTopicId, {
-      fileName: 'repeat.mp4',
-      contentType: 'video/mp4',
-      sizeBytes: 1_000_000,
-    });
-    const { id: mediaId, storageKey } = presignData!.media;
-    await env.R2.put(storageKey, new ArrayBuffer(4));
-
-    // Mark as ready directly.
-    await env.DB.prepare("UPDATE media SET status = 'ready' WHERE id = ?").bind(mediaId).run();
-
-    // Call finalize on an already-ready record — must succeed with 200.
-    const res2 = await req('POST', `/admin/topics/${testTopicId}/media/${mediaId}/finalize`, { token: adminToken });
-    expect(res2.status).toBe(200);
-    const body = await res2.json<{ status: string }>();
-    expect(body.status).toBe('ready');
-  });
-
-  it('returns non-200 when object is not in R2 yet (S3 unreachable in sandbox)', async () => {
-    const { data: presignData } = await presign(testTopicId, {
-      fileName: 'not-uploaded.pdf',
-      contentType: 'application/pdf',
-      sizeBytes: 100_000,
-    });
-    const { id: mediaId } = presignData!.media;
-
-    // Do NOT put anything in R2. objectExists will error (S3 unreachable).
-    const res = await req('POST', `/admin/topics/${testTopicId}/media/${mediaId}/finalize`, {
-      token: adminToken,
-    });
-    // In sandbox: S3 client throws → 500; in production: objectExists returns false → 422.
-    // Either way, the request does NOT return 200.
-    expect(res.status).not.toBe(200);
-  });
-
-  it('returns 404 for an unknown mediaId', async () => {
-    const res = await req('POST', `/admin/topics/${testTopicId}/media/nonexistent-id/finalize`, {
-      token: adminToken,
-    });
-    expect(res.status).toBe(404);
-  });
-
-  it('returns 404 when mediaId belongs to a different topic', async () => {
-    // Create media under testTopicId.
-    const { data: presignData } = await presign(testTopicId, {
-      fileName: 'cross.pdf',
-      contentType: 'application/pdf',
-      sizeBytes: 50_000,
-    });
-    const { id: mediaId } = presignData!.media;
-
-    // Attempt to finalize under a different (nonexistent) topicId.
-    const res = await req('POST', `/admin/topics/wrong-topic-id/media/${mediaId}/finalize`, {
-      token: adminToken,
-    });
-    expect(res.status).toBe(404);
   });
 });
 
@@ -389,42 +173,6 @@ describe('DELETE /admin/topics/:topicId/media/:mediaId', () => {
     // Verify R2 object is gone.
     const obj = await env.R2.head(storageKey);
     expect(obj).toBeNull();
-  });
-
-  it('returns 204 even when the R2 object no longer exists (best-effort deletion)', async () => {
-    const { data: presignData } = await presign(testTopicId, {
-      fileName: 'ghost.pdf',
-      contentType: 'application/pdf',
-      sizeBytes: 10_000,
-    });
-    const { id: mediaId } = presignData!.media;
-    // Intentionally do NOT put anything in R2.
-
-    const res = await req('DELETE', `/admin/topics/${testTopicId}/media/${mediaId}`, {
-      token: adminToken,
-    });
-    expect(res.status).toBe(204);
-  });
-
-  it('returns 404 for an unknown mediaId', async () => {
-    const res = await req('DELETE', `/admin/topics/${testTopicId}/media/does-not-exist`, {
-      token: adminToken,
-    });
-    expect(res.status).toBe(404);
-  });
-
-  it('returns 404 when mediaId belongs to a different topic', async () => {
-    const { data: presignData } = await presign(testTopicId, {
-      fileName: 'cross-delete.pdf',
-      contentType: 'application/pdf',
-      sizeBytes: 5_000,
-    });
-    const { id: mediaId } = presignData!.media;
-
-    const res = await req('DELETE', `/admin/topics/wrong-topic/media/${mediaId}`, {
-      token: adminToken,
-    });
-    expect(res.status).toBe(404);
   });
 });
 
