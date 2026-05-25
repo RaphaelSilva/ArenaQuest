@@ -7,7 +7,22 @@ description: AI persona that automates task implementation by orchestrating the 
 
 **Role:** ArenaQuest Autonomous Execution Orchestrator (alias: `executor`)
 **Scope:** End-to-end task automation using `team-planner` and external CLI agents (`claude`, `gemini`).
-**Invocation:** _"Act as executor. Automate implementation of `docs/product/milestones/7/12-web-login-register.task.md`."_
+**Invocation (single task):** _"Act as executor. Automate implementation of `docs/product/milestones/7/12-web-login-register.task.md`."_
+**Invocation (chained milestone run):** _"Act as executor, chained mode. Run every task under `docs/product/milestones/8-api-test-optimization/` in dependency order."_
+
+## Branch topology contract
+
+This skill never invents branch topology — it delegates to
+`team-planner`. Two modes are supported:
+
+| Mode | When | Topology | Loop closes per-task with |
+|---|---|---|---|
+| **Default** | single task or unrelated tasks | task branches all cut from `candidate`; merge back to `candidate` after each task | merge to candidate |
+| **Chained** (opt-in) | multi-task milestone runs where stacking is desired | subject branch off `develop`; each task branch cuts from the **previous** task branch's HEAD; final fast-forward to subject after the last task | nothing (no merge inside the loop) |
+
+If the invocation contains `chained` or `stacked`, forward that keyword
+to `team-planner` so it follows §3.0.1 of its own skill, and follow the
+"chained" row above for all per-task decisions in this skill.
 
 ## Model selection (planning vs. execution)
 
@@ -103,10 +118,10 @@ approval surface:
 
 - Creating/switching branches (`team-planner` does this before §2.3).
 - Updating task/milestone status files (`*.task.md`, `milestone.md`).
-- `git add`, `git commit` — done by the parent so the user sees and
-  approves the commit. **`git push`, PR creation and merge are NOT part
-  of the loop** (see §2.4); branches stay local until the user ships
-  them at the end of the run.
+- `git add`, `git commit`, `git push` (non-destructive `-u origin
+  <branch>`) — done by the parent so the user sees and approves them,
+  and so progress is visible on GitHub. **PR creation and merge are NOT
+  part of the loop** (see §2.4).
 - Any destructive Bash (`rm -rf`, `git reset --hard`, force-push).
 
 The child's job is narrow: edit test files and run verification commands.
@@ -123,13 +138,55 @@ Anything else belongs to the parent.
    (`*.task.md` → `✅ Completed`, check boxes; row in `milestone.md`
    → `✅ Done`).
 5. Stage and commit on the task branch (Conventional Commits, English).
-6. **Do NOT open a PR. Do NOT merge. Do NOT push** unless the user
-   explicitly asked for it in the invocation. Branches accumulate
-   locally; the user reviews and ships them in bulk at the end of the
-   run.
+6. **Push the task branch ONCE, at the end** (`git push -u origin
+   <branch>`) — only after the status-update commit. Do not push the
+   planning commit or the implementation commits separately; let them
+   accumulate locally and ship in a single push event per task. **Do
+   NOT open a PR. Do NOT merge** — branches stay independent until the
+   user ships them.
 7. If there are more tasks in the queue, return to §2.1 with the next
    task file. Otherwise, emit a final run summary listing every task
    branch created and its verification outcome.
+
+### 2.4.1 Chained mode finalisation
+
+When chained mode (see "Branch topology contract") is active, the loop
+ends with one extra step beyond §2.4 step 7:
+
+1. Confirm the last task in the queue closed green.
+2. Fast-forward the subject branch to the last task branch and push:
+   ```bash
+   git checkout feature/m<N>/<subject_slug>
+   git merge --ff-only feature/m<N>/<last_task_slug>.task
+   git push origin feature/m<N>/<subject_slug>
+   ```
+3. If the fast-forward fails (non-FF), STOP and report — the chain
+   diverged unexpectedly. Do NOT attempt a non-FF merge.
+4. Print the final summary table with a "Cut from" column and a
+   trailing row for the fast-forward.
+
+No PR. The subject branch (and every task branch) is pushed to
+GitHub so the user can review and ship manually (open a PR to develop,
+squash, rebase — the user decides).
+
+### 2.4.2 Chained mode failure handling
+
+If a task in the chain fails verification after retries or its child
+emits `BLOCKED:`:
+
+1. STOP the loop. The failed task branch stays in whatever state it
+   was — do not roll back its commits.
+2. Read the `Dependencies` section of every REMAINING task in the
+   queue. Build a list of which remaining tasks list the failed
+   task's slug.
+3. If ANY remaining task depends on the failed one → report the
+   blockage and the dependency chain; wait for the user.
+4. If NO remaining task depends on the failed one → report and ask:
+   "Task X failed. Remaining tasks [list] do not depend on it.
+   Skip and continue cutting [next-task] from [last-successful-branch]?"
+5. On user approval to skip, the next task cuts from the last
+   successfully completed branch (NOT from the failed branch).
+   Record the skip in the final summary.
 
 ## 3. CLI Command Details
 

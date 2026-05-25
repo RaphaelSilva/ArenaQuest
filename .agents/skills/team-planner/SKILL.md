@@ -59,6 +59,83 @@ Report a one-line status after each merge: `✓ <task_slug> merged to candidate.
 
 After all tasks: print a summary table (task | persona(s) | branch | status).
 
+### 3.0.1 Chained Sequential Mode (Stacked Branches) — opt-in
+
+Triggered when the invocation contains the keyword **`chained`** (or
+**`stacked`**) — for example:
+_"Act as team-planner. Chained mode. Plan and execute every task under
+docs/product/milestones/8-api-test-optimization/."_
+
+This mode replaces the default branch topology for milestone and epic
+runs. Backlog tasks do **not** support chained mode (they merge directly
+to `develop`).
+
+**Topology:**
+
+```
+develop
+  └── feature/m<N>/<subject_slug>          ← subject branch (one per run)
+        └── feature/m<N>/<task-01_slug>.task
+              └── feature/m<N>/<task-02_slug>.task
+                    └── feature/m<N>/<task-03_slug>.task
+                          └── …
+                                └── feature/m<N>/<task-N_slug>.task
+```
+
+- `<subject_slug>` is derived from the milestone folder name with any
+  leading `<number>-` stripped. Example: folder `8-api-test-optimization`
+  → subject `api-test-optimization` → branch
+  `feature/m8/api-test-optimization`. The user may override with an
+  explicit `subject=<slug>` in the invocation.
+- The first task branch cuts from the subject branch.
+- Every subsequent task branch cuts from the **HEAD of the previous task
+  branch** (not from the subject branch, not from candidate).
+- The subject branch replaces the standard `feature/m<N>/candidate` —
+  do NOT create a `candidate` branch in chained mode.
+
+**Loop rules in chained mode:**
+
+1. **No per-task merge.** Skip §3.6 step 4 (merge to candidate) between
+   tasks. Each task closes by updating its `.task.md`/milestone row and
+   committing on its own branch; nothing else.
+2. **Push once per task, at the end.** Do NOT push after each
+   intermediate commit (planning, implementation, status). Instead, run
+   a SINGLE `git push -u origin <task-branch>` after §3.6 step 3 (the
+   status-update commit, which is the last commit on the task branch).
+   This keeps GitHub history readable (one push event per task) and
+   reduces noise. Exception: the subject branch is pushed once, right
+   after it is created off `develop`, so GitHub can show the parent of
+   the stack.
+3. **No PR creation.** Override §6: PR creation is out of scope in
+   chained mode. Push only; PRs are the user's responsibility at the
+   end of the run.
+4. **Final fast-forward + push.** After the LAST task in the queue
+   verifies green and its `.task.md` is committed:
+   ```bash
+   git checkout feature/m<N>/<subject_slug>
+   git merge --ff-only feature/m<N>/<last_task_slug>.task
+   git push origin feature/m<N>/<subject_slug>
+   ```
+   Because the chain is linear, this is always a clean fast-forward.
+   If git refuses (non-FF), STOP and report — something diverged.
+5. **Failure handling.** If a task fails verification after retries OR
+   the executor child emits `BLOCKED:`:
+   a. STOP the loop. Do not start the next task.
+   b. Read the `Dependencies` section of every REMAINING task in the
+      queue. If any remaining task lists the failed task's slug as a
+      dependency, the chain is dead — report and wait for the user.
+   c. If NO remaining task depends on the failed one, report the
+      situation and ask the user whether to skip: "Task X failed.
+      No remaining task depends on it. Skip and continue cutting
+      task Y from the LAST SUCCESSFUL branch (Z)?"
+   d. On user approval to skip, the next task cuts from the last
+      successfully completed task's branch, not from the failed one.
+      Record the skip in the final summary.
+
+**Summary table additions:** in chained mode, the final table includes a
+"Cut from" column showing the parent branch of each task, and a row at
+the bottom for the final fast-forward.
+
 ### 3.1 Read the task
 
 1. Read the target `.task.md` end-to-end.
@@ -76,7 +153,9 @@ Run all git probes in parallel; act sequentially after.
 
 1. `git fetch origin` — confirm working tree is clean. Dirty tree → stop and ask.
 2. **Determine task source** (milestone, backlog, or epic) from the task file path.
-3. **Branch creation strategy** depends on source:
+3. **Branch creation strategy** depends on source AND mode:
+
+   **Default mode (per-task merge to candidate):**
    - **Milestone task** (`docs/product/milestones/<N>/*.task.md`):
      - Candidate: `feature/m<N>/candidate` (create or update from `develop`)
      - Task: `feature/m<N>/<task_slug>.task` (from candidate)
@@ -85,6 +164,17 @@ Run all git probes in parallel; act sequentially after.
    - **Epic task** (`docs/product/epics/<epic_name>/*.task.md`):
      - Candidate: `feature/epic/<epic_name>/candidate` (create or update from `develop`)
      - Task: `feature/epic/<epic_name>/<task_slug>.task` (from epic candidate)
+
+   **Chained mode (§3.0.1):**
+   - **Milestone task:**
+     - Subject (first task only): `feature/m<N>/<subject_slug>` from `develop`
+     - First task branch: from subject branch
+     - Subsequent task branches: from the PREVIOUS task branch's HEAD
+   - **Epic task:**
+     - Subject (first task only): `feature/epic/<epic_name>/<subject_slug>` from `develop`
+     - First task branch: from subject branch
+     - Subsequent task branches: from the PREVIOUS task branch's HEAD
+   - **Backlog:** not supported in chained mode.
 
 4. **Common steps for all sources:**
    ```bash
