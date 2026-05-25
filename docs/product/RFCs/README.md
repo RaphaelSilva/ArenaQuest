@@ -6,8 +6,9 @@ This directory contains formal proposals and architectural decisions for ArenaQu
 
 | RFC | Title | Status | Date | Author |
 |-----|-------|--------|------|--------|
-| [0001](./0001-apps-api-test-suite-optimization.md) | API Test Suite Optimization | Proposed | — | — |
+| [0001](./0001-apps-api-test-suite-optimization.md) | Otimização da suíte de testes de `apps/api` | Draft | 2026-05-24 | raphaelsilva |
 | [0002](./0002-frontend-internationalization-i18n.md) | Frontend Internationalization (i18n) Strategy | Proposed | 2026-05-24 | Claude Code |
+| [0003](./0003-apps-api-route-organization-and-openapi.md) | Reorganização de rotas e adoção de OpenAPI/Swagger em `apps/api` | Draft | 2026-05-24 | raphaelsilva |
 
 ## RFC Process
 
@@ -28,6 +29,7 @@ Use the structure from any RFC in this directory:
 - **Success Criteria** — how to measure if it worked
 
 ### Status Lifecycle
+- **Draft** — Work in progress, not yet ready for review
 - **Proposed** — Under discussion, awaiting review
 - **Approved** — Consensus reached, ready for implementation
 - **In Progress** — Implementation underway
