@@ -1,21 +1,14 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { D1TagRepository } from '@api/adapters/db/d1-tag-repository';
+import { applyMigrations } from '../helpers/apply-migrations';
 
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS tags (
-    id         TEXT NOT NULL PRIMARY KEY,
-    name       TEXT NOT NULL,
-    slug       TEXT NOT NULL UNIQUE,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-];
 
 describe('D1TagRepository', () => {
   let repo: D1TagRepository;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map(sql => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
     repo = new D1TagRepository(env.DB);
   });
 
