@@ -6,6 +6,11 @@ import { applyMigrations } from '../helpers/apply-migrations';
 // ---------------------------------------------------------------------------
 // DB setup
 // ---------------------------------------------------------------------------
+// PBKDF2 note: POST /auth/register hashes passwords through the Worker (buildApp),
+// which uses the production default of 100 000 iterations. There is no test-only
+// override without a src/ change. This is a known limitation; the spec is kept
+// as an integration smoke test rather than a performance-critical suite.
+// ---------------------------------------------------------------------------
 
 beforeAll(async () => {
   await applyMigrations(env.DB);

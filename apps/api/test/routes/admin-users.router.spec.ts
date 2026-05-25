@@ -14,7 +14,9 @@ beforeAll(async () => {
   await applyMigrations(env.DB);
 
   // Sign tokens directly — Worker verifies with the same secret.
-  const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
+  // Note: user creation via POST /admin/users goes through the Worker, which uses the production
+  // default of 100 000 PBKDF2 iterations. Lowering that requires a src/ change (out of scope here).
+  const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900, pbkdf2Iterations: 1 });
 
   adminToken = await adapter.signAccessToken({ sub: ADMIN_USER_ID, email: 'admin@example.com', roles: ['admin'] });
 });

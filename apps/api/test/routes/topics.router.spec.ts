@@ -26,7 +26,7 @@ beforeAll(async () => {
     .bind(ADMIN_USER_ID)
     .run();
 
-  const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
+  const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900, pbkdf2Iterations: 1 });
 
   [adminToken, studentToken] = await Promise.all([
     adapter.signAccessToken({ sub: ADMIN_USER_ID, email: 'admin@topics-pub.test', roles: ['admin'] }),

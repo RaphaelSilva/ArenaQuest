@@ -95,7 +95,7 @@ beforeAll(async () => {
     env.DB.prepare('INSERT OR IGNORE INTO enrollments_user_group (id, group_id, topic_node_id, granted_by) VALUES (?, ?, ?, ?)').bind(crypto.randomUUID(), GROUP_ID, groupTopic, ADMIN_ID),
   ]);
 
-  const auth = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
+  const auth = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900, pbkdf2Iterations: 1 });
   [adminToken] = await Promise.all([
     auth.signAccessToken({ sub: ADMIN_ID, email: 'admin@enr.test', roles: ['admin'] }),
   ]);

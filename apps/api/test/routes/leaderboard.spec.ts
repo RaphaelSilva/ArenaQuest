@@ -42,7 +42,7 @@ beforeAll(async () => {
       .bind('evt-c', USER_C, 'test', 200, 'key-c', '2026-01-04T12:00:00Z'),
   ]);
 
-  const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
+  const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900, pbkdf2Iterations: 1 });
   [userAToken, , userCToken] = await Promise.all([
     adapter.signAccessToken({ sub: USER_A, email: 'a@lb.test', roles: ['student'] }),
     adapter.signAccessToken({ sub: USER_B, email: 'b@lb.test', roles: ['student'] }),

@@ -21,7 +21,7 @@ beforeAll(async () => {
     `INSERT OR IGNORE INTO users (id, name, email, password_hash, status) VALUES (?, ?, ?, ?, 'active')`,
   ).bind(STUDENT_ID, 'Test Student', 'student@gamif.test', 'hash').run();
 
-  const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
+  const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900, pbkdf2Iterations: 1 });
   studentToken = await adapter.signAccessToken({
     sub: STUDENT_ID,
     email: 'student@gamif.test',
@@ -161,7 +161,7 @@ describe('GET /me/dashboard', () => {
       `INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)`,
     ).bind(freshUserId, 'Fresh', 'fresh@gamif.test', 'hash').run();
 
-    const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
+    const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900, pbkdf2Iterations: 1 });
     const freshToken = await adapter.signAccessToken({
       sub: freshUserId,
       email: 'fresh@gamif.test',

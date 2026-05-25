@@ -74,7 +74,7 @@ The deliverables are observable in the test suite, not in product features.
 | 08 | [Refactor `admin-users` controller/router pair (P2)](./08-refactor-admin-users-pair.task.md) | ✅ Done |
 | 09 | [Refactor small pairs: `register`, `password`, `account`, `activate`, `topics` (P2)](./09-refactor-small-pairs.task.md) | ✅ Done |
 | 10 | [Roll out migrations helper to remaining ~24 spec files (P4 phase 2)](./10-migrations-helper-rollout.task.md) | ✅ Done |
-| 11 | [Audit and lower PBKDF2 iterations in remaining test setups (P6)](./11-pbkdf2-test-iterations-audit.task.md) | ⏳ Pending |
+| 11 | [Audit and lower PBKDF2 iterations in remaining test setups (P6)](./11-pbkdf2-test-iterations-audit.task.md) | ✅ Done |
 
 Dependency graph:
 
