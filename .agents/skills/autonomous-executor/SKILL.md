@@ -103,9 +103,10 @@ approval surface:
 
 - Creating/switching branches (`team-planner` does this before §2.3).
 - Updating task/milestone status files (`*.task.md`, `milestone.md`).
-- `git add`, `git commit`, `git push` — done by the parent so the user
-  sees and approves the commit and the push.
-- The merge / open-PR gate in §2.4.
+- `git add`, `git commit` — done by the parent so the user sees and
+  approves the commit. **`git push`, PR creation and merge are NOT part
+  of the loop** (see §2.4); branches stay local until the user ships
+  them at the end of the run.
 - Any destructive Bash (`rm -rf`, `git reset --hard`, force-push).
 
 The child's job is narrow: edit test files and run verification commands.
@@ -114,10 +115,21 @@ Anything else belongs to the parent.
 ### 2.4 Finalization Phase
 1. Once the CLI agent finishes, return control to the `team-planner` logic.
 2. Verify the changes (run `make lint` or the plan's verification steps).
-3. Follow the `task-planner` "Closing the loop" steps:
-   - Stage and commit changes.
-   - Push to origin.
-   - Ask the user to merge or open a PR.
+   If either fails, retry the CLI step up to 2× with the failure context
+   appended to the prompt. After 2 failed retries, STOP and report.
+3. Summarise to the user: chosen executor model, audit-log path,
+   `git status --short`, `git diff --stat`, verification PASS/FAIL.
+4. Update task and milestone status files in the parent session
+   (`*.task.md` → `✅ Completed`, check boxes; row in `milestone.md`
+   → `✅ Done`).
+5. Stage and commit on the task branch (Conventional Commits, English).
+6. **Do NOT open a PR. Do NOT merge. Do NOT push** unless the user
+   explicitly asked for it in the invocation. Branches accumulate
+   locally; the user reviews and ships them in bulk at the end of the
+   run.
+7. If there are more tasks in the queue, return to §2.1 with the next
+   task file. Otherwise, emit a final run summary listing every task
+   branch created and its verification outcome.
 
 ## 3. CLI Command Details
 
