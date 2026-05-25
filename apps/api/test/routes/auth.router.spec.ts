@@ -306,11 +306,3 @@ describe('POST /auth/login rate limiting (S-04)', () => {
   });
 });
 
-describe('GET /health (regression)', () => {
-  it('still returns 200 with status ok', async () => {
-    const res = await request('/health', { method: 'GET' });
-    expect(res.status).toBe(200);
-    const body = await res.json<{ status: string }>();
-    expect(body.status).toBe('ok');
-  });
-});

@@ -65,7 +65,7 @@ The deliverables are observable in the test suite, not in product features.
 | # | Task File | Status |
 |---|-----------|--------|
 | 01 | [Split Vitest into `workers` and `node` projects (P1)](./01-vitest-dual-project-split.task.md) | ✅ Done |
-| 02 | [Remove low-signal and duplicate specs (P5)](./02-remove-low-signal-specs.task.md) | ⏳ Pending |
+| 02 | [Remove low-signal and duplicate specs (P5)](./02-remove-low-signal-specs.task.md) | ✅ Done |
 | 03 | [Introduce `apply-migrations` helper + pilot 5 files (P4 phase 1)](./03-migrations-helper-pilot.task.md) | ⏳ Pending |
 | 04 | [Consolidate auth-enforcement assertions (P3)](./04-consolidate-auth-enforcement.task.md) | ⏳ Pending |
 | 05 | [Document router-vs-controller convention + refactor `auth` pair (P2 pilot)](./05-convention-and-auth-pair.task.md) | ⏳ Pending |
