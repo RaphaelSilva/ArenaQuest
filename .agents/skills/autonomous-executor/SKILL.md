@@ -9,6 +9,35 @@ description: AI persona that automates task implementation by orchestrating the 
 **Scope:** End-to-end task automation using `team-planner` and external CLI agents (`claude`, `gemini`).
 **Invocation:** _"Act as executor. Automate implementation of `docs/product/milestones/7/12-web-login-register.task.md`."_
 
+## Model selection (planning vs. execution)
+
+The current Claude session you are running in is the **planner**. Any model
+override the user requests for planning must already be in effect in that
+session — you cannot change it from inside the skill.
+
+The **executor** model is the one passed to the `claude --model <X>` CLI
+call in §2.3. It is independently configurable per run:
+
+| Source | Precedence |
+|---|---|
+| Explicit user instruction in the invocation (e.g. "execute with haiku") | Highest |
+| `EXECUTOR_MODEL` environment variable, if set | Medium |
+| Skill default below | Lowest |
+
+**Skill default executor model:** `haiku` (fast, cheap; appropriate for
+mechanical edits driven by a detailed plan).
+
+When to override to `sonnet` for the executor:
+- Refactors that cross-reference multiple files and require judgment about
+  which scenarios to keep/remove (e.g. controller↔router consolidation,
+  large coverage backfills).
+- Tasks whose plan contains > ~8 implementation steps or > ~3 files with
+  non-trivial logic edits.
+- Anything where the plan itself flags risk.
+
+Resolve the executor model BEFORE constructing the CLI prompt and log the
+chosen model in the first line of your status message to the user.
+
 ## 2. Operating Loop
 
 ### 2.1 Planning Phase
@@ -29,10 +58,14 @@ description: AI persona that automates task implementation by orchestrating the 
    - **System Role:** Use the identity and invariants from the assigned persona's `SKILL.md`.
    - **Context:** Provide the content of the `.task.md` and `.plan.md`.
    - **Instructions:** "Implement the steps defined in the plan. Work on the current branch. Run verification commands (lint, test) as specified in the plan. Do not ask for confirmation; proceed with implementation."
-2. **First Choice: Claude (Sonnet)**
-   - Run: `claude -p "<CONSTRUCTED_PROMPT>"`
+2. **First Choice: Claude CLI with the resolved executor model**
+   - Resolve `<EXECUTOR_MODEL>` per the "Model selection" section above
+     (default `haiku`, override `sonnet` when the task warrants it).
+   - Run: `claude --model <EXECUTOR_MODEL> -p "<CONSTRUCTED_PROMPT>"`
    - Monitor the output. If it completes successfully, proceed to §2.4.
-3. **Fallback: Gemini (Flash)**
+   - On non-token errors: STOP and report. Do not silently retry with a
+     different model or fall back to Gemini.
+3. **Fallback: Gemini (Flash)** — only on token/quota/context-limit errors.
    - If `claude` fails with an error indicating token limits, quota issues, or any "out of tokens" message, switch to Gemini.
    - Run: `gemini -p "<CONSTRUCTED_PROMPT>"`
    - If `gemini` also fails, report the error to the user.
@@ -48,9 +81,13 @@ description: AI persona that automates task implementation by orchestrating the 
 ## 3. CLI Command Details
 
 ### 3.1 Claude CLI
-- Use the model `claude-3-6-sonnet` (aliased as `sonnet`).
-- Preferred command: `claude --model sonnet "Your prompt here"`
-- Use `-p` if you want to print the response directly.
+- The model is **not** hardcoded; resolve it via the "Model selection"
+  section. Skill default: `haiku`. Common overrides: `sonnet` (judgment-
+  heavy refactors), `opus` (only when the user explicitly asks).
+- Preferred command: `claude --model <EXECUTOR_MODEL> -p "Your prompt here"`
+- Always pass `--model` explicitly so the CLI does not silently pick a
+  different default than the one logged to the user.
+- Use `-p` to print the response directly.
 
 ### 3.2 Gemini CLI
 - Use the model `gemini-3-flash` (aliased as `flash`).
@@ -79,3 +116,9 @@ INSTRUCTIONS:
 - **Respect Persona Boundaries.** Do not use `frontend-developer` for `apps/api` or vice-versa.
 - **English Only.** All prompts and commits must be in English.
 - **Fail Fast.** If the CLI agent produces an error that isn't token-related, do not fallback to Gemini automatically; stop and analyze.
+- **Always pass `--model` explicitly** to the Claude CLI; never rely on the
+  CLI's implicit default. Log the chosen model to the user at the start of
+  each task.
+- **Per-task model resolution.** Re-resolve the executor model at the
+  beginning of every task in a multi-task run — a long milestone may mix
+  mechanical tasks (haiku) and judgment-heavy tasks (sonnet).
