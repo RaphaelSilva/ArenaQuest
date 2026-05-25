@@ -9,6 +9,8 @@
 		"lint": "eslint .",
 		"test": "vitest run",
 		"test:watch": "vitest",
+		"test:workers": "vitest run --project workers",
+		"test:node": "vitest run --project node",
 		"db:create": "wrangler d1 create arenaquest-db",
 		"db:create:staging": "wrangler d1 create arenaquest-db-staging --env staging",
 		"db:apply:migrations": "wrangler d1 migrations apply arenaquest-db",
