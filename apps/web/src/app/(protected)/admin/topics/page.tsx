@@ -235,6 +235,12 @@ export default function AdminTopicsPage() {
   const draggingIdRef = useRef<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; position: DropPosition } | null>(null);
 
+  // Mobile reordering
+  const [movingNodeId, setMovingNodeId] = useState<string | null>(null);
+  const [pendingNodes, setPendingNodes] = useState<TopicNode[] | null>(null);
+  const [targetParentId, setTargetParentId] = useState<string | null>(null);
+  const lastTapRef = useRef<{ id: string; time: number } | null>(null);
+
   // Detail pane
   const [detailTitle, setDetailTitle] = useState('');
   const [detailContent, setDetailContent] = useState('');
@@ -278,6 +284,12 @@ export default function AdminTopicsPage() {
   }, [canAccess, refresh]);
 
   // ---------------------------------------------------------------------------
+  // Active nodes (pending reorder or actual)
+  // ---------------------------------------------------------------------------
+
+  const activeNodes = pendingNodes ?? nodes;
+
+  // ---------------------------------------------------------------------------
   // Sync detail pane when selected node changes
   // ---------------------------------------------------------------------------
 
@@ -317,6 +329,85 @@ export default function AdminTopicsPage() {
   function showToast(message: string, kind: 'error' | 'success') {
     setToast({ message, kind });
     setTimeout(() => setToast(null), 4000);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mobile reordering handlers
+  // ---------------------------------------------------------------------------
+
+  function moveNodeLocally(nodeId: string, direction: 'up' | 'down') {
+    const base = pendingNodes ?? nodes;
+    const node = base.find((n) => n.id === nodeId);
+    if (!node) return;
+
+    const siblings = base
+      .filter((n) => n.parentId === node.parentId)
+      .sort((a, b) => a.order - b.order);
+    const idx = siblings.findIndex((n) => n.id === nodeId);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+
+    if (swapIdx < 0 || swapIdx >= siblings.length) return;
+
+    const swapNode = siblings[swapIdx];
+    const updated = base.map((n) => {
+      if (n.id === nodeId) return { ...n, order: swapNode.order };
+      if (n.id === swapNode.id) return { ...n, order: node.order };
+      return n;
+    });
+
+    setPendingNodes(updated);
+  }
+
+  async function confirmMove() {
+    if (!movingNodeId || !pendingNodes) return;
+    const node = pendingNodes.find((n) => n.id === movingNodeId);
+    if (!node) return;
+
+    const newParentId = targetParentId !== undefined ? targetParentId : node.parentId;
+
+    setMovingNodeId(null);
+    setPendingNodes(null);
+    setTargetParentId(null);
+
+    try {
+      await client.adminTopics.move(movingNodeId, {
+        newParentId,
+        newSortOrder: node.order,
+      });
+      await refresh();
+      showToast('Ordem salva', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Falha ao mover', 'error');
+    }
+  }
+
+  function cancelMove() {
+    setMovingNodeId(null);
+    setPendingNodes(null);
+    setTargetParentId(null);
+  }
+
+  function handleTitleClick(e: React.MouseEvent, nodeId: string) {
+    const now = Date.now();
+    const last = lastTapRef.current;
+
+    if (last && last.id === nodeId && now - last.time < 300) {
+      // Double tap detected - enter edit mode
+      e.stopPropagation();
+      lastTapRef.current = null;
+      setInlineEditId(nodeId);
+      const node = activeNodes.find((n) => n.id === nodeId);
+      if (node) setInlineTitle(node.title);
+    } else {
+      // First tap or single click - just record the tap, let propagation select the node
+      lastTapRef.current = { id: nodeId, time: now };
+      // Clear the tap history after 300ms if no second tap comes
+      setTimeout(() => {
+        if (lastTapRef.current && lastTapRef.current.id === nodeId && lastTapRef.current.time === now) {
+          lastTapRef.current = null;
+        }
+      }, 300);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -490,13 +581,25 @@ export default function AdminTopicsPage() {
         <div key={node.id}>
           <div
             className={`group flex items-center gap-1.5 rounded-lg py-1.5 pr-2 text-sm transition-all duration-200 ${
-              isSelected
-                ? 'bg-indigo-50 text-indigo-900 shadow-sm dark:bg-indigo-500/10 dark:text-indigo-300'
-                : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/50'
-            } ${node.archived ? 'opacity-40 grayscale-[0.5]' : ''} ${dropIndicatorClass}`}
+              movingNodeId === node.id
+                ? 'bg-indigo-100 ring-2 ring-indigo-400 dark:bg-indigo-500/20 dark:ring-indigo-400'
+                : isSelected
+                  ? 'bg-indigo-50 text-indigo-900 shadow-sm dark:bg-indigo-500/10 dark:text-indigo-300'
+                  : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/50'
+            } ${node.archived ? 'opacity-40 grayscale-[0.5]' : ''} ${
+              movingNodeId && movingNodeId !== node.id ? 'cursor-pointer md:cursor-default' : ''
+            } ${
+              targetParentId === node.id ? 'ring-2 ring-green-500 dark:ring-green-400' : ''
+            } ${dropIndicatorClass}`}
             style={{ paddingLeft: `${6 + depth * 18}px` }}
             data-testid={`topic-node-${node.id}`}
-            onClick={() => setSelectedId(node.id)}
+            onClick={() => {
+              if (movingNodeId && movingNodeId !== node.id) {
+                setTargetParentId(node.id);
+              } else {
+                setSelectedId(node.id);
+              }
+            }}
             onDragOver={handleDragOver(node)}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop(node)}
@@ -545,6 +648,7 @@ export default function AdminTopicsPage() {
             ) : (
               <button
                 type="button"
+                onClick={(e) => handleTitleClick(e, node.id)}
                 onDoubleClick={(e) => {
                   e.stopPropagation();
                   setInlineEditId(node.id);
@@ -585,6 +689,66 @@ export default function AdminTopicsPage() {
             >
               Archive
             </button>
+
+            {/* Mobile reordering buttons */}
+            {movingNodeId === node.id ? (
+              <div className="flex items-center gap-1 md:hidden flex-wrap">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); moveNodeLocally(node.id, 'up'); }}
+                  className="text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                  aria-label="Move up"
+                  title="Move up among siblings"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); moveNodeLocally(node.id, 'down'); }}
+                  className="text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                  aria-label="Move down"
+                  title="Move down among siblings"
+                >
+                  ▼
+                </button>
+                {targetParentId && (
+                  <span className="text-xs text-green-600 dark:text-green-400">
+                    → {activeNodes.find((n) => n.id === targetParentId)?.title || 'Destino'}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); confirmMove(); }}
+                  className="text-xs text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                  aria-label="Confirm move"
+                  title="Save the move (with or without new parent)"
+                >
+                  ✓
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); cancelMove(); }}
+                  className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  aria-label="Cancel move"
+                  title="Cancel and discard changes"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMovingNodeId(node.id);
+                }}
+                className="flex-shrink-0 text-xs text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 md:hidden"
+                aria-label="Reorder - use ▲▼ to move, click another topic to set as parent"
+                title="Click to reorder. Use ▲▼ to move between siblings. Click another topic to move inside it."
+              >
+                ⇅
+              </button>
+            )}
           </div>
 
           {/* Children (if expanded) */}
@@ -612,7 +776,7 @@ export default function AdminTopicsPage() {
   // Main render
   // ---------------------------------------------------------------------------
 
-  const tree = buildTree(nodes);
+  const tree = buildTree(activeNodes);
 
   return (
     <main className="flex flex-1 flex-col overflow-hidden">
@@ -633,8 +797,8 @@ export default function AdminTopicsPage() {
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--aq-bg)' }}>
-        {/* Left: tree panel — full width on mobile, fixed on desktop */}
-        <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:w-[620px] flex-shrink-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
+        {/* Left: tree panel — full width on mobile, responsive on desktop */}
+        <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:max-w-[50%] lg:max-w-[620px] min-w-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
           {fetchError && (
             <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{fetchError}</p>
           )}

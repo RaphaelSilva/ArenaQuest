@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useHasRole, useAuth } from '@web/hooks/use-auth';
@@ -33,6 +33,7 @@ export default function AdminTasksPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [inlineEditId, setInlineEditId] = useState<string | null>(null);
   const [inlineTitle, setInlineTitle] = useState('');
+  const lastTapRef = useRef<{ id: string; time: number } | null>(null);
 
   // Detail pane
   const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null);
@@ -133,6 +134,29 @@ export default function AdminTasksPage() {
     }
   };
 
+  const handleTitleClick = (e: React.MouseEvent, taskId: string) => {
+    const now = Date.now();
+    const last = lastTapRef.current;
+
+    if (last && last.id === taskId && now - last.time < 300) {
+      // Double tap detected - enter edit mode
+      e.stopPropagation();
+      lastTapRef.current = null;
+      setInlineEditId(taskId);
+      const task = tasks.find((t) => t.id === taskId);
+      if (task) setInlineTitle(task.title);
+    } else {
+      // First tap or single click - just record the tap, let propagation select the task
+      lastTapRef.current = { id: taskId, time: now };
+      // Clear the tap history after 300ms if no second tap comes
+      setTimeout(() => {
+        if (lastTapRef.current && lastTapRef.current.id === taskId && lastTapRef.current.time === now) {
+          lastTapRef.current = null;
+        }
+      }, 300);
+    }
+  };
+
   const handleDetailSave = async () => {
     if (!selectedId) return;
     setDetailError('');
@@ -224,8 +248,8 @@ export default function AdminTasksPage() {
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--aq-bg)' }}>
-        {/* Left: task list — full width on mobile, fixed on desktop */}
-        <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:w-[620px] flex-shrink-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
+        {/* Left: task list — full width on mobile, responsive on desktop */}
+        <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:max-w-[50%] lg:max-w-[620px] min-w-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
           {error && (
             <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{error}</p>
           )}
@@ -270,6 +294,7 @@ export default function AdminTasksPage() {
                       ) : (
                         <button
                           type="button"
+                          onClick={(e) => handleTitleClick(e, task.id)}
                           onDoubleClick={(e) => {
                             e.stopPropagation();
                             setInlineEditId(task.id);
