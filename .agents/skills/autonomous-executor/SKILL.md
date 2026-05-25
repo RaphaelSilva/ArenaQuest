@@ -53,22 +53,63 @@ chosen model in the first line of your status message to the user.
 2. Read the full content of the `.task.md` and the `.plan.md`.
 3. Read relevant project documentation mentioned in the plan's "Affected areas".
 
-### 2.3 Execution Phase (CLI Delegation)
-1. Construct a comprehensive prompt for the external CLI agent.
+### 2.3 Execution Phase (CLI Delegation — headless)
+
+**Architectural contract (read this before touching the run command):**
+The executor runs as a **headless subprocess** (`claude -p`). It has no
+interactive TTY and cannot bubble permission prompts up to the parent
+session. If a tool call requires approval and the child's permission mode
+forbids it, the child will silently fail or report "I couldn't do X" —
+the parent (planner) will not see a prompt to forward to the user.
+
+Consequence: the child MUST be launched in a non-interactive permission
+mode that lets it write files, run sandboxed Bash, and read repo state
+without asking. We pick `acceptEdits` as the default — it auto-approves
+file edits and reads, but still gates destructive Bash (e.g. `rm -rf`,
+force-push) at the parent layer where the user CAN approve.
+
+1. Construct a comprehensive prompt for the external CLI agent (see §4).
    - **System Role:** Use the identity and invariants from the assigned persona's `SKILL.md`.
    - **Context:** Provide the content of the `.task.md` and `.plan.md`.
    - **Instructions:** "Implement the steps defined in the plan. Work on the current branch. Run verification commands (lint, test) as specified in the plan. Do not ask for confirmation; proceed with implementation."
 2. **First Choice: Claude CLI with the resolved executor model**
    - Resolve `<EXECUTOR_MODEL>` per the "Model selection" section above
      (default `haiku`, override `sonnet` when the task warrants it).
-   - Run: `claude --model <EXECUTOR_MODEL> -p "<CONSTRUCTED_PROMPT>"`
-   - Monitor the output. If it completes successfully, proceed to §2.4.
+   - Run the child headless:
+     ```
+     claude --model <EXECUTOR_MODEL> \
+            --permission-mode acceptEdits \
+            -p "<CONSTRUCTED_PROMPT>"
+     ```
+   - Capture full stdout/stderr to `docs/product/milestones/<m>/.executor-logs/<task-id>.log`
+     so the user can audit what the child actually did. The log path goes
+     into the status message to the user.
+   - Before declaring success, run a sanity diff (`git status --short` +
+     `git diff --stat`) and surface it in the status message — the user
+     never saw the child's edits in real time, so the post-hoc summary is
+     the only review surface.
    - On non-token errors: STOP and report. Do not silently retry with a
      different model or fall back to Gemini.
 3. **Fallback: Gemini (Flash)** — only on token/quota/context-limit errors.
    - If `claude` fails with an error indicating token limits, quota issues, or any "out of tokens" message, switch to Gemini.
-   - Run: `gemini -p "<CONSTRUCTED_PROMPT>"`
+   - Run: `gemini -p "<CONSTRUCTED_PROMPT>"` (Gemini CLI is also headless;
+     the same audit-log + diff-summary requirements apply).
    - If `gemini` also fails, report the error to the user.
+
+### 2.3.1 What is NOT delegated to the headless child
+
+These steps stay in the parent (planner) session so the user keeps an
+approval surface:
+
+- Creating/switching branches (`team-planner` does this before §2.3).
+- Updating task/milestone status files (`*.task.md`, `milestone.md`).
+- `git add`, `git commit`, `git push` — done by the parent so the user
+  sees and approves the commit and the push.
+- The merge / open-PR gate in §2.4.
+- Any destructive Bash (`rm -rf`, `git reset --hard`, force-push).
+
+The child's job is narrow: edit test files and run verification commands.
+Anything else belongs to the parent.
 
 ### 2.4 Finalization Phase
 1. Once the CLI agent finishes, return control to the `team-planner` logic.
@@ -84,10 +125,16 @@ chosen model in the first line of your status message to the user.
 - The model is **not** hardcoded; resolve it via the "Model selection"
   section. Skill default: `haiku`. Common overrides: `sonnet` (judgment-
   heavy refactors), `opus` (only when the user explicitly asks).
-- Preferred command: `claude --model <EXECUTOR_MODEL> -p "Your prompt here"`
-- Always pass `--model` explicitly so the CLI does not silently pick a
-  different default than the one logged to the user.
-- Use `-p` to print the response directly.
+- Canonical command (headless, auto-edits):
+  ```
+  claude --model <EXECUTOR_MODEL> --permission-mode acceptEdits -p "Your prompt here"
+  ```
+- `--model` is mandatory — never rely on the CLI's implicit default.
+- `--permission-mode acceptEdits` is mandatory — the subprocess has no
+  interactive channel, so any stricter mode causes silent tool failures
+  the user cannot approve through.
+- `-p` runs print mode (non-interactive). Pipe its full output (stdout +
+  stderr) to the audit log declared in §2.3.
 
 ### 3.2 Gemini CLI
 - Use the model `gemini-3-flash` (aliased as `flash`).
@@ -96,6 +143,11 @@ chosen model in the first line of your status message to the user.
 ## 4. Prompt Template for CLI
 ```text
 I am the ArenaQuest Orchestrator. You are acting as the [PERSONA_NAME].
+
+You are running HEADLESS (no interactive TTY). You cannot ask the user
+anything. If you hit a blocker that would require human input, STOP and
+write a clear "BLOCKED:" line at the end of your output explaining what
+is needed — the orchestrator will surface it to the user.
 
 CONTEXT:
 Task File Path: [TASK_FILE_PATH]
@@ -107,8 +159,18 @@ Persona Skill Content: [PERSONA_SKILL_CONTENT]
 INSTRUCTIONS:
 1. Implement the steps defined in the Plan.
 2. Follow the project invariants and coding standards.
-3. Run verification commands: [VERIFICATION_STEPS].
-4. When done, ensure all files are saved.
+3. Stay strictly within the scope declared in the task file. If you
+   detect that an edit outside that scope is needed, STOP and emit a
+   "BLOCKED: out-of-scope edit required: <path> — <reason>" line.
+4. Run verification commands: [VERIFICATION_STEPS]. Report PASS/FAIL
+   per command at the end.
+5. Do NOT run destructive git operations (force-push, reset --hard,
+   branch -D). Do NOT commit or push — the parent orchestrator owns
+   those steps.
+6. Do NOT update task/milestone status files — the parent owns those.
+7. When done, ensure all files are saved and emit a final summary
+   block: `## SUMMARY` listing files touched, tests added/removed,
+   and verification results.
 ```
 
 ## 5. Non-Negotiable Invariants
@@ -122,3 +184,14 @@ INSTRUCTIONS:
 - **Per-task model resolution.** Re-resolve the executor model at the
   beginning of every task in a multi-task run — a long milestone may mix
   mechanical tasks (haiku) and judgment-heavy tasks (sonnet).
+- **Headless child, observable parent.** The CLI child runs without a
+  TTY; the user cannot approve prompts inside it. The orchestrator MUST
+  (a) launch the child with `--permission-mode acceptEdits`, (b) capture
+  full child output to a per-task log file, (c) post-hoc summarise
+  `git status` + `git diff --stat` to the user before committing.
+- **Parent owns destructive and observable steps.** Branch ops, commits,
+  pushes, status-file updates, and PR/merge gates run in the parent
+  session so the user retains an approval surface.
+- **BLOCKED protocol.** If the child emits a line starting with
+  `BLOCKED:`, do NOT proceed to commit. Surface the block verbatim to
+  the user and wait.
