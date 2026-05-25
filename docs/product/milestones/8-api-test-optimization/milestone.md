@@ -64,17 +64,17 @@ The deliverables are observable in the test suite, not in product features.
 
 | # | Task File | Status |
 |---|-----------|--------|
-| 01 | [Split Vitest into `workers` and `node` projects (P1)](./01-vitest-dual-project-split.task.md) | ⏳ Pending |
-| 02 | [Remove low-signal and duplicate specs (P5)](./02-remove-low-signal-specs.task.md) | ⏳ Pending |
-| 03 | [Introduce `apply-migrations` helper + pilot 5 files (P4 phase 1)](./03-migrations-helper-pilot.task.md) | ⏳ Pending |
-| 04 | [Consolidate auth-enforcement assertions (P3)](./04-consolidate-auth-enforcement.task.md) | ⏳ Pending |
-| 05 | [Document router-vs-controller convention + refactor `auth` pair (P2 pilot)](./05-convention-and-auth-pair.task.md) | ⏳ Pending |
-| 06 | [Refactor `admin-topics` controller/router pair (P2)](./06-refactor-admin-topics-pair.task.md) | ⏳ Pending |
-| 07 | [Refactor `admin-media` controller/router pair (P2)](./07-refactor-admin-media-pair.task.md) | ⏳ Pending |
-| 08 | [Refactor `admin-users` controller/router pair (P2)](./08-refactor-admin-users-pair.task.md) | ⏳ Pending |
-| 09 | [Refactor small pairs: `register`, `password`, `account`, `activate`, `topics` (P2)](./09-refactor-small-pairs.task.md) | ⏳ Pending |
-| 10 | [Roll out migrations helper to remaining ~24 spec files (P4 phase 2)](./10-migrations-helper-rollout.task.md) | ⏳ Pending |
-| 11 | [Audit and lower PBKDF2 iterations in remaining test setups (P6)](./11-pbkdf2-test-iterations-audit.task.md) | ⏳ Pending |
+| 01 | [Split Vitest into `workers` and `node` projects (P1)](./01-vitest-dual-project-split.task.md) | ✅ Done |
+| 02 | [Remove low-signal and duplicate specs (P5)](./02-remove-low-signal-specs.task.md) | ✅ Done |
+| 03 | [Introduce `apply-migrations` helper + pilot 5 files (P4 phase 1)](./03-migrations-helper-pilot.task.md) | ✅ Done |
+| 04 | [Consolidate auth-enforcement assertions (P3)](./04-consolidate-auth-enforcement.task.md) | ✅ Done |
+| 05 | [Document router-vs-controller convention + refactor `auth` pair (P2 pilot)](./05-convention-and-auth-pair.task.md) | ✅ Done |
+| 06 | [Refactor `admin-topics` controller/router pair (P2)](./06-refactor-admin-topics-pair.task.md) | ✅ Done |
+| 07 | [Refactor `admin-media` controller/router pair (P2)](./07-refactor-admin-media-pair.task.md) | ✅ Done |
+| 08 | [Refactor `admin-users` controller/router pair (P2)](./08-refactor-admin-users-pair.task.md) | ✅ Done |
+| 09 | [Refactor small pairs: `register`, `password`, `account`, `activate`, `topics` (P2)](./09-refactor-small-pairs.task.md) | ✅ Done |
+| 10 | [Roll out migrations helper to remaining ~24 spec files (P4 phase 2)](./10-migrations-helper-rollout.task.md) | ✅ Done |
+| 11 | [Audit and lower PBKDF2 iterations in remaining test setups (P6)](./11-pbkdf2-test-iterations-audit.task.md) | ✅ Done |
 
 Dependency graph:
 

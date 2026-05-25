@@ -1,6 +1,6 @@
 # Task 06 — Refactor `admin-topics` controller/router pair (P2)
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [8 — `apps/api` Test Suite Optimization](./milestone.md)
 **RFC:** [0001 §P2 / §D2](../../RFCs/0001-apps-api-test-suite-optimization.md)
 
@@ -30,10 +30,10 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `admin-topics.router.spec.ts` test count drops; every remaining test is HTTP-shaped.
-- [ ] `admin-topics.controller.spec.ts` covers every business-rule branch removed from the router spec.
-- [ ] `make test-api` and `make lint` pass.
-- [ ] No diff outside `apps/api/test/**`.
+- [x] `admin-topics.router.spec.ts` test count drops; every remaining test is HTTP-shaped.
+- [x] `admin-topics.controller.spec.ts` covers every business-rule branch removed from the router spec.
+- [x] `make test-api` and `make lint` pass.
+- [x] No diff outside `apps/api/test/**`.
 
 ## Verification Plan
 

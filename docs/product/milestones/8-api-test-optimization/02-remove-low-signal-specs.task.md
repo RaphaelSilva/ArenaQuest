@@ -1,6 +1,6 @@
 # Task 02 — Remove low-signal and duplicate specs (P5)
 
-**Status:** ⏳ Pending
+**Status:** ✅ Completed
 **Milestone:** [8 — `apps/api` Test Suite Optimization](./milestone.md)
 **RFC:** [0001 §P5 / §D5](../../RFCs/0001-apps-api-test-suite-optimization.md)
 
@@ -34,11 +34,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] All deletions/reductions listed above are applied; the suite still runs green.
-- [ ] No reference (import or otherwise) is left dangling to any deleted file.
-- [ ] Total test count drops in line with RFC §P5 expectations.
-- [ ] `make test-api` and `make lint` pass.
-- [ ] No diff outside `apps/api/test/**`.
+- [x] All deletions/reductions listed above are applied; the suite still runs green.
+- [x] No reference (import or otherwise) is left dangling to any deleted file.
+- [x] Total test count drops in line with RFC §P5 expectations (737→712, −25 tests).
+- [x] `make test-api` and `make lint` pass.
+- [x] No diff outside `apps/api/test/**`.
 
 ## Verification Plan
 

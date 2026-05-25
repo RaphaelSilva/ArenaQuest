@@ -177,6 +177,28 @@ describe('AdminMediaController', () => {
       const result = await controller.presignUpload('topic-1', { fileName: 'limit.pdf', contentType: 'application/pdf', sizeBytes: 25 * 1024 * 1024 }, 'user-1');
       expect(result.ok).toBe(true);
     });
+
+    it('generates storage key in topics/{topicId}/{mediaId}-{safeName} pattern', async () => {
+      await controller.presignUpload('topic-1', { fileName: 'My Document.pdf', contentType: 'application/pdf', sizeBytes: 1_000_000 }, 'user-1');
+      const createArg = (mediaRepo.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(createArg.storageKey).toMatch(/^topics\/topic-1\/[\w-]+-my-document\.pdf$/);
+    });
+
+    it('returns 422 FileTooLarge for MP4 exceeding 100 MB', async () => {
+      const result = await controller.presignUpload('topic-1', { fileName: 'huge.mp4', contentType: 'video/mp4', sizeBytes: 101 * 1024 * 1024 }, 'user-1');
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(422);
+      expect(result.error).toBe('FileTooLarge');
+    });
+
+    it('returns 422 FileTooLarge for image exceeding 5 MB', async () => {
+      const result = await controller.presignUpload('topic-1', { fileName: 'big.jpeg', contentType: 'image/jpeg', sizeBytes: 6 * 1024 * 1024 }, 'user-1');
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(422);
+      expect(result.error).toBe('FileTooLarge');
+    });
   });
 
   // ── finalizeUpload ────────────────────────────────────────────────────────

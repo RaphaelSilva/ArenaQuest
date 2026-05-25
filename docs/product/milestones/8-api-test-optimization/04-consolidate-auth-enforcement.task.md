@@ -1,6 +1,6 @@
 # Task 04 — Consolidate auth-enforcement assertions (P3)
 
-**Status:** ⏳ Pending
+**Status:** ✅ Completed
 **Milestone:** [8 — `apps/api` Test Suite Optimization](./milestone.md)
 **RFC:** [0001 §P3 / §D3](../../RFCs/0001-apps-api-test-suite-optimization.md)
 
@@ -31,11 +31,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `auth-guard.spec.ts` covers every endpoint protection shape currently asserted in per-router loops.
-- [ ] No router spec contains a generic `endpoints.forEach` loop for 401/403 matrices.
-- [ ] Each router spec keeps at most one auth smoke.
-- [ ] `make test-api` and `make lint` pass.
-- [ ] No diff outside `apps/api/test/**`.
+- [x] `auth-guard.spec.ts` covers every endpoint protection shape currently asserted in per-router loops.
+- [x] No router spec contains a generic `endpoints.forEach` loop for 401/403 matrices.
+- [x] Each router spec keeps at most one auth smoke.
+- [x] `make test-api` and `make lint` pass.
+- [x] No diff outside `apps/api/test/**`.
 
 ## Verification Plan
 

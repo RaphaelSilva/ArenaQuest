@@ -2,33 +2,18 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { D1TaskRepository } from '@api/adapters/db/d1-task-repository';
 import { Entities } from '@arenaquest/shared/types/entities';
-
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id    TEXT NOT NULL PRIMARY KEY,
-    email TEXT NOT NULL UNIQUE
-  )`,
-  `CREATE TABLE IF NOT EXISTS tasks (
-    id          TEXT NOT NULL PRIMARY KEY,
-    title       TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    status      TEXT NOT NULL DEFAULT 'draft',
-    created_by  TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-];
+import { applyMigrations } from '../helpers/apply-migrations';
 
 describe('D1TaskRepository', () => {
   let repo: D1TaskRepository;
   let userId: string;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map(sql => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
     userId = crypto.randomUUID();
     await env.DB
-      .prepare('INSERT OR IGNORE INTO users (id, email) VALUES (?, ?)')
-      .bind(userId, `${userId}@example.com`)
+      .prepare('INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)')
+      .bind(userId, 'test', `${userId}@example.com`, 'hash')
       .run();
     repo = new D1TaskRepository(env.DB);
   });

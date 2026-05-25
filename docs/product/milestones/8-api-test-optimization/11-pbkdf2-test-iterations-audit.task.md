@@ -1,6 +1,6 @@
 # Task 11 — Audit and lower PBKDF2 iterations in remaining test setups (P6)
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [8 — `apps/api` Test Suite Optimization](./milestone.md)
 **RFC:** [0001 §P6](../../RFCs/0001-apps-api-test-suite-optimization.md)
 
@@ -30,11 +30,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Every spec that exercises password hashing in setup uses ≤ 1 000 PBKDF2 iterations (or has a documented justification otherwise).
-- [ ] No production code change.
-- [ ] `make test-api` and `make lint` pass.
-- [ ] Wall-time impact recorded for the closeout.
-- [ ] No diff outside `apps/api/test/**`.
+- [x] Every spec that exercises password hashing in setup uses ≤ 1 000 PBKDF2 iterations (or has a documented justification otherwise).
+- [x] No production code change.
+- [x] `make test-api` and `make lint` pass.
+- [x] Wall-time impact recorded for the closeout.
+- [x] No diff outside `apps/api/test/**`.
 
 ## Verification Plan
 

@@ -1,6 +1,6 @@
 # Task 07 — Refactor `admin-media` controller/router pair (P2)
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [8 — `apps/api` Test Suite Optimization](./milestone.md)
 **RFC:** [0001 §P2 / §D2](../../RFCs/0001-apps-api-test-suite-optimization.md)
 
@@ -31,10 +31,10 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `admin-media.router.spec.ts` reduced to HTTP smokes; every endpoint keeps ≥ 1.
-- [ ] `admin-media.controller.spec.ts` covers all removed business-rule branches.
-- [ ] `make test-api` and `make lint` pass.
-- [ ] No diff outside `apps/api/test/**`.
+- [x] `admin-media.router.spec.ts` reduced to HTTP smokes; every endpoint keeps ≥ 1.
+- [x] `admin-media.controller.spec.ts` covers all removed business-rule branches.
+- [x] `make test-api` and `make lint` pass.
+- [x] No diff outside `apps/api/test/**`.
 
 ## Verification Plan
 

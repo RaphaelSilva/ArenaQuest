@@ -1,6 +1,6 @@
 # Task 09 — Refactor small pairs: `register`, `password`, `account`, `activate`, `topics` (P2)
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [8 — `apps/api` Test Suite Optimization](./milestone.md)
 **RFC:** [0001 §P2 / §D2](../../RFCs/0001-apps-api-test-suite-optimization.md)
 
@@ -29,10 +29,10 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Each of the 5 router specs is reduced to HTTP smokes (≥ 1 per endpoint).
-- [ ] Each controller spec covers all removed business-rule branches for its pair.
-- [ ] `make test-api` and `make lint` pass.
-- [ ] No diff outside `apps/api/test/**`.
+- [x] Each of the 5 router specs is reduced to HTTP smokes (≥ 1 per endpoint).
+- [x] Each controller spec covers all removed business-rule branches for its pair.
+- [x] `make test-api` and `make lint` pass.
+- [x] No diff outside `apps/api/test/**`.
 
 ## Verification Plan
 

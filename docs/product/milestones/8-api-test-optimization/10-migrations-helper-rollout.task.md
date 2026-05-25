@@ -1,6 +1,6 @@
 # Task 10 — Roll out migrations helper to remaining ~24 spec files (P4 phase 2)
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [8 — `apps/api` Test Suite Optimization](./milestone.md)
 **RFC:** [0001 §P4](../../RFCs/0001-apps-api-test-suite-optimization.md)
 
@@ -31,11 +31,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Repo-wide grep for `CREATE TABLE IF NOT EXISTS` inside `apps/api/test/**` returns zero matches.
-- [ ] All migrated specs run green.
-- [ ] `make test-api` and `make lint` pass.
-- [ ] Wall-time impact (positive or neutral) recorded for the closeout.
-- [ ] No diff outside `apps/api/test/**`.
+- [x] Repo-wide grep for `CREATE TABLE IF NOT EXISTS` inside `apps/api/test/**` returns zero matches.
+- [x] All migrated specs run green.
+- [x] `make test-api` and `make lint` pass.
+- [x] Wall-time impact (positive or neutral) recorded for the closeout.
+- [x] No diff outside `apps/api/test/**`.
 
 ## Verification Plan
 

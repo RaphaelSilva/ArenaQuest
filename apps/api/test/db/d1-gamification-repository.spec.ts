@@ -1,90 +1,15 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { D1GamificationRepository } from '@api/adapters/db/d1-gamification-repository';
+import { applyMigrations } from '../helpers/apply-migrations';
 
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id    TEXT NOT NULL PRIMARY KEY,
-    email TEXT NOT NULL UNIQUE
-  )`,
-  `CREATE TABLE IF NOT EXISTS xp_events (
-    id               TEXT    NOT NULL PRIMARY KEY,
-    user_id          TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    source_kind      TEXT    NOT NULL,
-    source_id        TEXT,
-    points           INTEGER NOT NULL,
-    idempotency_key  TEXT    NOT NULL,
-    earned_at        TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS uniq_xp_events_idempotency
-    ON xp_events(user_id, source_kind, idempotency_key)`,
-  `CREATE INDEX IF NOT EXISTS idx_xp_events_user ON xp_events(user_id)`,
-  `CREATE TABLE IF NOT EXISTS user_xp (
-    user_id    TEXT    NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    total_xp   INTEGER NOT NULL DEFAULT 0,
-    updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_streak (
-    user_id             TEXT    NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    current_streak      INTEGER NOT NULL DEFAULT 0,
-    longest_streak      INTEGER NOT NULL DEFAULT 0,
-    last_activity_date  TEXT,
-    updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS level_definitions (
-    level      INTEGER NOT NULL PRIMARY KEY,
-    rank_title TEXT    NOT NULL,
-    min_xp     INTEGER NOT NULL,
-    max_xp     INTEGER
-  )`,
-];
-
-const LEVEL_SEED = [
-  [1,  'Aspirante',        0,     100],
-  [2,  'Aspirante',        100,   300],
-  [3,  'Aspirante',        300,   600],
-  [4,  'Aspirante',        600,   1000],
-  [5,  'Treinador Júnior', 1000,  1500],
-  [6,  'Treinador Júnior', 1500,  2100],
-  [7,  'Treinador Júnior', 2100,  2800],
-  [8,  'Treinador Júnior', 2800,  3600],
-  [9,  'Treinador Júnior', 3600,  4500],
-  [10, 'Treinador',        4500,  5500],
-  [11, 'Treinador',        5500,  6600],
-  [12, 'Treinador',        6600,  7800],
-  [13, 'Treinador',        7800,  9100],
-  [14, 'Treinador',        9100,  10500],
-  [15, 'Treinador Sênior', 10500, 12000],
-  [16, 'Treinador Sênior', 12000, 13600],
-  [17, 'Treinador Sênior', 13600, 15300],
-  [18, 'Treinador Sênior', 15300, 17100],
-  [19, 'Treinador Sênior', 17100, 19000],
-  [20, 'Especialista',     19000, 21000],
-  [21, 'Especialista',     21000, 23100],
-  [22, 'Especialista',     23100, 25300],
-  [23, 'Especialista',     25300, 27600],
-  [24, 'Especialista',     27600, 30000],
-  [25, 'Mestre',           30000, 32500],
-  [26, 'Mestre',           32500, 35100],
-  [27, 'Mestre',           35100, 37800],
-  [28, 'Mestre',           37800, 40600],
-  [29, 'Mestre',           40600, 43500],
-  [30, 'Grão-Mestre',      43500, null],
-] as const;
 
 describe('D1GamificationRepository', () => {
   let repo: D1GamificationRepository;
   let userId: string;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map((sql) => env.DB.prepare(sql)));
-
-    const seedStmts = LEVEL_SEED.map(([level, rankTitle, minXp, maxXp]) =>
-      env.DB
-        .prepare('INSERT OR IGNORE INTO level_definitions (level, rank_title, min_xp, max_xp) VALUES (?, ?, ?, ?)')
-        .bind(level, rankTitle, minXp, maxXp),
-    );
-    await env.DB.batch(seedStmts);
+    await applyMigrations(env.DB);
 
     repo = new D1GamificationRepository(env.DB);
   });
@@ -92,8 +17,8 @@ describe('D1GamificationRepository', () => {
   beforeEach(async () => {
     userId = crypto.randomUUID();
     await env.DB
-      .prepare('INSERT INTO users (id, email) VALUES (?, ?)')
-      .bind(userId, `u-${userId}@test.com`)
+      .prepare('INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)')
+      .bind(userId, 'test', `u-${userId}@test.com`, 'hash')
       .run();
   });
 

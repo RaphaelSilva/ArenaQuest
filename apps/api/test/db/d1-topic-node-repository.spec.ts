@@ -2,44 +2,13 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { D1TopicNodeRepository } from '@api/adapters/db/d1-topic-node-repository';
 import { Entities } from '@arenaquest/shared/types/entities';
-
-// D1's exec() processes one statement at a time in the local simulator
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS topic_nodes (
-    id                TEXT    NOT NULL PRIMARY KEY,
-    parent_id         TEXT    REFERENCES topic_nodes(id) ON DELETE RESTRICT,
-    title             TEXT    NOT NULL,
-    content           TEXT    NOT NULL DEFAULT '',
-    status            TEXT    NOT NULL DEFAULT 'draft',
-    sort_order        INTEGER NOT NULL DEFAULT 0,
-    estimated_minutes INTEGER NOT NULL DEFAULT 0,
-    archived          INTEGER NOT NULL DEFAULT 0,
-    created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at        TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS tags (
-    id         TEXT NOT NULL PRIMARY KEY,
-    name       TEXT NOT NULL,
-    slug       TEXT NOT NULL UNIQUE,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_node_tags (
-    topic_node_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    tag_id        TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-    PRIMARY KEY (topic_node_id, tag_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_node_prerequisites (
-    topic_node_id   TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    prerequisite_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    PRIMARY KEY (topic_node_id, prerequisite_id)
-  )`,
-];
+import { applyMigrations } from '../helpers/apply-migrations';
 
 describe('D1TopicNodeRepository', () => {
   let repo: D1TopicNodeRepository;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map(sql => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
     repo = new D1TopicNodeRepository(env.DB);
   });
 

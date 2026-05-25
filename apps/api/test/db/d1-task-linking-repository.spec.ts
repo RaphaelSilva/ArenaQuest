@@ -4,55 +4,7 @@ import { D1TaskRepository } from '@api/adapters/db/d1-task-repository';
 import { D1TaskStageRepository } from '@api/adapters/db/d1-task-stage-repository';
 import { D1TaskLinkingRepository } from '@api/adapters/db/d1-task-linking-repository';
 import { StageTopicNotInTaskError } from '@arenaquest/shared/ports';
-
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id    TEXT NOT NULL PRIMARY KEY,
-    email TEXT NOT NULL UNIQUE
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_nodes (
-    id                TEXT    NOT NULL PRIMARY KEY,
-    parent_id         TEXT    REFERENCES topic_nodes(id) ON DELETE RESTRICT,
-    title             TEXT    NOT NULL,
-    content           TEXT    NOT NULL DEFAULT '',
-    status            TEXT    NOT NULL DEFAULT 'draft',
-    sort_order        INTEGER NOT NULL DEFAULT 0,
-    estimated_minutes INTEGER NOT NULL DEFAULT 0,
-    archived          INTEGER NOT NULL DEFAULT 0,
-    created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at        TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS tasks (
-    id          TEXT NOT NULL PRIMARY KEY,
-    title       TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    status      TEXT NOT NULL DEFAULT 'draft',
-    created_by  TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS task_stages (
-    id         TEXT    NOT NULL PRIMARY KEY,
-    task_id    TEXT    NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    label      TEXT    NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS uniq_task_stages_task_order
-    ON task_stages(task_id, sort_order)`,
-  `CREATE TABLE IF NOT EXISTS task_topic_links (
-    task_id       TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    topic_node_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE RESTRICT,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    PRIMARY KEY (task_id, topic_node_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS task_stage_topic_links (
-    stage_id      TEXT NOT NULL REFERENCES task_stages(id) ON DELETE CASCADE,
-    topic_node_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE RESTRICT,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    PRIMARY KEY (stage_id, topic_node_id)
-  )`,
-];
+import { applyMigrations } from '../helpers/apply-migrations';
 
 async function seedTopic(title: string): Promise<string> {
   const id = crypto.randomUUID();
@@ -70,14 +22,14 @@ describe('D1TaskLinkingRepository', () => {
   let userId: string;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map(sql => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
     // Foreign keys must be on for ON DELETE RESTRICT to fire in the local SQLite.
     await env.DB.exec('PRAGMA foreign_keys = ON');
 
     userId = crypto.randomUUID();
     await env.DB
-      .prepare('INSERT OR IGNORE INTO users (id, email) VALUES (?, ?)')
-      .bind(userId, `${userId}@example.com`)
+      .prepare('INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)')
+      .bind(userId, 'test', `${userId}@example.com`, 'hash')
       .run();
     tasks = new D1TaskRepository(env.DB);
     stages = new D1TaskStageRepository(env.DB);

@@ -1,62 +1,12 @@
 import { env, createExecutionContext, waitOnExecutionContext, fetchMock } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
+import { applyMigrations } from '../helpers/apply-migrations';
 
 // ---------------------------------------------------------------------------
 // DB setup
 // ---------------------------------------------------------------------------
 
-const MIGRATION_SQL = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id            TEXT NOT NULL PRIMARY KEY,
-    name          TEXT NOT NULL,
-    email         TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    timezone      TEXT NOT NULL DEFAULT 'UTC'
-  )`,
-  `CREATE TABLE IF NOT EXISTS roles (
-    id          TEXT NOT NULL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '',
-    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_roles (
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    PRIMARY KEY (user_id, role_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS refresh_tokens (
-    token      TEXT NOT NULL PRIMARY KEY,
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_activation_tokens (
-    token_hash   TEXT    NOT NULL PRIMARY KEY,
-    user_id      TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at   INTEGER NOT NULL,
-    consumed_at  INTEGER,
-    created_at   INTEGER NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS password_reset_tokens (
-    token_hash   TEXT    NOT NULL PRIMARY KEY,
-    user_id      TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at   INTEGER NOT NULL,
-    consumed_at  INTEGER,
-    created_at   INTEGER NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS oauth_accounts (
-    provider         TEXT NOT NULL,
-    provider_user_id TEXT NOT NULL,
-    user_id          TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    email            TEXT NOT NULL,
-    created_at       TEXT NOT NULL DEFAULT (datetime('now')),
-    PRIMARY KEY (provider, provider_user_id)
-  )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_accounts_provider_user
-     ON oauth_accounts (provider, user_id)`,
-];
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
@@ -75,11 +25,7 @@ function makeIdToken(payload: object): string {
 }
 
 beforeAll(async () => {
-  await env.DB.batch(MIGRATION_SQL.map(sql => env.DB.prepare(sql)));
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO roles (id, name, description) VALUES ('role-student', 'student', 'Student')"
-  ).run();
-
+  await applyMigrations(env.DB);
   fetchMock.activate();
   fetchMock.disableNetConnect();
 });
