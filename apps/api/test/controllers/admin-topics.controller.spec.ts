@@ -173,6 +173,12 @@ describe('AdminTopicsController', () => {
       expect(result.status).toBe(422);
       expect(result.error).toBe('UNKNOWN_PREREQ');
     });
+
+    it('sanitizes markdown content on update', async () => {
+      await controller.update('root-1', { content: '<iframe src="evil.com"></iframe>' });
+      const callArg = (topicsRepo.update as ReturnType<typeof vi.fn>).mock.calls[0][1];
+      expect(callArg.content).not.toContain('<iframe');
+    });
   });
 
   // ── move ──────────────────────────────────────────────────────────────────
