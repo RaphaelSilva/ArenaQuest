@@ -1,174 +1,190 @@
 'use client';
 
-import { useEffect, useState, useRef, use } from 'react';
-
-/**
- * @see https://nextjs.org/docs/app/api-reference/edge
- */
 export const runtime = 'edge';
 
+import { use, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@web/hooks/use-auth';
-import { topicsApi, type TopicProgressStatus } from '@web/lib/topics-api';
-import type { TopicNode } from '@web/lib/topics-api';
-import { MarkdownViewer } from '@web/components/catalog/MarkdownViewer';
-import { MediaViewer } from '@web/components/catalog/MediaViewer';
+import { useApiClient } from '@web/context/auth-context';
+import type { TopicProgressStatus, TopicWithMedia } from '@web/lib/topics-api';
+import { TopicHeader } from '@web/components/catalog/TopicHeader';
+import { BadgesStrip } from '@web/components/catalog/BadgesStrip';
+import { SubtopicCard } from '@web/components/catalog/SubtopicCard';
+import { ContentSection } from '@web/components/catalog/ContentSection';
+import { MediaGallery } from '@web/components/catalog/MediaGallery';
+import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
 import { Spinner } from '@web/components/spinner';
 
 type CatalogTopicPageProps = {
   params: Promise<{ id: string }>;
 };
 
-export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
-  // next.js 15 requires awaiting params
-  const { id } = use(params);
-  const { accessToken } = useAuth();
+type BadgeItem = { id: string; emoji: string; name: string; earned: boolean };
 
-  const [topic, setTopic] = useState<TopicNode | null>(null);
+export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
+  const { id } = use(params);
+  const { user, accessToken } = useAuth();
+  const client = useApiClient();
+
+  const [topic, setTopic] = useState<TopicWithMedia | null>(null);
+  const [progressMap, setProgressMap] = useState<Map<string, TopicProgressStatus>>(new Map());
+  const [badges, setBadges] = useState<BadgeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [progressStatus, setProgressStatus] = useState<TopicProgressStatus>('not_started');
-  const [markingDone, setMarkingDone] = useState(false);
-  const visitedRef = useRef(false);
+
+  const isInstructor = user?.roles.some((r) => r.name === 'instructor' || r.name === 'admin') ?? false;
+
+  // Read instructor preview mode from localStorage
+  const [previewRole] = useState<'participant' | 'instructor'>(() => {
+    if (typeof window === 'undefined') return 'participant';
+    return (localStorage.getItem('aq-catalog-role') as 'participant' | 'instructor') ?? 'participant';
+  });
+  const showInstructorUI = isInstructor && previewRole === 'instructor';
 
   useEffect(() => {
-    if (!accessToken) return;
+    let active = true;
 
-    let isMounted = true;
+    const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+    const headers = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' };
 
-    topicsApi.getById(accessToken, id)
-      .then((data) => {
-        if (isMounted) {
-          setTopic(data);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : 'Failed to load topic details');
-          setLoading(false);
-        }
-      });
+    Promise.all([
+      client.topics.getById(id),
+      client.topics.listProgress(),
+      fetch(`${API_URL}/me/badges`, { headers, cache: 'no-store' })
+        .then(async (r) => {
+          if (!r.ok) return [];
+          const body = (await r.json()) as Array<{ badge: { id: string; iconEmoji: string; name: string }; earnedAt: string }>;
+          return body.map((e) => ({ id: e.badge.id, emoji: e.badge.iconEmoji, name: e.badge.name, earned: true }));
+        })
+        .catch(() => [] as BadgeItem[]),
+    ]).then(([t, progressEntries, b]) => {
+      if (!active) return;
+      setTopic(t);
+      setProgressMap(new Map(progressEntries.map((p) => [p.topicNodeId, p.status])));
+      setBadges(b);
+      setLoading(false);
+    }).catch((err: unknown) => {
+      if (!active) return;
+      setError(err instanceof Error ? err.message : 'Failed to load topic');
+      setLoading(false);
+    });
 
-    return () => { isMounted = false; };
-  }, [accessToken, id]);
+    return () => { active = false; };
+  }, [client, accessToken, id]);
 
-  // Silent visit beacon — fires once per mount, non-blocking
-  useEffect(() => {
-    if (!accessToken || visitedRef.current) return;
-    visitedRef.current = true;
-    void topicsApi.visit(accessToken, id);
-  }, [accessToken, id]);
+  if (loading) {
+    return (
+      <div className="flex h-full min-h-[50vh] items-center justify-center">
+        <Spinner className="h-8 w-8" />
+      </div>
+    );
+  }
 
-  const handleMarkAsRead = async () => {
-    if (!accessToken || markingDone) return;
-    setMarkingDone(true);
-    try {
-      const status = await topicsApi.complete(accessToken, id);
-      setProgressStatus(status);
-    } catch {
-      setMarkingDone(false);
-    }
-  };
-
-  if (error) {
+  if (error || !topic) {
     return (
       <div className="flex h-full min-h-[50vh] flex-col items-center justify-center p-8 text-center">
-        <div className="mb-4 rounded-full bg-red-50 p-4 text-red-500 dark:bg-red-500/10 dark:text-red-400">
-          <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <p className="text-sm font-medium text-red-600 dark:text-red-400">{error}</p>
+        <p className="text-sm" style={{ color: 'var(--aq-error)' }}>{error || 'Topic not found'}</p>
       </div>
     );
   }
 
-  if (loading || !topic) {
-    return (
-      <div className="flex h-full min-h-[50vh] items-center justify-center p-8">
-        <Spinner className="h-8 w-8 text-zinc-400" />
-      </div>
-    );
-  }
-
-  // Filter for only 'ready' media items
-  const readyMedia = topic.media?.filter((m) => m.status === 'ready') || [];
+  // Progress computations
+  const subtopicTotal = topic.children.length;
+  const subtopicDone = topic.children.filter(
+    (c) => (progressMap.get(c.id) ?? 'not_started') === 'completed',
+  ).length;
+  const pct = subtopicTotal > 0 ? Math.round((subtopicDone / subtopicTotal) * 100) : 0;
 
   return (
-    <div className="mx-auto max-w-4xl p-8 pb-24">
-      <header className="mb-10">
-        <div className="mb-3 flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-          <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 font-medium shadow-sm ring-1 ring-inset ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {topic.estimatedMinutes} mins
+    <div className="mx-auto max-w-[900px] px-4 py-8 md:px-6 lg:px-10">
+      {/* Breadcrumb */}
+      <CatalogBreadcrumb
+        items={[
+          { label: 'Catalogue', href: '/catalog' },
+          { label: topic.title },
+        ]}
+        backHref="/catalog"
+      />
+
+      {/* Topic header */}
+      <TopicHeader topic={topic} pct={pct} />
+
+      {/* Progress bar */}
+      <div className="mb-8">
+        <div className="mb-2.5 flex items-center justify-between">
+          <span className="text-[13px] font-semibold" style={{ color: 'var(--aq-text2)', fontFamily: "'Space Grotesk', sans-serif" }}>
+            Progresso
           </span>
-          {topic.tags && topic.tags.length > 0 && (
-            <div className="flex gap-2">
-              {topic.tags.map(tag => (
-                <span key={tag.id} className="rounded-md bg-zinc-100 px-2 py-1 text-xs dark:bg-zinc-800">
-                  {tag.name}
-                </span>
-              ))}
-            </div>
+          <strong className="text-[13px]" style={{ color: 'var(--aq-accent)' }}>{pct}%</strong>
+        </div>
+        <div
+          className="overflow-hidden rounded-[10px]"
+          style={{ height: 10, background: 'var(--aq-bg3)', border: '1px solid var(--aq-border)' }}
+        >
+          <div
+            className="h-full rounded-[10px] transition-all duration-700"
+            style={{
+              width: `${pct}%`,
+              background: 'linear-gradient(90deg, var(--aq-accent), var(--aq-accent2))',
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Badges strip */}
+      {badges.length > 0 && <BadgesStrip badges={badges} />}
+
+      {/* Content section */}
+      <ContentSection content={topic.content} />
+
+      {/* Media gallery */}
+      <MediaGallery media={topic.media || []} />
+
+      {/* Subtopics */}
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+          <p
+            className="text-[13px] font-semibold uppercase tracking-widest"
+            style={{ color: 'var(--aq-text3)' }}
+          >
+            Subtopics
+          </p>
+          {showInstructorUI && (
+            <Link
+              href="/admin/topics"
+              className="flex items-center gap-1.5 rounded-[8px] px-3.5 py-1.5 text-[12px] font-medium transition-all hover:opacity-80"
+              style={{
+                border: '1px solid var(--aq-accent)',
+                background: 'var(--aq-accent-glow)',
+                color: 'var(--aq-accent)',
+              }}
+            >
+              + Add subtopic
+            </Link>
           )}
         </div>
-        
-        <h1 className="text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white sm:text-5xl">
-          {topic.title}
-        </h1>
-      </header>
 
-      {/* Main Content (Markdown) */}
-      {topic.content ? (
-        <div className="mb-16 rounded-2xl border border-zinc-100 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50">
-          <MarkdownViewer content={topic.content} />
-        </div>
-      ) : (
-        <div className="mb-16 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50 p-8 text-center dark:border-zinc-800 dark:bg-zinc-900/20">
-          <p className="text-zinc-500 dark:text-zinc-400">No text content available for this topic.</p>
-        </div>
-      )}
-
-      {/* Media Attachments */}
-      {readyMedia.length > 0 && (
-        <div className="space-y-8 border-t border-zinc-200 pt-10 dark:border-zinc-800">
-          <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Course Materials
-          </h2>
-          <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-2">
-            {readyMedia.map((m) => (
-              <MediaViewer key={m.id} media={m} />
+        {topic.children.length === 0 ? (
+          <div
+            className="flex flex-col items-center py-16"
+            style={{ color: 'var(--aq-text3)' }}
+          >
+            <p className="text-[40px] opacity-40" aria-hidden>📭</p>
+            <p className="mt-3 text-[15px]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>No subtopics yet</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {topic.children.map((child, i) => (
+              <SubtopicCard
+                key={child.id}
+                topicId={id}
+                subtopic={child}
+                index={i}
+                status={progressMap.get(child.id) ?? 'not_started'}
+                showInstructorUI={showInstructorUI}
+              />
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Mark as read */}
-      <div className="mt-12 flex justify-center border-t border-zinc-200 pt-10 dark:border-zinc-800">
-        {progressStatus === 'completed' ? (
-          <p
-            className="flex items-center gap-2 text-sm font-medium"
-            style={{ color: 'var(--accent3)' }}
-          >
-            <span aria-hidden="true">✓</span> Conteúdo concluído
-          </p>
-        ) : (
-          <button
-            type="button"
-            onClick={() => void handleMarkAsRead()}
-            disabled={markingDone}
-            aria-label="Marcar conteúdo como lido"
-            className="rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200 disabled:opacity-60"
-            style={{
-              background: 'var(--accent)',
-              color: '#0B0E17',
-              boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)',
-            }}
-          >
-            {markingDone ? 'Registrando…' : 'Marcar como lido'}
-          </button>
         )}
       </div>
     </div>

@@ -13,10 +13,11 @@ make dev-api      # Cloudflare Worker only (localhost:8787)
 
 **Build, lint, test:**
 ```bash
-pnpm turbo run build   # build all workspaces (with Turborepo caching)
+make build             # build all workspaces (with Turborepo caching)
 make lint              # lint entire monorepo
 make test              # run all tests
 make test-api          # run API tests only (Vitest + Cloudflare Workers pool)
+make test-web          # run Web tests only
 ```
 
 **Run a single test (Vitest in apps/api):**

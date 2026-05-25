@@ -5,14 +5,15 @@ import type { PublicTaskDetail } from '@web/lib/tasks-api';
 
 const mockCheckIn = vi.fn();
 
-vi.mock('@web/lib/tasks-api', async () => {
-  const actual = await vi.importActual<typeof import('@web/lib/tasks-api')>('@web/lib/tasks-api');
+vi.mock('@web/context/auth-context', async () => {
+  const actual = await vi.importActual('@web/context/auth-context');
   return {
     ...actual,
-    tasksApi: {
-      ...actual.tasksApi,
-      checkIn: (...args: unknown[]) => mockCheckIn(...args),
-    },
+    useApiClient: () => ({
+      tasks: {
+        checkIn: (...args: unknown[]) => mockCheckIn(...args),
+      },
+    }),
   };
 });
 
@@ -39,21 +40,21 @@ beforeEach(() => {
 
 describe('StudentTaskDetail — stage state rendering', () => {
   it('marks the first stage as current and renders its check-in button', () => {
-    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    render(<StudentTaskDetail task={makeTask()} />);
     const btn = screen.getByRole('button', { name: /check-in na etapa aquecimento/i });
     expect(btn).toBeInTheDocument();
     expect(btn).not.toBeDisabled();
   });
 
   it('marks subsequent stages as locked', () => {
-    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    render(<StudentTaskDetail task={makeTask()} />);
     const locked = screen.getAllByText('Bloqueada');
     expect(locked).toHaveLength(2);
   });
 
   it('marks pre-checked stages as completed with strikethrough label', () => {
     const checkins = [{ stageId: 's1', checkedInAt: '2026-05-01T10:00:00Z' }];
-    render(<StudentTaskDetail task={makeTask()} token={TOKEN} initialCheckins={checkins} />);
+    render(<StudentTaskDetail task={makeTask()} initialCheckins={checkins} />);
     const label = screen.getByText('Aquecimento');
     expect(label).toHaveStyle({ textDecoration: 'line-through' });
   });
@@ -64,17 +65,17 @@ describe('StudentTaskDetail — stage state rendering', () => {
       { stageId: 's2', checkedInAt: '2026-05-01T11:00:00Z' },
       { stageId: 's3', checkedInAt: '2026-05-01T12:00:00Z' },
     ];
-    render(<StudentTaskDetail task={makeTask()} token={TOKEN} initialCheckins={checkins} />);
+    render(<StudentTaskDetail task={makeTask()} initialCheckins={checkins} />);
     expect(screen.getByText(/Missão concluída/i)).toBeInTheDocument();
   });
 
   it('shows empty state when task has no stages', () => {
-    render(<StudentTaskDetail task={makeTask({ stages: [] })} token={TOKEN} />);
+    render(<StudentTaskDetail task={makeTask({ stages: [] })} />);
     expect(screen.getByText(/Nenhuma etapa definida ainda/i)).toBeInTheDocument();
   });
 
   it('renders topic chips as catalog links', () => {
-    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    render(<StudentTaskDetail task={makeTask()} />);
     const chip = screen.getByRole('link', { name: 'Fundamentos' });
     expect(chip).toHaveAttribute('href', '/catalog/top1');
   });
@@ -83,7 +84,7 @@ describe('StudentTaskDetail — stage state rendering', () => {
 describe('StudentTaskDetail — check-in flow', () => {
   it('disables button while request is in-flight', async () => {
     mockCheckIn.mockReturnValue(new Promise(() => {}));
-    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    render(<StudentTaskDetail task={makeTask()} />);
     const btn = screen.getByRole('button', { name: /check-in na etapa aquecimento/i });
     fireEvent.click(btn);
     await waitFor(() => expect(btn).toBeDisabled());
@@ -98,7 +99,7 @@ describe('StudentTaskDetail — check-in flow', () => {
       },
       created: true,
     });
-    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    render(<StudentTaskDetail task={makeTask()} />);
     fireEvent.click(screen.getByRole('button', { name: /check-in na etapa aquecimento/i }));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /check-in na etapa prática/i })).toBeInTheDocument(),
@@ -109,7 +110,7 @@ describe('StudentTaskDetail — check-in flow', () => {
   it('ignores double-click while inflight (only one request)', async () => {
     let resolve!: (v: unknown) => void;
     mockCheckIn.mockReturnValue(new Promise((r) => { resolve = r; }));
-    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    render(<StudentTaskDetail task={makeTask()} />);
     const btn = screen.getByRole('button', { name: /check-in na etapa aquecimento/i });
     fireEvent.click(btn);
     fireEvent.click(btn);
@@ -128,7 +129,7 @@ describe('StudentTaskDetail — error toasts', () => {
     mockCheckIn.mockResolvedValueOnce({
       error: { type: 'OUT_OF_ORDER', expectedStageId: 's1' },
     });
-    render(<StudentTaskDetail task={makeTask()} token={TOKEN} initialCheckins={[]} />);
+    render(<StudentTaskDetail task={makeTask()} initialCheckins={[]} />);
     fireEvent.click(screen.getByRole('button', { name: /check-in na etapa aquecimento/i }));
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(/Aquecimento/),
@@ -139,7 +140,7 @@ describe('StudentTaskDetail — error toasts', () => {
     mockCheckIn.mockResolvedValueOnce({
       error: { type: 'UNKNOWN', message: 'server error' },
     });
-    render(<StudentTaskDetail task={makeTask()} token={TOKEN} />);
+    render(<StudentTaskDetail task={makeTask()} />);
     fireEvent.click(screen.getByRole('button', { name: /check-in na etapa aquecimento/i }));
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(/Não foi possível/i),

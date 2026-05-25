@@ -1,25 +1,26 @@
 'use client';
 
 import { useState } from 'react';
-import { adminMediaApi, type Media } from '@web/lib/admin-media-api';
+import { useApiClient } from '@web/context/auth-context';
+import type { Media } from '@web/lib/admin-media-api';
 import { Spinner } from '@web/components/spinner';
 
 type MediaListProps = {
   topicId: string;
-  token: string;
   media: Media[];
   onMediaDeleted: () => void;
 };
 
-export function MediaList({ topicId, token, media, onMediaDeleted }: MediaListProps) {
+export function MediaList({ topicId, media, onMediaDeleted }: MediaListProps) {
+  const client = useApiClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this media?')) return;
-    
+
     setDeletingId(id);
     try {
-      await adminMediaApi.delete(token, topicId, id);
+      await client.adminMedia.delete(topicId, id);
       onMediaDeleted();
     } catch {
       alert('Failed to delete media');

@@ -1,7 +1,6 @@
 import type { Entities } from '@arenaquest/shared/types/entities';
 import type { RoleName } from '@arenaquest/shared/constants/roles';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+import type { HttpTransport } from './api-client';
 
 export type CreateUserInput = {
   name: string;
@@ -16,67 +15,75 @@ export type UpdateUserInput = {
   status?: Entities.Config.UserStatus;
 };
 
-async function apiFetch(path: string, token: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
+export type ResetPasswordInput = {
+  sendEmail: boolean;
+  adminNote?: string;
+};
+
+export type ResetPasswordResponse = {
+  userId: string;
+  temporaryPassword: string;
+  emailSent: boolean;
+  resetAt: string;
+};
+
+export function createAdminUsersApi(http: HttpTransport) {
+  return {
+    async list(page = 1, pageSize = 20): Promise<{ data: Entities.Identity.User[]; total: number }> {
+      const offset = (page - 1) * pageSize;
+      const res = await http('GET', `/admin/users?limit=${pageSize}&offset=${offset}`);
+      if (!res.ok) throw new Error(`Failed to list users (${res.status})`);
+      return res.json();
     },
-  });
-  return res;
+
+    async create(data: CreateUserInput): Promise<Entities.Identity.User> {
+      const res = await http('POST', '/admin/users', {
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Failed to create user (${res.status})`);
+      }
+      return res.json();
+    },
+
+    async update(id: string, data: Partial<UpdateUserInput>): Promise<Entities.Identity.User> {
+      const res = await http('PATCH', `/admin/users/${id}`, {
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Failed to update user (${res.status})`);
+      }
+      return res.json();
+    },
+
+    async deactivate(id: string): Promise<void> {
+      const res = await http('DELETE', `/admin/users/${id}`);
+      if (!res.ok && res.status !== 204) {
+        throw new Error(`Failed to deactivate user (${res.status})`);
+      }
+    },
+
+    async resetPassword(
+      id: string,
+      data: ResetPasswordInput,
+    ): Promise<ResetPasswordResponse> {
+      const res = await http('POST', `/admin/users/${id}/reset-password`, {
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const status = res.status;
+        const error = body.error ?? `Failed to reset password (${status})`;
+        const errorObj = new Error(error) as Error & { status?: number };
+        errorObj.status = status;
+        throw errorObj;
+      }
+      return res.json();
+    },
+  };
 }
 
-export const adminUsersApi = {
-  async list(
-    token: string,
-    page = 1,
-    pageSize = 20,
-  ): Promise<{ data: Entities.Identity.User[]; total: number }> {
-    const offset = (page - 1) * pageSize;
-    const res = await apiFetch(
-      `/admin/users?limit=${pageSize}&offset=${offset}`,
-      token,
-    );
-    if (!res.ok) throw new Error(`Failed to list users (${res.status})`);
-    return res.json();
-  },
-
-  async create(token: string, data: CreateUserInput): Promise<Entities.Identity.User> {
-    const res = await apiFetch('/admin/users', token, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new Error(body.error ?? `Failed to create user (${res.status})`);
-    }
-    return res.json();
-  },
-
-  async update(
-    token: string,
-    id: string,
-    data: Partial<UpdateUserInput>,
-  ): Promise<Entities.Identity.User> {
-    const res = await apiFetch(`/admin/users/${id}`, token, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new Error(body.error ?? `Failed to update user (${res.status})`);
-    }
-    return res.json();
-  },
-
-  async deactivate(token: string, id: string): Promise<void> {
-    const res = await apiFetch(`/admin/users/${id}`, token, {
-      method: 'DELETE',
-    });
-    if (!res.ok && res.status !== 204) {
-      throw new Error(`Failed to deactivate user (${res.status})`);
-    }
-  },
-};
+const _err = () => { throw new Error('adminUsersApi is deprecated. Use useApiClient() hook instead.'); };
+export const adminUsersApi = { list: _err, create: _err, update: _err, deactivate: _err };

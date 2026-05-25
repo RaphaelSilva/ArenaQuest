@@ -14,6 +14,7 @@ type UserRow = {
   password_hash: string;
   status: string;
   created_at: string;
+  timezone: string;
 };
 
 type RoleRow = {
@@ -54,6 +55,7 @@ export class D1UserRepository implements IUserRepository {
       roles,
       groups: [],
       createdAt: new Date(row.created_at),
+      timezone: row.timezone ?? 'UTC',
     };
   }
 
@@ -79,7 +81,7 @@ export class D1UserRepository implements IUserRepository {
 
   async findById(id: string): Promise<Entities.Identity.User | null> {
     const row = await this.db
-      .prepare('SELECT id, name, email, password_hash, status, created_at FROM users WHERE id = ?')
+      .prepare('SELECT id, name, email, password_hash, status, created_at, timezone FROM users WHERE id = ?')
       .bind(id)
       .first<UserRow>();
 
@@ -90,7 +92,7 @@ export class D1UserRepository implements IUserRepository {
 
   async findByEmail(email: string): Promise<UserRecord | null> {
     const row = await this.db
-      .prepare('SELECT id, name, email, password_hash, status, created_at FROM users WHERE email = ?')
+      .prepare('SELECT id, name, email, password_hash, status, created_at, timezone FROM users WHERE email = ?')
       .bind(email)
       .first<UserRow>();
 
@@ -153,7 +155,7 @@ export class D1UserRepository implements IUserRepository {
 
     const { results } = await this.db
       .prepare(
-        'SELECT id, name, email, password_hash, status, created_at FROM users LIMIT ? OFFSET ?',
+        'SELECT id, name, email, password_hash, status, created_at, timezone FROM users LIMIT ? OFFSET ?',
       )
       .bind(limit, offset)
       .all<UserRow>();

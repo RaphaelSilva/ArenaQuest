@@ -4,15 +4,16 @@ import React, { useEffect, useState, useCallback, useRef, type FormEvent } from 
 import { useRouter } from 'next/navigation';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useAuth, useHasRole } from '@web/hooks/use-auth';
-import {
-  adminTopicsApi,
-  type TopicNode,
-  type CreateTopicInput,
+import { useApiClient } from '@web/context/auth-context';
+import type {
+  TopicNode,
+  CreateTopicInput,
 } from '@web/lib/admin-topics-api';
-import { adminMediaApi, type Media } from '@web/lib/admin-media-api';
+import type { Media } from '@web/lib/admin-media-api';
 import { MediaUploader } from '@web/components/admin/MediaUploader';
 import { MediaList } from '@web/components/admin/MediaList';
 import { Spinner } from '@web/components/spinner';
+import { Button, Badge } from '@web/components/design-system';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,10 +64,10 @@ function getDropPosition(e: React.DragEvent<HTMLElement>): DropPosition {
 // Constants
 // ---------------------------------------------------------------------------
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 ring-1 ring-inset ring-zinc-200 dark:ring-zinc-700',
-  published: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 ring-1 ring-inset ring-emerald-200 dark:ring-emerald-500/20',
-  archived: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 ring-1 ring-inset ring-amber-200 dark:ring-amber-500/20',
+const STATUS_BADGE_MAP: Record<string, 'draft' | 'published' | 'archived'> = {
+  draft: 'draft',
+  published: 'published',
+  archived: 'archived',
 };
 
 // ---------------------------------------------------------------------------
@@ -128,21 +129,23 @@ function CreateModal({ parentId, onSubmit, onClose }: CreateModalProps) {
           {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button
+            <Button
               type="button"
               onClick={onClose}
-              className="rounded px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400"
+              variant="secondary"
+              size="md"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={submitting}
-              className="flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              variant="primary"
+              size="md"
+              isLoading={submitting}
             >
-              {submitting && <Spinner className="h-4 w-4" />}
               Create
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -173,18 +176,20 @@ function ConfirmDialog({
       <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
         <p className="mb-4 text-sm text-zinc-700 dark:text-zinc-300">{message}</p>
         <div className="flex justify-end gap-3">
-          <button
+          <Button
             onClick={onCancel}
-            className="rounded px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400"
+            variant="secondary"
+            size="md"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onConfirm}
-            className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            variant="danger"
+            size="md"
           >
             Confirm
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -197,7 +202,8 @@ function ConfirmDialog({
 
 export default function AdminTopicsPage() {
   const router = useRouter();
-  const { accessToken, isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading } = useAuth();
+  const client = useApiClient();
   const canAccess = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
 
   // ---------------------------------------------------------------------------
@@ -229,6 +235,12 @@ export default function AdminTopicsPage() {
   const draggingIdRef = useRef<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; position: DropPosition } | null>(null);
 
+  // Mobile reordering
+  const [movingNodeId, setMovingNodeId] = useState<string | null>(null);
+  const [pendingNodes, setPendingNodes] = useState<TopicNode[] | null>(null);
+  const [targetParentId, setTargetParentId] = useState<string | null>(null);
+  const lastTapRef = useRef<{ id: string; time: number } | null>(null);
+
   // Detail pane
   const [detailTitle, setDetailTitle] = useState('');
   const [detailContent, setDetailContent] = useState('');
@@ -256,21 +268,26 @@ export default function AdminTopicsPage() {
   // ---------------------------------------------------------------------------
 
   const refresh = useCallback(async () => {
-    if (!accessToken) return;
     setFetchError('');
     try {
-      const data = await adminTopicsApi.list(accessToken);
+      const data = await client.adminTopics.list();
       setNodes(data);
     } catch {
       setFetchError('Failed to load topics.');
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [client]);
 
   useEffect(() => {
-    if (canAccess && accessToken) refresh();
-  }, [canAccess, accessToken, refresh]);
+    if (canAccess) refresh();
+  }, [canAccess, refresh]);
+
+  // ---------------------------------------------------------------------------
+  // Active nodes (pending reorder or actual)
+  // ---------------------------------------------------------------------------
+
+  const activeNodes = pendingNodes ?? nodes;
 
   // ---------------------------------------------------------------------------
   // Sync detail pane when selected node changes
@@ -297,15 +314,13 @@ export default function AdminTopicsPage() {
     setDetailPrereqIds(selectedNode.prerequisiteIds.join(', '));
     
     // Load media
-    if (accessToken) {
-      setLoadingMedia(true);
-      adminMediaApi.list(accessToken, selectedNode.id)
-        .then(setDetailMedia)
-        .catch(() => showToast('Failed to load media', 'error'))
-        .finally(() => setLoadingMedia(false));
-    }
+    setLoadingMedia(true);
+    client.adminMedia.list(selectedNode.id)
+      .then(setDetailMedia)
+      .catch(() => showToast('Failed to load media', 'error'))
+      .finally(() => setLoadingMedia(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, accessToken]);
+  }, [selectedId, client]);
 
   // ---------------------------------------------------------------------------
   // Toast helpers
@@ -314,6 +329,85 @@ export default function AdminTopicsPage() {
   function showToast(message: string, kind: 'error' | 'success') {
     setToast({ message, kind });
     setTimeout(() => setToast(null), 4000);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mobile reordering handlers
+  // ---------------------------------------------------------------------------
+
+  function moveNodeLocally(nodeId: string, direction: 'up' | 'down') {
+    const base = pendingNodes ?? nodes;
+    const node = base.find((n) => n.id === nodeId);
+    if (!node) return;
+
+    const siblings = base
+      .filter((n) => n.parentId === node.parentId)
+      .sort((a, b) => a.order - b.order);
+    const idx = siblings.findIndex((n) => n.id === nodeId);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+
+    if (swapIdx < 0 || swapIdx >= siblings.length) return;
+
+    const swapNode = siblings[swapIdx];
+    const updated = base.map((n) => {
+      if (n.id === nodeId) return { ...n, order: swapNode.order };
+      if (n.id === swapNode.id) return { ...n, order: node.order };
+      return n;
+    });
+
+    setPendingNodes(updated);
+  }
+
+  async function confirmMove() {
+    if (!movingNodeId || !pendingNodes) return;
+    const node = pendingNodes.find((n) => n.id === movingNodeId);
+    if (!node) return;
+
+    const newParentId = targetParentId !== undefined ? targetParentId : node.parentId;
+
+    setMovingNodeId(null);
+    setPendingNodes(null);
+    setTargetParentId(null);
+
+    try {
+      await client.adminTopics.move(movingNodeId, {
+        newParentId,
+        newSortOrder: node.order,
+      });
+      await refresh();
+      showToast('Ordem salva', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Falha ao mover', 'error');
+    }
+  }
+
+  function cancelMove() {
+    setMovingNodeId(null);
+    setPendingNodes(null);
+    setTargetParentId(null);
+  }
+
+  function handleTitleClick(e: React.MouseEvent, nodeId: string) {
+    const now = Date.now();
+    const last = lastTapRef.current;
+
+    if (last && last.id === nodeId && now - last.time < 300) {
+      // Double tap detected - enter edit mode
+      e.stopPropagation();
+      lastTapRef.current = null;
+      setInlineEditId(nodeId);
+      const node = activeNodes.find((n) => n.id === nodeId);
+      if (node) setInlineTitle(node.title);
+    } else {
+      // First tap or single click - just record the tap, let propagation select the node
+      lastTapRef.current = { id: nodeId, time: now };
+      // Clear the tap history after 300ms if no second tap comes
+      setTimeout(() => {
+        if (lastTapRef.current && lastTapRef.current.id === nodeId && lastTapRef.current.time === now) {
+          lastTapRef.current = null;
+        }
+      }, 300);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -330,9 +424,9 @@ export default function AdminTopicsPage() {
   }
 
   async function handleInlineSave(id: string, title: string) {
-    if (!title.trim() || !accessToken) { setInlineEditId(null); return; }
+    if (!title.trim()) { setInlineEditId(null); return; }
     try {
-      await adminTopicsApi.update(accessToken, id, { title: title.trim() });
+      await client.adminTopics.update(id, { title: title.trim() });
       await refresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to rename topic', 'error');
@@ -342,16 +436,15 @@ export default function AdminTopicsPage() {
   }
 
   async function handleCreate(data: CreateTopicInput) {
-    if (!accessToken) return;
-    await adminTopicsApi.create(accessToken, data);
+    await client.adminTopics.create(data);
     await refresh();
     showToast('Topic created', 'success');
   }
 
   async function handleArchive() {
-    if (!archiveTarget || !accessToken) return;
+    if (!archiveTarget) return;
     try {
-      await adminTopicsApi.archive(accessToken, archiveTarget.id);
+      await client.adminTopics.archive(archiveTarget.id);
       setArchiveTarget(null);
       if (selectedId === archiveTarget.id) setSelectedId(null);
       await refresh();
@@ -364,7 +457,7 @@ export default function AdminTopicsPage() {
 
   async function handleDetailSave(e: FormEvent) {
     e.preventDefault();
-    if (!selectedId || !accessToken) return;
+    if (!selectedId) return;
     setDetailError('');
     setDetailSaving(true);
     try {
@@ -376,7 +469,7 @@ export default function AdminTopicsPage() {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-      await adminTopicsApi.update(accessToken, selectedId, {
+      await client.adminTopics.update(selectedId, {
         title: detailTitle,
         content: detailContent,
         status: detailStatus,
@@ -394,10 +487,10 @@ export default function AdminTopicsPage() {
   }
 
   async function reloadMedia() {
-    if (!accessToken || !selectedId) return;
+    if (!selectedId) return;
     setLoadingMedia(true);
     try {
-      const media = await adminMediaApi.list(accessToken, selectedId);
+      const media = await client.adminMedia.list(selectedId);
       setDetailMedia(media);
     } catch {
       showToast('Failed to reload media', 'error');
@@ -443,7 +536,7 @@ export default function AdminTopicsPage() {
       const position = getDropPosition(e);
       setDropTarget(null);
 
-      if (!sourceId || sourceId === targetNode.id || !accessToken) return;
+      if (!sourceId || sourceId === targetNode.id) return;
 
       try {
         let moveArgs: { newParentId: string | null; newSortOrder?: number };
@@ -454,7 +547,7 @@ export default function AdminTopicsPage() {
         } else {
           moveArgs = { newParentId: targetNode.parentId, newSortOrder: targetNode.order + 1 };
         }
-        await adminTopicsApi.move(accessToken, sourceId, moveArgs);
+        await client.adminTopics.move(sourceId, moveArgs);
         await refresh();
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Move failed';
@@ -488,13 +581,25 @@ export default function AdminTopicsPage() {
         <div key={node.id}>
           <div
             className={`group flex items-center gap-1.5 rounded-lg py-1.5 pr-2 text-sm transition-all duration-200 ${
-              isSelected
-                ? 'bg-indigo-50 text-indigo-900 shadow-sm dark:bg-indigo-500/10 dark:text-indigo-300'
-                : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/50'
-            } ${node.archived ? 'opacity-40 grayscale-[0.5]' : ''} ${dropIndicatorClass}`}
+              movingNodeId === node.id
+                ? 'bg-indigo-100 ring-2 ring-indigo-400 dark:bg-indigo-500/20 dark:ring-indigo-400'
+                : isSelected
+                  ? 'bg-indigo-50 text-indigo-900 shadow-sm dark:bg-indigo-500/10 dark:text-indigo-300'
+                  : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/50'
+            } ${node.archived ? 'opacity-40 grayscale-[0.5]' : ''} ${
+              movingNodeId && movingNodeId !== node.id ? 'cursor-pointer md:cursor-default' : ''
+            } ${
+              targetParentId === node.id ? 'ring-2 ring-green-500 dark:ring-green-400' : ''
+            } ${dropIndicatorClass}`}
             style={{ paddingLeft: `${6 + depth * 18}px` }}
             data-testid={`topic-node-${node.id}`}
-            onClick={() => setSelectedId(node.id)}
+            onClick={() => {
+              if (movingNodeId && movingNodeId !== node.id) {
+                setTargetParentId(node.id);
+              } else {
+                setSelectedId(node.id);
+              }
+            }}
             onDragOver={handleDragOver(node)}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop(node)}
@@ -543,12 +648,13 @@ export default function AdminTopicsPage() {
             ) : (
               <button
                 type="button"
-                onClick={(e) => {
+                onClick={(e) => handleTitleClick(e, node.id)}
+                onDoubleClick={(e) => {
                   e.stopPropagation();
                   setInlineEditId(node.id);
                   setInlineTitle(node.title);
                 }}
-                className="min-w-0 flex-1 truncate text-left font-medium text-zinc-900 hover:text-indigo-700 dark:text-zinc-100 dark:hover:text-indigo-300"
+                className="min-w-0 flex-1 truncate text-left font-medium text-zinc-900 hover:text-indigo-700 dark:text-zinc-100 dark:hover:text-indigo-300 cursor-text"
                 data-testid={`title-btn-${node.id}`}
               >
                 {node.title}
@@ -556,11 +662,9 @@ export default function AdminTopicsPage() {
             )}
 
             {/* Status badge */}
-            <span
-              className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[node.status] ?? ''}`}
-            >
+            <Badge status={STATUS_BADGE_MAP[node.status] || 'draft'} size="sm">
               {node.status}
-            </span>
+            </Badge>
 
             {/* Add child */}
             <button
@@ -585,6 +689,66 @@ export default function AdminTopicsPage() {
             >
               Archive
             </button>
+
+            {/* Mobile reordering buttons */}
+            {movingNodeId === node.id ? (
+              <div className="flex items-center gap-1 md:hidden flex-wrap">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); moveNodeLocally(node.id, 'up'); }}
+                  className="text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                  aria-label="Move up"
+                  title="Move up among siblings"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); moveNodeLocally(node.id, 'down'); }}
+                  className="text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                  aria-label="Move down"
+                  title="Move down among siblings"
+                >
+                  ▼
+                </button>
+                {targetParentId && (
+                  <span className="text-xs text-green-600 dark:text-green-400">
+                    → {activeNodes.find((n) => n.id === targetParentId)?.title || 'Destino'}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); confirmMove(); }}
+                  className="text-xs text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                  aria-label="Confirm move"
+                  title="Save the move (with or without new parent)"
+                >
+                  ✓
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); cancelMove(); }}
+                  className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  aria-label="Cancel move"
+                  title="Cancel and discard changes"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMovingNodeId(node.id);
+                }}
+                className="flex-shrink-0 text-xs text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 md:hidden"
+                aria-label="Reorder - use ▲▼ to move, click another topic to set as parent"
+                title="Click to reorder. Use ▲▼ to move between siblings. Click another topic to move inside it."
+              >
+                ⇅
+              </button>
+            )}
           </div>
 
           {/* Children (if expanded) */}
@@ -612,28 +776,29 @@ export default function AdminTopicsPage() {
   // Main render
   // ---------------------------------------------------------------------------
 
-  const tree = buildTree(nodes);
+  const tree = buildTree(activeNodes);
 
   return (
-    <main className="flex h-[calc(100vh-57px)] flex-col bg-zinc-50 dark:bg-zinc-950">
+    <main className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-zinc-200/80 bg-white/50 px-6 py-4 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/50">
+      <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900 flex-shrink-0">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Topic Tree</h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Build and organize your educational hierarchy</p>
+          <h1 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>Topic Tree</h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">Build and organize your educational hierarchy</p>
         </div>
-        <button
+        <Button
           onClick={() => { setCreateParentId(null); setShowCreate(true); }}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-indigo-500/25 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
+          variant="primary"
+          size="md"
         >
           New Root Topic
-        </button>
+        </Button>
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: tree panel */}
-        <div className="w-80 flex-shrink-0 overflow-y-auto border-r border-zinc-200/80 bg-white/30 backdrop-blur-sm p-4 dark:border-zinc-800/80 dark:bg-zinc-900/10">
+      <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--aq-bg)' }}>
+        {/* Left: tree panel — full width on mobile, responsive on desktop */}
+        <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:max-w-[50%] lg:max-w-[620px] min-w-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
           {fetchError && (
             <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{fetchError}</p>
           )}
@@ -652,31 +817,43 @@ export default function AdminTopicsPage() {
         </div>
 
         {/* Right: detail pane */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className={`${selectedId ? 'flex' : 'hidden md:flex'} flex-1 flex-col overflow-y-auto p-6 md:p-8`}>
+          {/* Mobile back button */}
+          {selectedNode && (
+            <button
+              onClick={() => setSelectedId(null)}
+              className="mb-4 flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 md:hidden"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to topics
+            </button>
+          )}
           {!selectedNode ? (
-            <div className="flex h-full flex-col items-center justify-center space-y-4 opacity-40">
-              <div className="rounded-full bg-zinc-100 p-6 dark:bg-zinc-800">
-                <svg className="h-12 w-12 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="flex h-full flex-col items-center justify-center space-y-4">
+              <div className="rounded-full bg-zinc-100 p-6 dark:bg-zinc-800/50">
+                <svg className="h-12 w-12 text-zinc-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <p className="text-sm font-medium text-zinc-500">Select a topic to edit its details</p>
+              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Select a topic to edit its details</p>
             </div>
           ) : (
-            <div className="mx-auto max-w-3xl space-y-8">
+            <div className="space-y-8">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <h2 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>
                     {detailTitle || 'Untitled Topic'}
                   </h2>
-                  <p className="text-sm text-zinc-500">Topic ID: <code className="font-mono text-xs">{selectedId}</code></p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Topic ID: <code className="font-mono text-xs">{selectedId}</code></p>
                 </div>
-                <div className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${STATUS_COLORS[detailStatus]}`}>
+                <Badge status={STATUS_BADGE_MAP[detailStatus] || 'draft'}>
                   {detailStatus}
-                </div>
+                </Badge>
               </div>
 
-              <form onSubmit={handleDetailSave} className="space-y-6 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/50" noValidate>
+              <form onSubmit={handleDetailSave} className="space-y-6" noValidate>
 
               <div>
                 <label htmlFor="dp-title" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -767,27 +944,27 @@ export default function AdminTopicsPage() {
               )}
 
               <div className="flex items-center gap-3 pt-2">
-                <button
+                <Button
                   type="submit"
                   disabled={detailSaving}
-                  className="flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  variant="primary"
+                  size="md"
+                  isLoading={detailSaving}
                 >
-                  {detailSaving && <Spinner className="h-4 w-4" />}
                   Save changes
-                </button>
+                </Button>
               </div>
             </form>
 
             <div className="mt-12 space-y-6">
               <div>
                 <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Media Attachments</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">Upload and manage files associated with this topic.</p>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">Upload and manage files associated with this topic.</p>
               </div>
 
-              {accessToken && selectedId && (
+              {selectedId && (
                 <MediaUploader
                   topicId={selectedId}
-                  token={accessToken}
                   onUploadComplete={reloadMedia}
                 />
               )}
@@ -797,10 +974,9 @@ export default function AdminTopicsPage() {
                   <Spinner className="h-6 w-6 text-zinc-400" />
                 </div>
               ) : (
-                accessToken && selectedId && (
+                selectedId && (
                   <MediaList
                     topicId={selectedId}
-                    token={accessToken}
                     media={detailMedia}
                     onMediaDeleted={reloadMedia}
                   />

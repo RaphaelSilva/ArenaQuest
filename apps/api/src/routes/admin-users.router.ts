@@ -7,8 +7,10 @@ import type {
   IAuthAdapter,
   IRefreshTokenRepository,
   IUserRepository,
+  IMailer,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
+import { AdminUsersController } from '@api/controllers/admin-users.controller';
 
 // ---------------------------------------------------------------------------
 // Validation schemas
@@ -97,8 +99,10 @@ export function buildAdminUsersRouter(
   users: IUserRepository,
   auth: IAuthAdapter,
   tokens: IRefreshTokenRepository,
+  mailer: IMailer,
 ): Hono {
   const router = new Hono();
+  const adminUsersController = new AdminUsersController(auth, users, tokens, mailer);
 
   // Every admin endpoint requires a valid token with the admin role.
   router.use('*', authGuard, requireRole(ROLES.ADMIN));
@@ -227,6 +231,21 @@ export function buildAdminUsersRouter(
     auditSessionRevocation('user.sessions.revoked.deleted', id, actor);
 
     return c.body(null, 204);
+  });
+
+  // POST /admin/users/:id/reset-password — admin-initiated password reset
+  router.post('/:id/reset-password', async (c) => {
+    const userId = c.req.param('id');
+    const adminId = c.get('user').sub;
+    const body = await c.req.json();
+
+    const result = await adminUsersController.resetPassword(adminId, userId, body);
+
+    if (!result.ok) {
+      return c.json({ error: result.error }, result.status);
+    }
+
+    return c.json(result.data);
   });
 
   return router;

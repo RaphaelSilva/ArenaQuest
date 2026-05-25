@@ -10,7 +10,8 @@ const MIGRATION_STATEMENTS = [
     email         TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    timezone      TEXT NOT NULL DEFAULT 'UTC'
   )`,
   `CREATE TABLE IF NOT EXISTS topic_nodes (
     id                TEXT    NOT NULL PRIMARY KEY,

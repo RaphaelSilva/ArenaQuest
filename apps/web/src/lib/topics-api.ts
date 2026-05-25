@@ -1,51 +1,76 @@
-import type { TopicNode } from './admin-topics-api';
-export type { TopicNode };
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
-
-async function apiFetch(path: string, token: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  });
-}
+import type { TopicNode, Media } from './admin-topics-api';
+import type { HttpTransport } from './api-client';
+export type { TopicNode, Media };
 
 export type TopicProgressStatus = 'not_started' | 'in_progress' | 'completed';
 
+export type TopicProgressEntry = {
+  topicNodeId: string;
+  status: TopicProgressStatus;
+};
+
+export type TopicWithMedia = TopicNode & {
+  children: TopicNode[];
+  media: Media[];
+};
+
+export function createTopicsApi(http: HttpTransport) {
+  return {
+    async list(): Promise<TopicNode[]> {
+      const res = await http('GET', '/topics');
+      if (!res.ok) throw new Error(`Failed to list published topics (${res.status})`);
+      const body = (await res.json()) as { data: TopicNode[] };
+      return body.data;
+    },
+
+    async getById(id: string): Promise<TopicWithMedia> {
+      const res = await http('GET', `/topics/${id}`);
+      if (!res.ok) {
+        if (res.status === 404) throw new Error('Topic not found or not published');
+        throw new Error(`Failed to get topic (${res.status})`);
+      }
+      return res.json();
+    },
+
+    async visit(id: string): Promise<void> {
+      try {
+        await http('POST', `/topics/${id}/visit`);
+      } catch {
+        // intentionally silent — beacon must not block rendering
+      }
+    },
+
+    async listProgress(): Promise<TopicProgressEntry[]> {
+      try {
+        const res = await http('GET', '/me/progress/topics');
+        if (!res.ok) return [];
+        const body = (await res.json()) as { data: TopicProgressEntry[] };
+        return body.data;
+      } catch {
+        return [];
+      }
+    },
+
+    async complete(id: string): Promise<TopicProgressStatus> {
+      const res = await http('POST', `/topics/${id}/complete`);
+      if (!res.ok) throw new Error(`Failed to mark topic as read (${res.status})`);
+      const body = (await res.json()) as { topicProgress: { status: string } };
+      return body.topicProgress.status as TopicProgressStatus;
+    },
+  };
+}
+
+// Deprecated: use useApiClient hook instead. Temporary export for backward compatibility during migration.
+// This will be removed in Phase C after all consumers are migrated.
+const _deprecationError = () => {
+  throw new Error(
+    'topicsApi is deprecated and no longer bound to auth context. Use const client = useApiClient(); instead.',
+  );
+};
 export const topicsApi = {
-  async list(token: string): Promise<TopicNode[]> {
-    const res = await apiFetch('/topics', token);
-    if (!res.ok) throw new Error(`Failed to list published topics (${res.status})`);
-    const body = (await res.json()) as { data: TopicNode[] };
-    return body.data;
-  },
-
-  async getById(token: string, id: string): Promise<TopicNode & { children: TopicNode[] }> {
-    const res = await apiFetch(`/topics/${id}`, token);
-    if (!res.ok) {
-      if (res.status === 404) throw new Error('Topic not found or not published');
-      throw new Error(`Failed to get topic (${res.status})`);
-    }
-    return res.json();
-  },
-
-  /** Fire-and-forget visit beacon. Never throws. */
-  async visit(token: string, id: string): Promise<void> {
-    try {
-      await apiFetch(`/topics/${id}/visit`, token, { method: 'POST' });
-    } catch {
-      // intentionally silent — beacon must not block rendering
-    }
-  },
-
-  async complete(token: string, id: string): Promise<TopicProgressStatus> {
-    const res = await apiFetch(`/topics/${id}/complete`, token, { method: 'POST' });
-    if (!res.ok) throw new Error(`Failed to mark topic as read (${res.status})`);
-    const body = (await res.json()) as { topicProgress: { status: string } };
-    return body.topicProgress.status as TopicProgressStatus;
-  },
+  list: _deprecationError,
+  getById: _deprecationError,
+  visit: _deprecationError,
+  listProgress: _deprecationError,
+  complete: _deprecationError,
 };

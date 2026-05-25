@@ -15,7 +15,8 @@ const MIGRATION_SQL = [
     email         TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    timezone      TEXT NOT NULL DEFAULT 'UTC'
   )`,
   `CREATE TABLE IF NOT EXISTS roles (
     id          TEXT NOT NULL PRIMARY KEY,
@@ -39,6 +40,13 @@ const MIGRATION_SQL = [
     ('3318927d-8b5e-52d9-a145-2e4323919ed6', 'content_creator', 'Can create/edit content'),
     ('32a5cab1-e66f-5d23-a80d-80cfa927d057', 'tutor',           'Can monitor student progress'),
     ('bf3d0f1d-7d77-5151-922e-b87dff0fa7ad', 'student',         'Can consume content and tasks')`,
+  `CREATE TABLE IF NOT EXISTS user_streak (
+    user_id             TEXT    NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    current_streak      INTEGER NOT NULL DEFAULT 0,
+    longest_streak      INTEGER NOT NULL DEFAULT 0,
+    last_activity_date  TEXT,
+    updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
+  )`,
 ];
 
 // Admin token signed with the test JWT_SECRET — avoids a real login round-trip.
@@ -703,5 +711,181 @@ describe('Admin audit log', () => {
     expect(new Date(entry.at as string).toString()).not.toBe('Invalid Date');
 
     infoSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /admin/users/:id/reset-password — password reset
+// ---------------------------------------------------------------------------
+
+describe('POST /admin/users/:id/reset-password', () => {
+  it('returns 401 without token', async () => {
+    const res = await req('POST', '/admin/users/some-id/reset-password', {
+      body: { sendEmail: false },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 403 with student token', async () => {
+    const res = await req('POST', '/admin/users/some-id/reset-password', {
+      token: studentToken,
+      body: { sendEmail: false },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('resets user password and returns temporary password', async () => {
+    const createRes = await req('POST', '/admin/users', {
+      token: adminToken,
+      body: { name: 'Reset Target', email: 'reset-target@example.com', password: 'password123', roles: ['student'] },
+    });
+    const { id } = await createRes.json<{ id: string }>();
+
+    const resetRes = await req('POST', `/admin/users/${id}/reset-password`, {
+      token: adminToken,
+      body: { sendEmail: false },
+    });
+
+    expect(resetRes.status).toBe(200);
+    const result = await resetRes.json<{ userId: string; temporaryPassword: string; emailSent: boolean; resetAt: string }>();
+    expect(result.userId).toBe(id);
+    expect(result.temporaryPassword).toBeDefined();
+    expect(result.temporaryPassword.length).toBeGreaterThan(0);
+    expect(result.emailSent).toBe(false);
+    expect(typeof result.resetAt).toBe('string');
+    expect(new Date(result.resetAt).toString()).not.toBe('Invalid Date');
+  });
+
+  it('returns 422 when admin tries to reset own password', async () => {
+    const resetRes = await req('POST', `/admin/users/${ADMIN_USER_ID}/reset-password`, {
+      token: adminToken,
+      body: { sendEmail: false },
+    });
+
+    expect(resetRes.status).toBe(422);
+    const result = await resetRes.json<{ error: string }>();
+    expect(result.error).toBe('SelfResetNotAllowed');
+  });
+
+  it('returns 404 when user not found', async () => {
+    const resetRes = await req('POST', '/admin/users/nonexistent-id/reset-password', {
+      token: adminToken,
+      body: { sendEmail: false },
+    });
+
+    expect(resetRes.status).toBe(404);
+  });
+
+  it('returns 404 when user is inactive', async () => {
+    const createRes = await req('POST', '/admin/users', {
+      token: adminToken,
+      body: { name: 'To Deactivate', email: 'to-deactivate@example.com', password: 'password123' },
+    });
+    const { id } = await createRes.json<{ id: string }>();
+
+    // Deactivate the user
+    await req('DELETE', `/admin/users/${id}`, { token: adminToken });
+
+    // Try to reset password
+    const resetRes = await req('POST', `/admin/users/${id}/reset-password`, {
+      token: adminToken,
+      body: { sendEmail: false },
+    });
+
+    expect(resetRes.status).toBe(404);
+  });
+
+  it('revokes refresh tokens for target user after reset', async () => {
+    const createRes = await req('POST', '/admin/users', {
+      token: adminToken,
+      body: { name: 'Token Revoke Target', email: 'token-revoke@example.com', password: 'password123', roles: ['student'] },
+    });
+    const { id } = await createRes.json<{ id: string }>();
+
+    // Seed a refresh token for this user
+    const testToken = 'test-refresh-token-12345';
+    await seedRefreshToken(id, testToken);
+
+    // Reset the password
+    const resetRes = await req('POST', `/admin/users/${id}/reset-password`, {
+      token: adminToken,
+      body: { sendEmail: false },
+    });
+    expect(resetRes.status).toBe(200);
+
+    // Verify the token is no longer valid by querying the database
+    const tokenCheck = await env.DB
+      .prepare('SELECT COUNT(*) as cnt FROM refresh_tokens WHERE user_id = ?')
+      .bind(id)
+      .first<{ cnt: number }>();
+
+    expect(tokenCheck?.cnt ?? 0).toBe(0);
+  });
+
+  it('returns 400 when adminNote exceeds 500 chars', async () => {
+    const createRes = await req('POST', '/admin/users', {
+      token: adminToken,
+      body: { name: 'Note Validation', email: 'note-validation@example.com', password: 'password123' },
+    });
+    const { id } = await createRes.json<{ id: string }>();
+
+    const resetRes = await req('POST', `/admin/users/${id}/reset-password`, {
+      token: adminToken,
+      body: { sendEmail: false, adminNote: 'a'.repeat(501) },
+    });
+
+    expect(resetRes.status).toBe(400);
+  });
+
+  it('returns 400 when sendEmail is not boolean', async () => {
+    const createRes = await req('POST', '/admin/users', {
+      token: adminToken,
+      body: { name: 'Type Validation', email: 'type-validation@example.com', password: 'password123' },
+    });
+    const { id } = await createRes.json<{ id: string }>();
+
+    const resetRes = await req('POST', `/admin/users/${id}/reset-password`, {
+      token: adminToken,
+      body: { sendEmail: 'true' }, // String instead of boolean
+    });
+
+    expect(resetRes.status).toBe(400);
+  });
+
+  it('accepts adminNote up to 500 chars', async () => {
+    const createRes = await req('POST', '/admin/users', {
+      token: adminToken,
+      body: { name: 'Note Max Valid', email: 'note-max@example.com', password: 'password123' },
+    });
+    const { id } = await createRes.json<{ id: string }>();
+
+    const resetRes = await req('POST', `/admin/users/${id}/reset-password`, {
+      token: adminToken,
+      body: { sendEmail: false, adminNote: 'a'.repeat(500) },
+    });
+
+    expect(resetRes.status).toBe(200);
+  });
+
+  it('generates unique temporary passwords on multiple resets', async () => {
+    const createRes = await req('POST', '/admin/users', {
+      token: adminToken,
+      body: { name: 'Multi Reset', email: 'multi-reset@example.com', password: 'password123' },
+    });
+    const { id } = await createRes.json<{ id: string }>();
+
+    const resetRes1 = await req('POST', `/admin/users/${id}/reset-password`, {
+      token: adminToken,
+      body: { sendEmail: false },
+    });
+    const result1 = await resetRes1.json<{ temporaryPassword: string }>();
+
+    const resetRes2 = await req('POST', `/admin/users/${id}/reset-password`, {
+      token: adminToken,
+      body: { sendEmail: false },
+    });
+    const result2 = await resetRes2.json<{ temporaryPassword: string }>();
+
+    expect(result1.temporaryPassword).not.toBe(result2.temporaryPassword);
   });
 });

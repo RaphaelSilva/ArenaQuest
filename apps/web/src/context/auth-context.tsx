@@ -6,10 +6,12 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type ReactNode,
 } from 'react';
 import type { Entities } from '@arenaquest/shared/types/entities';
 import { authApi } from '@web/lib/auth-api';
+import { ApiClient } from '@web/lib/api-client';
 
 // ---------------------------------------------------------------------------
 // JWT decoder — no external deps, client-side only
@@ -45,6 +47,7 @@ function userFromClaims(claims: {
       createdAt: new Date(0),
     })),
     groups: [],
+    timezone: '',
     createdAt: new Date(0),
   };
 }
@@ -57,8 +60,13 @@ export interface AuthContextValue {
   user: Entities.Identity.User | null;
   accessToken: string | null;
   isLoading: boolean;
+  apiClient: ApiClient;
   login(email: string, password: string): Promise<void>;
+  loginWithAccessToken(token: string): void;
   logout(): Promise<void>;
+  refreshSession(): Promise<string | null>;
+  setAccessToken(token: string | null): void;
+  onSessionExpired(): void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -95,8 +103,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status: 'active' as Entities.Config.UserStatus,
       roles: apiUser.roles,
       groups: [],
+      timezone: '',
       createdAt: new Date(),
     });
+  }, []);
+
+  const loginWithAccessToken = useCallback((token: string) => {
+    setAccessToken(token);
+    const claims = decodeJwtClaims(token);
+    if (claims) setUser(userFromClaims(claims));
   }, []);
 
   const logout = useCallback(async () => {
@@ -105,8 +120,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(null);
   }, []);
 
+  const refreshSession = useCallback(async () => {
+    try {
+      const result = await authApi.refresh();
+      if (!result) return null;
+
+      setAccessToken(result.accessToken);
+      const claims = decodeJwtClaims(result.accessToken);
+      if (claims) setUser(userFromClaims(claims));
+
+      return result.accessToken;
+    } catch {
+      setUser(null);
+      setAccessToken(null);
+      return null;
+    }
+  }, []);
+
+  const onSessionExpired = useCallback(() => {
+    setUser(null);
+    setAccessToken(null);
+  }, []);
+
+  const apiClient = useMemo(
+    () => new ApiClient(accessToken, refreshSession, setAccessToken, onSessionExpired),
+    [accessToken, refreshSession, setAccessToken, onSessionExpired],
+  );
+
   return (
-    <AuthContext.Provider value={{ user, accessToken, isLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        accessToken,
+        isLoading,
+        apiClient,
+        login,
+        loginWithAccessToken,
+        logout,
+        refreshSession,
+        setAccessToken,
+        onSessionExpired,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -120,4 +175,10 @@ export function useAuthContext(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuthContext must be used within <AuthProvider>');
   return ctx;
+}
+
+export function useApiClient(): ApiClient {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useApiClient must be used within <AuthProvider>');
+  return ctx.apiClient;
 }

@@ -1,17 +1,113 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useApiClient } from '@web/context/auth-context';
+import type { TopicNode, TopicProgressStatus } from '@web/lib/topics-api';
+import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
+import { Spinner } from '@web/components/spinner';
+
 export default function CatalogIndexPage() {
+  const client = useApiClient();
+  const [topics, setTopics] = useState<TopicNode[]>([]);
+  const [progressMap, setProgressMap] = useState<Map<string, TopicProgressStatus>>(new Map());
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    Promise.all([
+      client.topics.list(),
+      client.topics.listProgress(),
+    ]).then(([nodes, progressEntries]) => {
+      if (!active) return;
+      // Filter to root topics only (parentId === null)
+      setTopics(nodes.filter((n) => n.parentId === null));
+      const map = new Map<string, TopicProgressStatus>(
+        progressEntries.map((p) => [p.topicNodeId, p.status]),
+      );
+      setProgressMap(map);
+      setLoading(false);
+    }).catch(() => {
+      if (!active) return;
+      setLoading(false);
+    });
+
+    return () => { active = false; };
+  }, [client]);
+
   return (
-    <div className="flex h-full min-h-[50vh] flex-col items-center justify-center p-8 text-center">
-      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-indigo-50 text-indigo-500 shadow-inner dark:bg-indigo-500/10 dark:text-indigo-400">
-        <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-        </svg>
-      </div>
-      <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-        Welcome to the Catalogue
-      </h2>
-      <p className="mt-2 max-w-sm text-base text-zinc-500 dark:text-zinc-400">
-        Select a topic from the sidebar to view its content and attached media.
-      </p>
+    <div className="mx-auto max-w-[900px] px-4 py-8 md:px-6 lg:px-10">
+      {/* Breadcrumb */}
+      <CatalogBreadcrumb items={[{ label: 'Catalogue' }]} />
+
+      <h1 className="mb-8 text-2xl font-bold md:text-3xl" style={{ color: 'var(--aq-text)' }}>
+        Catalogue
+      </h1>
+
+      {loading ? (
+        <div className="flex h-[200px] items-center justify-center">
+          <Spinner className="h-8 w-8" />
+        </div>
+      ) : topics.length === 0 ? (
+        <div className="flex h-[200px] flex-col items-center justify-center text-center">
+          <p style={{ color: 'var(--aq-text3)' }}>No topics available yet.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {topics.map((topic) => {
+            const status = progressMap.get(topic.id) ?? 'not_started';
+            const pct = status === 'completed' ? 100 : status === 'in_progress' ? 50 : 0;
+            return (
+              <Link
+                key={topic.id}
+                href={`/catalog/${topic.id}`}
+                className="block rounded-[8px] border px-4 py-3 transition-colors hover:bg-[var(--aq-bg3)]"
+                style={{
+                  borderColor: 'var(--aq-border)',
+                  background: 'var(--aq-bg2)',
+                }}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[16px]">📚</span>
+                      <h3 className="truncate font-semibold" style={{ color: 'var(--aq-text)' }}>
+                        {topic.title}
+                      </h3>
+                      {status === 'completed' && (
+                        <span className="text-sm font-semibold" style={{ color: 'var(--aq-accent3)' }}>
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div
+                        className="h-[4px] flex-1 overflow-hidden rounded-full"
+                        style={{ background: 'var(--aq-bg4)' }}
+                      >
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${pct}%`,
+                            background:
+                              status === 'completed'
+                                ? 'var(--aq-accent3)'
+                                : 'var(--aq-accent)',
+                          }}
+                        />
+                      </div>
+                      <span className="flex-shrink-0 text-[11px] font-semibold" style={{ color: 'var(--aq-text3)' }}>
+                        {pct}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

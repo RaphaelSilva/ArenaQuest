@@ -6,9 +6,11 @@ import Link from 'next/link';
 import type { Entities } from '@arenaquest/shared/types/entities';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import type { RoleName } from '@arenaquest/shared/constants/roles';
-import { useAuth, useHasRole } from '@web/hooks/use-auth';
-import { adminUsersApi, type CreateUserInput, type UpdateUserInput } from '@web/lib/admin-users-api';
+import { useHasRole } from '@web/hooks/use-auth';
+import { useApiClient } from '@web/context/auth-context';
+import type { CreateUserInput, UpdateUserInput } from '@web/lib/admin-users-api';
 import { Spinner } from '@web/components/spinner';
+import { Button, Badge } from '@web/components/design-system';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -167,21 +169,23 @@ function UserForm({ initial, onSubmit, onClose }: UserFormProps) {
           )}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button
+            <Button
               type="button"
               onClick={onClose}
-              className="rounded px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400"
+              variant="secondary"
+              size="md"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={submitting}
-              className="flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              variant="primary"
+              size="md"
+              isLoading={submitting}
             >
-              {submitting && <Spinner className="h-4 w-4" />}
               {isEdit ? 'Save changes' : 'Create user'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -212,18 +216,20 @@ function ConfirmDialog({
       <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
         <p className="mb-4 text-sm text-zinc-700 dark:text-zinc-300">{message}</p>
         <div className="flex justify-end gap-3">
-          <button
+          <Button
             onClick={onCancel}
-            className="rounded px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400"
+            variant="secondary"
+            size="md"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onConfirm}
-            className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            variant="danger"
+            size="md"
           >
             Confirm
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -237,7 +243,7 @@ function ConfirmDialog({
 export default function AdminUsersPage() {
   const router = useRouter();
   const isAdmin = useHasRole(ROLES.ADMIN);
-  const { accessToken, isLoading: authLoading } = useAuth();
+  const client = useApiClient();
 
   const [users, setUsers] = useState<Entities.Identity.User[]>([]);
   const [total, setTotal] = useState(0);
@@ -252,17 +258,16 @@ export default function AdminUsersPage() {
 
   // Redirect non-admins
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    if (!isAdmin) {
       router.replace('/dashboard');
     }
-  }, [authLoading, isAdmin, router]);
+  }, [isAdmin, router]);
 
   const fetchUsers = useCallback(async () => {
-    if (!accessToken) return;
     setLoading(true);
     setError('');
     try {
-      const result = await adminUsersApi.list(accessToken, page, pageSize);
+      const result = await client.adminUsers.list();
       setUsers(result.data);
       setTotal(result.total);
     } catch {
@@ -270,51 +275,44 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, page, pageSize]);
+  }, [client]);
 
   useEffect(() => {
-    if (isAdmin && accessToken) fetchUsers();
-  }, [isAdmin, accessToken, fetchUsers]);
+    if (isAdmin) fetchUsers();
+  }, [isAdmin, fetchUsers]);
 
   async function handleCreate(data: CreateUserInput | Partial<UpdateUserInput>) {
-    await adminUsersApi.create(accessToken!, data as CreateUserInput);
+    await client.adminUsers.create(data as CreateUserInput);
     setPage(1);
     await fetchUsers();
   }
 
   async function handleUpdate(data: CreateUserInput | Partial<UpdateUserInput>) {
-    await adminUsersApi.update(accessToken!, editTarget!.id, data as Partial<UpdateUserInput>);
+    await client.adminUsers.update(editTarget!.id, data as Partial<UpdateUserInput>);
     await fetchUsers();
   }
 
   async function handleDeactivate() {
-    await adminUsersApi.deactivate(accessToken!, deactivateTarget!.id);
+    await client.adminUsers.deactivate(deactivateTarget!.id);
     setDeactivateTarget(undefined);
     await fetchUsers();
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Spinner className="h-8 w-8 text-zinc-600" />
-      </div>
-    );
-  }
-
   if (!isAdmin) return null;
 
   return (
-    <main className="p-8">
+    <main className="p-4 md:p-6 lg:p-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">User Management</h1>
-        <button
+        <h1 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>User Management</h1>
+        <Button
           onClick={() => { setEditTarget(undefined); setShowForm(true); }}
-          className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          variant="primary"
+          size="md"
         >
           Create User
-        </button>
+        </Button>
       </div>
 
       {error && (
@@ -329,7 +327,7 @@ export default function AdminUsersPage() {
         <>
           <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
             <table className="w-full text-sm">
-              <thead className="bg-zinc-50 text-left text-xs font-medium uppercase text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+              <thead className="bg-zinc-50 text-left text-xs font-medium uppercase text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400" style={{ letterSpacing: '0.05em' }}>
                 <tr>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Email</th>
@@ -341,22 +339,16 @@ export default function AdminUsersPage() {
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                 {users.map((u) => (
-                  <tr key={u.id} className="bg-white dark:bg-zinc-900">
+                  <tr key={u.id} className="bg-white dark:bg-zinc-900 hover:bg-[color:var(--bg3)] transition-colors duration-150">
                     <td className="px-4 py-3 text-zinc-900 dark:text-zinc-50">{u.name}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{u.email}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                       {u.roles.map((r) => r.name).join(', ') || '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                          u.status === 'active'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
-                            : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                        }`}
-                      >
+                      <Badge status={u.status === 'active' ? 'active' : 'inactive'} size="sm">
                         {u.status}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                       {new Date(u.createdAt).toLocaleDateString()}

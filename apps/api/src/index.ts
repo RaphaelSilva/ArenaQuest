@@ -28,6 +28,15 @@ import { AccountController } from '@api/controllers/account.controller';
 import { GoogleOAuthController } from '@api/controllers/google-oauth.controller';
 import { D1ProgressRepository } from '@api/adapters/db/d1-progress-repository';
 import { D1EnrollmentRepository } from '@api/adapters/db/d1-enrollment-repository';
+import { D1QuestRepository } from '@api/adapters/db/d1-quest-repository';
+import { D1BadgeRepository } from '@api/adapters/db/d1-badge-repository';
+import { D1GamificationRepository } from '@api/adapters/db/d1-gamification-repository';
+import { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
+import { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
+import { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
+import { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
+import { D1MissionRepository } from '@api/adapters/db/d1-mission-repository';
+import { D1CommentRepository } from '@api/adapters/db/d1-comment-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
 import { ConsoleMailAdapter } from '@api/adapters/mail/console-mail-adapter';
@@ -59,6 +68,18 @@ function buildApp(env: AppEnv): Hono {
   const taskLinks = new D1TaskLinkingRepository(env.DB);
   const progressRepo = new D1ProgressRepository(env.DB);
   const enrollmentRepo = new D1EnrollmentRepository(env.DB);
+  const questRepo = new D1QuestRepository(env.DB);
+  const badgeRepo = new D1BadgeRepository(env.DB);
+  const gamificationRepo = new D1GamificationRepository(env.DB);
+  const xpEngine = new XpEngine(gamificationRepo, (env as unknown as Record<string, string>)['GAMIFICATION_ENABLED'] !== 'false');
+  const streakEngine = new StreakEngine(
+    gamificationRepo,
+    (userId) => users.findById(userId).then(u => u?.timezone ?? null),
+  );
+  const missionRepo = new D1MissionRepository(env.DB);
+  const commentRepo = new D1CommentRepository(env.DB);
+  const questEvaluator = new QuestEvaluator(questRepo, missionRepo, xpEngine);
+  const badgeEngine = new BadgeEngine(badgeRepo, gamificationRepo, missionRepo, xpEngine);
   const storage = new R2StorageAdapter({
     bucket: env.R2,
     s3Endpoint: env.R2_S3_ENDPOINT,
@@ -157,6 +178,15 @@ function buildApp(env: AppEnv): Hono {
     taskLinks,
     progressRepo,
     enrollmentRepo,
+    questRepo,
+    badgeRepo,
+    gamificationRepo,
+    missionRepo,
+    commentRepo,
+    xpEngine,
+    streakEngine,
+    questEvaluator,
+    badgeEngine,
     authService,
     loginLimiter,
     registerController,
@@ -167,6 +197,7 @@ function buildApp(env: AppEnv): Hono {
     forgotPasswordLimiter,
     accountController,
     googleOAuthController,
+    mailer,
     cookieSameSite: parseCookieSameSite(env.COOKIE_SAMESITE),
     allowedOrigins: env.ALLOWED_ORIGINS,
     // If ALLOWED_ORIGINS is configured, enforce strict validation — an invalid

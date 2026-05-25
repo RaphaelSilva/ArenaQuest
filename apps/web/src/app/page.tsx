@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Logo } from '@web/components/design-system';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,9 @@ type Plan = {
 };
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
-
+/**
+ * TODO: When we public is ready, we need to update this data
+ */
 const PLANS: Plan[] = [
   {
     id: 'starter',
@@ -250,24 +253,7 @@ export default function LandingPage() {
         className="sticky top-0 z-10 flex items-center justify-between px-6 py-0 h-14"
         style={{ background: 'var(--aq-bg2)', borderBottom: '1px solid var(--aq-border)' }}
       >
-        <div className="flex items-center gap-2.5">
-          <div
-            className="flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold"
-            style={{
-              background: 'var(--aq-accent)',
-              color: '#0B0E17',
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}
-          >
-            AQ
-          </div>
-          <span
-            className="text-base font-bold tracking-tight"
-            style={{ color: 'var(--aq-text)', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.3px' }}
-          >
-            Arena<span style={{ color: 'var(--aq-accent)' }}>Quest</span>
-          </span>
-        </div>
+        <Logo />
 
         <nav className="flex items-center gap-3" aria-label="Navegação principal">
           <Link
@@ -416,12 +402,7 @@ export default function LandingPage() {
         className="border-t px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs"
         style={{ borderColor: 'var(--aq-border)', color: 'var(--aq-text3)' }}
       >
-        <span
-          className="font-bold text-sm"
-          style={{ color: 'var(--aq-text)', fontFamily: "'Space Grotesk', sans-serif" }}
-        >
-          Arena<span style={{ color: 'var(--aq-accent)' }}>Quest</span>
-        </span>
+        <Logo textOnly className="text-sm" />
         <span>© {new Date().getFullYear()} ArenaQuest. Todos os direitos reservados.</span>
         <Link
           href="/login"

@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+import type { HttpTransport } from './api-client';
 
 export type ProgressSummary = {
   topics: { total: number; completed: number; inProgress: number; percentage: number };
@@ -21,30 +21,29 @@ export type TaskProgressItem = {
   updatedAt: string;
 };
 
-async function apiFetch(path: string, token: string): Promise<Response> {
-  return fetch(`${API_URL}${path}`, {
-    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-  });
+export function createProgressApi(http: HttpTransport) {
+  return {
+    async getSummary(): Promise<ProgressSummary> {
+      const res = await http('GET', '/me/progress/summary');
+      if (!res.ok) throw new Error(`Failed to load progress summary (${res.status})`);
+      return res.json();
+    },
+
+    async getTopics(): Promise<TopicProgressItem[]> {
+      const res = await http('GET', '/me/progress/topics');
+      if (!res.ok) throw new Error(`Failed to load topic progress (${res.status})`);
+      const body = (await res.json()) as { data: TopicProgressItem[] };
+      return body.data;
+    },
+
+    async getTasks(): Promise<TaskProgressItem[]> {
+      const res = await http('GET', '/me/progress/tasks');
+      if (!res.ok) throw new Error(`Failed to load task progress (${res.status})`);
+      const body = (await res.json()) as { data: TaskProgressItem[] };
+      return body.data;
+    },
+  };
 }
 
-export const progressApi = {
-  async getSummary(token: string): Promise<ProgressSummary> {
-    const res = await apiFetch('/me/progress/summary', token);
-    if (!res.ok) throw new Error(`Failed to load progress summary (${res.status})`);
-    return res.json();
-  },
-
-  async getTopics(token: string): Promise<TopicProgressItem[]> {
-    const res = await apiFetch('/me/progress/topics', token);
-    if (!res.ok) throw new Error(`Failed to load topic progress (${res.status})`);
-    const body = (await res.json()) as { data: TopicProgressItem[] };
-    return body.data;
-  },
-
-  async getTasks(token: string): Promise<TaskProgressItem[]> {
-    const res = await apiFetch('/me/progress/tasks', token);
-    if (!res.ok) throw new Error(`Failed to load task progress (${res.status})`);
-    const body = (await res.json()) as { data: TaskProgressItem[] };
-    return body.data;
-  },
-};
+const _err = () => { throw new Error('progressApi is deprecated. Use useApiClient() hook instead.'); };
+export const progressApi = { getSummary: _err, getTopics: _err, getTasks: _err };
