@@ -1,6 +1,6 @@
 # Task 08 — Refactor `admin-users` controller/router pair (P2)
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 **Milestone:** [8 — `apps/api` Test Suite Optimization](./milestone.md)
 **RFC:** [0001 §P2 / §D2](../../RFCs/0001-apps-api-test-suite-optimization.md)
 
@@ -30,10 +30,10 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `admin-users.router.spec.ts` reduced to HTTP smokes (≥ 1 per endpoint).
-- [ ] `admin-users.controller.spec.ts` covers every removed business-rule branch (lockout guards explicitly listed in PR).
-- [ ] `make test-api` and `make lint` pass.
-- [ ] No diff outside `apps/api/test/**`.
+- [x] `admin-users.router.spec.ts` reduced to HTTP smokes (≥ 1 per endpoint).
+- [x] `admin-users.controller.spec.ts` covers every removed business-rule branch (lockout guards explicitly listed in PR).
+- [x] `make test-api` and `make lint` pass.
+- [x] No diff outside `apps/api/test/**`.
 
 ## Verification Plan
 
