@@ -2,31 +2,7 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { D1TaskRepository } from '@api/adapters/db/d1-task-repository';
 import { D1TaskStageRepository } from '@api/adapters/db/d1-task-stage-repository';
-
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id    TEXT NOT NULL PRIMARY KEY,
-    email TEXT NOT NULL UNIQUE
-  )`,
-  `CREATE TABLE IF NOT EXISTS tasks (
-    id          TEXT NOT NULL PRIMARY KEY,
-    title       TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    status      TEXT NOT NULL DEFAULT 'draft',
-    created_by  TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS task_stages (
-    id         TEXT    NOT NULL PRIMARY KEY,
-    task_id    TEXT    NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    label      TEXT    NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS uniq_task_stages_task_order
-    ON task_stages(task_id, sort_order)`,
-];
+import { applyMigrations } from '../helpers/apply-migrations';
 
 describe('D1TaskStageRepository', () => {
   let tasks: D1TaskRepository;
@@ -34,11 +10,11 @@ describe('D1TaskStageRepository', () => {
   let userId: string;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map(sql => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
     userId = crypto.randomUUID();
     await env.DB
-      .prepare('INSERT OR IGNORE INTO users (id, email) VALUES (?, ?)')
-      .bind(userId, `${userId}@example.com`)
+      .prepare('INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)')
+      .bind(userId, 'test', `${userId}@example.com`, 'hash')
       .run();
     tasks = new D1TaskRepository(env.DB);
     stages = new D1TaskStageRepository(env.DB);

@@ -1,26 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { D1PasswordResetTokenRepository } from '@api/adapters/db/d1-password-reset-token-repository';
-
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id            TEXT    NOT NULL PRIMARY KEY,
-    name          TEXT    NOT NULL,
-    email         TEXT    NOT NULL UNIQUE,
-    password_hash TEXT    NOT NULL,
-    status        TEXT    NOT NULL DEFAULT 'active',
-    created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS password_reset_tokens (
-    token_hash   TEXT    NOT NULL PRIMARY KEY,
-    user_id      TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at   INTEGER NOT NULL,
-    consumed_at  INTEGER,
-    created_at   INTEGER NOT NULL
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id
-    ON password_reset_tokens (user_id)`,
-];
+import { applyMigrations } from '../helpers/apply-migrations';
 
 const USER_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const OTHER_USER_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -29,7 +10,7 @@ describe('D1PasswordResetTokenRepository', () => {
   let repo: D1PasswordResetTokenRepository;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map(sql => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
     await env.DB.batch([
       env.DB
         .prepare('INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)')

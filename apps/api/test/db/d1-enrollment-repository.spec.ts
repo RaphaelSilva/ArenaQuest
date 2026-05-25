@@ -1,48 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { D1EnrollmentRepository } from '@api/adapters/db/d1-enrollment-repository';
-
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id    TEXT NOT NULL PRIMARY KEY,
-    email TEXT NOT NULL UNIQUE
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_nodes (
-    id        TEXT    NOT NULL PRIMARY KEY,
-    parent_id TEXT    REFERENCES topic_nodes(id),
-    title     TEXT    NOT NULL,
-    status    TEXT    NOT NULL DEFAULT 'draft',
-    archived  INTEGER NOT NULL DEFAULT 0
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_groups (
-    id          TEXT NOT NULL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '',
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_group_members (
-    group_id TEXT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
-    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    PRIMARY KEY (group_id, user_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS enrollments_user (
-    id            TEXT NOT NULL PRIMARY KEY,
-    user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    topic_node_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    granted_by    TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    granted_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (user_id, topic_node_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS enrollments_user_group (
-    id            TEXT NOT NULL PRIMARY KEY,
-    group_id      TEXT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
-    topic_node_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    granted_by    TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    granted_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (group_id, topic_node_id)
-  )`,
-];
+import { applyMigrations } from '../helpers/apply-migrations';
 
 describe('D1EnrollmentRepository', () => {
   let repo: D1EnrollmentRepository;
@@ -54,7 +13,7 @@ describe('D1EnrollmentRepository', () => {
   let groupId: string;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map((sql) => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
     repo = new D1EnrollmentRepository(env.DB);
   });
 
@@ -67,8 +26,8 @@ describe('D1EnrollmentRepository', () => {
     groupId = crypto.randomUUID();
 
     await env.DB.batch([
-      env.DB.prepare('INSERT INTO users (id, email) VALUES (?, ?)').bind(userId, `u-${userId}@t.com`),
-      env.DB.prepare('INSERT INTO users (id, email) VALUES (?, ?)').bind(adminId, `a-${adminId}@t.com`),
+      env.DB.prepare('INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)').bind(userId, 'test', `u-${userId}@t.com`, 'hash'),
+      env.DB.prepare('INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)').bind(adminId, 'admin', `a-${adminId}@t.com`, 'hash'),
       env.DB.prepare("INSERT INTO topic_nodes (id, title) VALUES (?, 'Root')").bind(rootTopicId),
       env.DB.prepare("INSERT INTO topic_nodes (id, parent_id, title) VALUES (?, ?, 'Child')").bind(childTopicId, rootTopicId),
       env.DB.prepare("INSERT INTO topic_nodes (id, parent_id, title) VALUES (?, ?, 'Grandchild')").bind(grandChildId, childTopicId),

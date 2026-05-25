@@ -1,53 +1,20 @@
 import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, it, expect, beforeAll } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
+import { applyMigrations } from '../helpers/apply-migrations';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 
 // ---------------------------------------------------------------------------
 // DB setup — runs once before all tests
 // ---------------------------------------------------------------------------
 
-const MIGRATION_SQL = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id            TEXT NOT NULL PRIMARY KEY,
-    name          TEXT NOT NULL,
-    email         TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    timezone      TEXT NOT NULL DEFAULT 'UTC'
-  )`,
-  `CREATE TABLE IF NOT EXISTS roles (
-    id          TEXT NOT NULL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '',
-    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_roles (
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    PRIMARY KEY (user_id, role_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS refresh_tokens (
-    token      TEXT NOT NULL PRIMARY KEY,
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_streak (
-    user_id             TEXT    NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    current_streak      INTEGER NOT NULL DEFAULT 0,
-    longest_streak      INTEGER NOT NULL DEFAULT 0,
-    last_activity_date  TEXT,
-    updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-];
 
 const TEST_EMAIL = 'alice@example.com';
 const TEST_PASSWORD = 'correct-password-123';
 const TEST_USER_ID = 'test-user-auth-router';
 
 beforeAll(async () => {
-  await env.DB.batch(MIGRATION_SQL.map((sql) => env.DB.prepare(sql)));
+  await applyMigrations(env.DB);
 
   const adapter = new JwtAuthAdapter({
     secret: env.JWT_SECRET,
