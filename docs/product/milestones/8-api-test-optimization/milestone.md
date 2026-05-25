@@ -68,7 +68,7 @@ The deliverables are observable in the test suite, not in product features.
 | 02 | [Remove low-signal and duplicate specs (P5)](./02-remove-low-signal-specs.task.md) | ✅ Done |
 | 03 | [Introduce `apply-migrations` helper + pilot 5 files (P4 phase 1)](./03-migrations-helper-pilot.task.md) | ✅ Done |
 | 04 | [Consolidate auth-enforcement assertions (P3)](./04-consolidate-auth-enforcement.task.md) | ✅ Done |
-| 05 | [Document router-vs-controller convention + refactor `auth` pair (P2 pilot)](./05-convention-and-auth-pair.task.md) | ⏳ Pending |
+| 05 | [Document router-vs-controller convention + refactor `auth` pair (P2 pilot)](./05-convention-and-auth-pair.task.md) | ✅ Done |
 | 06 | [Refactor `admin-topics` controller/router pair (P2)](./06-refactor-admin-topics-pair.task.md) | ⏳ Pending |
 | 07 | [Refactor `admin-media` controller/router pair (P2)](./07-refactor-admin-media-pair.task.md) | ⏳ Pending |
 | 08 | [Refactor `admin-users` controller/router pair (P2)](./08-refactor-admin-users-pair.task.md) | ⏳ Pending |
