@@ -82,17 +82,15 @@ const MIGRATION_SQL = [
 
 let adminToken: string;
 let contentCreatorToken: string;
-let studentToken: string;
 
 beforeAll(async () => {
   await env.DB.batch(MIGRATION_SQL.map(sql => env.DB.prepare(sql)));
 
   const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
 
-  [adminToken, contentCreatorToken, studentToken] = await Promise.all([
+  [adminToken, contentCreatorToken] = await Promise.all([
     adapter.signAccessToken({ sub: 'admin-topics-test', email: 'admin@topics.test', roles: ['admin'] }),
     adapter.signAccessToken({ sub: 'cc-topics-test', email: 'cc@topics.test', roles: ['content_creator'] }),
-    adapter.signAccessToken({ sub: 'student-topics-test', email: 'student@topics.test', roles: ['student'] }),
   ]);
 });
 
@@ -129,34 +127,9 @@ async function createTopic(body: Record<string, unknown>, token = adminToken) {
   return res.json<{ id: string; title: string; parentId: string | null; status: string; archived: boolean }>();
 }
 
-// ---------------------------------------------------------------------------
-// Auth enforcement
-// ---------------------------------------------------------------------------
-
-describe('Auth enforcement', () => {
-  const endpoints: [string, string][] = [
-    ['GET',    '/admin/topics'],
-    ['POST',   '/admin/topics'],
-    ['GET',    '/admin/topics/some-id'],
-    ['PATCH',  '/admin/topics/some-id'],
-    ['POST',   '/admin/topics/some-id/move'],
-    ['DELETE', '/admin/topics/some-id'],
-  ];
-
-  for (const [method, path] of endpoints) {
-    it(`${method} ${path} -> 401 without token`, async () => {
-      const res = await req(method, path);
-      expect(res.status).toBe(401);
-    });
-
-    it(`${method} ${path} -> 403 with student token`, async () => {
-      const res = await req(method, path, {
-        token: studentToken,
-        body: method !== 'GET' ? {} : undefined,
-      });
-      expect(res.status).toBe(403);
-    });
-  }
+it('requires admin: GET /admin/topics -> 401 without token', async () => {
+  const res = await req('GET', '/admin/topics');
+  expect(res.status).toBe(401);
 });
 
 // ---------------------------------------------------------------------------

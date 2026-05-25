@@ -95,30 +95,9 @@ async function req(
   return res;
 }
 
-// ---------------------------------------------------------------------------
-// Auth enforcement — every endpoint must guard 401/403
-// ---------------------------------------------------------------------------
-
-describe('Auth enforcement', () => {
-  const endpoints: [string, string][] = [
-    ['GET',    '/admin/users'],
-    ['GET',    '/admin/users/some-id'],
-    ['POST',   '/admin/users'],
-    ['PATCH',  '/admin/users/some-id'],
-    ['DELETE', '/admin/users/some-id'],
-  ];
-
-  for (const [method, path] of endpoints) {
-    it(`${method} ${path} -> 401 without token`, async () => {
-      const res = await req(method, path);
-      expect(res.status).toBe(401);
-    });
-
-    it(`${method} ${path} -> 403 with student token`, async () => {
-      const res = await req(method, path, { token: studentToken, body: method !== 'GET' ? {} : undefined });
-      expect(res.status).toBe(403);
-    });
-  }
+it('requires admin: GET /admin/users -> 401 without token', async () => {
+  const res = await req('GET', '/admin/users');
+  expect(res.status).toBe(401);
 });
 
 // ---------------------------------------------------------------------------

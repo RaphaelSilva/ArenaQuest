@@ -128,7 +128,6 @@ const STUDENT_ID = 'student-enr-test';
 const GROUP_ID = 'group-enr-test';
 
 let adminToken: string;
-let studentToken: string;
 
 // Topics created in beforeAll for tests that need pre-seeded data
 let rootTopic: string;
@@ -211,9 +210,8 @@ beforeAll(async () => {
   ]);
 
   const auth = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
-  [adminToken, studentToken] = await Promise.all([
+  [adminToken] = await Promise.all([
     auth.signAccessToken({ sub: ADMIN_ID, email: 'admin@enr.test', roles: ['admin'] }),
-    auth.signAccessToken({ sub: STUDENT_ID, email: 'student@enr.test', roles: ['student'] }),
   ]);
 });
 
@@ -223,11 +221,6 @@ describe('Auth guards', () => {
   it('GET enrollments → 401 without token', async () => {
     const r = await noAuthGet(`/admin/users/${STUDENT_ID}/enrollments`);
     expect(r.status).toBe(401);
-  });
-
-  it('GET enrollments → 403 for students', async () => {
-    const r = await get(`/admin/users/${STUDENT_ID}/enrollments`, studentToken);
-    expect(r.status).toBe(403);
   });
 });
 

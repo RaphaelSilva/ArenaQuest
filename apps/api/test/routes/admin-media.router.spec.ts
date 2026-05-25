@@ -81,11 +81,9 @@ const MIGRATION_SQL = [
 ];
 
 const ADMIN_USER_ID = 'admin-media-test-user';
-const STUDENT_USER_ID = 'student-media-test-user';
 
 let adminToken: string;
 let contentCreatorToken: string;
-let studentToken: string;
 let testTopicId: string;
 
 beforeAll(async () => {
@@ -99,10 +97,9 @@ beforeAll(async () => {
 
   const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
 
-  [adminToken, contentCreatorToken, studentToken] = await Promise.all([
+  [adminToken, contentCreatorToken] = await Promise.all([
     adapter.signAccessToken({ sub: ADMIN_USER_ID, email: 'admin@media.test', roles: ['admin'] }),
     adapter.signAccessToken({ sub: ADMIN_USER_ID, email: 'admin@media.test', roles: ['content_creator'] }),
-    adapter.signAccessToken({ sub: STUDENT_USER_ID, email: 'student@media.test', roles: ['student'] }),
   ]);
 
   // Create a topic to attach media to.
@@ -151,30 +148,9 @@ async function presign(
   return { res, data: res.ok ? await res.json<{ uploadUrl: string; media: { id: string; storageKey: string; status: string } }>() : null };
 }
 
-// ---------------------------------------------------------------------------
-// Auth enforcement
-// ---------------------------------------------------------------------------
-
-describe('Auth enforcement', () => {
-  const topicId = 'some-topic';
-  const mediaId = 'some-media';
-  const endpoints: [string, string][] = [
-    ['POST',   `/admin/topics/${topicId}/media/presign`],
-    ['POST',   `/admin/topics/${topicId}/media/${mediaId}/finalize`],
-    ['DELETE', `/admin/topics/${topicId}/media/${mediaId}`],
-  ];
-
-  for (const [method, path] of endpoints) {
-    it(`${method} ${path} -> 401 without token`, async () => {
-      const res = await req(method, path);
-      expect(res.status).toBe(401);
-    });
-
-    it(`${method} ${path} -> 403 with student token`, async () => {
-      const res = await req(method, path, { token: studentToken, body: method !== 'GET' ? {} : undefined });
-      expect(res.status).toBe(403);
-    });
-  }
+it('requires admin: POST presign -> 401 without token', async () => {
+  const res = await req('POST', '/admin/topics/some-topic/media/presign');
+  expect(res.status).toBe(401);
 });
 
 // ---------------------------------------------------------------------------

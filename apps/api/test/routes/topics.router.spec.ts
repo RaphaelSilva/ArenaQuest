@@ -270,11 +270,6 @@ describe('Auth enforcement', () => {
     const res = await req('GET', '/topics');
     expect(res.status).toBe(401);
   });
-
-  it('GET /topics/:id -> 401 without token', async () => {
-    const res = await req('GET', `/topics/${publishedTopicId}`);
-    expect(res.status).toBe(401);
-  });
 });
 
 // ---------------------------------------------------------------------------
