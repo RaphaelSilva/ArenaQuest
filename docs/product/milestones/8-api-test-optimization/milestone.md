@@ -1,6 +1,6 @@
 # Milestone 8 — `apps/api` Test Suite Optimization
 
-**Status:** Planning
+**Status:** ✅ Completed
 **Scope:** Test infrastructure and test code in `apps/api/test/**` and `apps/api/vitest.config.mts` only. Derived from [RFC 0001](../../RFCs/0001-apps-api-test-suite-optimization.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone touches **only** test-related artefacts: Vitest configuration, files under `apps/api/test/**`, and new test helpers under `apps/api/test/helpers/**`. Production code (`apps/api/src/**`), shared packages (`packages/shared/**`), the web app (`apps/web/**`), migrations (`apps/api/migrations/**`), and CI workflows are **out of scope**. If a finding here suggests a fix to production code, file a separate issue/task — do not bundle it.
@@ -39,15 +39,15 @@ The deliverables are observable in the test suite, not in product features.
 
 ## 3. Acceptance Criteria
 
-- [ ] `pnpm --filter @arenaquest/api test` wall time is **≤ 40 s** locally on the developer baseline (compare against the 63.76 s baseline recorded in RFC §Contexto).
-- [ ] Vitest reports two projects (`workers`, `node`); files not importing `cloudflare:test` run under `node` and do not boot Miniflare.
-- [ ] `apps/api/test/README.md` exists and documents the router-vs-controller convention, the auth-guard consolidation rule, and the migrations helper.
-- [ ] No spec file contains an inline `CREATE TABLE IF NOT EXISTS …` block; all schema setup goes through the shared helper.
-- [ ] `middleware/auth-guard.spec.ts` is the single source for the "401 without token" and "403 with wrong role" matrix; per-router specs hold at most one auth smoke.
-- [ ] For every controller/router pair listed in RFC §D2, the router spec contains only HTTP-shaped assertions; business-rule branches live in the controller spec.
-- [ ] All RFC §D5 removals/reductions are applied (`shared-roles.spec.ts`, `health.controller.spec.ts`, `/health` duplicates, `parse-cookie-samesite` reduced to 4 tests, CORS router reduced to HTTP smoke).
-- [ ] `make lint` and `make test-api` pass green; total test count is within the band declared in RFC §"Impacto esperado" (~680–700).
-- [ ] No diff outside `apps/api/test/**`, `apps/api/vitest.config.mts`, and (if needed) `apps/api/package.json` test scripts.
+- [x] `pnpm --filter @arenaquest/api test` wall time is **≤ 40 s** locally on the developer baseline (compare against the 63.76 s baseline recorded in RFC §Contexto).
+- [x] Vitest reports two projects (`workers`, `node`); files not importing `cloudflare:test` run under `node` and do not boot Miniflare.
+- [x] `apps/api/test/README.md` exists and documents the router-vs-controller convention, the auth-guard consolidation rule, and the migrations helper.
+- [x] No spec file contains an inline `CREATE TABLE IF NOT EXISTS …` block; all schema setup goes through the shared helper.
+- [x] `middleware/auth-guard.spec.ts` is the single source for the "401 without token" and "403 with wrong role" matrix; per-router specs hold at most one auth smoke.
+- [x] For every controller/router pair listed in RFC §D2, the router spec contains only HTTP-shaped assertions; business-rule branches live in the controller spec.
+- [x] All RFC §D5 removals/reductions are applied (`shared-roles.spec.ts`, `health.controller.spec.ts`, `/health` duplicates, `parse-cookie-samesite` reduced to 4 tests, CORS router reduced to HTTP smoke).
+- [x] `make lint` and `make test-api` pass green; total test count is within the band declared in RFC §"Impacto esperado" (~680–700).
+- [x] No diff outside `apps/api/test/**`, `apps/api/vitest.config.mts`, and (if needed) `apps/api/package.json` test scripts.
 
 ---
 
@@ -93,9 +93,9 @@ Dependency graph:
 
 ## 6. Definition of Done (milestone level)
 
-- [ ] All 11 tasks marked `✅ Done` with every acceptance box checked.
-- [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint` and `make test-api` green in CI.
-- [ ] Wall-time delta documented in a short closeout at `docs/product/milestones/8-api-test-optimization/closeout-analysis.md` (before/after table sourced from the same machine).
-- [ ] RFC 0001 status updated to `Accepted` (or `Implemented`) in `docs/product/RFCs/README.md` and in the RFC header.
-- [ ] No diff outside the scope declared in §"Hard scope guardrail".
+- [x] All 11 tasks marked `✅ Done` with every acceptance box checked.
+- [x] All milestone-level acceptance criteria in §3 pass.
+- [x] `make lint` and `make test-api` green in CI.
+- [x] Wall-time delta documented in a short closeout at `docs/product/milestones/8-api-test-optimization/closeout-analysis.md` (before/after table sourced from the same machine).
+- [x] RFC 0001 status updated to `Accepted` (or `Implemented`) in `docs/product/RFCs/README.md` and in the RFC header.
+- [x] No diff outside the scope declared in §"Hard scope guardrail".
