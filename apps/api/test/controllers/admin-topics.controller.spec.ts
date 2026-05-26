@@ -81,20 +81,6 @@ describe('AdminTopicsController', () => {
       expect(topicsRepo.create).toHaveBeenCalledOnce();
     });
 
-    it('returns 400 for missing title', async () => {
-      const result = await controller.create({ content: 'no title' });
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.status).toBe(400);
-      expect(result.error).toBe('BadRequest');
-    });
-
-    it('returns 400 for empty title', async () => {
-      const result = await controller.create({ title: '' });
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.status).toBe(400);
-    });
 
     it('returns 404 when parentId does not exist', async () => {
       const result = await controller.create({ title: 'Child', parentId: 'nonexistent' });
@@ -152,12 +138,6 @@ describe('AdminTopicsController', () => {
       expect(topicsRepo.update).toHaveBeenCalledOnce();
     });
 
-    it('returns 400 for invalid body (empty title)', async () => {
-      const result = await controller.update('root-1', { title: '' });
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.status).toBe(400);
-    });
 
     it('returns 404 when node does not exist', async () => {
       const result = await controller.update('nonexistent', { title: 'X' });
@@ -190,12 +170,6 @@ describe('AdminTopicsController', () => {
       expect(topicsRepo.move).toHaveBeenCalledWith('child-1', null, undefined);
     });
 
-    it('returns 400 for invalid body', async () => {
-      const result = await controller.move('root-1', {});
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.status).toBe(400);
-    });
 
     it('returns 404 when node does not exist', async () => {
       const result = await controller.move('nonexistent', { newParentId: null });

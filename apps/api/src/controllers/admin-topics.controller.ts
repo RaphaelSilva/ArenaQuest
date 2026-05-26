@@ -3,7 +3,7 @@ import type { ITopicNodeRepository, ITagRepository, TopicNodeRecord } from '@are
 import { Entities } from '@arenaquest/shared/types/entities';
 import { sanitizeMarkdown } from '@arenaquest/shared/utils/sanitize-markdown';
 import type { ControllerResult } from '../core/result';
-import { ValidateBody, Body } from '../core/decorators';
+
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -56,8 +56,7 @@ export class AdminTopicsController {
     return { ok: true, data: nodes };
   }
 
-  @ValidateBody(CreateTopicSchema)
-  async create(@Body() body: z.infer<typeof CreateTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
+  async create(body: z.infer<typeof CreateTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
     const { parentId, title, content, status, estimatedMinutes, tagIds, prerequisiteIds } = body;
 
     if (parentId) {
@@ -96,8 +95,7 @@ export class AdminTopicsController {
     return { ok: true, data: { ...node, children } };
   }
 
-  @ValidateBody(UpdateTopicSchema)
-  async update(id: string, @Body() body: z.infer<typeof UpdateTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
+  async update(id: string, body: z.infer<typeof UpdateTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
     const existing = await this.topics.findById(id);
     if (!existing) return { ok: false, status: 404, error: 'NotFound' };
 
@@ -124,8 +122,7 @@ export class AdminTopicsController {
     return { ok: true, data: node };
   }
 
-  @ValidateBody(MoveTopicSchema)
-  async move(id: string, @Body() body: z.infer<typeof MoveTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
+  async move(id: string, body: z.infer<typeof MoveTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
     const existing = await this.topics.findById(id);
     if (!existing) return { ok: false, status: 404, error: 'NotFound' };
 

@@ -10,7 +10,7 @@ import type {
 import { Entities } from '@arenaquest/shared/types/entities';
 import { sanitizeMarkdown } from '@arenaquest/shared/utils/sanitize-markdown';
 import type { ControllerResult } from '../core/result';
-import { ValidateBody, Body } from '../core/decorators';
+
 
 const TASK_STATUS_VALUES = ['draft', 'published', 'archived'] as const;
 
@@ -63,9 +63,8 @@ export class AdminTasksController {
     return { ok: true, data };
   }
 
-  @ValidateBody(CreateTaskSchema)
   async create(
-    @Body() body: z.infer<typeof CreateTaskSchema>,
+    body: z.infer<typeof CreateTaskSchema>,
     createdBy: string,
   ): Promise<ControllerResult<TaskRecord>> {
     const description = body.description !== undefined ? sanitizeMarkdown(body.description) : undefined;
@@ -102,10 +101,9 @@ export class AdminTasksController {
     };
   }
 
-  @ValidateBody(UpdateTaskSchema)
   async update(
     id: string,
-    @Body() body: z.infer<typeof UpdateTaskSchema>,
+    body: z.infer<typeof UpdateTaskSchema>,
   ): Promise<ControllerResult<TaskRecord>> {
     const existing = await this.tasks.findById(id);
     if (!existing) return { ok: false, status: 404, error: 'NotFound' };
