@@ -1,6 +1,6 @@
 # Task 01 — Bootstrap `OpenAPIHono` root and expose `/openapi.json` + `/docs` (F1)
 
-**Status:** 📝 Draft
+**Status:** ✅ Done
 **Milestone:** [9 — `apps/api` Route Reorganization and OpenAPI Adoption](./milestone.md)
 **RFC:** [0003 §5 — F1](../../RFCs/0003-apps-api-route-organization-and-openapi.md)
 
@@ -37,13 +37,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `pnpm --filter @arenaquest/api install` succeeds and the lockfile is updated.
-- [ ] `apps/api/src/index.ts` instantiates `OpenAPIHono`; the existing `AppRouter.register` continues to operate against it.
-- [ ] `GET /openapi.json` returns a valid OpenAPI 3.1 JSON document with `info.title === 'ArenaQuest API'` and at least the `/health` path described.
-- [ ] `GET /docs` returns an HTML page rendering Scalar against `/openapi.json`.
-- [ ] All current API tests (`make test-api`) pass green with no spec edits.
-- [ ] Compressed Worker bundle size delta is recorded in the PR description and stays under the 150 KB threshold (or the threshold breach is justified in the PR).
-- [ ] No diff outside the files listed in the scope guardrail.
+- [x] `pnpm --filter @arenaquest/api install` succeeds and the lockfile is updated.
+- [x] `apps/api/src/index.ts` instantiates `OpenAPIHono`; the existing `AppRouter.register` continues to operate against it.
+- [x] `GET /openapi.json` returns a valid OpenAPI 3.1 JSON document with `info.title === 'ArenaQuest API'` and at least the `/health` path described.
+- [x] `GET /docs` returns an HTML page rendering Scalar against `/openapi.json`.
+- [x] All current API tests (`make test-api`) pass green with no spec edits.
+- [x] Compressed Worker bundle size delta is recorded in the PR description and stays under the 150 KB threshold (or the threshold breach is justified in the PR).
+- [x] No diff outside the files listed in the scope guardrail.
 
 ## Verification Plan
 
