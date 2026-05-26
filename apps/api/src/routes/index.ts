@@ -1,16 +1,10 @@
 import type { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { buildAuthRouter } from './auth';
-import { buildAdminUsersRouter } from './admin-users.router';
-import { buildAdminTopicsRouter } from './admin-topics.router';
-import { buildAdminMediaRouter } from './admin-media.router';
-import { buildAdminTasksRouter } from './admin-tasks.router';
-import { buildAdminMissionsRouter } from './admin-missions.router';
+import { buildAdminRouter } from './admin';
 import { buildTopicsRouter } from './topics.router';
 import { buildPublicRouter } from './public';
 import { buildMeRouter } from './me';
-import { buildAdminEnrollmentRouter } from './admin-enrollment.router';
-import { buildAdminBadgesRouter } from './admin-badges.router';
 import { buildCommentsRouter } from './comments.router';
 
 import { authGuard } from '@api/middleware/auth-guard';
@@ -71,15 +65,9 @@ export class AppRouter {
     // Feature routes
     app.route('/', buildCommentsRouter({ engagement, progress, gamification }));
     app.route('/auth', buildAuthRouter({ identity, infra, controllers, gamification }));
-    app.route('/admin/users', buildAdminUsersRouter({ identity, infra }));
-    app.route('/admin/topics', buildAdminTopicsRouter({ content }));
-    app.route('/admin/topics', buildAdminMediaRouter({ content }));
-    app.route('/admin/tasks', buildAdminTasksRouter({ engagement, content }));
+    app.route('/admin', buildAdminRouter(container));
     app.route('/me', buildMeRouter(container));
     app.route('/topics', buildTopicsRouter({ content, progress, gamification }));
-    app.route('/admin', buildAdminEnrollmentRouter({ progress, identity, content }));
-    app.route('/admin/badges', buildAdminBadgesRouter({ gamification }));
-    app.route('/admin/missions', buildAdminMissionsRouter({ gamification }));
 
     // Sanity demo — development only, can be removed post-milestone.
     app.get('/protected/ping', authGuard, (c) =>
