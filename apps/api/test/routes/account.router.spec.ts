@@ -68,9 +68,9 @@ beforeEach(async () => {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('POST /account/change-password', () => {
+describe('POST /me/change-password', () => {
   it('returns 401 without a JWT', async () => {
-    const res = await post('/account/change-password', {
+    const res = await post('/me/change-password', {
       currentPassword: CURRENT_PASSWORD,
       newPassword: 'NewPass123',
     });
@@ -79,7 +79,7 @@ describe('POST /account/change-password', () => {
 
   it('returns 200 and updates password for valid request', async () => {
     const res = await post(
-      '/account/change-password',
+      '/me/change-password',
       { currentPassword: CURRENT_PASSWORD, newPassword: 'NewPass123' },
       { token: accessToken },
     );

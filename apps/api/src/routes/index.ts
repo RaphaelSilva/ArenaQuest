@@ -8,15 +8,9 @@ import { buildAdminTasksRouter } from './admin-tasks.router';
 import { buildAdminMissionsRouter } from './admin-missions.router';
 import { buildTopicsRouter } from './topics.router';
 import { buildPublicRouter } from './public';
-import {
-  buildProgressTaskRouter,
-  buildProgressTopicRouter,
-  buildMeProgressRouter,
-} from './progress.router';
+import { buildMeRouter } from './me';
 import { buildAdminEnrollmentRouter } from './admin-enrollment.router';
-import { buildAccountRouter } from './account.router';
 import { buildAdminBadgesRouter } from './admin-badges.router';
-import { buildMeGamificationRouter } from './me-gamification.router';
 import { buildCommentsRouter } from './comments.router';
 
 import { authGuard } from '@api/middleware/auth-guard';
@@ -81,13 +75,9 @@ export class AppRouter {
     app.route('/admin/topics', buildAdminTopicsRouter({ content }));
     app.route('/admin/topics', buildAdminMediaRouter({ content }));
     app.route('/admin/tasks', buildAdminTasksRouter({ engagement, content }));
-    app.route('/tasks', buildProgressTaskRouter({ progress, engagement, content, gamification }));
+    app.route('/me', buildMeRouter(container));
     app.route('/topics', buildTopicsRouter({ content, progress, gamification }));
-    app.route('/topics', buildProgressTopicRouter({ progress, engagement, content, gamification }));
-    app.route('/me', buildMeProgressRouter({ progress, engagement, content }));
-    app.route('/me', buildMeGamificationRouter({ gamification }));
     app.route('/admin', buildAdminEnrollmentRouter({ progress, identity, content }));
-    app.route('/account', buildAccountRouter({ controllers }));
     app.route('/admin/badges', buildAdminBadgesRouter({ gamification }));
     app.route('/admin/missions', buildAdminMissionsRouter({ gamification }));
 

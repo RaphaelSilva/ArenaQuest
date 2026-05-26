@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { parseCookieSameSite } from '@api/routes/auth.router';
+import { parseCookieSameSite } from '@api/routes/auth/login';
 
 describe('parseCookieSameSite', () => {
   it('returns "None" when input is undefined', () => {

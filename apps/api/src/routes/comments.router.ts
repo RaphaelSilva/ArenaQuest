@@ -44,22 +44,5 @@ export function buildCommentsRouter(slice: {
     return c.json(result.data, 201);
   });
 
-  router.post('/comments/:id/like', authGuard, async (c) => {
-    const userId = c.get('user').sub;
-    const commentId = c.req.param('id');
-    const result = await controller.likeComment(commentId, userId);
-    if (!result.ok) return c.json({ error: result.error }, result.status as 404);
-    return c.json(result.data);
-  });
-
-  router.delete('/comments/:id', authGuard, async (c) => {
-    const userId = c.get('user').sub;
-    const commentId = c.req.param('id');
-    const userRoles = c.get('user').roles;
-    const result = await controller.deleteComment(commentId, userId, userRoles);
-    if (!result.ok) return c.json({ error: result.error }, result.status as 403 | 404);
-    return c.body(null, 204);
-  });
-
   return router;
 }
