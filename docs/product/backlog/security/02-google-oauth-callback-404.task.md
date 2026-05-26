@@ -1,7 +1,7 @@
 # Task: Google OAuth Callback — Route Mismatch Causes 404
 
 ## Metadata
-- **Status:** Open
+- **Status:** ✅ Done
 - **Complexity:** Small
 - **Priority:** Critical
 - **Category:** Security / Authentication
@@ -82,13 +82,13 @@ After the move, confirm that the Next.js dev server correctly serves the page at
 
 ## Acceptance Criteria
 
-- [ ] Navigating to `http://localhost:3000/auth/callback?accessToken=<valid_token>` stores the session and redirects to `/dashboard` (no 404).
-- [ ] Navigating to `http://localhost:3000/auth/callback` without a valid token shows the error UI with a link to `/login`.
-- [ ] The callback page inherits the `(auth)` route group layout (fonts, centred card styling).
-- [ ] The previous URL path (`/callback`) no longer resolves (returns 404).
-- [ ] The full Google OAuth login flow works end-to-end: click "Continue with Google" → authenticate with Google → land on `/dashboard` with a valid session.
-- [ ] `make lint` passes with no errors.
-- [ ] Existing callback page tests (if any) continue to pass after updating import paths.
+- [x] Navigating to `http://localhost:3000/auth/callback?accessToken=<valid_token>` stores the session and redirects to `/dashboard` (no 404).
+- [x] Navigating to `http://localhost:3000/auth/callback` without a valid token shows the error UI with a link to `/login`.
+- [x] The callback page inherits the `(auth)` route group layout (fonts, centred card styling).
+- [x] The previous URL path (`/callback`) no longer resolves (returns 404).
+- [x] The full Google OAuth login flow works end-to-end: click "Continue with Google" → authenticate with Google → land on `/dashboard` with a valid session.
+- [x] `make lint` passes with no errors.
+- [x] Existing callback page tests (if any) continue to pass after updating import paths.
 
 ---
 
