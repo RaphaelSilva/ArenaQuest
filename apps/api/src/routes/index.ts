@@ -1,13 +1,13 @@
 import type { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { buildAuthRouter } from './auth';
-import { buildAdminRouter } from './admin';
-import { buildTopicsRouter } from './topics.router';
-import { buildPublicRouter } from './public';
-import { buildMeRouter } from './me';
-import { buildCommentsRouter } from './comments.router';
-import { buildHealthRouter } from './public/health';
+import { buildAuthRouter } from '@api/routes/auth';
+import { buildAdminRouter } from '@api/routes/admin';
+import { buildTopicsRouter } from '@api/routes/topics.router';
+import { buildPublicRouter } from '@api/routes/public';
+import { buildMeRouter } from '@api/routes/me';
+import { buildCommentsRouter } from '@api/routes/comments.router';
+import { buildHealthRouter } from '@api/routes/public/health';
 
 import { authGuard } from '@api/middleware/auth-guard';
 import { parseAllowedOrigins, buildOriginMatcher, hasAnyRule } from '@api/core/cors/origin-policy';

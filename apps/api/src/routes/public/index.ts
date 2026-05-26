@@ -1,10 +1,10 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { buildLeaderboardRouter } from './leaderboard';
-import { buildCatalogTopicsRouter } from './catalog.topics';
-import { buildCatalogTasksRouter } from './catalog.tasks';
-import type { AppContext } from '../../container';
+import { buildLeaderboardRouter } from '@api/routes/public/leaderboard';
+import { buildCatalogTopicsRouter } from '@api/routes/public/catalog.topics';
+import { buildCatalogTasksRouter } from '@api/routes/public/catalog.tasks';
+import type { AppContainer } from '@api/container';
 
-export function buildPublicRouter(ctx: AppContext): OpenAPIHono {
+export function buildPublicRouter(ctx: AppContainer): OpenAPIHono {
   const publicRouter = new OpenAPIHono();
 
   // Mount leaderboard route

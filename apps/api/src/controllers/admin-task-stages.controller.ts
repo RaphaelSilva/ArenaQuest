@@ -5,7 +5,7 @@ import type {
   TaskStageRecord,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
-import type { ControllerResult } from '../core/result';
+import type { ControllerResult } from '@api/core/result';
 
 
 const LABEL_RE = /^[^\n\r]{1,120}$/;

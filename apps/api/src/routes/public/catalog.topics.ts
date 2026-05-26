@@ -1,10 +1,10 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { TopicNodeSchema } from '../../openapi/components/entities';
-import { TopicsController } from '../../controllers/topics.controller';
-import { respondWith } from '../_shared/envelope';
-import { authGuard } from '../../middleware/auth-guard';
+import { TopicNodeSchema } from '@api/openapi/components/entities';
+import { TopicsController } from '@api/controllers/topics.controller';
+import { respondWith } from '@api/routes/_shared/envelope';
+import { authGuard } from '@api/middleware/auth-guard';
 import { ROLES } from '@arenaquest/shared/constants/roles';
-import type { ContentContext } from '../../container';
+import type { ContentContext } from '@api/container';
 
 export const listTopicsRoute = createRoute({
   method: 'get',

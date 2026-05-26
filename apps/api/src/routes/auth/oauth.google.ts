@@ -1,8 +1,8 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { setCookie } from 'hono/cookie';
-import type { GoogleOAuthController } from '../../controllers/google-oauth.controller';
-import type { CookieSameSite } from './login';
-import { respondWith } from '../_shared/envelope';
+import type { GoogleOAuthController } from '@api/controllers/google-oauth.controller';
+import type { CookieSameSite } from '@api/routes/auth/login';
+import { respondWith } from '@api/routes/_shared/envelope';
 
 const COOKIE_NAME = 'refresh_token';
 const COOKIE_TTL_SECONDS = 7 * 24 * 60 * 60;

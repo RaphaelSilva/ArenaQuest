@@ -1,10 +1,10 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { buildLoginRouter } from './login';
-import { buildRegisterRouter } from './register';
-import { buildActivateRouter } from './activate';
-import { buildPasswordRouter } from './password';
-import { buildOAuthRouter } from './oauth.google';
-import type { IdentityContext, InfraContext, ControllersContext, GamificationContext } from '../../container';
+import { buildLoginRouter } from '@api/routes/auth/login';
+import { buildRegisterRouter } from '@api/routes/auth/register';
+import { buildActivateRouter } from '@api/routes/auth/activate';
+import { buildPasswordRouter } from '@api/routes/auth/password';
+import { buildOAuthRouter } from '@api/routes/auth/oauth.google';
+import type { IdentityContext, InfraContext, ControllersContext, GamificationContext } from '@api/container';
 
 export function buildAuthRouter(slice: {
   identity: IdentityContext;

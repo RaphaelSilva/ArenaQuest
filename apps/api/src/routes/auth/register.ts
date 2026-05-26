@@ -1,6 +1,6 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import type { RegisterController } from '../../controllers/register.controller';
-import { RegisterRequestSchema } from '../../openapi/components/entities';
+import type { RegisterController } from '@api/controllers/register.controller';
+import { RegisterRequestSchema } from '@api/openapi/components/entities';
 import type { IRateLimiter } from '@arenaquest/shared/ports';
 
 export const registerRoute = createRoute({

@@ -1,7 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { ProgressService } from '../../core/progress/progress-service';
-import { respondWith } from '../_shared/envelope';
-import type { ProgressContext, EngagementContext, ContentContext, GamificationContext } from '../../container';
+import { ProgressService } from '@api/core/progress/progress-service';
+import { respondWith } from '@api/routes/_shared/envelope';
+import type { ProgressContext, EngagementContext, ContentContext, GamificationContext } from '@api/container';
 
 const CACHE_CONTROL = 'private, max-age=15';
 

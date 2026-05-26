@@ -8,7 +8,7 @@ import { buildAdminTasksRouter } from './tasks';
 import { buildAdminBadgesRouter } from './badges';
 import { buildAdminMissionsRouter } from './missions';
 import { buildAdminEnrollmentsRouter } from './enrollments';
-import type { AppContainer } from '../../container';
+import type { AppContainer } from '@api/container';
 
 export function buildAdminRouter(container: AppContainer) {
   const app = new OpenAPIHono();

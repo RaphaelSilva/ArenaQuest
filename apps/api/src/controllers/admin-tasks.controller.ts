@@ -9,7 +9,7 @@ import type {
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
 import { sanitizeMarkdown } from '@arenaquest/shared/utils/sanitize-markdown';
-import type { ControllerResult } from '../core/result';
+import type { ControllerResult } from '@api/core/result';
 
 
 const TASK_STATUS_VALUES = ['draft', 'published', 'archived'] as const;

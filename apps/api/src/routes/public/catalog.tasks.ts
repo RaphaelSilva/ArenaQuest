@@ -1,10 +1,10 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { TaskSchema } from '../../openapi/components/entities';
-import { PublicTasksController } from '../../controllers/public-tasks.controller';
-import { respondWith } from '../_shared/envelope';
-import { authGuard } from '../../middleware/auth-guard';
+import { TaskSchema } from '@api/openapi/components/entities';
+import { PublicTasksController } from '@api/controllers/public-tasks.controller';
+import { respondWith } from '@api/routes/_shared/envelope';
+import { authGuard } from '@api/middleware/auth-guard';
 import { ROLES } from '@arenaquest/shared/constants/roles';
-import type { EngagementContext, ContentContext, ProgressContext } from '../../container';
+import type { EngagementContext, ContentContext, ProgressContext } from '@api/container';
 
 const TaskListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50).openapi({

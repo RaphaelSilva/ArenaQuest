@@ -1,2 +1,2 @@
-export { ErrorBody, ValidationErrorBody, type ErrorBodyType, type ValidationErrorBodyType } from './errors';
-export { PaginationQuery, PaginatedResponse, type PaginationQueryType } from './pagination';
+export { ErrorBody, ValidationErrorBody, type ErrorBodyType, type ValidationErrorBodyType } from '@api/openapi/components/errors';
+export { PaginationQuery, PaginatedResponse, type PaginationQueryType } from '@api/openapi/components/pagination';

@@ -2,9 +2,8 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { Entities } from '@arenaquest/shared/types/entities';
-import { AdminUsersController } from '../../controllers/admin-users.controller';
-import { respondWith } from '../_shared/envelope';
-import type { AppContainer } from '../../container';
+import { AdminUsersController } from '@api/controllers/admin-users.controller';
+import type { AppContainer } from '@api/container';
 
 const ROLE_VALUES = ['admin', 'content_creator', 'tutor', 'student'] as const;
 const STATUS_VALUES = ['active', 'inactive', 'pending', 'banned'] as const;

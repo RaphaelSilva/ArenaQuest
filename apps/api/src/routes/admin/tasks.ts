@@ -1,9 +1,9 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { AdminTasksController } from '../../controllers/admin-tasks.controller';
-import { AdminTaskStagesController } from '../../controllers/admin-task-stages.controller';
-import { AdminTaskLinkingController } from '../../controllers/admin-task-linking.controller';
-import { respondWith, respondCreated, respondNoContent } from '../_shared/envelope';
-import type { AppContainer } from '../../container';
+import { AdminTasksController } from '@api/controllers/admin-tasks.controller';
+import { AdminTaskStagesController } from '@api/controllers/admin-task-stages.controller';
+import { AdminTaskLinkingController } from '@api/controllers/admin-task-linking.controller';
+import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
+import type { AppContainer } from '@api/container';
 
 // ---------------------------------------------------------------------------
 // Schemas

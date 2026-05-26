@@ -1,8 +1,8 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { LeaderboardController, LeaderboardQuerySchema } from '../../controllers/leaderboard.controller';
-import { respondWith } from '../_shared/envelope';
-import { authGuard } from '../../middleware/auth-guard';
-import type { GamificationContext, IdentityContext } from '../../container';
+import { LeaderboardController, LeaderboardQuerySchema } from '@api/controllers/leaderboard.controller';
+import { respondWith } from '@api/routes/_shared/envelope';
+import { authGuard } from '@api/middleware/auth-guard';
+import type { GamificationContext, IdentityContext } from '@api/container';
 
 export const LeaderboardRowSchema = z.object({
   userId: z.string().uuid().openapi({

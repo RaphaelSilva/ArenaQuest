@@ -1,7 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { AdminBadgesController } from '../../controllers/admin-badges.controller';
-import { respondWith, respondCreated } from '../_shared/envelope';
-import type { AppContainer } from '../../container';
+import { AdminBadgesController } from '@api/controllers/admin-badges.controller';
+import { respondWith } from '@api/routes/_shared/envelope';
+import type { AppContainer } from '@api/container';
 
 const BadgeRecordSchema = z.object({
   id: z.string().uuid().openapi({ example: 'a1b2c3d4-e5f6-7890-1234-567890abcdef' }),

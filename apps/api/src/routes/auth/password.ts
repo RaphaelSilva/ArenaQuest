@@ -1,7 +1,7 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
-import type { PasswordController } from '../../controllers/password.controller';
-import { ForgotPasswordRequestSchema, ResetPasswordRequestSchema } from '../../openapi/components/entities';
-import { respondWith } from '../_shared/envelope';
+import type { PasswordController } from '@api/controllers/password.controller';
+import { ForgotPasswordRequestSchema, ResetPasswordRequestSchema } from '@api/openapi/components/entities';
+import { respondWith } from '@api/routes/_shared/envelope';
 import type { IRateLimiter } from '@arenaquest/shared/ports';
 
 export const forgotPasswordRoute = createRoute({

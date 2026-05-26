@@ -1,8 +1,8 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { AdminTopicsController } from '../../controllers/admin-topics.controller';
-import { AdminMediaController } from '../../controllers/admin-media.controller';
-import { respondWith, respondCreated, respondNoContent } from '../_shared/envelope';
-import type { AppContainer } from '../../container';
+import { AdminTopicsController } from '@api/controllers/admin-topics.controller';
+import { AdminMediaController } from '@api/controllers/admin-media.controller';
+import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
+import type { AppContainer } from '@api/container';
 
 // ---------------------------------------------------------------------------
 // Schemas

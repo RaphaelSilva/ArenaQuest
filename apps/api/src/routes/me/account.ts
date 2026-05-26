@@ -1,7 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { getCookie } from 'hono/cookie';
-import type { AccountController } from '../../controllers/account.controller';
-import { respondWith } from '../_shared/envelope';
+import type { AccountController } from '@api/controllers/account.controller';
+import { respondWith } from '@api/routes/_shared/envelope';
 
 const COOKIE_NAME = 'refresh_token';
 

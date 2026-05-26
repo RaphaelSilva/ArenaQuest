@@ -1,7 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { CommentsController } from '../../controllers/comments.controller';
-import { respondWith, respondNoContent } from '../_shared/envelope';
-import type { EngagementContext } from '../../container';
+import { CommentsController } from '@api/controllers/comments.controller';
+import { respondWith, respondNoContent } from '@api/routes/_shared/envelope';
+import type { EngagementContext } from '@api/container';
 
 export const likeCommentRoute = createRoute({
   method: 'post',

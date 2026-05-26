@@ -1,7 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { EnrollmentService } from '../../core/enrollment/enrollment-service';
-import { respondWith, respondCreated, respondNoContent } from '../_shared/envelope';
-import type { AppContainer } from '../../container';
+import { EnrollmentService } from '@api/core/enrollment/enrollment-service';
+import { respondWith, respondNoContent } from '@api/routes/_shared/envelope';
+import type { AppContainer } from '@api/container';
 
 const EnrollmentGrantSchema = z.object({
   id: z.string().uuid().openapi({ example: 'a1b2c3d4-e5f6-7890-1234-567890abcdef' }),

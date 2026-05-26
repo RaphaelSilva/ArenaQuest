@@ -2,12 +2,14 @@ import { buildApp } from '../src/index';
 import * as fs from 'fs';
 import * as path from 'path';
 
+type StubEnv = Record<string, unknown>;
+
 // Stub Env object to satisfy buildContainer and buildApp boot
-const stubEnv = {
+const stubEnv: StubEnv = {
   JWT_SECRET: 'test-secret-at-least-32-chars-long-for-hmac-validation',
   COOKIE_SAMESITE: 'Lax',
   ALLOWED_ORIGINS: '*',
-  R2: {} as any,
+  R2: {} as Record<string, unknown>,
   R2_S3_ENDPOINT: 'https://stub-s3-endpoint.com',
   R2_ACCESS_KEY_ID: 'stub-access-key-id',
   R2_SECRET_ACCESS_KEY: 'stub-secret-access-key',
@@ -22,7 +24,7 @@ const stubEnv = {
     batch: () => Promise.resolve(),
     exec: () => Promise.resolve(),
   },
-} as any;
+} as unknown as Env;
 
 async function main() {
   const app = buildApp(stubEnv);
@@ -33,20 +35,21 @@ async function main() {
     process.exit(1);
   }
 
-  const openapiDoc = await res.json();
+  const openapiDoc = (await res.json()) as Record<string, unknown>;
 
   // Sort keys recursively to ensure deterministic output (zero diff on rebuilds)
-  function sortKeys(obj: any): any {
+  function sortKeys(obj: unknown): unknown {
     if (obj === null || typeof obj !== 'object') {
       return obj;
     }
     if (Array.isArray(obj)) {
       return obj.map(sortKeys);
     }
-    return Object.keys(obj)
+    const objRecord = obj as Record<string, unknown>;
+    return Object.keys(objRecord)
       .sort()
-      .reduce((result: any, key: string) => {
-        result[key] = sortKeys(obj[key]);
+      .reduce((result: Record<string, unknown>, key: string) => {
+        result[key] = sortKeys(objRecord[key]);
         return result;
       }, {});
   }

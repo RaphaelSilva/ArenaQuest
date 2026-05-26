@@ -1,6 +1,6 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { getHealth } from '../../controllers/health.controller';
-import { respondWith } from '../_shared/envelope';
+import { getHealth } from '@api/controllers/health.controller';
+import { respondWith } from '@api/routes/_shared/envelope';
 
 const HealthResponseSchema = z.object({
   status: z.string(),

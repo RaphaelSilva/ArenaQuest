@@ -1,7 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import type { ActivateController } from '../../controllers/activate.controller';
-import { ActivateRequestSchema } from '../../openapi/components/entities';
-import { respondWith } from '../_shared/envelope';
+import type { ActivateController } from '@api/controllers/activate.controller';
+import { ActivateRequestSchema } from '@api/openapi/components/entities';
+import { respondWith } from '@api/routes/_shared/envelope';
 import type { IRateLimiter } from '@arenaquest/shared/ports';
 
 export const activateRoute = createRoute({

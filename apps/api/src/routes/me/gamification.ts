@@ -1,10 +1,10 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { MeGamificationController } from '../../controllers/me-gamification.controller';
-import { MeQuestsController } from '../../controllers/me-quests.controller';
-import { MeMissionsController } from '../../controllers/me-missions.controller';
-import { MeDashboardController } from '../../controllers/me-dashboard.controller';
-import { respondWith } from '../_shared/envelope';
-import type { GamificationContext } from '../../container';
+import { MeGamificationController } from '@api/controllers/me-gamification.controller';
+import { MeQuestsController } from '@api/controllers/me-quests.controller';
+import { MeMissionsController } from '@api/controllers/me-missions.controller';
+import { MeDashboardController } from '@api/controllers/me-dashboard.controller';
+import { respondWith } from '@api/routes/_shared/envelope';
+import type { GamificationContext } from '@api/container';
 
 const CACHE_CONTROL = 'private, max-age=15';
 

@@ -1,9 +1,9 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
-import { AuthController } from '../../controllers/auth.controller';
-import { respondWith, respondNoContent } from '../_shared/envelope';
-import { LoginRequestSchema, LoginResponseSchema } from '../../openapi/components/entities';
-import type { IdentityContext, InfraContext, GamificationContext } from '../../container';
+import { AuthController } from '@api/controllers/auth.controller';
+import { respondWith, respondNoContent } from '@api/routes/_shared/envelope';
+import { LoginRequestSchema, LoginResponseSchema } from '@api/openapi/components/entities';
+import type { IdentityContext, InfraContext, GamificationContext } from '@api/container';
 
 const COOKIE_NAME = 'refresh_token';
 const COOKIE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days

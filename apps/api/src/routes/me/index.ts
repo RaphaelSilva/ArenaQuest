@@ -1,9 +1,9 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { authGuard } from '../../middleware/auth-guard';
-import { buildMeAccountRouter } from './account';
-import { buildMeProgressRouter } from './progress';
-import { buildMeGamificationRouter } from './gamification';
-import { buildMeCommentsRouter } from './comments';
+import { authGuard } from '@api/middleware/auth-guard';
+import { buildMeAccountRouter } from '@api/routes/me/account';
+import { buildMeProgressRouter } from '@api/routes/me/progress';
+import { buildMeGamificationRouter } from '@api/routes/me/gamification';
+import { buildMeCommentsRouter } from '@api/routes/me/comments';
 import type {
   IdentityContext,
   InfraContext,
@@ -12,7 +12,7 @@ import type {
   ProgressContext,
   EngagementContext,
   ContentContext,
-} from '../../container';
+} from '@api/container';
 
 export function buildMeRouter(slice: {
   identity: IdentityContext;
