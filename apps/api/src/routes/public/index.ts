@@ -1,5 +1,4 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { buildHealthRouter } from './health';
 import { buildLeaderboardRouter } from './leaderboard';
 import { buildCatalogTopicsRouter } from './catalog.topics';
 import { buildCatalogTasksRouter } from './catalog.tasks';
@@ -7,9 +6,6 @@ import type { AppContext } from '../../container';
 
 export function buildPublicRouter(ctx: AppContext): OpenAPIHono {
   const publicRouter = new OpenAPIHono();
-
-  // Mount health route
-  publicRouter.route('/', buildHealthRouter(ctx));
 
   // Mount leaderboard route
   publicRouter.route('/', buildLeaderboardRouter(ctx));

@@ -36,6 +36,24 @@ function buildApp(env: AppEnv): OpenAPIHono {
 
 export default {
   async fetch(request: Request, env: AppEnv, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    // Transparently rewrite legacy routes to their versioned /v1 counterparts
+    if (
+      path.startsWith('/auth') ||
+      path.startsWith('/me') ||
+      path.startsWith('/admin') ||
+      path.startsWith('/topics') ||
+      path.startsWith('/tasks') ||
+      path.startsWith('/leaderboard') ||
+      path.startsWith('/catalog')
+    ) {
+      url.pathname = `/v1${path}`;
+      const rewrittenRequest = new Request(url.toString(), request);
+      return buildApp(env).fetch(rewrittenRequest, env, ctx);
+    }
+
     return buildApp(env).fetch(request, env, ctx);
   },
 } satisfies ExportedHandler<AppEnv>;

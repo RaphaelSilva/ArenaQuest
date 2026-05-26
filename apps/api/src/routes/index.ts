@@ -1,11 +1,13 @@
 import type { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { OpenAPIHono } from '@hono/zod-openapi';
 import { buildAuthRouter } from './auth';
 import { buildAdminRouter } from './admin';
 import { buildTopicsRouter } from './topics.router';
 import { buildPublicRouter } from './public';
 import { buildMeRouter } from './me';
 import { buildCommentsRouter } from './comments.router';
+import { buildHealthRouter } from './public/health';
 
 import { authGuard } from '@api/middleware/auth-guard';
 import { parseAllowedOrigins, buildOriginMatcher, hasAnyRule } from '@api/core/cors/origin-policy';
@@ -59,15 +61,19 @@ export class AppRouter {
       return next();
     });
 
-    // Mount public routes first, so they match before authenticated routes with same prefix
-    app.route('/', buildPublicRouter(container));
+    // Mount unversioned public health route first
+    app.route('/', buildHealthRouter());
 
-    // Feature routes
-    app.route('/', buildCommentsRouter({ engagement, progress, gamification }));
-    app.route('/auth', buildAuthRouter({ identity, infra, controllers, gamification }));
-    app.route('/admin', buildAdminRouter(container));
-    app.route('/me', buildMeRouter(container));
-    app.route('/topics', buildTopicsRouter({ content, progress, gamification }));
+    // Consolidate versioned business routes under /v1 sub-app
+    const v1 = new OpenAPIHono();
+    v1.route('/', buildPublicRouter(container));
+    v1.route('/', buildCommentsRouter({ engagement, progress, gamification }));
+    v1.route('/auth', buildAuthRouter({ identity, infra, controllers, gamification }));
+    v1.route('/admin', buildAdminRouter(container));
+    v1.route('/me', buildMeRouter(container));
+    v1.route('/topics', buildTopicsRouter({ content, progress, gamification }));
+
+    app.route('/v1', v1);
 
     // Sanity demo — development only, can be removed post-milestone.
     app.get('/protected/ping', authGuard, (c) =>
