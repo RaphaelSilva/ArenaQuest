@@ -1,31 +1,5 @@
-import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { getHealth } from '../controllers/health.controller';
+import { OpenAPIHono } from '@hono/zod-openapi';
 import { ErrorBody, ValidationErrorBody, PaginationQuery } from './components';
-
-const HealthResponseSchema = z.object({
-  status: z.string(),
-  version: z.string(),
-  timestamp: z.string(),
-  adapters: z.record(z.string()),
-}).openapi('HealthResponse');
-
-export const healthRoute = createRoute({
-  method: 'get',
-  path: '/health',
-  summary: 'Health check endpoint',
-  description: 'Returns the health status of the API and its dependencies',
-  tags: ['Health'],
-  responses: {
-    200: {
-      description: 'API is healthy',
-      content: {
-        'application/json': {
-          schema: HealthResponseSchema,
-        },
-      },
-    },
-  },
-});
 
 /**
  * Root OpenAPI document configuration for ArenaQuest API.
@@ -72,10 +46,6 @@ export function configureOpenAPIDocument(app: OpenAPIHono) {
       },
     },
   });
-
-  // Register the declarative OpenAPI route for health
-  app.openapi(healthRoute, (c) =>
-    c.json(getHealth({ auth: 'jwt_pbkdf2', database: 'd1', storage: 'not_wired' }))
-  );
 }
+
 

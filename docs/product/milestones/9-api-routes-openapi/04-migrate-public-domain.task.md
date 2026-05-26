@@ -1,6 +1,6 @@
 # Task 04 — Migrate public domain: health, catalog, leaderboard (F4)
 
-**Status:** 📝 Draft
+**Status:** ✅ Completed
 **Milestone:** [9 — `apps/api` Route Reorganization and OpenAPI Adoption](./milestone.md)
 **RFC:** [0003 §4.1 and §5 — F4](../../RFCs/0003-apps-api-route-organization-and-openapi.md)
 
@@ -36,13 +36,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `apps/api/src/routes/public/**` exists with the four modules above and an `index.ts` aggregator.
-- [ ] `routes/index.ts` mounts the new public sub-app and removes the now-empty public read handlers from the legacy routers (without dropping their remaining responsibilities).
-- [ ] `GET /health`, `GET /topics/...` (public reads), `GET /tasks/...` (public reads), `GET /leaderboard` respond with the same status, headers (excluding `content-length`), and JSON body as before migration.
-- [ ] `GET /openapi.json` lists every public route with: tags, summary, request schema (where applicable), 200/4xx response schemas using `ErrorBody` / `ValidationErrorBody`.
-- [ ] Every public handler returns through `respondWith` / `respondCreated` / `respondNoContent`.
-- [ ] `make test-api` passes green. No new spec files needed beyond minimal smoke coverage for the new modules; existing route specs continue to assert the same behaviour.
-- [ ] No diff outside the scope guardrail.
+- [x] `apps/api/src/routes/public/**` exists with the four modules above and an `index.ts` aggregator.
+- [x] `routes/index.ts` mounts the new public sub-app and removes the now-empty public read handlers from the legacy routers (without dropping their remaining responsibilities).
+- [x] `GET /health`, `GET /topics/...` (public reads), `GET /tasks/...` (public reads), `GET /leaderboard` respond with the same status, headers (excluding `content-length`), and JSON body as before migration.
+- [x] `GET /openapi.json` lists every public route with: tags, summary, request schema (where applicable), 200/4xx response schemas using `ErrorBody` / `ValidationErrorBody`.
+- [x] Every public handler returns through `respondWith` / `respondCreated` / `respondNoContent`.
+- [x] `make test-api` passes green. No new spec files needed beyond minimal smoke coverage for the new modules; existing route specs continue to assert the same behaviour.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

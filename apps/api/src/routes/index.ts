@@ -6,8 +6,8 @@ import { buildAdminTopicsRouter } from './admin-topics.router';
 import { buildAdminMediaRouter } from './admin-media.router';
 import { buildAdminTasksRouter } from './admin-tasks.router';
 import { buildAdminMissionsRouter } from './admin-missions.router';
-import { buildTasksRouter } from './tasks.router';
 import { buildTopicsRouter } from './topics.router';
+import { buildPublicRouter } from './public';
 import {
   buildProgressTaskRouter,
   buildProgressTopicRouter,
@@ -18,7 +18,6 @@ import { buildAccountRouter } from './account.router';
 import { buildOAuthRouter } from './oauth.router';
 import { buildAdminBadgesRouter } from './admin-badges.router';
 import { buildMeGamificationRouter } from './me-gamification.router';
-import { buildLeaderboardRouter } from './leaderboard.router';
 import { buildCommentsRouter } from './comments.router';
 
 import { authGuard } from '@api/middleware/auth-guard';
@@ -73,7 +72,8 @@ export class AppRouter {
       return next();
     });
 
-
+    // Mount public routes first, so they match before authenticated routes with same prefix
+    app.route('/', buildPublicRouter(container));
 
     // Feature routes
     app.route('/', buildCommentsRouter({ engagement, progress, gamification }));
@@ -82,13 +82,11 @@ export class AppRouter {
     app.route('/admin/topics', buildAdminTopicsRouter({ content }));
     app.route('/admin/topics', buildAdminMediaRouter({ content }));
     app.route('/admin/tasks', buildAdminTasksRouter({ engagement, content }));
-    app.route('/tasks', buildTasksRouter({ engagement, content, progress }));
     app.route('/tasks', buildProgressTaskRouter({ progress, engagement, content, gamification }));
     app.route('/topics', buildTopicsRouter({ content, progress, gamification }));
     app.route('/topics', buildProgressTopicRouter({ progress, engagement, content, gamification }));
     app.route('/me', buildMeProgressRouter({ progress, engagement, content }));
     app.route('/me', buildMeGamificationRouter({ gamification }));
-    app.route('/leaderboard', buildLeaderboardRouter({ gamification, identity }));
     app.route('/admin', buildAdminEnrollmentRouter({ progress, identity, content }));
     app.route('/account', buildAccountRouter({ controllers }));
     app.route('/auth', buildOAuthRouter({ controllers, infra }));
