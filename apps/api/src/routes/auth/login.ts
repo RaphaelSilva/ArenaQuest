@@ -1,24 +1,20 @@
-import { Hono } from 'hono';
+import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
-import { AuthController } from '@api/controllers/auth.controller';
-import { buildRegisterRouter } from '@api/routes/register.router';
-import { buildActivateRouter } from '@api/routes/activate.router';
-import { buildPasswordRouter } from '@api/routes/password.router';
-import type { IdentityContext, InfraContext, ControllersContext, GamificationContext } from '@api/container';
+import { AuthController } from '../../controllers/auth.controller';
+import { respondWith, respondNoContent } from '../_shared/envelope';
+import { LoginRequestSchema, LoginResponseSchema } from '../../openapi/components/entities';
+import type { IdentityContext, InfraContext, GamificationContext } from '../../container';
 
 const COOKIE_NAME = 'refresh_token';
 const COOKIE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 /**
  * Accepted values for the `SameSite` cookie attribute.
- * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#samesitesamesite-value
  */
 export type CookieSameSite = 'Strict' | 'Lax' | 'None';
 
 /**
  * Parse and validate the COOKIE_SAMESITE env var.
- * Returns a type-safe SameSite value, defaulting to `'None'` when the
- * input is empty or unrecognised (logs a warning for the latter).
  */
 export function parseCookieSameSite(raw: string | undefined): CookieSameSite {
   if (!raw || raw.trim() === '') return 'None';
@@ -27,7 +23,7 @@ export function parseCookieSameSite(raw: string | undefined): CookieSameSite {
     raw.trim().charAt(0).toUpperCase() + raw.trim().slice(1).toLowerCase();
 
   if (normalised === 'Strict' || normalised === 'Lax' || normalised === 'None') {
-    return normalised;
+    return normalised as CookieSameSite;
   }
 
   console.warn(
@@ -36,48 +32,108 @@ export function parseCookieSameSite(raw: string | undefined): CookieSameSite {
   return 'None';
 }
 
-/**
- * Build the login rate-limit key from the request. Lower-casing the email
- * guarantees that attackers can't bypass the limit by changing letter case.
- */
+export const loginRoute = createRoute({
+  method: 'post',
+  path: '/login',
+  summary: 'User Login',
+  description: 'Authenticates a user with email and password, setting a session cookie.',
+  tags: ['auth'],
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: LoginRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: 'Successfully logged in',
+      content: {
+        'application/json': {
+          schema: LoginResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: 'Bad Request',
+    },
+    401: {
+      description: 'Invalid Credentials',
+    },
+    429: {
+      description: 'Too Many Requests',
+    },
+  },
+});
+
+export const logoutRoute = createRoute({
+  method: 'post',
+  path: '/logout',
+  summary: 'User Logout',
+  description: 'Logs out the user and clears the session cookie.',
+  tags: ['auth'],
+  responses: {
+    204: {
+      description: 'Successfully logged out',
+    },
+    401: {
+      description: 'Unauthorized / Invalid Refresh Token',
+    },
+  },
+});
+
+export const refreshRoute = createRoute({
+  method: 'post',
+  path: '/refresh',
+  summary: 'Rotate Session Token',
+  description: 'Rotates the session refresh token and returns a new access token.',
+  tags: ['auth'],
+  responses: {
+    200: {
+      description: 'Successfully rotated session token',
+      content: {
+        'application/json': {
+          schema: z.object({
+            accessToken: z.string().openapi({ example: 'new-access-token' }),
+          }),
+        },
+      },
+    },
+    401: {
+      description: 'Unauthorized / Invalid Refresh Token',
+    },
+  },
+});
+
 function buildLoginKey(email: string | undefined, ip: string): string {
   return `${(email ?? '').toLowerCase()}:${ip}`;
 }
 
 function extractIp(header: string | undefined): string {
-  // `cf-connecting-ip` is set by Cloudflare on every request it forwards.
-  // Local dev and tests don't see it — bucket those under a shared "unknown".
   return header && header.length > 0 ? header : 'unknown';
 }
 
-export function buildAuthRouter(slice: {
+export function buildLoginRouter(slice: {
   identity: IdentityContext;
   infra: InfraContext;
-  controllers: ControllersContext;
   gamification: GamificationContext;
-}): Hono {
+}) {
   const { authService } = slice.identity;
   const { rateLimiters, cookies } = slice.infra;
-  const { login: loginLimiter, register: registerLimiter, activate: activateLimiter, forgotPassword: forgotPasswordLimiter } = rateLimiters;
+  const { login: loginLimiter } = rateLimiters;
   const cookieSameSite = cookies.sameSite;
-  const { registerController, activateController, passwordController } = slice.controllers;
   const { streakEngine, questEvaluator, badgeEngine } = slice.gamification;
 
   const controller = new AuthController(authService);
-  const router = new Hono();
+  const router = new OpenAPIHono();
 
-  router.route('/', buildRegisterRouter({ controller: registerController, limiter: registerLimiter }));
-  router.route('/', buildActivateRouter({ controller: activateController, limiter: activateLimiter }));
-  router.route('/', buildPasswordRouter({ controller: passwordController, forgotPasswordLimiter }));
-
-  router.post('/login', async (c) => {
-    const body = await c.req.json<{ email?: string; password?: string }>();
+  router.openapi(loginRoute, async (c) => {
+    const body = c.req.valid('json');
     const ip = extractIp(c.req.header('cf-connecting-ip'));
     const key = buildLoginKey(body.email, ip);
 
-    // S-04: check the limiter before spending CPU on password verification.
-    // Fail-open — if the limiter itself errors, we still let the request
-    // through (logged). A transient KV outage should not lock every user out.
     try {
       const state = await loginLimiter.peek(key);
       if (!state.allowed) {
@@ -91,8 +147,6 @@ export function buildAuthRouter(slice: {
     const result = await controller.login(body);
 
     if (!result.ok) {
-      // Only count credential failures (401) against the bucket — 400 (bad
-      // payload) is a client shape bug, not an attack signal.
       if (result.status === 401) {
         try {
           await loginLimiter.hit(key);
@@ -100,7 +154,7 @@ export function buildAuthRouter(slice: {
           console.error('[rate-limit] hit failed', err);
         }
       }
-      return c.json({ error: result.error }, result.status as 400 | 401 | 429 | 500);
+      return respondWith(c, result);
     }
 
     try {
@@ -141,24 +195,28 @@ export function buildAuthRouter(slice: {
       path: '/',
     });
 
-    return c.json({ accessToken: result.data.accessToken, user: result.data.user });
+    return respondWith(c, result);
   });
 
-  router.post('/logout', async (c) => {
+  router.openapi(logoutRoute, async (c) => {
     const token = getCookie(c, COOKIE_NAME);
     const result = await controller.logout(token);
 
-    if (!result.ok) return c.json({ error: result.error }, result.status as 401 | 404 | 500);
+    if (!result.ok) {
+      return respondWith(c, result);
+    }
 
     deleteCookie(c, COOKIE_NAME, { path: '/' });
-    return c.body(null, 204);
+    return respondNoContent(c, result);
   });
 
-  router.post('/refresh', async (c) => {
+  router.openapi(refreshRoute, async (c) => {
     const token = getCookie(c, COOKIE_NAME);
     const result = await controller.refresh(token);
 
-    if (!result.ok) return c.json({ error: result.error }, result.status as 401 | 500);
+    if (!result.ok) {
+      return respondWith(c, result);
+    }
 
     setCookie(c, COOKIE_NAME, result.data.refreshToken, {
       httpOnly: true,
@@ -168,7 +226,7 @@ export function buildAuthRouter(slice: {
       path: '/',
     });
 
-    return c.json({ accessToken: result.data.accessToken });
+    return respondWith(c, result);
   });
 
   return router;

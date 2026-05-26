@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { buildAuthRouter } from './auth.router';
+import { buildAuthRouter } from './auth';
 import { buildAdminUsersRouter } from './admin-users.router';
 import { buildAdminTopicsRouter } from './admin-topics.router';
 import { buildAdminMediaRouter } from './admin-media.router';
@@ -15,7 +15,6 @@ import {
 } from './progress.router';
 import { buildAdminEnrollmentRouter } from './admin-enrollment.router';
 import { buildAccountRouter } from './account.router';
-import { buildOAuthRouter } from './oauth.router';
 import { buildAdminBadgesRouter } from './admin-badges.router';
 import { buildMeGamificationRouter } from './me-gamification.router';
 import { buildCommentsRouter } from './comments.router';
@@ -89,7 +88,6 @@ export class AppRouter {
     app.route('/me', buildMeGamificationRouter({ gamification }));
     app.route('/admin', buildAdminEnrollmentRouter({ progress, identity, content }));
     app.route('/account', buildAccountRouter({ controllers }));
-    app.route('/auth', buildOAuthRouter({ controllers, infra }));
     app.route('/admin/badges', buildAdminBadgesRouter({ gamification }));
     app.route('/admin/missions', buildAdminMissionsRouter({ gamification }));
 

@@ -100,3 +100,38 @@ export const LeaderboardEntrySchema = z.object({
   name: z.string().openapi({ example: 'John Doe' }),
   xp: z.number().int().openapi({ example: 1250 }),
 }).openapi('LeaderboardEntry');
+
+export const LoginRequestSchema = z.object({
+  email: z.string().email().openapi({ example: 'student@arenaquest.app' }),
+  password: z.string().openapi({ example: 'password123' }),
+}).openapi('LoginRequest');
+
+export const LoginResponseSchema = z.object({
+  accessToken: z.string().openapi({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' }),
+  user: z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    email: z.string().email(),
+    roles: z.array(z.string()),
+  }),
+}).openapi('LoginResponse');
+
+export const RegisterRequestSchema = z.object({
+  name: z.string().openapi({ example: 'John Doe' }),
+  email: z.string().email().openapi({ example: 'student@arenaquest.app' }),
+  password: z.string().openapi({ example: 'password123' }),
+}).openapi('RegisterRequest');
+
+export const ActivateRequestSchema = z.object({
+  token: z.string().openapi({ example: 'some-activation-token' }),
+}).openapi('ActivateRequest');
+
+export const ForgotPasswordRequestSchema = z.object({
+  email: z.string().email().openapi({ example: 'student@arenaquest.app' }),
+}).openapi('ForgotPasswordRequest');
+
+export const ResetPasswordRequestSchema = z.object({
+  token: z.string().openapi({ example: 'some-reset-token' }),
+  newPassword: z.string().openapi({ example: 'newpassword123' }),
+}).openapi('ResetPasswordRequest');
+

@@ -32,7 +32,7 @@ import { AccountController } from '@api/controllers/account.controller';
 import { GoogleOAuthController } from '@api/controllers/google-oauth.controller';
 import { RegisterController } from '@api/controllers/register.controller';
 import { ActivateController } from '@api/controllers/activate.controller';
-import { parseCookieSameSite } from '@api/routes/auth.router';
+import { parseCookieSameSite } from '@api/routes/auth/login';
 import type {
   IAuthAdapter,
   IRateLimiter,
