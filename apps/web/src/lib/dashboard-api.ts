@@ -43,7 +43,7 @@ export type DashboardMission = {
   icon: string;
   description: string;
   progressPct: number;
-  deadlineAt: string;
+  deadlineAt: string | null;
   rewardXp: number;
   rewardBadge: string | null;
 };
@@ -205,12 +205,22 @@ async function safeFetch<T>(http: HttpTransport, path: string): Promise<T | null
 // Raw API types (minimal, only what we read)
 // ---------------------------------------------------------------------------
 
-type ApiDashboardShape = paths['/v1/me/dashboard']['get']['responses'][200]['content']['application/json'];
-type ApiXp = NonNullable<ApiDashboardShape['xp']>;
-type ApiStreak = NonNullable<ApiDashboardShape['streak']>;
-type ApiBadgeEntry = NonNullable<ApiDashboardShape['badges']>[number];
-type ApiQuestEntry = NonNullable<ApiDashboardShape['questsDaily']>[number];
-type ApiMissionEntry = NonNullable<ApiDashboardShape['missions']>[number];
+// NOTE: The dashboard endpoint schema uses z.any() for complex fields, so the
+// generated types are `unknown`. Define explicit local types matching the actual
+// runtime shape returned by the API controllers.
+type ApiXp = { totalXp: number; level: number; rankTitle: string; xpInLevel: number; xpToNext: number | null };
+type ApiStreak = { currentStreak: number; longestStreak: number; lastActivityDate: string | null };
+type ApiBadgeEntry = { badge: { id: string; name: string; iconEmoji: string; xpReward: number }; earnedAt: string };
+type ApiQuestEntry = { id: string; title: string; xpReward: number; progress: { currentValue: number; targetValue: number; completed: boolean } | null };
+type ApiMissionEntry = { mission: { id: string; title: string; description: string; xpReward: number; endAt: string | null; badgeId: string | null }; progress: { currentValue: number; targetValue: number } | null };
+type ApiDashboardShape = {
+  xp: ApiXp | null;
+  streak: ApiStreak | null;
+  questsDaily: ApiQuestEntry[];
+  questsWeekly: ApiQuestEntry[];
+  missions: ApiMissionEntry[] | null;
+  badges: ApiBadgeEntry[] | null;
+};
 
 type ApiLeaderboardResponse = {
   rows: Array<{ userId: string; totalXp: number }>;
