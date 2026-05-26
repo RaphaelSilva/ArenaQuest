@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import type { ControllerResult } from '@api/core/result';
 
-type StatusCode = 200 | 201 | 204 | 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500;
+type StatusCode = 200 | 201 | 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500;
 
 export function respondWith<T>(c: Context, result: ControllerResult<T>): Response {
   if (result.ok) {
