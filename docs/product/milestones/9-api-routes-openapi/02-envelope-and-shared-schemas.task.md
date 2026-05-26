@@ -1,6 +1,6 @@
 # Task 02 — Introduce envelope helpers and shared error/pagination schemas (F2)
 
-**Status:** 📝 Draft
+**Status:** ✅ Done
 **Milestone:** [9 — `apps/api` Route Reorganization and OpenAPI Adoption](./milestone.md)
 **RFC:** [0003 §4.3 and §5 — F2](../../RFCs/0003-apps-api-route-organization-and-openapi.md)
 
@@ -36,12 +36,12 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `apps/api/src/routes/_shared/envelope.ts` exports the three helpers with explicit return types.
-- [ ] Unit tests cover: `ok=true` → correct success status (200/201/204), `ok=false` → status preserved, `meta` merged into JSON body, `error` string preserved.
-- [ ] `ErrorBody` and `ValidationErrorBody` schemas appear under `components.schemas` in `GET /openapi.json` after this task.
-- [ ] `PaginatedResponse<T>` factory produces a schema with `items: T[]`, plus the pagination metadata fields used by the current endpoints (audit them first; document the chosen field set in the PR description).
-- [ ] `make test-api` and `make lint` pass green.
-- [ ] No diff to existing handlers, controllers, or `routes/index.ts` beyond the OpenAPI registration of the new components.
+- [x] `apps/api/src/routes/_shared/envelope.ts` exports the three helpers with explicit return types.
+- [x] Unit tests cover: `ok=true` → correct success status (200/201/204), `ok=false` → status preserved, `meta` merged into JSON body, `error` string preserved.
+- [x] `ErrorBody` and `ValidationErrorBody` schemas appear under `components.schemas` in `GET /openapi.json` after this task.
+- [x] `PaginatedResponse<T>` factory produces a schema with `items: T[]`, plus the pagination metadata fields used by the current endpoints (data / total).
+- [x] `make test-api` and `make lint` pass green.
+- [x] No diff to existing handlers, controllers, or `routes/index.ts` beyond the OpenAPI registration of the new components.
 
 ## Verification Plan
 
