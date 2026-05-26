@@ -9,7 +9,8 @@
  *     module-level singletons (Workers have no shared memory between requests).
  */
 
-import { Hono } from 'hono';
+import { OpenAPIHono } from '@hono/zod-openapi';
+import { apiReference } from '@scalar/hono-api-reference';
 
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { D1UserRepository } from '@api/adapters/db/d1-user-repository';
@@ -49,11 +50,12 @@ import type { IMailer } from '@arenaquest/shared/ports';
 import type { RegistrationEventEmitter } from '@api/core/registration/registration-events';
 import { AppRouter } from '@api/routes';
 import { parseCookieSameSite } from '@api/routes/auth.router';
+import { configureOpenAPIDocument } from '@api/openapi/document';
 import '@api/types/hono-env';
 
 export type AppEnv = Env;
 
-function buildApp(env: AppEnv): Hono {
+function buildApp(env: AppEnv): OpenAPIHono {
   const auth = new JwtAuthAdapter({
     secret: env.JWT_SECRET,
     accessTokenExpiresInSeconds: 900, // 15 min
@@ -163,7 +165,7 @@ function buildApp(env: AppEnv): Hono {
     prefix: 'rl:activate:',
   });
 
-  const app = new Hono();
+  const app = new OpenAPIHono();
 
   AppRouter.register(app, {
     auth,
@@ -205,6 +207,12 @@ function buildApp(env: AppEnv): Hono {
     // If the variable is absent (local dev), fall back gracefully to localhost.
     strictCors: env.ALLOWED_ORIGINS !== undefined && env.ALLOWED_ORIGINS.trim() !== '',
   });
+
+  // Configure OpenAPI documentation at /openapi.json
+  configureOpenAPIDocument(app);
+
+  // Serve Scalar UI at /docs for browsing the OpenAPI spec
+  app.get('/docs', apiReference({ url: '/openapi.json' }));
 
   return app;
 }

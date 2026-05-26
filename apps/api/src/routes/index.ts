@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import type { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { buildAuthRouter } from './auth.router';
 import type { CookieSameSite } from './auth.router';
@@ -26,7 +26,7 @@ import { buildLeaderboardRouter } from './leaderboard.router';
 import { buildCommentsRouter } from './comments.router';
 import type { AccountController } from '@api/controllers/account.controller';
 import type { GoogleOAuthController } from '@api/controllers/google-oauth.controller';
-import { getHealth } from '@api/controllers/health.controller';
+
 import { authGuard } from '@api/middleware/auth-guard';
 import { parseAllowedOrigins, buildOriginMatcher, hasAnyRule } from '@api/core/cors/origin-policy';
 import type {
@@ -146,10 +146,7 @@ export class AppRouter {
       return next();
     });
 
-    // Health check endpoint
-    app.get('/health', (c) =>
-      c.json(getHealth({ auth: 'jwt_pbkdf2', database: 'd1', storage: 'not_wired' })),
-    );
+
 
     // Feature routes
     app.route('/', buildCommentsRouter(commentRepo, enrollmentRepo, xpEngine));
