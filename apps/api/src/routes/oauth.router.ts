@@ -1,15 +1,18 @@
 import { Hono } from 'hono';
 import { setCookie } from 'hono/cookie';
-import type { GoogleOAuthController } from '@api/controllers/google-oauth.controller';
 import type { CookieSameSite } from './auth.router';
+import type { ControllersContext, InfraContext } from '@api/container';
 
 const COOKIE_NAME = 'refresh_token';
 const COOKIE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
-export function buildOAuthRouter(
-  controller: GoogleOAuthController,
-  cookieSameSite: CookieSameSite,
-): Hono {
+export function buildOAuthRouter(slice: {
+  controllers: ControllersContext;
+  infra: InfraContext;
+}): Hono {
+  const { googleOAuthController: controller } = slice.controllers;
+  const cookieSameSite: CookieSameSite = slice.infra.cookies.sameSite;
+
   const router = new Hono();
 
   router.get('/google', async (c) => {

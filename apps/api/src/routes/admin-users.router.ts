@@ -3,14 +3,9 @@ import { z } from 'zod';
 import { authGuard } from '@api/middleware/auth-guard';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
-import type {
-  IAuthAdapter,
-  IRefreshTokenRepository,
-  IUserRepository,
-  IMailer,
-} from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
 import { AdminUsersController } from '@api/controllers/admin-users.controller';
+import type { IdentityContext, InfraContext } from '@api/container';
 
 // ---------------------------------------------------------------------------
 // Validation schemas
@@ -95,12 +90,13 @@ function isSelfLockout(
 // Router
 // ---------------------------------------------------------------------------
 
-export function buildAdminUsersRouter(
-  users: IUserRepository,
-  auth: IAuthAdapter,
-  tokens: IRefreshTokenRepository,
-  mailer: IMailer,
-): Hono {
+export function buildAdminUsersRouter(slice: {
+  identity: IdentityContext;
+  infra: InfraContext;
+}): Hono {
+  const { users, tokens } = slice.identity;
+  const { auth, mailer } = slice.infra;
+
   const router = new Hono();
   const adminUsersController = new AdminUsersController(auth, users, tokens, mailer);
 

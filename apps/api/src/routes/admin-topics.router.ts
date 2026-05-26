@@ -3,9 +3,11 @@ import { authGuard } from '@api/middleware/auth-guard';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { AdminTopicsController } from '@api/controllers/admin-topics.controller';
-import type { ITopicNodeRepository, ITagRepository } from '@arenaquest/shared/ports';
+import type { ContentContext } from '@api/container';
 
-export function buildAdminTopicsRouter(topics: ITopicNodeRepository, tags: ITagRepository): Hono {
+export function buildAdminTopicsRouter(slice: { content: ContentContext }): Hono {
+  const { topics, tags } = slice.content;
+
   const router = new Hono();
   const controller = new AdminTopicsController(topics, tags);
 

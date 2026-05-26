@@ -1,20 +1,16 @@
 import { Hono } from 'hono';
 import { authGuard } from '@api/middleware/auth-guard';
-import type { IGamificationRepository, IQuestRepository, IBadgeRepository } from '@arenaquest/shared/ports';
-import type { IMissionRepository } from '@arenaquest/shared/ports';
 import { MeGamificationController } from '@api/controllers/me-gamification.controller';
 import { MeQuestsController } from '@api/controllers/me-quests.controller';
 import { MeMissionsController } from '@api/controllers/me-missions.controller';
 import { MeDashboardController } from '@api/controllers/me-dashboard.controller';
+import type { GamificationContext } from '@api/container';
 
 const CACHE_CONTROL = 'private, max-age=15';
 
-export function buildMeGamificationRouter(
-  gamificationRepo: IGamificationRepository,
-  questRepo: IQuestRepository,
-  badgeRepo: IBadgeRepository,
-  missionRepo: IMissionRepository,
-): Hono {
+export function buildMeGamificationRouter(slice: { gamification: GamificationContext }): Hono {
+  const { gamificationRepo, questRepo, badgeRepo, missionRepo } = slice.gamification;
+
   const router = new Hono();
 
   const gamificationCtrl = new MeGamificationController(gamificationRepo, badgeRepo);

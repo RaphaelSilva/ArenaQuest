@@ -1,29 +1,16 @@
 import { Hono } from 'hono';
 import { authGuard } from '@api/middleware/auth-guard';
 import { ProgressService } from '@api/core/progress/progress-service';
-import type {
-  IProgressRepository,
-  IEnrollmentRepository,
-  ITaskRepository,
-  ITaskStageRepository,
-  ITaskLinkingRepository,
-  ITopicNodeRepository,
-} from '@arenaquest/shared/ports';
-import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
-import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
-import type { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
-import type { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
+import type { ProgressContext, EngagementContext, ContentContext, GamificationContext } from '@api/container';
 
 const CACHE_CONTROL = 'private, max-age=15';
 
 function buildService(
-  progress: IProgressRepository,
-  enrollment: IEnrollmentRepository,
-  tasks: ITaskRepository,
-  stages: ITaskStageRepository,
-  links: ITaskLinkingRepository,
-  topics: ITopicNodeRepository,
+  slice: { progress: ProgressContext; engagement: EngagementContext; content: ContentContext },
 ): ProgressService {
+  const { progressRepo: progress, enrollmentRepo: enrollment } = slice.progress;
+  const { taskRepo: tasks, taskStages: stages, taskLinks: links } = slice.engagement;
+  const { topics } = slice.content;
   return new ProgressService(progress, enrollment, tasks, stages, links, topics);
 }
 
@@ -31,20 +18,16 @@ function buildService(
 // POST /tasks/:id/stages/:stageId/check-in
 // ---------------------------------------------------------------------------
 
-export function buildProgressTaskRouter(
-  progress: IProgressRepository,
-  enrollment: IEnrollmentRepository,
-  tasks: ITaskRepository,
-  stages: ITaskStageRepository,
-  links: ITaskLinkingRepository,
-  topics: ITopicNodeRepository,
-  xpEngine?: XpEngine,
-  streakEngine?: StreakEngine,
-  questEvaluator?: QuestEvaluator,
-  badgeEngine?: BadgeEngine,
-): Hono {
+export function buildProgressTaskRouter(slice: {
+  progress: ProgressContext;
+  engagement: EngagementContext;
+  content: ContentContext;
+  gamification: GamificationContext;
+}): Hono {
+  const { xpEngine, streakEngine, questEvaluator, badgeEngine } = slice.gamification;
+
   const router = new Hono();
-  const service = buildService(progress, enrollment, tasks, stages, links, topics);
+  const service = buildService(slice);
 
   router.use('*', authGuard);
 
@@ -98,20 +81,16 @@ export function buildProgressTaskRouter(
 // POST /topics/:id/visit and POST /topics/:id/complete
 // ---------------------------------------------------------------------------
 
-export function buildProgressTopicRouter(
-  progress: IProgressRepository,
-  enrollment: IEnrollmentRepository,
-  tasks: ITaskRepository,
-  stages: ITaskStageRepository,
-  links: ITaskLinkingRepository,
-  topics: ITopicNodeRepository,
-  xpEngine?: XpEngine,
-  streakEngine?: StreakEngine,
-  questEvaluator?: QuestEvaluator,
-  badgeEngine?: BadgeEngine,
-): Hono {
+export function buildProgressTopicRouter(slice: {
+  progress: ProgressContext;
+  engagement: EngagementContext;
+  content: ContentContext;
+  gamification: GamificationContext;
+}): Hono {
+  const { xpEngine, streakEngine, questEvaluator, badgeEngine } = slice.gamification;
+
   const router = new Hono();
-  const service = buildService(progress, enrollment, tasks, stages, links, topics);
+  const service = buildService(slice);
 
   router.use('*', authGuard);
 
@@ -169,16 +148,13 @@ export function buildProgressTopicRouter(
 // GET /me/progress/summary, /me/progress/topics, /me/progress/tasks
 // ---------------------------------------------------------------------------
 
-export function buildMeProgressRouter(
-  progress: IProgressRepository,
-  enrollment: IEnrollmentRepository,
-  tasks: ITaskRepository,
-  stages: ITaskStageRepository,
-  links: ITaskLinkingRepository,
-  topics: ITopicNodeRepository,
-): Hono {
+export function buildMeProgressRouter(slice: {
+  progress: ProgressContext;
+  engagement: EngagementContext;
+  content: ContentContext;
+}): Hono {
   const router = new Hono();
-  const service = buildService(progress, enrollment, tasks, stages, links, topics);
+  const service = buildService(slice);
 
   router.use('*', authGuard);
 

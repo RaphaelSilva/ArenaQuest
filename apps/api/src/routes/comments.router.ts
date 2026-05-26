@@ -1,14 +1,17 @@
 import { Hono } from 'hono';
 import { authGuard } from '@api/middleware/auth-guard';
-import type { ICommentRepository, IEnrollmentRepository } from '@arenaquest/shared/ports';
-import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 import { CommentsController } from '@api/controllers/comments.controller';
+import type { EngagementContext, ProgressContext, GamificationContext } from '@api/container';
 
-export function buildCommentsRouter(
-  commentRepo: ICommentRepository,
-  enrollmentRepo: IEnrollmentRepository,
-  xpEngine?: XpEngine,
-): Hono {
+export function buildCommentsRouter(slice: {
+  engagement: EngagementContext;
+  progress: ProgressContext;
+  gamification: GamificationContext;
+}): Hono {
+  const { commentRepo } = slice.engagement;
+  const { enrollmentRepo } = slice.progress;
+  const { xpEngine } = slice.gamification;
+
   const router = new Hono();
   const controller = new CommentsController(commentRepo);
 

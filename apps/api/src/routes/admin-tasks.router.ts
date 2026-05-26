@@ -5,19 +5,15 @@ import { ROLES } from '@arenaquest/shared/constants/roles';
 import { AdminTasksController } from '@api/controllers/admin-tasks.controller';
 import { AdminTaskStagesController } from '@api/controllers/admin-task-stages.controller';
 import { AdminTaskLinkingController } from '@api/controllers/admin-task-linking.controller';
-import type {
-  ITaskRepository,
-  ITaskStageRepository,
-  ITaskLinkingRepository,
-  ITopicNodeRepository,
-} from '@arenaquest/shared/ports';
+import type { EngagementContext, ContentContext } from '@api/container';
 
-export function buildAdminTasksRouter(
-  tasks: ITaskRepository,
-  stages: ITaskStageRepository,
-  links: ITaskLinkingRepository,
-  topics: ITopicNodeRepository,
-): Hono {
+export function buildAdminTasksRouter(slice: {
+  engagement: EngagementContext;
+  content: ContentContext;
+}): Hono {
+  const { taskRepo: tasks, taskStages: stages, taskLinks: links } = slice.engagement;
+  const { topics } = slice.content;
+
   const router = new Hono();
   const controller = new AdminTasksController(tasks, stages, links, topics);
   const stagesController = new AdminTaskStagesController(tasks, stages);

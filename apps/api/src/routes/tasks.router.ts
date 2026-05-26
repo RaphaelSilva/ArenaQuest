@@ -2,21 +2,17 @@ import { Hono } from 'hono';
 import { authGuard } from '@api/middleware/auth-guard';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { PublicTasksController } from '@api/controllers/public-tasks.controller';
-import type {
-  ITaskRepository,
-  ITaskStageRepository,
-  ITaskLinkingRepository,
-  ITopicNodeRepository,
-  IEnrollmentRepository,
-} from '@arenaquest/shared/ports';
+import type { EngagementContext, ContentContext, ProgressContext } from '@api/container';
 
-export function buildTasksRouter(
-  tasks: ITaskRepository,
-  stages: ITaskStageRepository,
-  links: ITaskLinkingRepository,
-  topics: ITopicNodeRepository,
-  enrollment: IEnrollmentRepository,
-): Hono {
+export function buildTasksRouter(slice: {
+  engagement: EngagementContext;
+  content: ContentContext;
+  progress: ProgressContext;
+}): Hono {
+  const { taskRepo: tasks, taskStages: stages, taskLinks: links } = slice.engagement;
+  const { topics } = slice.content;
+  const { enrollmentRepo: enrollment } = slice.progress;
+
   const router = new Hono();
   const controller = new PublicTasksController(tasks, stages, links, topics, enrollment);
 

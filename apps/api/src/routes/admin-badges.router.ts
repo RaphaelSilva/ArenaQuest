@@ -3,9 +3,11 @@ import { authGuard } from '@api/middleware/auth-guard';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { AdminBadgesController } from '@api/controllers/admin-badges.controller';
-import type { IBadgeRepository } from '@arenaquest/shared/ports';
+import type { GamificationContext } from '@api/container';
 
-export function buildAdminBadgesRouter(badgeRepo: IBadgeRepository): Hono {
+export function buildAdminBadgesRouter(slice: { gamification: GamificationContext }): Hono {
+  const { badgeRepo } = slice.gamification;
+
   const router = new Hono();
   const controller = new AdminBadgesController(badgeRepo);
 

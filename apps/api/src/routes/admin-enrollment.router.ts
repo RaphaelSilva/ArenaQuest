@@ -4,11 +4,7 @@ import { authGuard } from '@api/middleware/auth-guard';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { EnrollmentService } from '@api/core/enrollment/enrollment-service';
-import type {
-  IEnrollmentRepository,
-  IUserRepository,
-  ITopicNodeRepository,
-} from '@arenaquest/shared/ports';
+import type { ProgressContext, IdentityContext, ContentContext } from '@api/container';
 
 const GrantSchema = z.object({
   topicNodeId: z.string().uuid(),
@@ -18,11 +14,15 @@ const CascadeSchema = z.object({
   cascade: z.boolean().optional(),
 });
 
-export function buildAdminEnrollmentRouter(
-  enrollment: IEnrollmentRepository,
-  users: IUserRepository,
-  topics: ITopicNodeRepository,
-): Hono {
+export function buildAdminEnrollmentRouter(slice: {
+  progress: ProgressContext;
+  identity: IdentityContext;
+  content: ContentContext;
+}): Hono {
+  const { enrollmentRepo: enrollment } = slice.progress;
+  const { users } = slice.identity;
+  const { topics } = slice.content;
+
   const router = new Hono();
   const service = new EnrollmentService(enrollment, users, topics);
 

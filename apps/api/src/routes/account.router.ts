@@ -1,11 +1,13 @@
 import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { authGuard } from '@api/middleware/auth-guard';
-import type { AccountController } from '@api/controllers/account.controller';
+import type { ControllersContext } from '@api/container';
 
 const COOKIE_NAME = 'refresh_token';
 
-export function buildAccountRouter(controller: AccountController): Hono {
+export function buildAccountRouter(slice: { controllers: ControllersContext }): Hono {
+  const { accountController: controller } = slice.controllers;
+
   const router = new Hono();
 
   router.post('/change-password', authGuard, async (c) => {

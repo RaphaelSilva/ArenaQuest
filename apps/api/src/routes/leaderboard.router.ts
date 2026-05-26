@@ -1,12 +1,15 @@
 import { Hono } from 'hono';
 import { authGuard } from '@api/middleware/auth-guard';
-import type { IGamificationRepository, IUserRepository } from '@arenaquest/shared/ports';
 import { LeaderboardController, LeaderboardQuerySchema } from '@api/controllers/leaderboard.controller';
+import type { GamificationContext, IdentityContext } from '@api/container';
 
-export function buildLeaderboardRouter(
-  gamificationRepo: IGamificationRepository,
-  userRepo: IUserRepository,
-): Hono {
+export function buildLeaderboardRouter(slice: {
+  gamification: GamificationContext;
+  identity: IdentityContext;
+}): Hono {
+  const { gamificationRepo } = slice.gamification;
+  const { users: userRepo } = slice.identity;
+
   const router = new Hono();
   const controller = new LeaderboardController(gamificationRepo);
 

@@ -2,29 +2,19 @@ import { Hono } from 'hono';
 import { authGuard } from '@api/middleware/auth-guard';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { TopicsController } from '@api/controllers/topics.controller';
-import type {
-  ITopicNodeRepository,
-  IMediaRepository,
-  IStorageAdapter,
-  IEnrollmentRepository,
-} from '@arenaquest/shared/ports';
-import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
-import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
-import type { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
-import type { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
+import type { ContentContext, ProgressContext, GamificationContext } from '@api/container';
 
 const CACHE_CONTROL = 'private, max-age=30';
 
-export function buildTopicsRouter(
-  topics: ITopicNodeRepository,
-  media: IMediaRepository,
-  storage: IStorageAdapter,
-  enrollment: IEnrollmentRepository,
-  xpEngine?: XpEngine,
-  streakEngine?: StreakEngine,
-  questEvaluator?: QuestEvaluator,
-  badgeEngine?: BadgeEngine,
-): Hono {
+export function buildTopicsRouter(slice: {
+  content: ContentContext;
+  progress: ProgressContext;
+  gamification: GamificationContext;
+}): Hono {
+  const { topics, media, storage } = slice.content;
+  const { enrollmentRepo: enrollment } = slice.progress;
+  const { xpEngine, streakEngine, questEvaluator, badgeEngine } = slice.gamification;
+
   const router = new Hono();
   const controller = new TopicsController(topics, media, storage, enrollment);
 

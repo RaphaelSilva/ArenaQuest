@@ -1,17 +1,10 @@
 import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
-import type { AuthService } from '@api/core/auth/auth-service';
 import { AuthController } from '@api/controllers/auth.controller';
-import type { RegisterController } from '@api/controllers/register.controller';
-import type { ActivateController } from '@api/controllers/activate.controller';
 import { buildRegisterRouter } from '@api/routes/register.router';
 import { buildActivateRouter } from '@api/routes/activate.router';
 import { buildPasswordRouter } from '@api/routes/password.router';
-import type { PasswordController } from '@api/controllers/password.controller';
-import type { IRateLimiter } from '@arenaquest/shared/ports';
-import type { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
-import type { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
-import type { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
+import type { IdentityContext, InfraContext, ControllersContext, GamificationContext } from '@api/container';
 
 const COOKIE_NAME = 'refresh_token';
 const COOKIE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
@@ -43,21 +36,6 @@ export function parseCookieSameSite(raw: string | undefined): CookieSameSite {
   return 'None';
 }
 
-export interface AuthRouterDeps {
-  authService: AuthService;
-  loginLimiter: IRateLimiter;
-  cookieSameSite: CookieSameSite;
-  registerController: RegisterController;
-  registerLimiter: IRateLimiter;
-  activateController: ActivateController;
-  activateLimiter: IRateLimiter;
-  passwordController: PasswordController;
-  forgotPasswordLimiter: IRateLimiter;
-  streakEngine?: StreakEngine;
-  questEvaluator?: QuestEvaluator;
-  badgeEngine?: BadgeEngine;
-}
-
 /**
  * Build the login rate-limit key from the request. Lower-casing the email
  * guarantees that attackers can't bypass the limit by changing letter case.
@@ -72,8 +50,19 @@ function extractIp(header: string | undefined): string {
   return header && header.length > 0 ? header : 'unknown';
 }
 
-export function buildAuthRouter(deps: AuthRouterDeps): Hono {
-  const { authService, loginLimiter, cookieSameSite, registerController, registerLimiter, activateController, activateLimiter, passwordController, forgotPasswordLimiter, streakEngine, questEvaluator, badgeEngine } = deps;
+export function buildAuthRouter(slice: {
+  identity: IdentityContext;
+  infra: InfraContext;
+  controllers: ControllersContext;
+  gamification: GamificationContext;
+}): Hono {
+  const { authService } = slice.identity;
+  const { rateLimiters, cookies } = slice.infra;
+  const { login: loginLimiter, register: registerLimiter, activate: activateLimiter, forgotPassword: forgotPasswordLimiter } = rateLimiters;
+  const cookieSameSite = cookies.sameSite;
+  const { registerController, activateController, passwordController } = slice.controllers;
+  const { streakEngine, questEvaluator, badgeEngine } = slice.gamification;
+
   const controller = new AuthController(authService);
   const router = new Hono();
 

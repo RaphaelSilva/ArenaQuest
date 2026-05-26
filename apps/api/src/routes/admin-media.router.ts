@@ -3,17 +3,15 @@ import { authGuard } from '@api/middleware/auth-guard';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { AdminMediaController } from '@api/controllers/admin-media.controller';
-import type { ITopicNodeRepository, IMediaRepository, IStorageAdapter } from '@arenaquest/shared/ports';
+import type { ContentContext } from '@api/container';
 
 /**
  * Mounted at /admin/topics in AppRouter.
  * Handles /admin/topics/:topicId/media/* paths.
  */
-export function buildAdminMediaRouter(
-  topics: ITopicNodeRepository,
-  media: IMediaRepository,
-  storage: IStorageAdapter,
-): Hono {
+export function buildAdminMediaRouter(slice: { content: ContentContext }): Hono {
+  const { topics, media, storage } = slice.content;
+
   const router = new Hono();
   const controller = new AdminMediaController(topics, media, storage);
 

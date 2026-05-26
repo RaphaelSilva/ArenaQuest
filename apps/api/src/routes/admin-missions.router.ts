@@ -3,9 +3,11 @@ import { authGuard } from '@api/middleware/auth-guard';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { AdminMissionsController } from '@api/controllers/admin-missions.controller';
-import type { IMissionRepository } from '@arenaquest/shared/ports';
+import type { GamificationContext } from '@api/container';
 
-export function buildAdminMissionsRouter(missionRepo: IMissionRepository): Hono {
+export function buildAdminMissionsRouter(slice: { gamification: GamificationContext }): Hono {
+  const { missionRepo } = slice.gamification;
+
   const router = new Hono();
   const controller = new AdminMissionsController(missionRepo);
 
