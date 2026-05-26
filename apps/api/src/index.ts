@@ -19,7 +19,7 @@ import '@api/types/hono-env';
 
 export type AppEnv = Env;
 
-function buildApp(env: AppEnv): OpenAPIHono {
+export function buildApp(env: AppEnv): OpenAPIHono {
   const container = buildContainer(env);
   const app = new OpenAPIHono();
 

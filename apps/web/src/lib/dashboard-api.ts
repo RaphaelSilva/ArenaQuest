@@ -1,4 +1,5 @@
 import type { HttpTransport } from './api-client';
+import type { paths } from './api-types.gen';
 
 
 // ---------------------------------------------------------------------------
@@ -204,23 +205,12 @@ async function safeFetch<T>(http: HttpTransport, path: string): Promise<T | null
 // Raw API types (minimal, only what we read)
 // ---------------------------------------------------------------------------
 
-type ApiXp = { totalXp: number; level: number; rankTitle: string; xpToNext: number | null; xpInLevel: number };
-type ApiStreak = { currentStreak: number; longestStreak: number; lastActivityDate: string | null };
-type ApiBadgeEntry = { badge: { id: string; iconEmoji: string; name: string; xpReward: number }; earnedAt: string };
-type ApiQuestEntry = { id: string; title: string; xpReward: number; progress: { currentValue: number; targetValue: number; completed: boolean } | null };
-type ApiMissionEntry = {
-  mission: { id: string; title: string; description: string; endAt: string; xpReward: number; badgeId: string | null };
-  progress: { currentValue: number; targetValue: number } | null;
-};
-
-type ApiDashboardShape = {
-  xp: ApiXp | null;
-  streak: ApiStreak | null;
-  badges: ApiBadgeEntry[] | null;
-  questsDaily: ApiQuestEntry[] | null;
-  questsWeekly: ApiQuestEntry[] | null;
-  missions: ApiMissionEntry[] | null;
-};
+type ApiDashboardShape = paths['/v1/me/dashboard']['get']['responses'][200]['content']['application/json'];
+type ApiXp = NonNullable<ApiDashboardShape['xp']>;
+type ApiStreak = NonNullable<ApiDashboardShape['streak']>;
+type ApiBadgeEntry = NonNullable<ApiDashboardShape['badges']>[number];
+type ApiQuestEntry = NonNullable<ApiDashboardShape['questsDaily']>[number];
+type ApiMissionEntry = NonNullable<ApiDashboardShape['missions']>[number];
 
 type ApiLeaderboardResponse = {
   rows: Array<{ userId: string; totalXp: number }>;

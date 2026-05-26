@@ -15,7 +15,8 @@
 		"db:create:staging": "wrangler d1 create arenaquest-db-staging --env staging",
 		"db:apply:migrations": "wrangler d1 migrations apply arenaquest-db",
 		"db:apply:migrations:staging": "wrangler d1 migrations apply arenaquest-db-staging --env staging",		
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"dump-openapi": "tsx scripts/dump-openapi.ts"
 	},
 	"dependencies": {
 		"@arenaquest/shared": "workspace:*",
