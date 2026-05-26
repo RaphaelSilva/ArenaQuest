@@ -74,8 +74,9 @@ All tasks in this folder maintain:
 ## Questions?
 
 Refer to:
+- `docs/product/mission.md` — Project mission, pillars and non-negotiables
 - `docs/product/vision.md` — Project vision and long-term goals
-- `docs/product/specification.md` — Functional requirements overview
 - `docs/product/milestones/*/milestone.md` — Completed feature sets
 - `CONTRIBUTING.md` — Development workflow and standards
+
 

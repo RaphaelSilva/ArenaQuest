@@ -76,3 +76,6 @@ Desktop.ini
 .cache/
 tmp/
 temp/
+.antigravitycli
+.claude/worktrees
+.claude/settings.local.json
