@@ -5,8 +5,8 @@ import type {
   TaskStageRecord,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
-import type { ControllerResult } from '../core/result';
-import { ValidateBody, Body } from '../core/decorators';
+import type { ControllerResult } from '@api/core/result';
+
 
 const LABEL_RE = /^[^\n\r]{1,120}$/;
 const Label = z.string().trim().regex(LABEL_RE, 'Label must be 1-120 chars with no newlines');
@@ -29,10 +29,9 @@ export class AdminTaskStagesController {
     private readonly stages: ITaskStageRepository,
   ) {}
 
-  @ValidateBody(CreateStageSchema)
   async create(
     taskId: string,
-    @Body() body: z.infer<typeof CreateStageSchema>,
+    body: z.infer<typeof CreateStageSchema>,
   ): Promise<ControllerResult<TaskStageRecord>> {
     const task = await this.tasks.findById(taskId);
     if (!task) return { ok: false, status: 404, error: 'NotFound' };
@@ -41,11 +40,10 @@ export class AdminTaskStagesController {
     return { ok: true, data: stage };
   }
 
-  @ValidateBody(UpdateStageSchema)
   async update(
     taskId: string,
     stageId: string,
-    @Body() body: z.infer<typeof UpdateStageSchema>,
+    body: z.infer<typeof UpdateStageSchema>,
   ): Promise<ControllerResult<TaskStageRecord>> {
     const ownership = await this.assertOwnership(taskId, stageId);
     if (ownership) return ownership;
@@ -69,10 +67,9 @@ export class AdminTaskStagesController {
     return { ok: true, data: null };
   }
 
-  @ValidateBody(ReorderStagesSchema)
   async reorder(
     taskId: string,
-    @Body() body: z.infer<typeof ReorderStagesSchema>,
+    body: z.infer<typeof ReorderStagesSchema>,
   ): Promise<ControllerResult<TaskStageRecord[]>> {
     const task = await this.tasks.findById(taskId);
     if (!task) return { ok: false, status: 404, error: 'NotFound' };

@@ -120,12 +120,6 @@ describe('AdminTasksController', () => {
     expect(result.data.description).toContain('Hello');
   });
 
-  it('create - rejects title over 200 chars', async () => {
-    const result = await controller.create({ title: 'x'.repeat(201) }, USER_ID);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.status).toBe(400);
-  });
 
   it('getById - 404 when missing', async () => {
     const result = await controller.getById('nope');

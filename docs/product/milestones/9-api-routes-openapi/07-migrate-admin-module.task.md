@@ -1,6 +1,6 @@
 # Task 07 — Migrate `/admin` module: users, topics+media, tasks+stages+linking, badges, missions, enrollments (F7)
 
-**Status:** 📝 Draft
+**Status:** ✅ Completed
 **Milestone:** [9 — `apps/api` Route Reorganization and OpenAPI Adoption](./milestone.md)
 **RFC:** [0003 §4.1 and §5 — F7](../../RFCs/0003-apps-api-route-organization-and-openapi.md)
 
@@ -38,15 +38,15 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `routes/index.ts` mounts `/admin` exactly once. No `admin-*` legacy router files remain.
-- [ ] Every previously existing `/admin/*` endpoint resolves at the same URL with the same payload, status, and headers (verified per resource).
-- [ ] The role guard is applied once at the sub-app level; no per-route admin guard call remains.
-- [ ] The `/admin/topics` prefix has exactly one owner (the new admin topics module, with media as sub-routes).
-- [ ] `GET /openapi.json` lists every admin route with full schemas, `bearerAuth`, and the correct `admin:<resource>` tag.
-- [ ] All existing admin specs pass green with at most cosmetic edits.
-- [ ] Last-admin protection and self-lockout prevention specs continue to pass unchanged (the controller logic is untouched).
-- [ ] `make test-api`, `make test-web`, `make lint` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `routes/index.ts` mounts `/admin` exactly once. No `admin-*` legacy router files remain.
+- [x] Every previously existing `/admin/*` endpoint resolves at the same URL with the same payload, status, and headers (verified per resource).
+- [x] The role guard is applied once at the sub-app level; no per-route admin guard call remains.
+- [x] The `/admin/topics` prefix has exactly one owner (the new admin topics module, with media as sub-routes).
+- [x] `GET /openapi.json` lists every admin route with full schemas, `bearerAuth`, and the correct `admin:<resource>` tag.
+- [x] All existing admin specs pass green with at most cosmetic edits.
+- [x] Last-admin protection and self-lockout prevention specs continue to pass unchanged (the controller logic is untouched).
+- [x] `make test-api`, `make test-web`, `make lint` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

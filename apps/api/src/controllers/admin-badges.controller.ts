@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { IBadgeRepository, BadgeRecord, UserBadgeRecord } from '@arenaquest/shared/ports';
-import type { ControllerResult } from '../core/result';
+import type { ControllerResult } from '@api/core/result';
 
 const VALID_RULE_KINDS = [
   'streak_days',

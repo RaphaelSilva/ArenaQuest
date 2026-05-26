@@ -149,20 +149,7 @@ describe('AdminMediaController', () => {
       expect(result.status).toBe(404);
     });
 
-    it('returns 400 for invalid body schema', async () => {
-      const result = await controller.presignUpload('topic-1', { contentType: 'video/mp4' }, 'user-1');
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.status).toBe(400);
-      expect(result.error).toBe('BadRequest');
-    });
 
-    it('returns 400 for unsupported content type', async () => {
-      const result = await controller.presignUpload('topic-1', { ...validBody, contentType: 'application/msword' }, 'user-1');
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.status).toBe(400);
-    });
 
     it('returns 422 FileTooLarge when sizeBytes exceeds the limit', async () => {
       const result = await controller.presignUpload('topic-1', { fileName: 'huge.pdf', contentType: 'application/pdf', sizeBytes: 26 * 1024 * 1024 }, 'user-1');

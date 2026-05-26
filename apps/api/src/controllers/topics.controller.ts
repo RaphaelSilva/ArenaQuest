@@ -6,7 +6,7 @@ import type {
   TopicNodeRecord,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
-import type { ControllerResult } from '../core/result';
+import type { ControllerResult } from '@api/core/result';
 
 // ---------------------------------------------------------------------------
 // Constants

@@ -88,13 +88,13 @@ describe('auth guard', () => {
     expect(res.status).toBe(401);
   });
 
-  it('POST /comments/:id/like returns 401 without token', async () => {
-    const res = await req('POST', '/comments/any-id/like');
+  it('POST /me/comments/:id/like returns 401 without token', async () => {
+    const res = await req('POST', '/me/comments/any-id/like');
     expect(res.status).toBe(401);
   });
 
-  it('DELETE /comments/:id returns 401 without token', async () => {
-    const res = await req('DELETE', '/comments/any-id');
+  it('DELETE /me/comments/:id returns 401 without token', async () => {
+    const res = await req('DELETE', '/me/comments/any-id');
     expect(res.status).toBe(401);
   });
 });
@@ -193,7 +193,7 @@ describe('POST /topics/:id/comments', () => {
 // Soft delete
 // ---------------------------------------------------------------------------
 
-describe('DELETE /comments/:id', () => {
+describe('DELETE /me/comments/:id', () => {
   it('author can delete own comment', async () => {
     const createRes = await req('POST', `/topics/${TOPIC_ID}/comments`, {
       token: tokenA,
@@ -201,7 +201,7 @@ describe('DELETE /comments/:id', () => {
     });
     const comment = await createRes.json<{ id: string }>();
 
-    const deleteRes = await req('DELETE', `/comments/${comment.id}`, { token: tokenA });
+    const deleteRes = await req('DELETE', `/me/comments/${comment.id}`, { token: tokenA });
     expect(deleteRes.status).toBe(204);
   });
 
@@ -212,7 +212,7 @@ describe('DELETE /comments/:id', () => {
     });
     const comment = await createRes.json<{ id: string }>();
 
-    await req('DELETE', `/comments/${comment.id}`, { token: tokenA });
+    await req('DELETE', `/me/comments/${comment.id}`, { token: tokenA });
 
     const listRes = await req('GET', `/topics/${TOPIC_ID}/comments`, { token: tokenA });
     const { data } = await listRes.json<{ data: Array<{ id: string; body: string | null }> }>();
@@ -229,7 +229,7 @@ describe('DELETE /comments/:id', () => {
     const comment = await createRes.json<{ id: string }>();
 
     // B tries to delete A's comment
-    const deleteRes = await req('DELETE', `/comments/${comment.id}`, { token: tokenB });
+    const deleteRes = await req('DELETE', `/me/comments/${comment.id}`, { token: tokenB });
     expect(deleteRes.status).toBe(403);
   });
 
@@ -240,7 +240,7 @@ describe('DELETE /comments/:id', () => {
     });
     const comment = await createRes.json<{ id: string }>();
 
-    const deleteRes = await req('DELETE', `/comments/${comment.id}`, { token: adminToken });
+    const deleteRes = await req('DELETE', `/me/comments/${comment.id}`, { token: adminToken });
     expect(deleteRes.status).toBe(204);
   });
 });
@@ -249,7 +249,7 @@ describe('DELETE /comments/:id', () => {
 // Like toggle
 // ---------------------------------------------------------------------------
 
-describe('POST /comments/:id/like', () => {
+describe('POST /me/comments/:id/like', () => {
   it('liked_by_me reflects toggle state', async () => {
     const createRes = await req('POST', `/topics/${TOPIC_ID}/comments`, {
       token: tokenA,
@@ -258,19 +258,19 @@ describe('POST /comments/:id/like', () => {
     const comment = await createRes.json<{ id: string }>();
 
     // Like
-    const likeRes = await req('POST', `/comments/${comment.id}/like`, { token: tokenA });
+    const likeRes = await req('POST', `/me/comments/${comment.id}/like`, { token: tokenA });
     expect(likeRes.status).toBe(200);
     const likeBody = await likeRes.json<{ liked: boolean }>();
     expect(likeBody.liked).toBe(true);
 
     // Unlike
-    const unlikeRes = await req('POST', `/comments/${comment.id}/like`, { token: tokenA });
+    const unlikeRes = await req('POST', `/me/comments/${comment.id}/like`, { token: tokenA });
     const unlikeBody = await unlikeRes.json<{ liked: boolean }>();
     expect(unlikeBody.liked).toBe(false);
   });
 
   it('returns 404 for unknown comment', async () => {
-    const res = await req('POST', '/comments/does-not-exist/like', { token: tokenA });
+    const res = await req('POST', '/me/comments/00000000-0000-0000-0000-000000000000/like', { token: tokenA });
     expect(res.status).toBe(404);
   });
 });

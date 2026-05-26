@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ValidateBody, Body } from '@api/core/decorators';
+
 import type { ICommentRepository, CommentRecord, CommentWithMeta } from '@arenaquest/shared/ports';
 import type { ControllerResult } from '@api/core/result';
 
@@ -40,11 +40,10 @@ export class CommentsController {
     return { ok: true, data: [...topLevel, ...replies] };
   }
 
-  @ValidateBody(CreateCommentSchema)
   async createComment(
     topicNodeId: string,
     userId: string,
-    @Body() input: CreateCommentInput,
+    input: CreateCommentInput,
     enrolledTopicIds: string[],
   ): Promise<ControllerResult<CommentRecord>> {
     if (!enrolledTopicIds.includes(topicNodeId)) {

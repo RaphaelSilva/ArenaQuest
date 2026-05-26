@@ -1,6 +1,6 @@
 # Task 05 — Migrate `/auth` module: login, register, activate, password, OAuth (F5)
 
-**Status:** 📝 Draft
+**Status:** ✅ Completed
 **Milestone:** [9 — `apps/api` Route Reorganization and OpenAPI Adoption](./milestone.md)
 **RFC:** [0003 §4.1 and §5 — F5](../../RFCs/0003-apps-api-route-organization-and-openapi.md)
 
@@ -38,14 +38,14 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `routes/index.ts` mounts exactly one auth sub-app (down from two).
-- [ ] Every `/auth/*` endpoint (login, refresh, logout, register, activate, password reset/change, Google OAuth start + callback) resolves at the same URL and returns the same payload, status, and `Set-Cookie` header set as before.
-- [ ] `GET /openapi.json` lists each `/auth/*` route with full request/response schemas, including the `bearerAuth` security marker on authenticated routes.
-- [ ] All current `apps/api/test/routes/auth/**` specs pass green. New smoke tests cover any path that previously had none.
-- [ ] Login rate-limit, register rate-limit, activate rate-limit, forgot-password rate-limit each trigger on the same conditions as before (verified by existing specs).
-- [ ] Refresh-token rotation continues to work end-to-end (verified by existing specs).
-- [ ] `make test-api`, `make test-web` (no diff expected here), `make lint` pass green.
-- [ ] Legacy `auth.router.ts` and `oauth.router.ts` files are deleted.
+- [x] `routes/index.ts` mounts exactly one auth sub-app (down from two).
+- [x] Every `/auth/*` endpoint (login, refresh, logout, register, activate, password reset/change, Google OAuth start + callback) resolves at the same URL and returns the same payload, status, and `Set-Cookie` header set as before.
+- [x] `GET /openapi.json` lists each `/auth/*` route with full request/response schemas, including the `bearerAuth` security marker on authenticated routes.
+- [x] All current `apps/api/test/routes/auth/**` specs pass green. New smoke tests cover any path that previously had none.
+- [x] Login rate-limit, register rate-limit, activate rate-limit, forgot-password rate-limit each trigger on the same conditions as before (verified by existing specs).
+- [x] Refresh-token rotation continues to work end-to-end (verified by existing specs).
+- [x] `make test-api`, `make test-web` (no diff expected here), `make lint` pass green.
+- [x] Legacy `auth.router.ts` and `oauth.router.ts` files are deleted.
 
 ## Verification Plan
 

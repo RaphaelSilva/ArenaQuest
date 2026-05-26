@@ -1,6 +1,6 @@
 # Task 08 — Introduce `/v1` prefix and legacy rewrites for cutover (F8)
 
-**Status:** 📝 Draft
+**Status:** ✅ Completed
 **Milestone:** [9 — `apps/api` Route Reorganization and OpenAPI Adoption](./milestone.md)
 **RFC:** [0003 §4.6 and §5 — F8](../../RFCs/0003-apps-api-route-organization-and-openapi.md)
 
@@ -36,14 +36,14 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Every business endpoint resolves at `/v1/...`. Spot-check `/v1/auth/login`, `/v1/me`, `/v1/admin/topics`, `/v1/leaderboard`.
-- [ ] Every legacy path (`/auth/...`, `/me/...`, `/admin/...`, `/topics/...`, `/tasks/...`, `/leaderboard`) keeps responding with the same payload, status, and headers as before.
-- [ ] `/health`, `/openapi.json`, `/docs` remain unversioned.
-- [ ] `GET /openapi.json` lists only `/v1/...` paths under `paths`. Legacy bridge does not appear in the contract.
-- [ ] The cutover window and deprecation date are documented in `apps/api/README.md` (or the dedicated ops doc).
-- [ ] `make test-api` passes. Specs continue to assert against legacy paths (they exercise the bridge as a side benefit); new smoke specs added to confirm at least one `/v1/...` path per module.
-- [ ] `make test-web` passes (no `apps/web` changes are required to keep it green; the bridge guarantees it).
-- [ ] Worker bundle size delta recorded in PR (rewriter overhead should be negligible — flag anything > 20 KB compressed).
+- [x] Every business endpoint resolves at `/v1/...`. Spot-check `/v1/auth/login`, `/v1/me`, `/v1/admin/topics`, `/v1/leaderboard`.
+- [x] Every legacy path (`/auth/...`, `/me/...`, `/admin/...`, `/topics/...`, `/tasks/...`, `/leaderboard`) keeps responding with the same payload, status, and headers as before.
+- [x] `/health`, `/openapi.json`, `/docs` remain unversioned.
+- [x] `GET /openapi.json` lists only `/v1/...` paths under `paths`. Legacy bridge does not appear in the contract.
+- [x] The cutover window and deprecation date are documented in `apps/api/README.md` (or the dedicated ops doc).
+- [x] `make test-api` passes. Specs continue to assert against legacy paths (they exercise the bridge as a side benefit); new smoke specs added to confirm at least one `/v1/...` path per module.
+- [x] `make test-web` passes (no `apps/web` changes are required to keep it green; the bridge guarantees it).
+- [x] Worker bundle size delta recorded in PR (rewriter overhead should be negligible — flag anything > 20 KB compressed).
 
 ## Verification Plan
 

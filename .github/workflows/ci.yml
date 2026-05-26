@@ -47,3 +47,31 @@ jobs:
 
       - name: Run Tests
         run: make test
+
+      - name: Verify OpenAPI Document is Up-to-Date
+        run: |
+          pnpm --filter api dump-openapi
+          git diff --exit-code apps/api/openapi.json
+
+      - name: Verify Generated API Types are Up-to-Date
+        run: |
+          pnpm --filter web gen:api-types
+          git diff --exit-code apps/web/src/lib/api-types.gen.ts
+
+      - name: Run oasdiff Breaking Change Check
+        if: github.event_name == 'pull_request'
+        run: |
+          # Install oasdiff
+          curl -fsSL https://raw.githubusercontent.com/tufin/oasdiff/main/install.sh | sh
+          # Retrieve main openapi.json
+          git fetch origin main --depth=1
+          git show origin/main:apps/api/openapi.json > base-openapi.json || echo "{}" > base-openapi.json
+          # Query GitHub API for 'breaking-change' label
+          HAS_LABEL=$(curl -s "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" | jq -r '.labels[].name' | grep -i 'breaking-change' || true)
+          if [ -n "$HAS_LABEL" ]; then
+            echo "PR carries 'breaking-change' label. Skipping breaking change enforcement."
+            ~/.oasdiff/bin/oasdiff breaking base-openapi.json apps/api/openapi.json || true
+          else
+            echo "Enforcing breaking change checks..."
+            ~/.oasdiff/bin/oasdiff breaking base-openapi.json apps/api/openapi.json
+          fi

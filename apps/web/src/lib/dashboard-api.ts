@@ -1,4 +1,5 @@
 import type { HttpTransport } from './api-client';
+import type { paths } from './api-types.gen';
 
 
 // ---------------------------------------------------------------------------
@@ -42,7 +43,7 @@ export type DashboardMission = {
   icon: string;
   description: string;
   progressPct: number;
-  deadlineAt: string;
+  deadlineAt: string | null;
   rewardXp: number;
   rewardBadge: string | null;
 };
@@ -204,22 +205,21 @@ async function safeFetch<T>(http: HttpTransport, path: string): Promise<T | null
 // Raw API types (minimal, only what we read)
 // ---------------------------------------------------------------------------
 
-type ApiXp = { totalXp: number; level: number; rankTitle: string; xpToNext: number | null; xpInLevel: number };
+// NOTE: The dashboard endpoint schema uses z.any() for complex fields, so the
+// generated types are `unknown`. Define explicit local types matching the actual
+// runtime shape returned by the API controllers.
+type ApiXp = { totalXp: number; level: number; rankTitle: string; xpInLevel: number; xpToNext: number | null };
 type ApiStreak = { currentStreak: number; longestStreak: number; lastActivityDate: string | null };
-type ApiBadgeEntry = { badge: { id: string; iconEmoji: string; name: string; xpReward: number }; earnedAt: string };
+type ApiBadgeEntry = { badge: { id: string; name: string; iconEmoji: string; xpReward: number }; earnedAt: string };
 type ApiQuestEntry = { id: string; title: string; xpReward: number; progress: { currentValue: number; targetValue: number; completed: boolean } | null };
-type ApiMissionEntry = {
-  mission: { id: string; title: string; description: string; endAt: string; xpReward: number; badgeId: string | null };
-  progress: { currentValue: number; targetValue: number } | null;
-};
-
+type ApiMissionEntry = { mission: { id: string; title: string; description: string; xpReward: number; endAt: string | null; badgeId: string | null }; progress: { currentValue: number; targetValue: number } | null };
 type ApiDashboardShape = {
   xp: ApiXp | null;
   streak: ApiStreak | null;
-  badges: ApiBadgeEntry[] | null;
-  questsDaily: ApiQuestEntry[] | null;
-  questsWeekly: ApiQuestEntry[] | null;
+  questsDaily: ApiQuestEntry[];
+  questsWeekly: ApiQuestEntry[];
   missions: ApiMissionEntry[] | null;
+  badges: ApiBadgeEntry[] | null;
 };
 
 type ApiLeaderboardResponse = {

@@ -1,6 +1,6 @@
 # Task 03 — Define `AppContainer` and refactor `buildApp` wiring (F3)
 
-**Status:** 📝 Draft
+**Status:** ✅ Done
 **Milestone:** [9 — `apps/api` Route Reorganization and OpenAPI Adoption](./milestone.md)
 **RFC:** [0003 §4.4 and §5 — F3](../../RFCs/0003-apps-api-route-organization-and-openapi.md)
 
@@ -36,12 +36,12 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `apps/api/src/container.ts` exports `AppContainer` and `buildContainer`, with the seven groups from RFC §4.4.
-- [ ] `buildApp(env)` no longer constructs the flat `deps` bag; it calls `buildContainer(env)` and passes slices to each route builder.
-- [ ] Every route builder under `apps/api/src/routes/**` receives a container slice typed as a subset of `AppContainer`. No builder imports more than its bounded-context slice plus `infra` (when needed).
-- [ ] `routes/index.ts` still produces the same 20 mounts in the same order, with the same paths. (Topology collapse comes later.)
-- [ ] `make test-api`, `make test-web`, and `make lint` pass green with no behavioural diff on any endpoint.
-- [ ] No diff to controllers, adapters, or `packages/shared/**`.
+- [x] `apps/api/src/container.ts` exports `AppContainer` and `buildContainer`, with the seven groups from RFC §4.4.
+- [x] `buildApp(env)` no longer constructs the flat `deps` bag; it calls `buildContainer(env)` and passes slices to each route builder.
+- [x] Every route builder under `apps/api/src/routes/**` receives a container slice typed as a subset of `AppContainer`. No builder imports more than its bounded-context slice plus `infra` (when needed).
+- [x] `routes/index.ts` still produces the same 20 mounts in the same order, with the same paths. (Topology collapse comes later.)
+- [x] `make test-api`, `make test-web`, and `make lint` pass green with no behavioural diff on any endpoint.
+- [x] No diff to controllers, adapters, or `packages/shared/**`.
 
 ## Verification Plan
 

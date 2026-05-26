@@ -1,6 +1,6 @@
 # Task 06 — Migrate `/me` module: account, progress, enrollments, gamification, comments (F6)
 
-**Status:** 📝 Draft
+**Status:** ✅ Completed
 **Milestone:** [9 — `apps/api` Route Reorganization and OpenAPI Adoption](./milestone.md)
 **RFC:** [0003 §4.1 and §5 — F6](../../RFCs/0003-apps-api-route-organization-and-openapi.md)
 
@@ -36,14 +36,14 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `routes/index.ts` mounts `/me` exactly once. The `/account` mount is gone (folded into `/me`).
-- [ ] Every previously existing `/me/*`, `/account/*`, and progress endpoint resolves at the same URL with the same payload, status, and headers.
-- [ ] The bearer-auth guard is applied once at the `/me` sub-app level; no per-route auth boilerplate remains inside the sub-app.
-- [ ] `GET /openapi.json` lists each `/me/*` route with full request/response schemas and `bearerAuth` security.
-- [ ] All existing specs covering progress, gamification, account, and `/me`-side comments pass green with at most cosmetic edits (imports, file paths).
-- [ ] Legacy files `progress.router.ts`, `me-gamification.router.ts`, `account.router.ts` are deleted; `comments.router.ts` either shrinks to its non-`/me` responsibilities or is deleted if those moved elsewhere.
-- [ ] `make test-api`, `make test-web`, `make lint` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `routes/index.ts` mounts `/me` exactly once. The `/account` mount is gone (folded into `/me`).
+- [x] Every previously existing `/me/*`, `/account/*`, and progress endpoint resolves at the same URL with the same payload, status, and headers.
+- [x] The bearer-auth guard is applied once at the `/me` sub-app level; no per-route auth boilerplate remains inside the sub-app.
+- [x] `GET /openapi.json` lists each `/me/*` route with full request/response schemas and `bearerAuth` security.
+- [x] All existing specs covering progress, gamification, account, and `/me`-side comments pass green with at most cosmetic edits (imports, file paths).
+- [x] Legacy files `progress.router.ts`, `me-gamification.router.ts`, `account.router.ts` are deleted; `comments.router.ts` either shrinks to its non-`/me` responsibilities or is deleted if those moved elsewhere.
+- [x] `make test-api`, `make test-web`, `make lint` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -15,12 +15,15 @@
 		"db:create:staging": "wrangler d1 create arenaquest-db-staging --env staging",
 		"db:apply:migrations": "wrangler d1 migrations apply arenaquest-db",
 		"db:apply:migrations:staging": "wrangler d1 migrations apply arenaquest-db-staging --env staging",		
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"dump-openapi": "tsx scripts/dump-openapi.ts"
 	},
 	"dependencies": {
 		"@arenaquest/shared": "workspace:*",
 		"@aws-sdk/client-s3": "^3.1036.0",
 		"@aws-sdk/s3-request-presigner": "^3.1036.0",
+		"@hono/zod-openapi": "^0.16.0",
+		"@scalar/hono-api-reference": "^0.10.19",
 		"hono": "^4",
 		"zod": "^3"
 	},

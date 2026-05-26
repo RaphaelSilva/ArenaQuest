@@ -7,8 +7,8 @@ import {
   StageTopicNotInTaskError,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
-import type { ControllerResult } from '../core/result';
-import { ValidateBody, Body } from '../core/decorators';
+import type { ControllerResult } from '@api/core/result';
+
 
 export const ReplaceTopicsSchema = z.object({
   topicIds: z.array(z.string()),
@@ -24,10 +24,9 @@ export class AdminTaskLinkingController {
     private readonly topics: ITopicNodeRepository,
   ) {}
 
-  @ValidateBody(ReplaceTopicsSchema)
   async replaceTaskTopics(
     taskId: string,
-    @Body() body: Schema,
+    body: Schema,
   ): Promise<ControllerResult<{ topicIds: string[] }>> {
     const task = await this.tasks.findById(taskId);
     if (!task) return { ok: false, status: 404, error: 'NotFound' };
@@ -52,11 +51,10 @@ export class AdminTaskLinkingController {
     return { ok: true, data: { topicIds: incoming } };
   }
 
-  @ValidateBody(ReplaceTopicsSchema)
   async replaceStageTopics(
     taskId: string,
     stageId: string,
-    @Body() body: Schema,
+    body: Schema,
   ): Promise<ControllerResult<{ topicIds: string[] }>> {
     const task = await this.tasks.findById(taskId);
     if (!task) return { ok: false, status: 404, error: 'NotFound' };

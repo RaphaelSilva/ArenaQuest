@@ -2,7 +2,8 @@ import type { DashboardMission } from '@web/lib/dashboard-api';
 
 type Props = { missions: DashboardMission[] | null };
 
-function formatDeadline(iso: string): string {
+function formatDeadline(iso: string | null): string {
+  if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });

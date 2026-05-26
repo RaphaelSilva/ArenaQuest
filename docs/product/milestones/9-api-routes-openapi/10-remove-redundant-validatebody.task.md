@@ -1,6 +1,6 @@
 # Task 10 — Remove redundant `@ValidateBody` decorators from HTTP-facing controllers (F10)
 
-**Status:** 📝 Draft
+**Status:** ✅ Completed
 **Milestone:** [9 — `apps/api` Route Reorganization and OpenAPI Adoption](./milestone.md)
 **RFC:** [0003 §4.2 and §5 — F10](../../RFCs/0003-apps-api-route-organization-and-openapi.md)
 

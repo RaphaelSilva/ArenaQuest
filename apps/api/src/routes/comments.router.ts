@@ -1,14 +1,17 @@
 import { Hono } from 'hono';
 import { authGuard } from '@api/middleware/auth-guard';
-import type { ICommentRepository, IEnrollmentRepository } from '@arenaquest/shared/ports';
-import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 import { CommentsController } from '@api/controllers/comments.controller';
+import type { EngagementContext, ProgressContext, GamificationContext } from '@api/container';
 
-export function buildCommentsRouter(
-  commentRepo: ICommentRepository,
-  enrollmentRepo: IEnrollmentRepository,
-  xpEngine?: XpEngine,
-): Hono {
+export function buildCommentsRouter(slice: {
+  engagement: EngagementContext;
+  progress: ProgressContext;
+  gamification: GamificationContext;
+}): Hono {
+  const { commentRepo } = slice.engagement;
+  const { enrollmentRepo } = slice.progress;
+  const { xpEngine } = slice.gamification;
+
   const router = new Hono();
   const controller = new CommentsController(commentRepo);
 
@@ -39,23 +42,6 @@ export function buildCommentsRouter(
       }
     }
     return c.json(result.data, 201);
-  });
-
-  router.post('/comments/:id/like', authGuard, async (c) => {
-    const userId = c.get('user').sub;
-    const commentId = c.req.param('id');
-    const result = await controller.likeComment(commentId, userId);
-    if (!result.ok) return c.json({ error: result.error }, result.status as 404);
-    return c.json(result.data);
-  });
-
-  router.delete('/comments/:id', authGuard, async (c) => {
-    const userId = c.get('user').sub;
-    const commentId = c.req.param('id');
-    const userRoles = c.get('user').roles;
-    const result = await controller.deleteComment(commentId, userId, userRoles);
-    if (!result.ok) return c.json({ error: result.error }, result.status as 403 | 404);
-    return c.body(null, 204);
   });
 
   return router;
