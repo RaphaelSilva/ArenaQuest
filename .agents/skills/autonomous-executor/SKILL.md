@@ -105,9 +105,15 @@ The headless child is strictly responsible for code generation and saving files.
    * Capture full stdout/stderr to `docs/product/milestones/<m>/.executor-logs/<task-id>.log` (or equivalent category folder for backlogs/epics) so the user can audit what the child did. The log path goes into the status message.
    - Before declaring success, run a sanity diff (`git status --short` + `git diff --stat`) and surface it in the status message.
    - On non-token errors: STOP and report. Do not silently retry with a different model or fall back to Gemini.
-3. **Fallback: Gemini (Flash)** — only on token/quota/context-limit errors.
-   - If `claude` fails with an error indicating token limits or quota issues, switch to Gemini.
-   - Run: `gemini --model flash -p "<CONSTRUCTED_PROMPT>"`
+3. **Fallback: Gemini (Flash/Pro)** — only on token/quota/context-limit errors.
+   - If `claude` fails with an error indicating token limits or quota issues, switch to Gemini using a compatible model tier:
+     - If the Claude model is `haiku` (or if it's the initial execution under default settings), use `flash` (`gemini --model flash`).
+     - If the Claude model is `sonnet` (or escalated to `sonnet` for self-correction), use `pro` (`gemini --model pro`) to preserve high-reasoning capabilities.
+   - To match Claude's permission guidelines, always execute the headless child in non-interactive mode with auto-approvals enabled by appending `--approval-mode auto_edit` (which corresponds to Claude's `--permission-mode acceptEdits`).
+   - Run the fallback command with the prompt as a positional argument (avoiding the deprecated `-p` flag):
+     ```
+     gemini --model <GEMINI_MODEL> --approval-mode auto_edit "<CONSTRUCTED_PROMPT>"
+     ```
    - If `gemini` also fails, report the error to the user.
 
 ### 2.3.1 What is NOT delegated to the headless child
@@ -182,7 +188,15 @@ If a task in the chain fails verification after retries or its child emits `BLOC
 - **Prompt Caching Optimization:** Structure the prompt consistently, keeping the large static sections at the front. Do not inject dynamic timestamps or randomized nonces in the static block, as this invalidates cache entries.
 
 ### 3.2 Gemini CLI
-- Preferred command: `gemini --model flash "Your prompt here"`
+- Canonical command:
+  ```
+  gemini --model <GEMINI_MODEL> --approval-mode auto_edit "Your prompt here"
+  ```
+- **Dynamic Model Mapping:**
+  - Claude `haiku` -> Gemini `flash` (fast, cost-efficient default).
+  - Claude `sonnet` -> Gemini `pro` (high-reasoning, advanced self-correction/large-plan execution).
+- `--approval-mode auto_edit` is mandatory to align with the headless child permission constraints.
+- Note: Avoid the `-p` / `--prompt` flag as it is deprecated in Gemini CLI version 0.25.0+. Use positional query arguments instead.
 
 ---
 
