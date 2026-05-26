@@ -158,6 +158,15 @@ Rules of thumb:
 - Never `throw` for validation/business errors — return `{ ok: false, … }`. Let
   unexpected runtime errors bubble up; Hono will turn them into `500`s.
 
+### File layout & parameter ordering
+
+- **Zod schemas at the top of the controller file**, above the class. Promote
+  to `@arenaquest/shared` only when a schema crosses package boundaries.
+- **Path parameters first, `@Body()` last** — e.g.
+  `update(id: string, @Body() body: ...)`. The `@Body()` decorator targets a
+  fixed parameter index; placing it last keeps that index stable as new path
+  params are added.
+
 ### 4. Wire up the route
 
 `apps/api/src/routes/admin-topics.router.ts`:
