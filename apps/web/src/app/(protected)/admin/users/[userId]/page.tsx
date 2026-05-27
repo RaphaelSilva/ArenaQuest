@@ -9,6 +9,7 @@ import { useApiClient } from '@web/context/auth-context';
 import { EnrollmentsTab } from '@web/components/enrollment/enrollments-tab';
 import { ResetPasswordModal } from '@web/components/admin/ResetPasswordModal';
 import { Spinner } from '@web/components/spinner';
+import { useDict } from '@web/context/dict-context';
 import type { Entities } from '@arenaquest/shared/types/entities';
 
 export const runtime = 'edge';
@@ -26,24 +27,26 @@ export default function AdminUserDetailPage({ params }: Props) {
   const [user, setUser] = useState<Entities.Identity.User | null>(null);
   const [userError, setUserError] = useState('');
   const [showResetModal, setShowResetModal] = useState(false);
-
-  useEffect(() => {
-    if (!isAdmin) router.replace('/dashboard');
-  }, [isAdmin, router]);
+  const dict = useDict();
+  const d = dict.admin.users.detail;
 
   const loadUser = useCallback(async () => {
     try {
       const res = await client.adminUsers.list();
       const found = res.data.find((u) => u.id === userId);
-      if (!found) setUserError('User not found.');
+      if (!found) setUserError(d.errorNotFound);
       else {
         setUser(found);
         setUserError('');
       }
     } catch {
-      setUserError('Failed to load user.');
+      setUserError(d.errorLoading);
     }
-  }, [client, userId]);
+  }, [client, userId, d]);
+
+  useEffect(() => {
+    if (!isAdmin) router.replace('/dashboard');
+  }, [isAdmin, router]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -55,7 +58,7 @@ export default function AdminUserDetailPage({ params }: Props) {
   return (
     <main className="mx-auto max-w-3xl px-6 py-8">
       <Link href="/admin/users" className="text-sm transition-colors" style={{ color: 'var(--text2)' }}>
-        ← Back to users
+        {d.backToUsers}
       </Link>
 
       {userError ? (
@@ -75,7 +78,7 @@ export default function AdminUserDetailPage({ params }: Props) {
               className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
               style={{ background: 'var(--error)' }}
             >
-              Reset Password
+              {d.resetPasswordButton}
             </button>
           )}
         </header>
@@ -99,7 +102,7 @@ export default function AdminUserDetailPage({ params }: Props) {
               borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent',
             }}
           >
-            {t}
+            {t === 'profile' ? d.tabProfile : d.tabEnrollments}
           </button>
         ))}
       </nav>
@@ -111,15 +114,15 @@ export default function AdminUserDetailPage({ params }: Props) {
       {tab === 'profile' && user && (
         <dl className="space-y-3 text-sm">
           <div>
-            <dt className="font-medium" style={{ color: 'var(--text3)' }}>Roles</dt>
+            <dt className="font-medium" style={{ color: 'var(--text3)' }}>{d.rolesLabel}</dt>
             <dd style={{ color: 'var(--text)' }}>{user.roles.map((r) => r.name).join(', ') || '—'}</dd>
           </div>
           <div>
-            <dt className="font-medium" style={{ color: 'var(--text3)' }}>Status</dt>
+            <dt className="font-medium" style={{ color: 'var(--text3)' }}>{d.statusLabel}</dt>
             <dd style={{ color: 'var(--text)' }}>{user.status}</dd>
           </div>
           <div>
-            <dt className="font-medium" style={{ color: 'var(--text3)' }}>Member since</dt>
+            <dt className="font-medium" style={{ color: 'var(--text3)' }}>{d.memberSinceLabel}</dt>
             <dd style={{ color: 'var(--text)' }}>{new Date(user.createdAt).toLocaleDateString('pt-BR')}</dd>
           </div>
         </dl>

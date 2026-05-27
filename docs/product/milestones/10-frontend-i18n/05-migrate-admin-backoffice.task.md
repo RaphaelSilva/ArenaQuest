@@ -1,6 +1,6 @@
 # Task 05 — Migrate `(protected)/admin/**` strings to the dictionary (Phase 2)
 
-**Status:** 📝 Draft
+**Status:** ✅ Done
 **Milestone:** [10 — Frontend Internationalization (i18n)](./milestone.md)
 **RFC:** [0002 — Frontend i18n, Phase 2](../../RFCs/0002-frontend-internationalization-i18n.md)
 
@@ -37,12 +37,12 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Every JSX text node, `alt`, `aria-label`, `title`, `placeholder`, button label, table header, empty-state message, confirmation modal, and toast under the declared scope reads from `dict` or `useDict`.
-- [ ] Every key referenced from migrated code exists in both `dict-en.ts` and `dict-pt.ts`.
-- [ ] Admin tests pass without behavioural changes; literal-string assertions are replaced with dictionary lookups.
-- [ ] Manual smoke against `make dev-web` with `NEXT_PUBLIC_LANGUAGE=en` and `=pt`: every admin page renders entirely in the expected language, including empty states, error states, and confirmation dialogs.
-- [ ] `make lint` and `make test-web` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] Every JSX text node, `alt`, `aria-label`, `title`, `placeholder`, button label, table header, empty-state message, confirmation modal, and toast under the declared scope reads from `dict` or `useDict`.
+- [x] Every key referenced from migrated code exists in both `dict-en.ts` and `dict-pt.ts`.
+- [x] Admin tests pass without behavioural changes; literal-string assertions are replaced with dictionary lookups.
+- [x] Manual smoke against `make dev-web` with `NEXT_PUBLIC_LANGUAGE=en` and `=pt`: every admin page renders entirely in the expected language, including empty states, error states, and confirmation dialogs.
+- [x] `make lint` and `make test-web` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
