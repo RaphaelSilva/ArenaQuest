@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { dictPt } from '@web/i18n/dict-pt';
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [key: string]: unknown }) => (
@@ -41,7 +42,7 @@ describe('MediaTabs', () => {
         accessToken="token"
       />,
     );
-    expect(screen.getByRole('tab', { name: /vídeos/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: new RegExp(dictPt.catalog.mediaTabs.videos, 'i') })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('switches to Files tab when clicked', () => {
@@ -54,7 +55,7 @@ describe('MediaTabs', () => {
         accessToken="token"
       />,
     );
-    const filesTab = screen.getByRole('tab', { name: /arquivos/i });
+    const filesTab = screen.getByRole('tab', { name: new RegExp(dictPt.catalog.mediaTabs.files, 'i') });
     fireEvent.click(filesTab);
     expect(filesTab).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Guide.pdf')).toBeInTheDocument();
@@ -70,7 +71,7 @@ describe('MediaTabs', () => {
         accessToken="token"
       />,
     );
-    fireEvent.click(screen.getByRole('tab', { name: /arquivos/i }));
+    fireEvent.click(screen.getByRole('tab', { name: new RegExp(dictPt.catalog.mediaTabs.files, 'i') }));
     // Video panel still in DOM (display:none) to preserve playback state
     const videoPanel = container.querySelector('#tabpanel-videos');
     expect(videoPanel).toBeInTheDocument();
@@ -130,10 +131,10 @@ describe('Comments', () => {
       />,
     );
 
-    const textarea = screen.getByPlaceholderText(/compartilhe/i);
+    const textarea = screen.getByPlaceholderText(new RegExp(dictPt.catalog.comments.placeholder.slice(0, 12), 'i'));
     fireEvent.change(textarea, { target: { value: 'New comment' } });
 
-    const submitBtn = screen.getByRole('button', { name: /publicar/i });
+    const submitBtn = screen.getByRole('button', { name: new RegExp(dictPt.catalog.comments.submit, 'i') });
     fireEvent.click(submitBtn);
 
     // Optimistic comment should appear immediately
@@ -163,20 +164,18 @@ describe('Comments', () => {
       />,
     );
 
-    const textarea = screen.getByPlaceholderText(/compartilhe/i);
+    const textarea = screen.getByPlaceholderText(new RegExp(dictPt.catalog.comments.placeholder.slice(0, 12), 'i'));
     fireEvent.change(textarea, { target: { value: 'Will fail' } });
 
-    const submitBtn = screen.getByRole('button', { name: /publicar/i });
+    const submitBtn = screen.getByRole('button', { name: new RegExp(dictPt.catalog.comments.submit, 'i') });
     fireEvent.click(submitBtn);
 
-    // The comment count header starts at "0 comentários" (no comments)
-    // After optimistic add, count goes to 1; after rollback, back to 0
     // After rollback an error message appears
     await waitFor(() => {
       expect(screen.getByText(/failed to post comment/i)).toBeInTheDocument();
     }, { timeout: 3000 });
 
-    // After rollback, comments list is empty again (0 comentários)
-    expect(screen.getByText(/0 comentários/i)).toBeInTheDocument();
+    // After rollback, comments list is empty again (header shows 0 comments)
+    expect(screen.getByText(dictPt.catalog.comments.header(0))).toBeInTheDocument();
   });
 });

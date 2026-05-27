@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useApiClient } from '@web/context/auth-context';
+import { useDict } from '@web/context/dict-context';
 import type { UserGrant } from '@web/lib/admin-enrollment-api';
 import type { TopicNode } from '@web/lib/admin-topics-api';
 import { Spinner } from '@web/components/spinner';
@@ -18,6 +19,7 @@ type TopicPickerDialogProps = {
 };
 
 function TopicPickerDialog({ topics, grantedIds, onSelect, onClose }: TopicPickerDialogProps) {
+  const dict = useDict();
   const [search, setSearch] = useState('');
 
   const visible = topics
@@ -29,7 +31,7 @@ function TopicPickerDialog({ topics, grantedIds, onSelect, onClose }: TopicPicke
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Grant topic access"
+      aria-label={dict.enrollment.pickerTitle}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
       <div
@@ -38,11 +40,11 @@ function TopicPickerDialog({ topics, grantedIds, onSelect, onClose }: TopicPicke
       >
         <div className="p-4 pb-0">
           <h2 className="mb-3 text-base font-semibold" style={{ color: 'var(--text)' }}>
-            Grant topic access
+            {dict.enrollment.pickerTitle}
           </h2>
           <input
             type="search"
-            placeholder="Search topics…"
+            placeholder={dict.enrollment.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoFocus
@@ -54,7 +56,7 @@ function TopicPickerDialog({ topics, grantedIds, onSelect, onClose }: TopicPicke
         <ul className="mt-3 flex-1 overflow-y-auto px-4 pb-2 space-y-1">
           {visible.length === 0 ? (
             <li className="py-4 text-center text-sm" style={{ color: 'var(--text2)' }}>
-              No published topics found.
+              {dict.enrollment.noTopicsFound}
             </li>
           ) : (
             visible.map((t) => {
@@ -71,7 +73,7 @@ function TopicPickerDialog({ topics, grantedIds, onSelect, onClose }: TopicPicke
                     {t.title}
                     {already && (
                       <span className="ml-2 text-xs" style={{ color: 'var(--accent3)' }}>
-                        Already granted
+                        {dict.enrollment.alreadyGranted}
                       </span>
                     )}
                   </button>
@@ -88,7 +90,7 @@ function TopicPickerDialog({ topics, grantedIds, onSelect, onClose }: TopicPicke
             className="w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors"
             style={{ background: 'var(--bg2)', color: 'var(--text2)' }}
           >
-            Cancel
+            {dict.enrollment.cancelButton}
           </button>
         </div>
       </div>
@@ -107,12 +109,13 @@ type RevokeDialogProps = {
 };
 
 function RevokeDialog({ topicTitle, onConfirm, onCancel }: RevokeDialogProps) {
+  const dict = useDict();
   const [cascade, setCascade] = useState(false);
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Revoke access"
+      aria-label={dict.enrollment.revokeDialog.title(topicTitle)}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
       <div
@@ -120,16 +123,16 @@ function RevokeDialog({ topicTitle, onConfirm, onCancel }: RevokeDialogProps) {
         style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
       >
         <p className="mb-4 text-sm" style={{ color: 'var(--text)' }}>
-          Revoke access to <strong>{topicTitle}</strong>?
+          {dict.enrollment.revokeDialog.title(topicTitle)}
         </p>
         <label className="mb-6 flex items-center gap-2 text-sm" style={{ color: 'var(--text2)' }}>
           <input
             type="checkbox"
             checked={cascade}
             onChange={(e) => setCascade(e.target.checked)}
-            aria-label="Also revoke descendant grants"
+            aria-label={dict.enrollment.revokeDialog.cascade}
           />
-          Also revoke descendant grants
+          {dict.enrollment.revokeDialog.cascade}
         </label>
         <div className="flex justify-end gap-3">
           <button
@@ -137,14 +140,14 @@ function RevokeDialog({ topicTitle, onConfirm, onCancel }: RevokeDialogProps) {
             className="rounded-lg px-4 py-2 text-sm transition-colors"
             style={{ color: 'var(--text2)' }}
           >
-            Cancel
+            {dict.enrollment.revokeDialog.cancelButton}
           </button>
           <button
             onClick={() => onConfirm(cascade)}
             className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
             style={{ background: 'var(--error)' }}
           >
-            Revoke
+            {dict.enrollment.revokeDialog.revokeButton}
           </button>
         </div>
       </div>
@@ -161,6 +164,7 @@ export type EnrollmentsTabProps = {
 };
 
 export function EnrollmentsTab({ userId }: EnrollmentsTabProps) {
+  const dict = useDict();
   const client = useApiClient();
   const [grants, setGrants] = useState<UserGrant[]>([]);
   const [allTopics, setAllTopics] = useState<TopicNode[]>([]);
@@ -180,11 +184,11 @@ export function EnrollmentsTab({ userId }: EnrollmentsTabProps) {
       setGrants(g);
       setAllTopics(t);
     } catch {
-      setError('Failed to load enrollments.');
+      setError(dict.enrollment.errorLoading);
     } finally {
       setLoading(false);
     }
-  }, [client, userId]);
+  }, [client, userId, dict]);
 
   useEffect(() => {
     void load();
@@ -200,7 +204,7 @@ export function EnrollmentsTab({ userId }: EnrollmentsTabProps) {
       const { grant } = await client.adminEnrollment.grantUserTopic(userId, topicId);
       setGrants((prev) => [...prev.filter((g) => g.topicNodeId !== topicId), grant]);
     } catch {
-      setError('Failed to grant access.');
+      setError(dict.enrollment.errorGrant);
     } finally {
       setBusy(false);
     }
@@ -215,7 +219,7 @@ export function EnrollmentsTab({ userId }: EnrollmentsTabProps) {
       await client.adminEnrollment.revokeUserTopic(userId, target.topicNodeId, cascade);
       setGrants((prev) => prev.filter((g) => g.id !== target.id));
     } catch {
-      setError('Failed to revoke access.');
+      setError(dict.enrollment.errorRevoke);
     } finally {
       setBusy(false);
     }
@@ -246,7 +250,7 @@ export function EnrollmentsTab({ userId }: EnrollmentsTabProps) {
           className="text-sm font-semibold uppercase tracking-wide"
           style={{ color: 'var(--text3)' }}
         >
-          Direct Grants ({grants.length})
+          {dict.enrollment.directGrantsTitle(grants.length)}
         </h2>
         <button
           type="button"
@@ -255,7 +259,7 @@ export function EnrollmentsTab({ userId }: EnrollmentsTabProps) {
           className="rounded-lg px-4 py-2 text-sm font-semibold transition-all disabled:opacity-60"
           style={{ background: 'var(--accent)', color: '#0B0E17' }}
         >
-          Grant topic access
+          {dict.enrollment.grantButton}
         </button>
       </div>
 
@@ -264,7 +268,7 @@ export function EnrollmentsTab({ userId }: EnrollmentsTabProps) {
           className="rounded-xl border border-dashed py-8 text-center text-sm"
           style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}
         >
-          No topics granted yet.
+          {dict.enrollment.noGrants}
         </p>
       ) : (
         <ul className="space-y-2" aria-label="Granted topics">
@@ -281,18 +285,18 @@ export function EnrollmentsTab({ userId }: EnrollmentsTabProps) {
                     {topic?.title ?? grant.topicNodeId}
                   </p>
                   <p className="text-xs" style={{ color: 'var(--text3)' }}>
-                    Granted {new Date(grant.grantedAt).toLocaleDateString('pt-BR')}
+                    {dict.enrollment.grantedAt} {new Date(grant.grantedAt).toLocaleDateString('pt-BR')}
                   </p>
                 </div>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => setRevokeTarget(grant)}
-                  aria-label={`Revoke access to ${topic?.title ?? grant.topicNodeId}`}
+                  aria-label={`${dict.enrollment.revokeButton} ${topic?.title ?? grant.topicNodeId}`}
                   className="rounded-lg px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50"
                   style={{ color: 'var(--error)', background: 'var(--error-bg)' }}
                 >
-                  Revoke
+                  {dict.enrollment.revokeButton}
                 </button>
               </li>
             );

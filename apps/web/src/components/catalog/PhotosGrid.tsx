@@ -1,12 +1,17 @@
+'use client';
+
 import type { Media } from '@web/lib/admin-media-api';
+import { useDict } from '@web/context/dict-context';
 
 type Props = { photos: Media[] };
 
 export function PhotosGrid({ photos }: Props) {
+  const dict = useDict();
+
   if (photos.length === 0) {
     return (
       <p className="py-8 text-center text-sm" style={{ color: 'var(--aq-text3)' }}>
-        No photos available.
+        {dict.catalog.photosGrid.noPhotos}
       </p>
     );
   }

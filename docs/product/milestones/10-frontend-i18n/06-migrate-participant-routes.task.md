@@ -1,6 +1,6 @@
 # Task 06 — Migrate participant routes — catalog, dashboard, tasks, enrollment, settings (Phase 2)
 
-**Status:** 📝 Draft
+**Status:** ✅ Done
 **Milestone:** [10 — Frontend Internationalization (i18n)](./milestone.md)
 **RFC:** [0002 — Frontend i18n, Phase 2](../../RFCs/0002-frontend-internationalization-i18n.md)
 
@@ -45,13 +45,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Every JSX text node, attribute string, and UI message under the declared scope reads from `dict` or `useDict`.
-- [ ] Every key referenced exists in both dictionaries.
-- [ ] Charts and progress indicators are pixel-identical to pre-migration screenshots (verified manually); only text content changes.
-- [ ] Backend-driven Markdown content is preserved unchanged — no attempt is made to localize topic/task descriptions in this PR.
-- [ ] Participant-route tests pass without behavioural changes; string assertions go through the dictionary.
-- [ ] `make lint` and `make test-web` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] Every JSX text node, attribute string, and UI message under the declared scope reads from `dict` or `useDict`.
+- [x] Every key referenced exists in both dictionaries.
+- [x] Charts and progress indicators are pixel-identical to pre-migration screenshots (verified manually); only text content changes.
+- [x] Backend-driven Markdown content is preserved unchanged — no attempt is made to localize topic/task descriptions in this PR.
+- [x] Participant-route tests pass without behavioural changes; string assertions go through the dictionary.
+- [x] `make lint` and `make test-web` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

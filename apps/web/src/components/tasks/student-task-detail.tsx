@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useApiClient } from '@web/context/auth-context';
+import { useDict } from '@web/context/dict-context';
 import type { PublicTaskDetail } from '@web/lib/tasks-api';
 
 type StageState = 'checked' | 'current' | 'locked';
@@ -39,6 +40,7 @@ function computeStageStates(
 }
 
 export function StudentTaskDetail({ task, initialCheckins = [] }: Props) {
+  const dict = useDict();
   const client = useApiClient();
   const [checkins, setCheckins] = useState<StageProgress[]>(initialCheckins);
   const [inflight, setInflight] = useState<string | null>(null);
@@ -60,10 +62,10 @@ export function StudentTaskDetail({ task, initialCheckins = [] }: Props) {
         const { error } = res;
         if (error.type === 'OUT_OF_ORDER') {
           const expectedStage = task.stages.find((s) => s.id === error.expectedStageId);
-          const stageName = expectedStage ? `"${expectedStage.label}"` : 'a etapa anterior';
-          showToast(`Conclua ${stageName} primeiro antes de avançar.`);
+          const stageName = expectedStage ? `"${expectedStage.label}"` : dict.tasks.detail.unknownStageFallback;
+          showToast(dict.tasks.detail.errorOutOfOrder(stageName));
         } else {
-          showToast('Não foi possível registrar o check-in. Tente novamente.');
+          showToast(dict.tasks.detail.errorGeneral);
         }
         return;
       }
@@ -75,7 +77,7 @@ export function StudentTaskDetail({ task, initialCheckins = [] }: Props) {
         { stageId: checkIn.stageId, checkedInAt: checkIn.checkedInAt },
       ]);
     },
-    [inflight, task, client, showToast],
+    [inflight, task, client, showToast, dict],
   );
 
   const stageStates = computeStageStates(task.stages, checkins);
@@ -101,7 +103,7 @@ export function StudentTaskDetail({ task, initialCheckins = [] }: Props) {
         className="text-sm transition-colors"
         style={{ color: 'var(--text2)' }}
       >
-        ← Voltar para missões
+        {dict.tasks.detail.backToMissions}
       </Link>
 
       <header className="mt-3 mb-6">
@@ -113,7 +115,7 @@ export function StudentTaskDetail({ task, initialCheckins = [] }: Props) {
         </h1>
         {allDone && sortedStages.length > 0 && (
           <p className="mt-2 text-sm font-medium" style={{ color: 'var(--accent3)' }}>
-            ✓ Missão concluída!
+            {dict.tasks.detail.completedLabel}
           </p>
         )}
       </header>
@@ -123,14 +125,14 @@ export function StudentTaskDetail({ task, initialCheckins = [] }: Props) {
           className="mb-4 text-[11px] font-semibold uppercase tracking-wide"
           style={{ color: 'var(--text3)' }}
         >
-          Etapas
+          {dict.tasks.detail.stagesTitle}
         </h2>
         {sortedStages.length === 0 ? (
           <p className="text-sm" style={{ color: 'var(--text2)' }}>
-            Nenhuma etapa definida ainda.
+            {dict.tasks.detail.noStages}
           </p>
         ) : (
-          <ol className="space-y-3" data-testid="stages-list" aria-label="Etapas da missão">
+          <ol className="space-y-3" data-testid="stages-list" aria-label={dict.tasks.detail.stagesAriaLabel}>
             {sortedStages.map((stage, idx) => {
               const state = stageStates.get(stage.id) ?? 'locked';
               const isCurrent = state === 'current';
@@ -164,7 +166,7 @@ export function StudentTaskDetail({ task, initialCheckins = [] }: Props) {
                           className="shrink-0 text-xs font-semibold uppercase tracking-wide"
                           style={{ color: 'var(--text3)' }}
                         >
-                          Etapa {idx + 1}
+                          {dict.tasks.detail.stageLabel(idx + 1)}
                         </span>
                         <h3
                           className="text-base font-medium"
@@ -181,17 +183,16 @@ export function StudentTaskDetail({ task, initialCheckins = [] }: Props) {
                         <p
                           className="mt-1 text-xs"
                           style={{ color: 'var(--accent3)' }}
-                          aria-label={`Concluído em ${new Date(checkin.checkedInAt).toLocaleDateString('pt-BR')}`}
+                          aria-label={dict.tasks.detail.completedAt(new Date(checkin.checkedInAt).toLocaleDateString('pt-BR'))}
                         >
-                          ✓ Concluído em{' '}
-                          {new Date(checkin.checkedInAt).toLocaleDateString('pt-BR')}
+                          {dict.tasks.detail.completedAt(new Date(checkin.checkedInAt).toLocaleDateString('pt-BR'))}
                         </p>
                       )}
 
                       {stage.topics.length > 0 && (
                         <ul
                           className="mt-3 flex flex-wrap gap-2"
-                          aria-label={`Tópicos de ${stage.label}`}
+                          aria-label={dict.tasks.detail.stageTopicsAriaLabel(stage.label)}
                         >
                           {stage.topics.map((topic) => (
                             <li key={topic.id}>
@@ -217,7 +218,7 @@ export function StudentTaskDetail({ task, initialCheckins = [] }: Props) {
                         type="button"
                         onClick={() => void handleCheckIn(stage.id)}
                         disabled={inflight === stage.id}
-                        aria-label={`Check-in na etapa ${stage.label}`}
+                        aria-label={dict.tasks.detail.checkInAriaLabel(stage.label)}
                         className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 disabled:opacity-60"
                         style={{
                           background: 'var(--accent)',
@@ -225,7 +226,7 @@ export function StudentTaskDetail({ task, initialCheckins = [] }: Props) {
                           boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)',
                         }}
                       >
-                        {inflight === stage.id ? 'Registrando…' : 'Check-in'}
+                        {inflight === stage.id ? dict.tasks.detail.checkInLoading : dict.tasks.detail.checkInButton}
                       </button>
                     )}
 
@@ -233,10 +234,10 @@ export function StudentTaskDetail({ task, initialCheckins = [] }: Props) {
                       <span
                         className="shrink-0 rounded-lg px-4 py-2 text-xs font-medium"
                         style={{ background: 'var(--bg4)', color: 'var(--text3)' }}
-                        title="Conclua as etapas anteriores primeiro"
-                        aria-label="Etapa bloqueada. Conclua as etapas anteriores primeiro."
+                        title={dict.tasks.detail.lockedTooltip}
+                        aria-label={dict.tasks.detail.lockedAriaLabel}
                       >
-                        Bloqueada
+                        {dict.tasks.detail.locked}
                       </span>
                     )}
 

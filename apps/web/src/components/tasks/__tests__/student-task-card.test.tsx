@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
+import { dictPt } from '@web/i18n/dict-pt';
 import { StudentTaskCard } from '../student-task-card';
 
 describe('StudentTaskCard', () => {
@@ -11,7 +12,7 @@ describe('StudentTaskCard', () => {
     );
     const link = screen.getByRole('link');
     expect(link).toHaveAttribute('href', '/tasks/abc');
-    expect(screen.getByText(/3 stages · 2 topics/)).toBeInTheDocument();
+    expect(screen.getByText(`${dictPt.tasks.card.stageCount(3)} · ${dictPt.tasks.card.topicCount(2)}`)).toBeInTheDocument();
   });
 
   it('uses singular labels for counts of 1', () => {
@@ -20,6 +21,6 @@ describe('StudentTaskCard', () => {
         task={{ id: 'a', title: 'Solo', stageCount: 1, topicCount: 1, updatedAt: '' }}
       />,
     );
-    expect(screen.getByText(/1 stage · 1 topic/)).toBeInTheDocument();
+    expect(screen.getByText(`${dictPt.tasks.card.stageCount(1)} · ${dictPt.tasks.card.topicCount(1)}`)).toBeInTheDocument();
   });
 });

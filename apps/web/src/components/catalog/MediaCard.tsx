@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { Media } from '@web/lib/topics-api';
 import { VideoPlayer } from './VideoPlayer';
+import { useDict } from '@web/context/dict-context';
 
 type MediaCardProps = {
   media: Media;
@@ -26,6 +27,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export function MediaCard({ media }: MediaCardProps) {
+  const dict = useDict();
   const [isExpanded, setIsExpanded] = useState(false);
   const isVideo = media.type.toLowerCase().includes('video') || media.type.toLowerCase().includes('mp4');
   const isPdf = media.type.toLowerCase().includes('pdf');
@@ -62,7 +64,7 @@ export function MediaCard({ media }: MediaCardProps) {
               setIsExpanded(!isExpanded);
             }}
           >
-            {isExpanded ? 'Hide' : 'Play'}
+            {isExpanded ? dict.catalog.mediaCard.hide : dict.catalog.mediaCard.play}
           </button>
         )}
 
@@ -75,7 +77,7 @@ export function MediaCard({ media }: MediaCardProps) {
             style={{ color: 'var(--aq-accent)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {isPdf ? 'View' : 'Open'}
+            {isPdf ? dict.catalog.mediaCard.view : dict.catalog.mediaCard.open}
           </a>
         )}
       </div>

@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useDict } from '@web/context/dict-context';
 
 type BreadcrumbItem = {
   label: string;
@@ -11,6 +14,8 @@ type Props = {
 };
 
 export function CatalogBreadcrumb({ items, backHref }: Props) {
+  const dict = useDict();
+
   return (
     <div className="mb-5 md:mb-6">
       {/* Back button — visible only on mobile */}
@@ -20,7 +25,7 @@ export function CatalogBreadcrumb({ items, backHref }: Props) {
           className="mb-3 flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:text-[var(--aq-accent)] md:hidden"
           style={{ color: 'var(--aq-text3)' }}
         >
-          ← Voltar
+          {dict.catalog.breadcrumb.back}
         </Link>
       )}
 

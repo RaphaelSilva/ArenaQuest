@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useApiClient } from '@web/context/auth-context';
+import { useDict } from '@web/context/dict-context';
 import { AccountApiError } from '@web/lib/account-api';
 
 const LockIcon = () => (
@@ -39,7 +40,7 @@ const s = {
   fieldError: { fontSize: 11, color: 'var(--aq-error)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 },
 };
 
-function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+function Toast({ message, onDismiss, closeLabel }: { message: string; onDismiss: () => void; closeLabel: string }) {
   return (
     <div
       role="status"
@@ -49,7 +50,7 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
       <button
         onClick={onDismiss}
         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0B0E17', fontSize: 16, lineHeight: 1, padding: 0, marginLeft: 4, opacity: 0.7 }}
-        aria-label="Fechar"
+        aria-label={closeLabel}
       >
         ×
       </button>
@@ -58,6 +59,7 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
 }
 
 export default function SettingsPage() {
+  const dict = useDict();
   const client = useApiClient();
 
   const [currentPw, setCurrentPw] = useState('');
@@ -71,12 +73,12 @@ export default function SettingsPage() {
 
   function validate(): boolean {
     const errs: typeof fieldErrors = {};
-    if (!currentPw) errs.currentPw = 'Campo obrigatório';
-    if (!newPw) errs.newPw = 'Campo obrigatório';
-    else if (newPw.length < 8) errs.newPw = 'Mínimo 8 caracteres';
-    else if (!/\d/.test(newPw)) errs.newPw = 'Inclua pelo menos um número';
-    if (!confirmPw) errs.confirmPw = 'Campo obrigatório';
-    else if (newPw !== confirmPw) errs.confirmPw = 'As senhas não coincidem';
+    if (!currentPw) errs.currentPw = dict.settings.changePassword.errorRequired;
+    if (!newPw) errs.newPw = dict.settings.changePassword.errorRequired;
+    else if (newPw.length < 8) errs.newPw = dict.settings.changePassword.errorMinLength;
+    else if (!/\d/.test(newPw)) errs.newPw = dict.settings.changePassword.errorNoDigit;
+    if (!confirmPw) errs.confirmPw = dict.settings.changePassword.errorRequired;
+    else if (newPw !== confirmPw) errs.confirmPw = dict.settings.changePassword.errorMismatch;
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -91,12 +93,12 @@ export default function SettingsPage() {
       setCurrentPw('');
       setNewPw('');
       setConfirmPw('');
-      setToast('Senha alterada com sucesso!');
+      setToast(dict.settings.changePassword.successToast);
     } catch (err) {
       if (err instanceof AccountApiError && err.code === 'InvalidCurrentPassword') {
-        setFieldErrors({ currentPw: 'Senha atual incorreta' });
+        setFieldErrors({ currentPw: dict.settings.changePassword.errorCurrentInvalid });
       } else {
-        setGeneralError('Não foi possível alterar a senha. Tente novamente.');
+        setGeneralError(dict.settings.changePassword.errorGeneral);
       }
     } finally {
       setLoading(false);
@@ -106,18 +108,18 @@ export default function SettingsPage() {
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '40px 24px', fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif', color: 'var(--aq-text)' }}>
       <h1 style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 26, fontWeight: 700, letterSpacing: '-0.4px', marginBottom: 8 }}>
-        Configurações
+        {dict.settings.title}
       </h1>
       <p style={{ fontSize: 13, color: 'var(--aq-text3)', marginBottom: 36 }}>
-        Gerencie suas preferências de conta.
+        {dict.settings.subtitle}
       </p>
 
       <div style={{ background: 'var(--aq-bg2)', border: '1px solid var(--aq-border)', borderRadius: 14, padding: '28px 28px' }}>
         <h2 style={{ fontFamily: 'var(--font-space-grotesk)', fontSize: 17, fontWeight: 700, marginBottom: 6 }}>
-          Alterar senha
+          {dict.settings.changePassword.title}
         </h2>
         <p style={{ fontSize: 12, color: 'var(--aq-text3)', marginBottom: 24 }}>
-          Após salvar, outras sessões abertas serão desconectadas.
+          {dict.settings.changePassword.subtitle}
         </p>
 
         {generalError && (
@@ -129,13 +131,13 @@ export default function SettingsPage() {
         <form onSubmit={handleSubmit} noValidate>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 24 }}>
             <div>
-              <label htmlFor="current-password" style={s.fieldLabel}>Senha atual</label>
+              <label htmlFor="current-password" style={s.fieldLabel}>{dict.settings.changePassword.currentPasswordLabel}</label>
               <div style={s.inputWrap}>
                 <span style={s.inputIcon}><LockIcon /></span>
                 <input
                   id="current-password"
                   type={showPw ? 'text' : 'password'}
-                  placeholder="Sua senha atual"
+                  placeholder={dict.settings.changePassword.currentPasswordPlaceholder}
                   value={currentPw}
                   onChange={(e) => setCurrentPw(e.target.value)}
                   autoComplete="current-password"
@@ -145,7 +147,7 @@ export default function SettingsPage() {
                   type="button"
                   onClick={() => setShowPw(!showPw)}
                   style={{ position: 'absolute', right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--aq-text3)', display: 'flex', alignItems: 'center' }}
-                  aria-label={showPw ? 'Ocultar senha' : 'Mostrar senha'}
+                  aria-label={showPw ? dict.settings.changePassword.hidePassword : dict.settings.changePassword.showPassword}
                 >
                   <EyeIcon off={showPw} />
                 </button>
@@ -154,13 +156,13 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label htmlFor="settings-new-password" style={s.fieldLabel}>Nova senha</label>
+              <label htmlFor="settings-new-password" style={s.fieldLabel}>{dict.settings.changePassword.newPasswordLabel}</label>
               <div style={s.inputWrap}>
                 <span style={s.inputIcon}><LockIcon /></span>
                 <input
                   id="settings-new-password"
                   type={showPw ? 'text' : 'password'}
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder={dict.settings.changePassword.newPasswordPlaceholder}
                   value={newPw}
                   onChange={(e) => setNewPw(e.target.value)}
                   autoComplete="new-password"
@@ -171,13 +173,13 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label htmlFor="settings-confirm-password" style={s.fieldLabel}>Confirmar nova senha</label>
+              <label htmlFor="settings-confirm-password" style={s.fieldLabel}>{dict.settings.changePassword.confirmPasswordLabel}</label>
               <div style={s.inputWrap}>
                 <span style={s.inputIcon}><LockIcon /></span>
                 <input
                   id="settings-confirm-password"
                   type={showPw ? 'text' : 'password'}
-                  placeholder="Repita a nova senha"
+                  placeholder={dict.settings.changePassword.confirmPasswordPlaceholder}
                   value={confirmPw}
                   onChange={(e) => setConfirmPw(e.target.value)}
                   autoComplete="new-password"
@@ -193,12 +195,12 @@ export default function SettingsPage() {
             disabled={loading}
             style={{ padding: '11px 24px', borderRadius: 10, border: 'none', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', background: 'var(--aq-accent)', color: '#0B0E17', boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)', opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s' }}
           >
-            {loading ? 'Salvando…' : 'Salvar nova senha'}
+            {loading ? dict.settings.changePassword.loadingButton : dict.settings.changePassword.submitButton}
           </button>
         </form>
       </div>
 
-      {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
+      {toast && <Toast message={toast} onDismiss={() => setToast('')} closeLabel={dict.settings.changePassword.closeToast} />}
     </div>
   );
 }

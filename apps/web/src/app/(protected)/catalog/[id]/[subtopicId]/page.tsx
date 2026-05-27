@@ -14,6 +14,7 @@ import { SubtopicSidebar } from '@web/components/catalog/SubtopicSidebar';
 import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
 import { Spinner } from '@web/components/spinner';
 import type { Media } from '@web/lib/admin-media-api';
+import { useDict } from '@web/context/dict-context';
 
 type PageProps = { params: Promise<{ id: string; subtopicId: string }> };
 
@@ -28,6 +29,7 @@ type CommentWithMeta = {
 };
 
 export default function SubtopicDetailPage({ params }: PageProps) {
+  const dict = useDict();
   const { id: topicId, subtopicId } = use(params);
   const { accessToken } = useAuth();
   const client = useApiClient();
@@ -70,12 +72,12 @@ export default function SubtopicDetailPage({ params }: PageProps) {
       setLoading(false);
     }).catch((err: unknown) => {
       if (!active) return;
-      setError(err instanceof Error ? err.message : 'Failed to load subtopic');
+      setError(err instanceof Error ? err.message : dict.catalog.subtopicPage.errorLoading);
       setLoading(false);
     });
 
     return () => { active = false; };
-  }, [client, accessToken, topicId, subtopicId, API_URL]);
+  }, [client, accessToken, topicId, subtopicId, API_URL, dict.catalog.subtopicPage.errorLoading]);
 
   async function handleMarkDone() {
     if (markingDone || status === 'completed') return;
@@ -100,7 +102,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
   if (error || !subtopic || !parentTopic) {
     return (
       <div className="flex h-full min-h-[50vh] items-center justify-center p-8 text-center">
-        <p className="text-sm" style={{ color: 'var(--aq-error)' }}>{error || 'Subtopic not found'}</p>
+        <p className="text-sm" style={{ color: 'var(--aq-error)' }}>{error || dict.catalog.subtopicPage.errorNotFound}</p>
       </div>
     );
   }
@@ -126,7 +128,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
         {/* Breadcrumb */}
         <CatalogBreadcrumb
           items={[
-            { label: 'Catalogue', href: '/catalog' },
+            { label: dict.catalog.breadcrumb.catalogue, href: '/catalog' },
             { label: parentTopic.title, href: `/catalog/${topicId}` },
             { label: subtopic.title },
           ]}
@@ -149,7 +151,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
             </span>
             {siblingIndex >= 0 && (
               <span className="text-[11px]" style={{ color: 'var(--aq-text3)' }}>
-                Subtópico {siblingIndex + 1} de {siblings.length}
+                {dict.catalog.subtopicPage.subtopicOf(siblingIndex + 1, siblings.length)}
               </span>
             )}
           </div>
@@ -175,7 +177,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
                 className="flex items-center gap-1 rounded-[20px] px-2.5 py-1 text-[11px] font-medium"
                 style={{ background: 'var(--aq-bg3)', border: '1px solid var(--aq-border2)', color: 'var(--aq-text2)' }}
               >
-                📦 {readyMedia.length} {readyMedia.length === 1 ? 'item' : 'itens'}
+                📦 {dict.catalog.subtopicPage.itemCount(readyMedia.length)}
               </span>
             )}
             {subtopic.tags?.map((t) => (
@@ -212,7 +214,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
               className="flex-shrink-0 rounded-[8px] px-4 py-2 text-[12px] font-semibold"
               style={{ background: 'var(--aq-accent3-glow)', color: 'var(--aq-accent3)' }}
             >
-              ✓ Concluído
+              {dict.catalog.subtopicPage.completedLabel}
             </span>
           ) : (
             <button
@@ -222,7 +224,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
               className="flex-shrink-0 rounded-[8px] px-4 py-2 text-[12px] font-semibold transition-opacity disabled:opacity-60"
               style={{ background: 'var(--aq-accent)', color: '#0B0E17' }}
             >
-              {markingDone ? 'Registrando…' : 'Marcar como concluído'}
+              {markingDone ? dict.catalog.subtopicPage.markingDone : dict.catalog.subtopicPage.markDoneButton}
             </button>
           )}
         </div>
@@ -233,7 +235,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
         {readyMedia.length > 0 && (
           <div className="mb-8">
             <p className="mb-4 text-[13px] font-semibold uppercase tracking-widest" style={{ color: 'var(--aq-text3)' }}>
-              Material do Subtópico
+              {dict.catalog.subtopicPage.materialTitle}
             </p>
             <MediaTabs
               videos={videos}
@@ -281,7 +283,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
           <div className="mt-12">
             <div className="mb-4 h-[1px]" style={{ background: 'var(--aq-border)' }} />
             <p className="mb-4 text-[13px] font-semibold uppercase tracking-widest" style={{ color: 'var(--aq-text3)' }}>
-              Próximos tópicos
+              {dict.catalog.subtopicPage.nextTopicsTitle}
             </p>
             <div className="space-y-2">
               {subtopic.children.map((child, i) => {
@@ -328,7 +330,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-2 text-[12px] font-medium transition-colors hover:bg-[var(--aq-bg3)]"
                 style={{ border: '1px solid var(--aq-border2)', color: 'var(--aq-text2)' }}
               >
-                ← Anterior
+                {dict.catalog.subtopicPage.previous}
               </Link>
             ) : (
               <div className="flex-1" />
@@ -339,7 +341,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-2 text-[12px] font-medium transition-colors hover:bg-[var(--aq-bg3)]"
                 style={{ border: '1px solid var(--aq-border2)', color: 'var(--aq-text2)' }}
               >
-                Próximo →
+                {dict.catalog.subtopicPage.next}
               </Link>
             ) : (
               <Link
@@ -347,7 +349,7 @@ export default function SubtopicDetailPage({ params }: PageProps) {
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-2 text-[12px] font-medium transition-colors"
                 style={{ background: 'var(--aq-accent-glow)', border: '1px solid var(--aq-accent)', color: 'var(--aq-accent)' }}
               >
-                Concluído ✓
+                {dict.catalog.subtopicPage.completedNav}
               </Link>
             )}
           </div>

@@ -1,4 +1,7 @@
+'use client';
+
 import type { TopicNode } from '@web/lib/topics-api';
+import { useDict } from '@web/context/dict-context';
 
 type Props = {
   topic: TopicNode & { children: TopicNode[] };
@@ -6,6 +9,7 @@ type Props = {
 };
 
 export function TopicHeader({ topic, pct }: Props) {
+  const dict = useDict();
   const subtopicCount = topic.children.length;
   const totalMinutes = topic.children.reduce((sum, c) => sum + (c.estimatedMinutes ?? 0), 0);
 
@@ -52,7 +56,7 @@ export function TopicHeader({ topic, pct }: Props) {
           >
             {subtopicCount}
           </p>
-          <p className="mt-0.5 text-[11px]" style={{ color: 'var(--aq-text3)' }}>subtopics</p>
+          <p className="mt-0.5 text-[11px]" style={{ color: 'var(--aq-text3)' }}>{dict.catalog.topicPage.subtopics}</p>
         </div>
         <div className="text-right">
           <p
@@ -61,7 +65,7 @@ export function TopicHeader({ topic, pct }: Props) {
           >
             {totalMinutes}
           </p>
-          <p className="mt-0.5 text-[11px]" style={{ color: 'var(--aq-text3)' }}>est. min</p>
+          <p className="mt-0.5 text-[11px]" style={{ color: 'var(--aq-text3)' }}>{dict.catalog.topicPage.estimatedMin}</p>
         </div>
         <div className="text-right">
           <p
@@ -70,7 +74,7 @@ export function TopicHeader({ topic, pct }: Props) {
           >
             {pct}%
           </p>
-          <p className="mt-0.5 text-[11px]" style={{ color: 'var(--aq-text3)' }}>progress</p>
+          <p className="mt-0.5 text-[11px]" style={{ color: 'var(--aq-text3)' }}>{dict.catalog.topicPage.progress}</p>
         </div>
       </div>
     </div>

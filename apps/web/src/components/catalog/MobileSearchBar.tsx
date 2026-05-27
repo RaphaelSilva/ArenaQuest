@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useDict } from '@web/context/dict-context';
 
 function SearchIcon() {
   return (
@@ -13,11 +14,11 @@ function SearchIcon() {
 }
 
 export function MobileSearchBar() {
+  const dict = useDict();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // URL state: search query
   const qParam = searchParams.get('q') ?? '';
   const [searchValue, setSearchValue] = useState(qParam);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,12 +62,12 @@ export function MobileSearchBar() {
         </span>
         <input
           type="search"
-          placeholder="Search topics…"
+          placeholder={dict.catalog.mobileSearch.placeholder}
           value={searchValue}
           onChange={(e) => handleSearch(e.target.value)}
           className="w-full bg-transparent text-[13px] outline-none"
           style={{ color: 'var(--aq-text)', caretColor: 'var(--aq-accent)' }}
-          aria-label="Search topics"
+          aria-label={dict.catalog.mobileSearch.ariaLabel}
         />
       </div>
     </div>

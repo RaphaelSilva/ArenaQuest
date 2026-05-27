@@ -14,6 +14,7 @@ import { ContentSection } from '@web/components/catalog/ContentSection';
 import { MediaGallery } from '@web/components/catalog/MediaGallery';
 import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
 import { Spinner } from '@web/components/spinner';
+import { useDict } from '@web/context/dict-context';
 
 type CatalogTopicPageProps = {
   params: Promise<{ id: string }>;
@@ -22,6 +23,7 @@ type CatalogTopicPageProps = {
 type BadgeItem = { id: string; emoji: string; name: string; earned: boolean };
 
 export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
+  const dict = useDict();
   const { id } = use(params);
   const { user, accessToken } = useAuth();
   const client = useApiClient();
@@ -65,12 +67,12 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
       setLoading(false);
     }).catch((err: unknown) => {
       if (!active) return;
-      setError(err instanceof Error ? err.message : 'Failed to load topic');
+      setError(err instanceof Error ? err.message : dict.catalog.topicPage.errorNotFound);
       setLoading(false);
     });
 
     return () => { active = false; };
-  }, [client, accessToken, id]);
+  }, [client, accessToken, id, dict.catalog.topicPage.errorNotFound]);
 
   if (loading) {
     return (
@@ -83,7 +85,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   if (error || !topic) {
     return (
       <div className="flex h-full min-h-[50vh] flex-col items-center justify-center p-8 text-center">
-        <p className="text-sm" style={{ color: 'var(--aq-error)' }}>{error || 'Topic not found'}</p>
+        <p className="text-sm" style={{ color: 'var(--aq-error)' }}>{error || dict.catalog.topicPage.errorNotFound}</p>
       </div>
     );
   }
@@ -100,7 +102,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
       {/* Breadcrumb */}
       <CatalogBreadcrumb
         items={[
-          { label: 'Catalogue', href: '/catalog' },
+          { label: dict.catalog.breadcrumb.catalogue, href: '/catalog' },
           { label: topic.title },
         ]}
         backHref="/catalog"
@@ -113,7 +115,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
       <div className="mb-8">
         <div className="mb-2.5 flex items-center justify-between">
           <span className="text-[13px] font-semibold" style={{ color: 'var(--aq-text2)', fontFamily: "'Space Grotesk', sans-serif" }}>
-            Progresso
+            {dict.catalog.topicPage.progress}
           </span>
           <strong className="text-[13px]" style={{ color: 'var(--aq-accent)' }}>{pct}%</strong>
         </div>
@@ -147,7 +149,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
             className="text-[13px] font-semibold uppercase tracking-widest"
             style={{ color: 'var(--aq-text3)' }}
           >
-            Subtopics
+            {dict.catalog.topicPage.subtopics}
           </p>
           {showInstructorUI && (
             <Link
@@ -159,7 +161,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
                 color: 'var(--aq-accent)',
               }}
             >
-              + Add subtopic
+              {dict.catalog.topicPage.addSubtopic}
             </Link>
           )}
         </div>
@@ -170,7 +172,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
             style={{ color: 'var(--aq-text3)' }}
           >
             <p className="text-[40px] opacity-40" aria-hidden>📭</p>
-            <p className="mt-3 text-[15px]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>No subtopics yet</p>
+            <p className="mt-3 text-[15px]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{dict.catalog.topicPage.noSubtopics}</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">

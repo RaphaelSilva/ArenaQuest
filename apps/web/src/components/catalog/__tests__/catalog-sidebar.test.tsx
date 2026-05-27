@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { dictPt } from '@web/i18n/dict-pt';
 
 // Mock next/navigation
 const mockReplace = vi.fn();
@@ -131,14 +132,14 @@ describe('CatalogSidebar', () => {
 
   it('shows role pill when isInstructor is true', () => {
     renderSidebar({ isInstructor: true });
-    expect(screen.getByText('Participante')).toBeInTheDocument();
-    expect(screen.getByText('Instrutor')).toBeInTheDocument();
+    expect(screen.getByText(dictPt.catalog.sidebar.participantRole)).toBeInTheDocument();
+    expect(screen.getByText(dictPt.catalog.sidebar.instructorRole)).toBeInTheDocument();
   });
 
   it('hides role pill for participants', () => {
     renderSidebar({ isInstructor: false });
-    expect(screen.queryByText('Participante')).not.toBeInTheDocument();
-    expect(screen.queryByText('Instrutor')).not.toBeInTheDocument();
+    expect(screen.queryByText(dictPt.catalog.sidebar.participantRole)).not.toBeInTheDocument();
+    expect(screen.queryByText(dictPt.catalog.sidebar.instructorRole)).not.toBeInTheDocument();
   });
 
   it('shows global progress', () => {
@@ -148,6 +149,6 @@ describe('CatalogSidebar', () => {
 
   it('shows empty state when no topics', () => {
     renderSidebar({ topics: [] });
-    expect(screen.getByText('No published content yet.')).toBeInTheDocument();
+    expect(screen.getByText(dictPt.catalog.sidebar.noContent)).toBeInTheDocument();
   });
 });
