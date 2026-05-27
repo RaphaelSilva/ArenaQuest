@@ -1,6 +1,6 @@
 import type { dictPt } from './dict-pt';
 
-type Broaden<T> = T extends (...args: unknown[]) => unknown
+type Broaden<T> = T extends (...args: never[]) => unknown
   ? T
   : T extends object
   ? { readonly [K in keyof T]: Broaden<T[K]> }

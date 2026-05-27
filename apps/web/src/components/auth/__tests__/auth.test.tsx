@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { dictPt } from '@web/i18n';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be hoisted before the component imports
@@ -37,6 +38,8 @@ vi.mock('@web/lib/auth-api', async () => {
 import { PasswordStrength } from '../password-strength';
 import LoginPage from '@web/app/(auth)/login/page';
 
+const d = dictPt.auth;
+
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
@@ -49,14 +52,12 @@ describe('PasswordStrength', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('shows "Fraca" for a 1-criteria password', () => {
-    render(<PasswordStrength password="abcdefgh" />);
-    expect(screen.getByText(/Fraca/)).toBeInTheDocument();
-  });
+  it('shows password strength levels', () => {
+    const { rerender } = render(<PasswordStrength password="abcdefgh" />);
+    expect(screen.getByText(d.passwordStrength.weak)).toBeInTheDocument();
 
-  it('shows "Forte" for a password meeting all 4 criteria', () => {
-    render(<PasswordStrength password="Abcdef1!" />);
-    expect(screen.getByText(/Forte/)).toBeInTheDocument();
+    rerender(<PasswordStrength password="Abcdef1!" />);
+    expect(screen.getByText(d.passwordStrength.strong)).toBeInTheDocument();
   });
 });
 
@@ -65,47 +66,46 @@ describe('Register step navigation', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    // Click the "Criar conta" tab (exact match avoids "Criar conta grátis" button)
-    await user.click(screen.getByRole('button', { name: 'Criar conta' }));
+    await user.click(screen.getByRole('button', { name: d.tabs.register }));
 
-    await user.type(screen.getByPlaceholderText('João'), 'Maria');
-    await user.type(screen.getByPlaceholderText('seu@email.com'), 'maria@example.com');
+    await user.type(screen.getByPlaceholderText(d.register.firstNamePlaceholder), 'Maria');
+    await user.type(screen.getByPlaceholderText(d.login.emailPlaceholder), 'maria@example.com');
 
-    const passwordInputs = screen.getAllByPlaceholderText(/Mínimo 8 caracteres|Repita a senha/);
+    const passwordInputs = screen.getAllByPlaceholderText(new RegExp(`${d.register.passwordPlaceholder}|${d.register.confirmPasswordPlaceholder}`));
     await user.type(passwordInputs[0], 'Abcdef1!');
     await user.type(passwordInputs[1], 'Abcdef1!');
 
-    await user.click(screen.getByRole('button', { name: /Continuar/i }));
+    await user.click(screen.getByRole('button', { name: d.register.continueButton }));
 
-    expect(screen.getAllByText('Tipo de conta').length).toBeGreaterThan(0);
-    expect(screen.getByText(/Como você vai usar/i)).toBeInTheDocument();
+    expect(screen.getAllByText(d.register.accountTypeTitle).length).toBeGreaterThan(0);
+    expect(screen.getByText(d.register.accountTypeSubtitle)).toBeInTheDocument();
   });
 
   it('stays on step 1 when required fields are empty', async () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Criar conta' }));
-    await user.click(screen.getByRole('button', { name: /Continuar/i }));
+    await user.click(screen.getByRole('button', { name: d.tabs.register }));
+    await user.click(screen.getByRole('button', { name: d.register.continueButton }));
 
-    expect(screen.getAllByText('Campo obrigatório').length).toBeGreaterThan(0);
-    expect(screen.queryByText(/Como você vai usar/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText(d.register.errorRequired).length).toBeGreaterThan(0);
+    expect(screen.queryByText(d.register.accountTypeSubtitle)).not.toBeInTheDocument();
   });
 
   it('goes back to step 1 when ← Voltar is clicked', async () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Criar conta' }));
-    await user.type(screen.getByPlaceholderText('João'), 'Maria');
-    await user.type(screen.getByPlaceholderText('seu@email.com'), 'maria@example.com');
-    const passwordInputs = screen.getAllByPlaceholderText(/Mínimo 8 caracteres|Repita a senha/);
+    await user.click(screen.getByRole('button', { name: d.tabs.register }));
+    await user.type(screen.getByPlaceholderText(d.register.firstNamePlaceholder), 'Maria');
+    await user.type(screen.getByPlaceholderText(d.login.emailPlaceholder), 'maria@example.com');
+    const passwordInputs = screen.getAllByPlaceholderText(new RegExp(`${d.register.passwordPlaceholder}|${d.register.confirmPasswordPlaceholder}`));
     await user.type(passwordInputs[0], 'Abcdef1!');
     await user.type(passwordInputs[1], 'Abcdef1!');
-    await user.click(screen.getByRole('button', { name: /Continuar/i }));
+    await user.click(screen.getByRole('button', { name: d.register.continueButton }));
 
-    await user.click(screen.getByRole('button', { name: /Voltar/i }));
+    await user.click(screen.getByRole('button', { name: d.register.backButton }));
 
-    expect(screen.getByText(/Criar sua conta/i)).toBeInTheDocument();
+    expect(screen.getByText(d.register.title)).toBeInTheDocument();
   });
 });

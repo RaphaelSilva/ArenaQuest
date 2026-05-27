@@ -147,6 +147,11 @@ export const dictEn = {
       errorRateLimited: 'Too many attempts. Please wait a few minutes.',
       errorGeneral: 'Could not reset the password. Please try again.',
     },
+    oauthCallback: {
+      missingParams: 'Missing authentication parameters. Please try again.',
+      authenticating: 'Authenticating with Google…',
+      backToLogin: 'Back to sign in',
+    },
   },
   admin: {
     dashboard: {

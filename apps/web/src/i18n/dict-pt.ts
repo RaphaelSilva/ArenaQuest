@@ -145,6 +145,11 @@ export const dictPt = {
       errorRateLimited: 'Muitas tentativas. Aguarde alguns minutos.',
       errorGeneral: 'Não foi possível redefinir a senha. Tente novamente.',
     },
+    oauthCallback: {
+      missingParams: 'Parâmetros de autenticação ausentes. Tente novamente.',
+      authenticating: 'Autenticando com Google…',
+      backToLogin: 'Voltar ao login',
+    },
   },
   admin: {
     dashboard: {
