@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
     // Resolve absolute path to monorepo root
     root: path.resolve(process.cwd(), "../../"),
   },
+  env: {
+    NEXT_PUBLIC_LANGUAGE: process.env.NEXT_PUBLIC_LANGUAGE || 'pt',
+  },
 };
 
 export default nextConfig;
