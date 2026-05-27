@@ -1,6 +1,6 @@
 # Task 07 — Migrate shared layout, navigation, and design-system strings (Phase 2)
 
-**Status:** 📝 Draft
+**Status:** ✅ Done
 **Milestone:** [10 — Frontend Internationalization (i18n)](./milestone.md)
 **RFC:** [0002 — Frontend i18n, Phase 2](../../RFCs/0002-frontend-internationalization-i18n.md)
 
@@ -46,13 +46,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] All layout files (`layout.tsx` at every level) read user-facing strings from the dictionary.
-- [ ] Global header, sidebar, footer, and user menu are fully dictionary-driven.
-- [ ] Design-system component defaults read from the dictionary; the components' public prop APIs are unchanged.
-- [ ] Hooks producing user-facing strings source them from the dictionary.
-- [ ] Running the post-merge audit command from Task 08 against `apps/web/src/{app,components,hooks}/**` reports zero remaining hardcoded user-facing strings (preview run included in the PR description).
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] All layout files (`layout.tsx` at every level) read user-facing strings from the dictionary.
+- [x] Global header, sidebar, footer, and user menu are fully dictionary-driven.
+- [x] Design-system component defaults read from the dictionary; the components' public prop APIs are unchanged.
+- [x] Hooks producing user-facing strings source them from the dictionary.
+- [x] Running the post-merge audit command from Task 08 against `apps/web/src/{app,components,hooks}/**` reports zero remaining hardcoded user-facing strings (preview run included in the PR description).
+- [x] `make lint`, `make test-web`, and `make test-api` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
