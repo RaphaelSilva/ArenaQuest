@@ -8,7 +8,7 @@
     "pages:build": "next-on-pages",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run",
+    "test": "node scripts/check-i18n-coverage.js && vitest run",
     "test:watch": "vitest",
     "gen:api-types": "openapi-typescript ../api/openapi.json -o src/lib/api-types.gen.ts"
   },

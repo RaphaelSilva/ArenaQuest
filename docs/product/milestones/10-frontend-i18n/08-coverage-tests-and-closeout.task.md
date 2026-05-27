@@ -1,6 +1,6 @@
 # Task 08 — Coverage gate, tests, documentation, and milestone closeout
 
-**Status:** 📝 Draft
+**Status:** ✅ Done
 **Milestone:** [10 — Frontend Internationalization (i18n)](./milestone.md)
 **RFC:** [0002 — Frontend i18n](../../RFCs/0002-frontend-internationalization-i18n.md)
 
@@ -44,13 +44,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The coverage-check script runs as part of `make test-web` and fails on a deliberately-introduced hardcoded string (verified during the PR by a throwaway commit, reverted before merge).
-- [ ] Unit tests for `getLanguageFromEnv`, `get-dict`, and `DictProvider`/`useDict` pass and cover the cases enumerated in §"Scope".
-- [ ] `CLAUDE.md` documents the i18n architecture, the build-time env-var workflow, and the "no hardcoded user-facing strings" rule. A new contributor reading only `CLAUDE.md` could add a localized string without consulting the RFC.
-- [ ] RFC 0002 header status is `Accepted` (or `Implemented`); the RFCs index reflects the same.
-- [ ] `docs/product/milestones/10-frontend-i18n/closeout-analysis.md` exists and records: count of strings migrated per namespace, the milestone decisions from `milestone.md` §6, the sentinel-string verification for both EN and PT builds (run locally), screenshots of one representative screen in each language, and a bullet list of Phase 4 follow-ups parked in the backlog.
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] The coverage-check script runs as part of `make test-web` and fails on a deliberately-introduced hardcoded string (verified during the PR by a throwaway commit, reverted before merge).
+- [x] Unit tests for `getLanguageFromEnv`, `get-dict`, and `DictProvider`/`useDict` pass and cover the cases enumerated in §"Scope".
+- [x] `CLAUDE.md` documents the i18n architecture, the build-time env-var workflow, and the "no hardcoded user-facing strings" rule. A new contributor reading only `CLAUDE.md` could add a localized string without consulting the RFC.
+- [x] RFC 0002 header status is `Accepted` (or `Implemented`); the RFCs index reflects the same.
+- [x] `docs/product/milestones/10-frontend-i18n/closeout-analysis.md` exists and records: count of strings migrated per namespace, the milestone decisions from `milestone.md` §6, the sentinel-string verification for both EN and PT builds (run locally), screenshots of one representative screen in each language, and a bullet list of Phase 4 follow-ups parked in the backlog.
+- [x] `make lint`, `make test-web`, and `make test-api` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -1,6 +1,6 @@
 # Milestone 10 — Frontend Internationalization (i18n)
 
-**Status:** 📝 Draft
+**Status:** ✅ Implemented
 **Scope:** `apps/web` (Next.js 15 frontend) and `CLAUDE.md`. Derived from [RFC 0002](../../RFCs/0002-frontend-internationalization-i18n.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone introduces a build-time i18n layer to `apps/web` so that a single deploy serves exactly one language, selected at build time via `NEXT_PUBLIC_LANGUAGE`. It may touch: a new `apps/web/src/i18n/**` tree, a new `apps/web/src/context/dict-context.tsx`, every component or page that currently renders a hardcoded user-facing string under `apps/web/src/**`, `apps/web/next.config.ts`, and `CLAUDE.md`. It is **not** an opportunity to redesign components, swap CSS, refactor API clients, change visible behaviour beyond text substitution, build a language switcher, add routing/redirect logic, or stand up parallel per-language deployments. Domain entities under `packages/shared/**`, anything under `apps/api/**`, database migrations, adapter implementations, and the existing deploy pipeline (`make deploy-web`, `make deploy-web-staging`, Cloudflare Pages project configuration) are **out of scope**. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
@@ -37,15 +37,15 @@ Out of scope (explicit):
 
 ## 3. Acceptance Criteria
 
-- [ ] `apps/web/src/i18n/` contains `config.ts`, `dict-en.ts`, `dict-pt.ts`, `get-dict.ts`, and `index.ts`; `apps/web/src/context/dict-context.tsx` exposes a provider and a `useDict` hook.
-- [ ] `dict-en` and `dict-pt` both satisfy a single shared `Dictionary` type. Removing or renaming any key in one dictionary without mirroring it in the other fails typecheck.
-- [ ] The Task-02 string inventory matches the post-migration codebase: a grep for the listed pre-migration strings returns zero hits under `apps/web/src/{app,components,hooks}/**` after Task 07.
-- [ ] `make build-web` succeeds with `NEXT_PUBLIC_LANGUAGE` set to `en`, set to `pt`, set to an unknown value, and unset. The last two cases fall back to PT and emit the documented warning.
-- [ ] The EN build does not contain Portuguese sentinel strings from `dict-pt`, and the PT build does not contain English sentinel strings from `dict-en` (verified by grepping built JS for a unique sentinel from each dictionary; result is recorded in the Task 08 closeout).
-- [ ] No code under `apps/web/src/**` implements language detection, redirect logic, override persistence, or a language switcher.
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green in CI (single language, default PT).
-- [ ] `CLAUDE.md` documents the i18n architecture, the build-time env-var workflow, and the rule that no hardcoded user-facing string may be added to `apps/web/src/**`.
-- [ ] No diff outside the scope declared in §"Hard scope guardrail".
+- [x] `apps/web/src/i18n/` contains `config.ts`, `dict-en.ts`, `dict-pt.ts`, `get-dict.ts`, and `index.ts`; `apps/web/src/context/dict-context.tsx` exposes a provider and a `useDict` hook.
+- [x] `dict-en` and `dict-pt` both satisfy a single shared `Dictionary` type. Removing or renaming any key in one dictionary without mirroring it in the other fails typecheck.
+- [x] The Task-02 string inventory matches the post-migration codebase: a grep for the listed pre-migration strings returns zero hits under `apps/web/src/{app,components,hooks}/**` after Task 07.
+- [x] `make build-web` succeeds with `NEXT_PUBLIC_LANGUAGE` set to `en`, set to `pt`, set to an unknown value, and unset. The last two cases fall back to PT and emit the documented warning.
+- [x] The EN build does not contain Portuguese sentinel strings from `dict-pt`, and the PT build does not contain English sentinel strings from `dict-en` (verified by grepping built JS for a unique sentinel from each dictionary; result is recorded in the Task 08 closeout).
+- [x] No code under `apps/web/src/**` implements language detection, redirect logic, override persistence, or a language switcher.
+- [x] `make lint`, `make test-web`, and `make test-api` pass green in CI (single language, default PT).
+- [x] `CLAUDE.md` documents the i18n architecture, the build-time env-var workflow, and the rule that no hardcoded user-facing string may be added to `apps/web/src/**`.
+- [x] No diff outside the scope declared in §"Hard scope guardrail".
 
 ---
 
@@ -62,14 +62,14 @@ Out of scope (explicit):
 
 | # | Task File | Status |
 |---|-----------|--------|
-| 01 | [i18n module foundation and build-time language config](./01-i18n-module-foundation.task.md) | 📝 Draft |
-| 02 | [Author EN and PT dictionaries with a shared `Dictionary` type](./02-dictionaries-en-pt.task.md) | 📝 Draft |
-| 03 | [Server dict loader and client `DictProvider` / `useDict`](./03-dict-loader-and-context.task.md) | 📝 Draft |
-| 04 | [Migrate `(auth)` route group strings to the dictionary](./04-migrate-auth-group.task.md) | 📝 Draft |
-| 05 | [Migrate `(protected)/admin/**` strings to the dictionary](./05-migrate-admin-backoffice.task.md) | 📝 Draft |
-| 06 | [Migrate participant routes — catalog, dashboard, tasks, enrollment, settings](./06-migrate-participant-routes.task.md) | 📝 Draft |
-| 07 | [Migrate shared layout, navigation, and design-system strings](./07-migrate-shared-layout.task.md) | 📝 Draft |
-| 08 | [Coverage gate, tests, documentation, and milestone closeout](./08-coverage-tests-and-closeout.task.md) | 📝 Draft |
+| 01 | [i18n module foundation and build-time language config](./01-i18n-module-foundation.task.md) | ✅ Done |
+| 02 | [Author EN and PT dictionaries with a shared `Dictionary` type](./02-dictionaries-en-pt.task.md) | ✅ Done |
+| 03 | [Server dict loader and client `DictProvider` / `useDict`](./03-dict-loader-and-context.task.md) | ✅ Done |
+| 04 | [Migrate `(auth)` route group strings to the dictionary](./04-migrate-auth-group.task.md) | ✅ Done |
+| 05 | [Migrate `(protected)/admin/**` strings to the dictionary](./05-migrate-admin-backoffice.task.md) | ✅ Done |
+| 06 | [Migrate participant routes — catalog, dashboard, tasks, enrollment, settings](./06-migrate-participant-routes.task.md) | ✅ Done |
+| 07 | [Migrate shared layout, navigation, and design-system strings](./07-migrate-shared-layout.task.md) | ✅ Done |
+| 08 | [Coverage gate, tests, documentation, and milestone closeout](./08-coverage-tests-and-closeout.task.md) | ✅ Done |
 
 Dependency graph:
 
@@ -99,9 +99,9 @@ The following questions from RFC 0002 §"Questions & Future Decisions" are resol
 
 ## 7. Definition of Done (milestone level)
 
-- [ ] All 8 tasks marked `✅ Done` with every acceptance box checked.
-- [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint`, `make test-api`, and `make test-web` all green in CI.
-- [ ] Closeout note at `docs/product/milestones/10-frontend-i18n/closeout-analysis.md` records: number of strings migrated per namespace, the decisions recorded in §6, and a screenshot of one representative screen in each language built locally.
-- [ ] RFC 0002 status updated to `Accepted` (or `Implemented`) in `docs/product/RFCs/README.md` and in the RFC header. Phase 4 items remain explicitly listed as backlog.
-- [ ] No diff outside the scope declared in §"Hard scope guardrail".
+- [x] All 8 tasks marked `✅ Done` with every acceptance box checked.
+- [x] All milestone-level acceptance criteria in §3 pass.
+- [x] `make lint`, `make test-api`, and `make test-web` all green in CI.
+- [x] Closeout note at `docs/product/milestones/10-frontend-i18n/closeout-analysis.md` records: number of strings migrated per namespace, the decisions recorded in §6, and a screenshot of one representative screen in each language built locally.
+- [x] RFC 0002 status updated to `Accepted` (or `Implemented`) in `docs/product/RFCs/README.md` and in the RFC header. Phase 4 items remain explicitly listed as backlog.
+- [x] No diff outside the scope declared in §"Hard scope guardrail".

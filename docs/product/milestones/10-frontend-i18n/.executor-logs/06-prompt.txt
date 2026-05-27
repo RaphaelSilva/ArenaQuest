@@ -1,0 +1,31 @@
+I am the ArenaQuest Orchestrator. You are acting as the ArenaQuest Senior Frontend Developer.
+
+You are running HEADLESS (no interactive TTY). You cannot ask the user anything. If you hit a blocker that would require human input, STOP and write a clear "BLOCKED:" line at the end of your output explaining what is needed — the orchestrator will surface it to the user.
+
+SYSTEM STANDARDS & GUIDELINES (Cached):
+We are migrating all participant-facing routes and components to the typed dictionary i18n system.
+- Scope: `apps/web/src/app/(protected)/{catalog,dashboard,tasks,settings}/**` and `apps/web/src/components/{catalog,dashboard,tasks,enrollment}/**`.
+- Non-negotiable rules:
+  1. DO NOT hardcode user-facing strings in apps/web.
+  2. Client Components (with 'use client') must read via `useDict()` from `@web/context/dict-context`.
+  3. Server Components (without 'use client') must read from `dict` imported from `@web/i18n`.
+  4. DO NOT mix both in the same file.
+  5. When adding keys to the dictionaries, you MUST add them to BOTH `apps/web/src/i18n/dict-en.ts` and `apps/web/src/i18n/dict-pt.ts` with the exact same type and structure.
+  6. Empty strings are forbidden.
+  7. Do not touch admin routes or layout chrome (which are other tasks).
+  8. Markdown-rendered content is out of scope. Only the surrounding UI chrome is migrated.
+  9. Update affected tests under `apps/web/src/components/{catalog,dashboard,tasks}/__tests__/**` to assert on dictionary values rather than literal strings.
+
+TASK DESCRIPTION (Dynamic):
+Task File: docs/product/milestones/10-frontend-i18n/06-migrate-participant-routes.task.md
+Plan File: docs/product/milestones/10-frontend-i18n/planing/06-migrate-participant-routes.plan.md
+
+INSTRUCTIONS:
+1. Please execute the plan for migrating Catalog routes and components first:
+   - `apps/web/src/app/(protected)/catalog/[id]/[subtopicId]/page.tsx`
+   - Any components in `apps/web/src/components/catalog/**` that contain hardcoded strings (e.g. `CatalogSidebar.tsx`, `Comments.tsx`, `SubtopicSidebar.tsx`, `MediaTabs.tsx`, `SubtopicCard.tsx`, etc.).
+   - Make sure they use `useDict()`.
+   - Update both `dict-en.ts` and `dict-pt.ts` with any missing keys. The keys must exactly match the i18n spec and existing inventory in `string-inventory.md`.
+2. Do not attempt to run verification, test, or linter commands directly. The orchestrator will run them.
+3. Keep all changes clean and precise.
+4. When done, list files touched and changes made.
