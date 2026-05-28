@@ -1,10 +1,15 @@
+'use client';
+
 import { renderMarkdown } from '@arenaquest/shared/utils/sanitize-markdown';
+import { useDict } from '@web/context/dict-context';
 
 type ContentSectionProps = {
   content: string | null | undefined;
 };
 
 export function ContentSection({ content }: ContentSectionProps) {
+  const dict = useDict();
+
   if (!content?.trim()) {
     return null;
   }
@@ -17,7 +22,7 @@ export function ContentSection({ content }: ContentSectionProps) {
         className="mb-4 text-[15px] font-semibold uppercase tracking-widest"
         style={{ color: 'var(--aq-text3)' }}
       >
-        About This Topic
+        {dict.catalog.topicPage.contentTitle}
       </h2>
       <div
         className="prose prose-sm dark:prose-invert max-w-none"

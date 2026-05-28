@@ -1,6 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import type { TopicNode } from '@web/lib/topics-api';
 import type { TopicProgressStatus } from '@web/lib/topics-api';
+import { useDict } from '@web/context/dict-context';
 
 type Props = {
   topicId: string;
@@ -10,31 +13,28 @@ type Props = {
   showInstructorUI: boolean;
 };
 
-const STATUS_CONFIG: Record<TopicProgressStatus, { label: string; bg: string; color: string; stripe: string }> = {
-  completed: {
-    label: 'Concluído',
-    bg: 'oklch(0.68 0.17 150 / 0.15)',
-    color: 'var(--aq-accent3)',
-    stripe: 'var(--aq-accent3)',
-  },
-  in_progress: {
-    label: 'Em andamento',
-    bg: 'var(--aq-accent-glow)',
-    color: 'var(--aq-accent)',
-    stripe: 'var(--aq-accent)',
-  },
-  not_started: {
-    label: 'Não iniciado',
-    bg: 'var(--aq-bg4)',
-    color: 'var(--aq-text3)',
-    stripe: 'transparent',
-  },
-};
-
 const PCT: Record<TopicProgressStatus, number> = {
   completed: 100,
   in_progress: 50,
   not_started: 0,
+};
+
+const STATUS_BG: Record<TopicProgressStatus, string> = {
+  completed: 'oklch(0.68 0.17 150 / 0.15)',
+  in_progress: 'var(--aq-accent-glow)',
+  not_started: 'var(--aq-bg4)',
+};
+
+const STATUS_COLOR: Record<TopicProgressStatus, string> = {
+  completed: 'var(--aq-accent3)',
+  in_progress: 'var(--aq-accent)',
+  not_started: 'var(--aq-text3)',
+};
+
+const STATUS_STRIPE: Record<TopicProgressStatus, string> = {
+  completed: 'var(--aq-accent3)',
+  in_progress: 'var(--aq-accent)',
+  not_started: 'transparent',
 };
 
 function EditIcon() {
@@ -54,8 +54,17 @@ function TrashIcon() {
 }
 
 export function SubtopicCard({ topicId, subtopic, index, status, showInstructorUI }: Props) {
-  const config = STATUS_CONFIG[status];
+  const dict = useDict();
   const pct = PCT[status];
+  const stripe = STATUS_STRIPE[status];
+  const bg = STATUS_BG[status];
+  const color = STATUS_COLOR[status];
+
+  const statusLabels: Record<TopicProgressStatus, string> = {
+    completed: dict.catalog.subtopicCard.statusCompleted,
+    in_progress: dict.catalog.subtopicCard.statusInProgress,
+    not_started: dict.catalog.subtopicCard.statusNotStarted,
+  };
 
   return (
     <Link
@@ -70,7 +79,7 @@ export function SubtopicCard({ topicId, subtopic, index, status, showInstructorU
       {/* Left accent stripe */}
       <div
         className="absolute bottom-0 left-0 top-0 w-1 rounded-[4px_0_0_4px]"
-        style={{ background: config.stripe }}
+        style={{ background: stripe }}
       />
 
       {/* Number badge */}
@@ -119,7 +128,7 @@ export function SubtopicCard({ topicId, subtopic, index, status, showInstructorU
           <div className="flex gap-1.5" onClick={(e) => e.preventDefault()}>
             <button
               type="button"
-              title="Edit"
+              title={dict.common.edit}
               className="flex h-7 w-7 items-center justify-center rounded-[7px] transition-colors"
               style={{ border: '1px solid var(--aq-border2)', background: 'var(--aq-bg3)', color: 'var(--aq-text3)' }}
             >
@@ -127,7 +136,7 @@ export function SubtopicCard({ topicId, subtopic, index, status, showInstructorU
             </button>
             <button
               type="button"
-              title="Delete"
+              title={dict.common.delete}
               className="flex h-7 w-7 items-center justify-center rounded-[7px] transition-colors"
               style={{ border: '1px solid var(--aq-border2)', background: 'var(--aq-bg3)', color: 'var(--aq-text3)' }}
             >
@@ -140,15 +149,15 @@ export function SubtopicCard({ topicId, subtopic, index, status, showInstructorU
           <div className="h-[5px] overflow-hidden rounded-full" style={{ background: 'var(--aq-bg4)' }}>
             <div
               className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${pct}%`, background: config.stripe || 'var(--aq-accent)' }}
+              style={{ width: `${pct}%`, background: stripe || 'var(--aq-accent)' }}
             />
           </div>
         </div>
         <span
           className="rounded-[10px] px-2.5 py-0.5 text-[11px] font-semibold"
-          style={{ background: config.bg, color: config.color }}
+          style={{ background: bg, color: color }}
         >
-          {config.label}
+          {statusLabels[status]}
         </span>
       </div>
     </Link>

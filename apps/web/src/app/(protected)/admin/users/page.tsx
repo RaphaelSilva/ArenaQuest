@@ -11,6 +11,7 @@ import { useApiClient } from '@web/context/auth-context';
 import type { CreateUserInput, UpdateUserInput } from '@web/lib/admin-users-api';
 import { Spinner } from '@web/components/spinner';
 import { Button, Badge } from '@web/components/design-system';
+import { useDict } from '@web/context/dict-context';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -30,6 +31,9 @@ type UserFormProps = {
 };
 
 function UserForm({ initial, onSubmit, onClose }: UserFormProps) {
+  const dict = useDict();
+  const d = dict.admin.users.form;
+
   const [name, setName] = useState(initial?.name ?? '');
   const [email, setEmail] = useState(initial?.email ?? '');
   const [password, setPassword] = useState('');
@@ -54,9 +58,9 @@ function UserForm({ initial, onSubmit, onClose }: UserFormProps) {
     e.preventDefault();
     setError('');
 
-    if (!name.trim()) { setError('Name is required.'); return; }
-    if (!isEdit && !email.trim()) { setError('Email is required.'); return; }
-    if (!isEdit && password.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (!name.trim()) { setError(d.errorNameRequired); return; }
+    if (!isEdit && !email.trim()) { setError(d.errorEmailRequired); return; }
+    if (!isEdit && password.length < 8) { setError(d.errorPasswordLength); return; }
 
     setSubmitting(true);
     try {
@@ -68,7 +72,7 @@ function UserForm({ initial, onSubmit, onClose }: UserFormProps) {
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setError(err instanceof Error ? err.message : d.errorGeneral);
     } finally {
       setSubmitting(false);
     }
@@ -78,18 +82,18 @@ function UserForm({ initial, onSubmit, onClose }: UserFormProps) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={isEdit ? 'Edit User' : 'Create User'}
+      aria-label={isEdit ? d.editTitle : d.createTitle}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
         <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          {isEdit ? 'Edit User' : 'Create User'}
+          {isEdit ? d.editTitle : d.createTitle}
         </h2>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
             <label htmlFor="uf-name" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Name
+              {d.nameLabel}
             </label>
             <input
               id="uf-name"
@@ -104,7 +108,7 @@ function UserForm({ initial, onSubmit, onClose }: UserFormProps) {
             <>
               <div>
                 <label htmlFor="uf-email" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Email
+                  {d.emailLabel}
                 </label>
                 <input
                   id="uf-email"
@@ -116,7 +120,7 @@ function UserForm({ initial, onSubmit, onClose }: UserFormProps) {
               </div>
               <div>
                 <label htmlFor="uf-password" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Password
+                  {d.passwordLabel}
                 </label>
                 <input
                   id="uf-password"
@@ -130,7 +134,7 @@ function UserForm({ initial, onSubmit, onClose }: UserFormProps) {
           )}
 
           <fieldset>
-            <legend className="mb-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">Roles</legend>
+            <legend className="mb-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">{d.rolesLabel}</legend>
             <div className="flex flex-wrap gap-2">
               {ALL_ROLES.map((role) => (
                 <label key={role} className="flex items-center gap-1.5 text-sm">
@@ -148,7 +152,7 @@ function UserForm({ initial, onSubmit, onClose }: UserFormProps) {
           {isEdit && (
             <div>
               <label htmlFor="uf-status" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Status
+                {d.statusLabel}
               </label>
               <select
                 id="uf-status"
@@ -175,7 +179,7 @@ function UserForm({ initial, onSubmit, onClose }: UserFormProps) {
               variant="secondary"
               size="md"
             >
-              Cancel
+              {d.cancelButton}
             </Button>
             <Button
               type="submit"
@@ -184,7 +188,7 @@ function UserForm({ initial, onSubmit, onClose }: UserFormProps) {
               size="md"
               isLoading={submitting}
             >
-              {isEdit ? 'Save changes' : 'Create user'}
+              {isEdit ? d.saveButton : d.createButton}
             </Button>
           </div>
         </form>
@@ -206,6 +210,9 @@ function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const dict = useDict();
+  const d = dict.admin.users.confirm;
+
   return (
     <div
       role="dialog"
@@ -221,14 +228,14 @@ function ConfirmDialog({
             variant="secondary"
             size="md"
           >
-            Cancel
+            {d.cancelButton}
           </Button>
           <Button
             onClick={onConfirm}
             variant="danger"
             size="md"
           >
-            Confirm
+            {d.confirmButton}
           </Button>
         </div>
       </div>
@@ -244,6 +251,8 @@ export default function AdminUsersPage() {
   const router = useRouter();
   const isAdmin = useHasRole(ROLES.ADMIN);
   const client = useApiClient();
+  const dict = useDict();
+  const d = dict.admin.users;
 
   const [users, setUsers] = useState<Entities.Identity.User[]>([]);
   const [total, setTotal] = useState(0);
@@ -271,11 +280,11 @@ export default function AdminUsersPage() {
       setUsers(result.data);
       setTotal(result.total);
     } catch {
-      setError('Failed to load users.');
+      setError(d.errorLoading);
     } finally {
       setLoading(false);
     }
-  }, [client]);
+  }, [client, d]);
 
   useEffect(() => {
     if (isAdmin) fetchUsers();
@@ -305,13 +314,13 @@ export default function AdminUsersPage() {
   return (
     <main className="p-4 md:p-6 lg:p-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>User Management</h1>
+        <h1 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>{d.title}</h1>
         <Button
           onClick={() => { setEditTarget(undefined); setShowForm(true); }}
           variant="primary"
           size="md"
         >
-          Create User
+          {d.createButton}
         </Button>
       </div>
 
@@ -329,12 +338,12 @@ export default function AdminUsersPage() {
             <table className="w-full text-sm">
               <thead className="bg-zinc-50 text-left text-xs font-medium uppercase text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400" style={{ letterSpacing: '0.05em' }}>
                 <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Roles</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Created At</th>
-                  <th className="px-4 py-3">Actions</th>
+                  <th className="px-4 py-3">{d.table.nameHeader}</th>
+                  <th className="px-4 py-3">{d.table.emailHeader}</th>
+                  <th className="px-4 py-3">{d.table.rolesHeader}</th>
+                  <th className="px-4 py-3">{d.table.statusHeader}</th>
+                  <th className="px-4 py-3">{d.table.createdAtHeader}</th>
+                  <th className="px-4 py-3">{d.table.actionsHeader}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -359,20 +368,20 @@ export default function AdminUsersPage() {
                           href={`/admin/users/${u.id}`}
                           className="text-indigo-600 hover:underline dark:text-indigo-400"
                         >
-                          Enrollments
+                          {d.actions.enrollments}
                         </Link>
                         <button
                           onClick={() => { setEditTarget(u); setShowForm(true); }}
                           className="text-indigo-600 hover:underline dark:text-indigo-400"
                         >
-                          Edit
+                          {d.actions.edit}
                         </button>
                         {u.status !== 'inactive' && (
                           <button
                             onClick={() => setDeactivateTarget(u)}
                             className="text-red-600 hover:underline dark:text-red-400"
                           >
-                            Deactivate
+                            {d.actions.deactivate}
                           </button>
                         )}
                       </div>
@@ -382,7 +391,7 @@ export default function AdminUsersPage() {
                 {users.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
-                      No users found.
+                      {d.table.emptyMessage}
                     </td>
                   </tr>
                 )}
@@ -393,7 +402,7 @@ export default function AdminUsersPage() {
           {/* Pagination */}
           <div className="mt-4 flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
             <div className="flex items-center gap-2">
-              <span>Rows per page:</span>
+              <span>{d.pagination.rowsPerPage}</span>
               <select
                 value={pageSize}
                 onChange={(e) => { setPageSize(Number(e.target.value) as typeof pageSize); setPage(1); }}
@@ -407,21 +416,21 @@ export default function AdminUsersPage() {
 
             <div className="flex items-center gap-3">
               <span>
-                Page {page} of {totalPages} ({total} total)
+                {d.pagination.pageInfo(page, totalPages, total)}
               </span>
               <button
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
                 className="rounded border border-zinc-300 px-3 py-1 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-800"
               >
-                Prev
+                {d.pagination.prev}
               </button>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
                 className="rounded border border-zinc-300 px-3 py-1 hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-800"
               >
-                Next
+                {d.pagination.next}
               </button>
             </div>
           </div>
@@ -438,7 +447,7 @@ export default function AdminUsersPage() {
 
       {deactivateTarget && (
         <ConfirmDialog
-          message={`Deactivate "${deactivateTarget.name}"? They will no longer be able to log in.`}
+          message={d.confirm.deactivateMessage(deactivateTarget.name)}
           onConfirm={handleDeactivate}
           onCancel={() => setDeactivateTarget(undefined)}
         />

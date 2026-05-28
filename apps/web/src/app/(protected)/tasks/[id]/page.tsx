@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useApiClient } from '@web/context/auth-context';
+import { useDict } from '@web/context/dict-context';
 import { Spinner } from '@web/components/spinner';
 import { StudentTaskDetail } from '@web/components/tasks/student-task-detail';
 import type { PublicTaskDetail } from '@web/lib/tasks-api';
@@ -10,6 +11,7 @@ import type { PublicTaskDetail } from '@web/lib/tasks-api';
 export const runtime = 'edge';
 
 export default function StudentTaskDetailPage() {
+  const dict = useDict();
   const params = useParams<{ id: string }>();
   const client = useApiClient();
   const [task, setTask] = useState<PublicTaskDetail | null>(null);
@@ -19,10 +21,10 @@ export default function StudentTaskDetailPage() {
     if (!params.id) return;
     try {
       setTask(await client.tasks.getById(params.id));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load task');
+    } catch {
+      setError(dict.tasks.detail.loadError);
     }
-  }, [client, params.id]);
+  }, [client, params.id, dict]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch is the canonical use case

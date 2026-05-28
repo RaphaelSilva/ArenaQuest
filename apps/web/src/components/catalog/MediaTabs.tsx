@@ -5,6 +5,7 @@ import type { Media } from '@web/lib/admin-media-api';
 import { VideoPlayerWithPlaylist } from './VideoPlayerWithPlaylist';
 import { FilesGrid } from './FilesGrid';
 import { PhotosGrid } from './PhotosGrid';
+import { useDict } from '@web/context/dict-context';
 
 type Props = {
   videos: Media[];
@@ -17,17 +18,18 @@ type Props = {
 
 type Tab = 'videos' | 'files' | 'photos';
 
-const TAB_LABELS: Record<Tab, string> = {
-  videos: 'Vídeos',
-  files: 'Arquivos',
-  photos: 'Fotos',
-};
-
 export function MediaTabs({ videos, files, photos, topicId, accessToken, onVideoWatched }: Props) {
+  const dict = useDict();
   const tabs: Tab[] = ['videos', 'files', 'photos'];
   const counts: Record<Tab, number> = { videos: videos.length, files: files.length, photos: photos.length };
   const firstNonEmpty: Tab = tabs.find((t) => counts[t] > 0) ?? 'videos';
   const [activeTab, setActiveTab] = useState<Tab>(firstNonEmpty);
+
+  const tabLabels: Record<Tab, string> = {
+    videos: dict.catalog.mediaTabs.videos,
+    files: dict.catalog.mediaTabs.files,
+    photos: dict.catalog.mediaTabs.photos,
+  };
 
   return (
     <div>
@@ -35,7 +37,7 @@ export function MediaTabs({ videos, files, photos, topicId, accessToken, onVideo
       <div
         className="mb-5 flex gap-1"
         role="tablist"
-        aria-label="Media tabs"
+        aria-label={dict.catalog.mediaTabs.ariaLabel}
       >
         {tabs.map((tab) => (
           <button
@@ -52,7 +54,7 @@ export function MediaTabs({ videos, files, photos, topicId, accessToken, onVideo
                 : { background: 'var(--aq-bg3)', color: 'var(--aq-text2)' }
             }
           >
-            {TAB_LABELS[tab]}
+            {tabLabels[tab]}
             <span
               className="rounded-[6px] px-1.5 py-0.5 text-[10px] font-semibold"
               style={

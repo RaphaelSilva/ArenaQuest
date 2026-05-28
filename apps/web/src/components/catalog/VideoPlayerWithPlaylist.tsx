@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import type { Media } from '@web/lib/admin-media-api';
+import { useDict } from '@web/context/dict-context';
 
 type Props = {
   videos: Media[];
@@ -27,6 +28,7 @@ function CheckIcon() {
 }
 
 export function VideoPlayerWithPlaylist({ videos, topicId, accessToken, onWatched }: Props) {
+  const dict = useDict();
   const [activeId, setActiveId] = useState(videos[0]?.id ?? '');
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -62,14 +64,13 @@ export function VideoPlayerWithPlaylist({ videos, topicId, accessToken, onWatche
 
   function selectVideo(id: string) {
     setActiveId(id);
-    // Reset the video element to load new source
     setTimeout(() => videoRef.current?.load(), 0);
   }
 
   if (videos.length === 0) {
     return (
       <p className="py-8 text-center text-sm" style={{ color: 'var(--aq-text3)' }}>
-        No videos available.
+        {dict.catalog.videoPlaylist.noVideos}
       </p>
     );
   }
@@ -92,7 +93,7 @@ export function VideoPlayerWithPlaylist({ videos, topicId, accessToken, onWatche
           onEnded={handleEnded}
         >
           {activeVideo && <source src={activeVideo.url} type={activeVideo.type} />}
-          Your browser does not support the video tag.
+          {dict.catalog.videoPlaylist.noSupport}
         </video>
       </div>
 

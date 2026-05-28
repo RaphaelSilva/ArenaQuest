@@ -1,8 +1,12 @@
+'use client';
+
 import type { DashboardBadge } from '@web/lib/dashboard-api';
+import { useDict } from '@web/context/dict-context';
 
 type Props = { badges: { earned: DashboardBadge[]; locked: DashboardBadge[] } };
 
 export function BadgesGrid({ badges }: Props) {
+  const dict = useDict();
   const allBadges = [...badges.earned, ...badges.locked];
 
   if (allBadges.length === 0) {
@@ -10,10 +14,10 @@ export function BadgesGrid({ badges }: Props) {
       <section
         className="rounded-2xl border border-dashed p-8 text-center"
         style={{ borderColor: 'var(--aq-border2)', background: 'var(--aq-bg2)' }}
-        aria-label="Badges"
+        aria-label={dict.dashboard.badges.title}
       >
         <p className="text-sm" style={{ color: 'var(--aq-text3)' }}>
-          No badges yet. Keep learning to earn them!
+          {dict.dashboard.badges.empty}
         </p>
       </section>
     );
@@ -23,7 +27,7 @@ export function BadgesGrid({ badges }: Props) {
     <section
       className="overflow-hidden rounded-2xl border"
       style={{ background: 'var(--aq-bg2)', borderColor: 'var(--aq-border2)' }}
-      aria-label="Badges"
+      aria-label={dict.dashboard.badges.title}
     >
       <div
         className="flex items-center justify-between border-b px-5 py-4"
@@ -33,10 +37,10 @@ export function BadgesGrid({ badges }: Props) {
           className="text-[13px] font-semibold"
           style={{ color: 'var(--aq-text)', fontFamily: "'Space Grotesk', sans-serif" }}
         >
-          Badges
+          {dict.dashboard.badges.title}
         </h2>
         <span className="text-xs" style={{ color: 'var(--aq-text3)' }}>
-          {badges.earned.length}/{allBadges.length} earned
+          {badges.earned.length}/{allBadges.length} {dict.dashboard.badges.earned}
         </span>
       </div>
 
@@ -50,14 +54,14 @@ export function BadgesGrid({ badges }: Props) {
               opacity: badge.earned ? 1 : 0.45,
               filter: badge.earned ? 'none' : 'grayscale(1)',
             }}
-            title={badge.earned ? `${badge.name} — ${badge.xpReward} XP` : `Locked: ${badge.name}`}
+            title={badge.earned ? dict.dashboard.badges.earnedTitle(badge.name, badge.xpReward) : dict.dashboard.badges.lockedTitle(badge.name)}
           >
             <span className="text-2xl" aria-hidden>{badge.emoji}</span>
             <span className="text-[9px] leading-tight" style={{ color: badge.earned ? 'var(--aq-text2)' : 'var(--aq-text3)' }}>
               {badge.name}
             </span>
             {!badge.earned && (
-              <span className="text-[9px]" style={{ color: 'var(--aq-text3)' }} aria-label="Locked">🔒</span>
+              <span className="text-[9px]" style={{ color: 'var(--aq-text3)' }} aria-label={dict.dashboard.badges.lockedPrefix}>🔒</span>
             )}
           </li>
         ))}

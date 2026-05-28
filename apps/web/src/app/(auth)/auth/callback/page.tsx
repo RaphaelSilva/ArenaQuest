@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@web/hooks/use-auth';
 import { Spinner } from '@web/components/spinner';
+import { useDict } from '@web/context/dict-context';
 
 const AlertIcon = () => (
   <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
@@ -14,16 +15,18 @@ const AlertIcon = () => (
 );
 
 function MissingTokenError() {
+  const dict = useDict();
+  const d = dict.auth.oauthCallback;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 16 }} className="aq-anim">
       <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderRadius: 9, background: 'var(--aq-error-bg)', border: '1px solid oklch(0.65 0.22 15 / 0.3)', fontSize: 13, color: 'var(--aq-error)' }}>
-        <AlertIcon /> Parâmetros de autenticação ausentes. Tente novamente.
+        <AlertIcon /> {d.missingParams}
       </div>
       <Link
         href="/login"
         style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 10, border: 'none', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer', background: 'var(--aq-accent)', color: '#0B0E17', boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)', textDecoration: 'none' }}
       >
-        Voltar ao login
+        {d.backToLogin}
       </Link>
     </div>
   );
@@ -32,6 +35,7 @@ function MissingTokenError() {
 function StoringSession({ accessToken }: { accessToken: string }) {
   const router = useRouter();
   const { loginWithAccessToken } = useAuth();
+  const dict = useDict();
 
   useEffect(() => {
     loginWithAccessToken(accessToken);
@@ -41,7 +45,7 @@ function StoringSession({ accessToken }: { accessToken: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
       <Spinner className="h-8 w-8" />
-      <p style={{ fontSize: 13, color: 'var(--aq-text2)' }}>Autenticando com Google…</p>
+      <p style={{ fontSize: 13, color: 'var(--aq-text2)' }}>{dict.auth.oauthCallback.authenticating}</p>
     </div>
   );
 }

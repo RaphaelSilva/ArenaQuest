@@ -1,4 +1,7 @@
+'use client';
+
 import type { LeaderboardEntry } from '@web/lib/dashboard-api';
+import { useDict } from '@web/context/dict-context';
 
 type Props = {
   rows: LeaderboardEntry[];
@@ -7,19 +10,20 @@ type Props = {
 };
 
 export function StatCardRanking({ rows, myRank, totalPlayers }: Props) {
+  const dict = useDict();
   const top = rows.slice(0, 3);
 
   return (
     <article
       className="relative overflow-hidden rounded-2xl border p-5"
       style={{ background: 'var(--aq-bg2)', borderColor: 'var(--aq-border2)' }}
-      aria-label="Ranking"
+      aria-label={dict.dashboard.rankingCard.label}
     >
       <div className="absolute inset-x-0 top-0 h-[3px] rounded-t-2xl" style={{ background: 'var(--aq-accent2)' }} />
 
       <div className="mb-3 flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: 'var(--aq-text3)' }}>
-          Ranking
+          {dict.dashboard.rankingCard.label}
         </span>
         <span
           className="flex h-8 w-8 items-center justify-center rounded-[9px] text-base"
@@ -39,13 +43,13 @@ export function StatCardRanking({ rows, myRank, totalPlayers }: Props) {
           #{myRank}
         </span>
         <span className="mb-1 text-sm" style={{ color: 'var(--aq-text2)' }}>
-          of {totalPlayers}
+          {dict.dashboard.rankingCard.of} {totalPlayers}
         </span>
       </div>
 
       {top.length === 0 ? (
         <p className="mt-3 text-xs" style={{ color: 'var(--aq-text3)' }}>
-          No ranking data yet.
+          {dict.dashboard.rankingCard.noData}
         </p>
       ) : (
         <ul className="mt-3 space-y-2">

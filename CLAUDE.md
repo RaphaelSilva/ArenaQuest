@@ -82,3 +82,9 @@ Next.js 15 + React 19 frontend deployed to Cloudflare Pages via `@cloudflare/nex
 - **Package manager** — pnpm with frozen lockfile.
 - **TypeScript** — strict mode. Shared types live in `packages/shared`.
 - **No external auth deps** — Auth is intentionally implemented with Web Crypto API only. Do not introduce `jsonwebtoken`, `bcrypt`, or similar.
+- **Internationalization (i18n)** — Build-time dictionary system in `apps/web`.
+  - No hardcoded user-facing strings in `src/{app,components,hooks}/**`. Verified by `check-i18n-coverage.js` script.
+  - Server Components: import `dict` from `@web/i18n`.
+  - Client Components: use the `useDict()` hook from `@web/context/dict-context`.
+  - Dictionaries: `dict-en.ts` and `dict-pt.ts` must maintain identical keys.
+  - Build: set `NEXT_PUBLIC_LANGUAGE=en` to build/run in English; defaults to `pt`. No runtime switcher UI is implemented.

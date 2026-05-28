@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import type { TopicNode } from '@web/lib/topics-api';
 import type { TopicProgressStatus } from '@web/lib/topics-api';
+import { useDict } from '@web/context/dict-context';
 
 type TreeNode = TopicNode & { children: TreeNode[] };
 
@@ -76,23 +77,20 @@ type Props = {
 };
 
 export function CatalogSidebar({ topics, progressMap, globalProgress, isInstructor }: Props) {
+  const dict = useDict();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Note: This component is hidden on mobile/tablet via 'hidden lg:flex' in layout.tsx
   const tree = buildTree(topics);
 
-  // URL state: expanded IDs
   const openParam = searchParams.get('open') ?? '';
   const expandedIds = new Set(openParam ? openParam.split(',').filter(Boolean) : tree.map((n) => n.id));
 
-  // URL state: search query
   const qParam = searchParams.get('q') ?? '';
   const [searchValue, setSearchValue] = useState(qParam);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Role preview (local state, persisted in localStorage)
   const [previewRole, setPreviewRole] = useState<'participant' | 'instructor'>(() => {
     if (typeof window === 'undefined') return 'participant';
     return (localStorage.getItem('aq-catalog-role') as 'participant' | 'instructor') ?? 'participant';
@@ -147,7 +145,7 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
     if (visible.length === 0) {
       return (
         <p className="px-4 py-6 text-center text-xs" style={{ color: 'var(--aq-text3)' }}>
-          No results
+          {dict.catalog.sidebar.noResults}
         </p>
       );
     }
@@ -160,7 +158,6 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
       ).length;
       const pct = subtopicTotal > 0 ? Math.round((subtopicDone / subtopicTotal) * 100) : 0;
 
-      // Active: any route under this topic
       const isActive = pathname.startsWith(`/catalog/${node.id}`);
 
       const visibleChildren = q
@@ -283,7 +280,7 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
           className="mb-3 text-[11px] font-semibold uppercase tracking-widest"
           style={{ color: 'var(--aq-text3)' }}
         >
-          Catalogue
+          {dict.catalog.breadcrumb.catalogue}
         </p>
 
         {/* Role pill — instructor only */}
@@ -305,7 +302,7 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
                   cursor: 'pointer',
                 }}
               >
-                {r === 'participant' ? 'Participante' : 'Instrutor'}
+                {r === 'participant' ? dict.catalog.sidebar.participantRole : dict.catalog.sidebar.instructorRole}
               </button>
             ))}
           </div>
@@ -314,7 +311,7 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
         {/* Global progress */}
         <div>
           <div className="mb-1.5 flex justify-between text-[12px]" style={{ color: 'var(--aq-text2)' }}>
-            <span>Progress</span>
+            <span>{dict.catalog.sidebar.progressLabel}</span>
             <strong style={{ color: 'var(--aq-accent)' }}>{globalProgress}%</strong>
           </div>
           <div
@@ -343,12 +340,12 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
           </span>
           <input
             type="search"
-            placeholder="Search topics…"
+            placeholder={dict.catalog.sidebar.searchPlaceholder}
             value={searchValue}
             onChange={(e) => handleSearch(e.target.value)}
             className="w-full bg-transparent text-[13px] outline-none"
             style={{ color: 'var(--aq-text)', caretColor: 'var(--aq-accent)' }}
-            aria-label="Search topics"
+            aria-label={dict.catalog.sidebar.searchAriaLabel}
           />
         </div>
       </div>
@@ -356,12 +353,12 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
       {/* Tree */}
       <nav
         className="flex-1 overflow-y-auto py-3"
-        aria-label="Catalogue tree"
+        aria-label={dict.catalog.sidebar.navAriaLabel}
         style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--aq-bg4) transparent' }}
       >
         {topics.length === 0 ? (
           <p className="px-4 py-6 text-center text-xs" style={{ color: 'var(--aq-text3)' }}>
-            No published content yet.
+            {dict.catalog.sidebar.noContent}
           </p>
         ) : (
           renderTree()
@@ -380,7 +377,7 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
             }}
           >
             <span>+</span>
-            <span>Manage topics</span>
+            <span>{dict.catalog.sidebar.manageTopics}</span>
           </Link>
         </div>
       )}

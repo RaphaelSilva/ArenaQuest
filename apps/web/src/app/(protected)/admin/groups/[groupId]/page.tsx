@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useAuth, useHasRole } from '@web/hooks/use-auth';
 import { Spinner } from '@web/components/spinner';
+import { useDict } from '@web/context/dict-context';
 
 export const runtime = 'edge';
 
@@ -22,6 +23,8 @@ export default function AdminGroupDetailPage({ params }: Props) {
   const router = useRouter();
   const isAdmin = useHasRole(ROLES.ADMIN);
   const { isLoading: authLoading } = useAuth();
+  const dict = useDict();
+  const d = dict.admin.groups;
 
   useEffect(() => {
     if (!authLoading && !isAdmin) router.replace('/dashboard');
@@ -40,21 +43,20 @@ export default function AdminGroupDetailPage({ params }: Props) {
   return (
     <main className="mx-auto max-w-3xl px-6 py-8">
       <Link href="/admin/groups" className="text-sm transition-colors" style={{ color: 'var(--text2)' }}>
-        ← Back to groups
+        {d.backToGroups}
       </Link>
       <h1 className="mt-4 mb-2 text-2xl font-bold" style={{ color: 'var(--text)' }}>
-        Group <code className="text-base">{groupId}</code>
+        {d.detailTitle(groupId)}
       </h1>
       <p className="mb-6 text-sm" style={{ color: 'var(--text2)' }}>
-        Group detail management is pending backend group CRUD endpoints.
-        Enrollment grants for this group are supported via the API.
+        {d.detailSubtitle}
       </p>
       <div
         className="rounded-xl border border-dashed py-12 text-center"
         style={{ borderColor: 'var(--border)' }}
       >
         <p className="text-sm font-medium" style={{ color: 'var(--text3)' }}>
-          Group management UI coming soon.
+          {d.detailComingSoon}
         </p>
       </div>
     </main>

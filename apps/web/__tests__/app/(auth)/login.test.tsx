@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AuthApiError } from '@web/lib/auth-api';
+import { dictPt } from '@web/i18n';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -48,6 +49,7 @@ vi.mock('@web/lib/auth-api', async () => {
 import LoginPage from '@web/app/(auth)/login/page';
 
 const PENDING_KEY = 'aq_pending_activation_email';
+const d = dictPt.auth;
 
 // ---------------------------------------------------------------------------
 
@@ -64,20 +66,20 @@ beforeEach(() => {
 describe('LoginPage — login flow', () => {
   it('renders email and password fields', () => {
     render(<LoginPage />);
-    expect(screen.getByLabelText(/e-mail/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^senha$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(d.login.emailLabel)).toBeInTheDocument();
+    expect(screen.getByLabelText(d.login.passwordLabel)).toBeInTheDocument();
   });
 
   it('renders the submit button', () => {
     render(<LoginPage />);
-    expect(screen.getByRole('button', { name: /entrar na arena/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: d.login.submitButton })).toBeInTheDocument();
   });
 
   it('shows a validation error when fields are empty', async () => {
     render(<LoginPage />);
-    fireEvent.submit(screen.getByRole('button', { name: /entrar na arena/i }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: d.login.submitButton }).closest('form')!);
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Informe seu e-mail.');
+      expect(screen.getByRole('alert')).toHaveTextContent(d.login.errorEmailRequired);
     });
     expect(mockLogin).not.toHaveBeenCalled();
   });
@@ -87,9 +89,9 @@ describe('LoginPage — login flow', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText(/e-mail/i), 'alice@example.com');
-    await user.type(screen.getByLabelText(/^senha$/i), 'secret');
-    await user.click(screen.getByRole('button', { name: /entrar na arena/i }));
+    await user.type(screen.getByLabelText(d.login.emailLabel), 'alice@example.com');
+    await user.type(screen.getByLabelText(d.login.passwordLabel), 'secret');
+    await user.click(screen.getByRole('button', { name: d.login.submitButton }));
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('alice@example.com', 'secret');
@@ -102,12 +104,12 @@ describe('LoginPage — login flow', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText(/e-mail/i), 'bad@example.com');
-    await user.type(screen.getByLabelText(/^senha$/i), 'wrong');
-    await user.click(screen.getByRole('button', { name: /entrar na arena/i }));
+    await user.type(screen.getByLabelText(d.login.emailLabel), 'bad@example.com');
+    await user.type(screen.getByLabelText(d.login.passwordLabel), 'wrong');
+    await user.click(screen.getByRole('button', { name: d.login.submitButton }));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('E-mail ou senha inválidos.');
+      expect(screen.getByRole('alert')).toHaveTextContent(d.login.errorInvalidCredentials);
     });
     expect(mockReplace).not.toHaveBeenCalled();
   });
@@ -118,14 +120,12 @@ describe('LoginPage — login flow', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText(/e-mail/i), 'pending@example.com');
-    await user.type(screen.getByLabelText(/^senha$/i), 'whatever');
-    await user.click(screen.getByRole('button', { name: /entrar na arena/i }));
+    await user.type(screen.getByLabelText(d.login.emailLabel), 'pending@example.com');
+    await user.type(screen.getByLabelText(d.login.passwordLabel), 'whatever');
+    await user.click(screen.getByRole('button', { name: d.login.submitButton }));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'Confira seu e-mail para ativar sua conta antes de entrar.',
-      );
+      expect(screen.getByRole('alert')).toHaveTextContent(d.login.errorCheckEmail);
     });
   });
 
@@ -135,9 +135,9 @@ describe('LoginPage — login flow', () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText(/e-mail/i), 'alice@example.com');
-    await user.type(screen.getByLabelText(/^senha$/i), 'secret');
-    await user.click(screen.getByRole('button', { name: /entrar na arena/i }));
+    await user.type(screen.getByLabelText(d.login.emailLabel), 'alice@example.com');
+    await user.type(screen.getByLabelText(d.login.passwordLabel), 'secret');
+    await user.click(screen.getByRole('button', { name: d.login.submitButton }));
 
     await waitFor(() => {
       expect(window.localStorage.getItem(PENDING_KEY)).toBeNull();
@@ -154,34 +154,24 @@ async function submitRegisterStep1(user: ReturnType<typeof userEvent.setup>, opt
   email: string;
   password: string;
 }) {
-  // The tab and the LoginForm's "Criar conta grátis" link both match — pick
-  // the first (the tab) to switch into the register flow.
-  const tabs = screen.getAllByRole('button', { name: /^criar conta$/i });
-  await user.click(tabs[0]);
-  // Wait until step 1 form is present (Nome label appears in registration only)
-  await waitFor(() => screen.getByText(/Suas informações/i));
+  await user.click(screen.getByRole('button', { name: d.tabs.register }));
+  await waitFor(() => screen.getByText(d.register.step1Label));
 
-  const inputs = screen.getAllByRole('textbox');
-  // First textbox is Nome, second Sobrenome, third E-mail, fourth Telefone
-  await user.type(inputs[0], opts.firstName);
-  await user.type(inputs[2], opts.email);
+  await user.type(screen.getByPlaceholderText(d.register.firstNamePlaceholder), opts.firstName);
+  await user.type(screen.getByPlaceholderText(d.login.emailPlaceholder), opts.email);
+  await user.type(screen.getByPlaceholderText(d.register.passwordPlaceholder), opts.password);
+  await user.type(screen.getByPlaceholderText(d.register.confirmPasswordPlaceholder), opts.password);
 
-  // Password fields are not textboxes — query by placeholder.
-  const pwInput = screen.getByPlaceholderText(/Mínimo 8 caracteres/i) as HTMLInputElement;
-  const pwConfirmInput = screen.getByPlaceholderText(/Repita a senha/i) as HTMLInputElement;
-  await user.type(pwInput, opts.password);
-  await user.type(pwConfirmInput, opts.password);
-
-  await user.click(screen.getByRole('button', { name: /Continuar/i }));
+  await user.click(screen.getByRole('button', { name: d.register.continueButton }));
 }
 
 async function submitRegisterStep2(user: ReturnType<typeof userEvent.setup>) {
-  // Check the terms label (clicking the label toggles the controlled checkbox)
-  await waitFor(() => screen.getByText(/Concordo com os/i));
-  await user.click(screen.getByText(/Concordo com os/i));
-  // The tab and the form's submit both say "Criar conta" — pick the one
-  // that lives inside a <form> element.
-  const buttons = screen.getAllByRole('button', { name: /^Criar conta$/i });
+  const termsRegex = new RegExp(d.register.termsText.split('{')[0].trim());
+  screen.debug(undefined, 100000);
+  await waitFor(() => screen.getByText(termsRegex));
+  await user.click(screen.getByText(termsRegex));
+
+  const buttons = screen.getAllByRole('button', { name: d.register.createButton });
   const submit = buttons.find((b) => b.closest('form') !== null);
   await user.click(submit!);
 }
@@ -208,7 +198,7 @@ describe('LoginPage — register flow', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/Confira seu e-mail/i)).toBeInTheDocument();
+      expect(screen.getByText(d.registerSuccess.title)).toBeInTheDocument();
       expect(screen.getByText(/joana@example\.com/i)).toBeInTheDocument();
     });
 
@@ -229,15 +219,15 @@ describe('LoginPage — register flow', () => {
     await submitRegisterStep1(user, {
       firstName: 'Joana',
       email: 'joana@example.com',
-      password: 'hunter22a',
+      password: 'hunter22a', // Too short on mocked API
     });
     await submitRegisterStep2(user);
 
     // Form returns to step 1 to surface the field-level error.
     await waitFor(() => {
-      expect(screen.getByText('Mínimo 8 caracteres')).toBeInTheDocument();
+      expect(screen.getByText(d.register.errorPasswordMinLength)).toBeInTheDocument();
     });
-    expect(screen.getByRole('button', { name: /Continuar/i })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: d.register.continueButton })).not.toBeDisabled();
   });
 
   it('rate-limited: shows the rate-limit copy near the terms checkbox', async () => {
@@ -253,7 +243,7 @@ describe('LoginPage — register flow', () => {
     await submitRegisterStep2(user);
 
     await waitFor(() => {
-      expect(screen.getByText(/Muitas tentativas/i)).toBeInTheDocument();
+      expect(screen.getByText(d.register.errorRateLimited)).toBeInTheDocument();
     });
   });
 });
@@ -270,12 +260,12 @@ describe('LoginPage — activated banner', () => {
     render(<LoginPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent('Conta ativada!');
+      expect(screen.getByRole('status')).toHaveTextContent(d.login.activatedBanner);
     });
 
-    await user.type(screen.getByLabelText(/e-mail/i), 'alice@example.com');
-    await user.type(screen.getByLabelText(/^senha$/i), 'secret');
-    await user.click(screen.getByRole('button', { name: /entrar na arena/i }));
+    await user.type(screen.getByLabelText(d.login.emailLabel), 'alice@example.com');
+    await user.type(screen.getByLabelText(d.login.passwordLabel), 'secret');
+    await user.click(screen.getByRole('button', { name: d.login.submitButton }));
 
     // After submit, the page navigates to /dashboard — banner is gone with the unmount.
     await waitFor(() => {

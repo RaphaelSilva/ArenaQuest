@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useAuth, useHasRole } from '@web/hooks/use-auth';
 import { Spinner } from '@web/components/spinner';
+import { useDict } from '@web/context/dict-context';
 
 export const runtime = 'edge';
 
@@ -18,6 +19,8 @@ export default function AdminGroupsPage() {
   const router = useRouter();
   const isAdmin = useHasRole(ROLES.ADMIN);
   const { isLoading: authLoading } = useAuth();
+  const dict = useDict();
+  const d = dict.admin.groups;
 
   useEffect(() => {
     if (!authLoading && !isAdmin) router.replace('/dashboard');
@@ -36,19 +39,17 @@ export default function AdminGroupsPage() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
       <h1 className="mb-2 text-2xl font-bold" style={{ color: 'var(--text)' }}>
-        Group Management
+        {d.title}
       </h1>
       <p className="mb-6 text-sm" style={{ color: 'var(--text2)' }}>
-        Group CRUD (create, list, add/remove members) requires backend endpoints that are
-        planned for the next milestone. Group enrollment grants are already supported via
-        the API once a group ID is known.
+        {d.subtitle}
       </p>
       <div
         className="rounded-xl border border-dashed py-12 text-center"
         style={{ borderColor: 'var(--border)' }}
       >
         <p className="text-sm font-medium" style={{ color: 'var(--text3)' }}>
-          Coming soon — group management backend in progress.
+          {d.comingSoon}
         </p>
       </div>
     </main>

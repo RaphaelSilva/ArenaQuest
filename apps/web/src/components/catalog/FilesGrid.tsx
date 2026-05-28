@@ -1,4 +1,7 @@
+'use client';
+
 import type { Media } from '@web/lib/admin-media-api';
+import { useDict } from '@web/context/dict-context';
 
 type Props = { files: Media[] };
 
@@ -17,10 +20,12 @@ function formatSize(bytes: number): string {
 }
 
 export function FilesGrid({ files }: Props) {
+  const dict = useDict();
+
   if (files.length === 0) {
     return (
       <p className="py-8 text-center text-sm" style={{ color: 'var(--aq-text3)' }}>
-        No files available.
+        {dict.catalog.filesGrid.noFiles}
       </p>
     );
   }
@@ -60,7 +65,7 @@ export function FilesGrid({ files }: Props) {
             className="flex items-center justify-center gap-1.5 rounded-[8px] py-1.5 text-[12px] font-medium transition-opacity hover:opacity-80"
             style={{ background: 'var(--aq-accent-glow)', color: 'var(--aq-accent)', border: '1px solid var(--aq-accent)' }}
           >
-            ↓ Download
+            {dict.catalog.filesGrid.download}
           </a>
         </div>
       ))}

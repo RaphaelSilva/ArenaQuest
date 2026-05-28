@@ -1,17 +1,22 @@
+'use client';
+
 import type { WeeklyChallenge } from '@web/lib/dashboard-api';
+import { useDict } from '@web/context/dict-context';
 
 type Props = { challenges: WeeklyChallenge[] };
 
 export function WeeklyChallenges({ challenges }: Props) {
+  const dict = useDict();
+
   if (challenges.length === 0) {
     return (
       <section
         className="rounded-2xl border border-dashed p-8 text-center"
         style={{ borderColor: 'var(--aq-border2)', background: 'var(--aq-bg2)' }}
-        aria-label="Weekly challenges"
+        aria-label={dict.dashboard.weeklyChallenges.title}
       >
         <p className="text-sm" style={{ color: 'var(--aq-text3)' }}>
-          No weekly challenges this week.
+          {dict.dashboard.weeklyChallenges.empty}
         </p>
       </section>
     );
@@ -21,7 +26,7 @@ export function WeeklyChallenges({ challenges }: Props) {
     <section
       className="overflow-hidden rounded-2xl border"
       style={{ background: 'var(--aq-bg2)', borderColor: 'var(--aq-border2)' }}
-      aria-label="Weekly challenges"
+      aria-label={dict.dashboard.weeklyChallenges.title}
     >
       <div
         className="border-b px-5 py-4"
@@ -31,7 +36,7 @@ export function WeeklyChallenges({ challenges }: Props) {
           className="text-[13px] font-semibold"
           style={{ color: 'var(--aq-text)', fontFamily: "'Space Grotesk', sans-serif" }}
         >
-          Weekly Challenges
+          {dict.dashboard.weeklyChallenges.title}
         </h2>
       </div>
 

@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { useApiClient } from '@web/context/auth-context';
 import type { PresignInput } from '@web/lib/admin-media-api';
+import { useDict } from '@web/context/dict-context';
 
 type UploadState = 'idle' | 'presigning' | 'uploading' | 'finalizing' | 'success' | 'error';
 
@@ -24,6 +25,8 @@ export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps)
   const client = useApiClient();
   const [uploads, setUploads] = useState<ActiveUpload[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dict = useDict();
+  const d = dict.admin.topics.media;
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -66,7 +69,7 @@ export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps)
       
       // Basic client side validation
       if (upload.file.size > 100 * 1024 * 1024) {
-          throw new Error('File too large (Max 100MB)');
+          throw new Error(d.uploader.fileTooBig);
       }
 
       const { uploadUrl, media } = await client.adminMedia.getPresignedUrl(topicId, presignData);
@@ -157,10 +160,10 @@ export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps)
           </svg>
         </div>
         <p className="mt-4 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          Click to upload or drag and drop
+          {d.uploader.dropzoneTitle}
         </p>
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          PDF, Video, or Images up to 100MB
+          {d.uploader.dropzoneHint}
         </p>
       </div>
 
@@ -192,14 +195,14 @@ export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps)
               {upload.state === 'error' ? (
                 <p className="mt-2 text-xs text-red-500">{upload.error}</p>
               ) : upload.state === 'success' ? (
-                 <p className="mt-2 text-xs text-emerald-500">Upload complete</p>
+                 <p className="mt-2 text-xs text-emerald-500">{d.uploader.uploadComplete}</p>
               ) : (
                 <div className="mt-3">
                   <div className="flex justify-between text-xs text-zinc-500 mb-1">
                     <span>
-                      {upload.state === 'presigning' && 'Preparing...'}
-                      {upload.state === 'uploading' && 'Uploading...'}
-                      {upload.state === 'finalizing' && 'Finishing...'}
+                      {upload.state === 'presigning' && d.uploader.preparing}
+                      {upload.state === 'uploading' && d.uploader.uploading}
+                      {upload.state === 'finalizing' && d.uploader.finishing}
                     </span>
                     <span>{upload.progress}%</span>
                   </div>

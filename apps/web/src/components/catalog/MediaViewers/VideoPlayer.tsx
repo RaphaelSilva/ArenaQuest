@@ -1,5 +1,7 @@
 'use client';
 
+import { useDict } from '@web/context/dict-context';
+
 type VideoPlayerProps = {
   url: string;
   title: string;
@@ -7,6 +9,8 @@ type VideoPlayerProps = {
 };
 
 export function VideoPlayer({ url, title, mimeType }: VideoPlayerProps) {
+  const dict = useDict();
+
   return (
     <div className="flex flex-col space-y-4">
       <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">{title}</h3>
@@ -18,7 +22,7 @@ export function VideoPlayer({ url, title, mimeType }: VideoPlayerProps) {
           preload="metadata"
         >
           <source src={url} type={mimeType} />
-          Your browser does not support the video tag.
+          {dict.catalog.videoPlayer.noSupport}
         </video>
       </div>
     </div>

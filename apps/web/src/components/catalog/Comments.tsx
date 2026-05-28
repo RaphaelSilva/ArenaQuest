@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useDict } from '@web/context/dict-context';
 
 type CommentWithMeta = {
   id: string;
@@ -18,18 +19,19 @@ type Props = {
   accessToken: string;
 };
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, now: string): string {
   try {
     return new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' }).format(
       Math.round((new Date(iso).getTime() - Date.now()) / 60000),
       'minute',
     );
   } catch {
-    return 'agora';
+    return now;
   }
 }
 
 export function Comments({ topicId, initialComments, accessToken }: Props) {
+  const dict = useDict();
   const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
   const [comments, setComments] = useState<CommentWithMeta[]>(
     initialComments.filter((c) => c.parentCommentId === null && c.body !== null),
@@ -110,7 +112,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
         className="mb-4 text-[13px] font-semibold uppercase tracking-widest"
         style={{ color: 'var(--aq-text3)' }}
       >
-        Discussão · {comments.length} {comments.length === 1 ? 'comentário' : 'comentários'}
+        {dict.catalog.comments.header(comments.length)}
       </p>
 
       {/* Comment input */}
@@ -127,7 +129,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void handleSubmit(); }}
-            placeholder="Compartilhe uma dúvida ou observação…"
+            placeholder={dict.catalog.comments.placeholder}
             rows={2}
             className="w-full rounded-[10px] px-3 py-2 text-[13px] outline-none transition-all"
             style={{
@@ -150,7 +152,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
                 className="ml-auto rounded-[8px] px-4 py-1.5 text-[12px] font-medium transition-opacity disabled:opacity-60"
                 style={{ background: 'var(--aq-accent)', color: '#0B0E17' }}
               >
-                {submitting ? 'Publicando…' : 'Publicar'}
+                {submitting ? dict.catalog.comments.submitting : dict.catalog.comments.submit}
               </button>
             </div>
           )}
@@ -161,7 +163,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
       <div className="flex flex-col gap-4">
         {comments.length === 0 && (
           <p className="py-6 text-center text-[13px]" style={{ color: 'var(--aq-text3)' }}>
-            Seja o primeiro a comentar.
+            {dict.catalog.comments.empty}
           </p>
         )}
         {comments.map((c) => (
@@ -176,10 +178,10 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-[13px] font-semibold" style={{ color: 'var(--aq-text)' }}>
-                  {c.userId === 'me' ? 'Você' : c.userId.slice(0, 8)}
+                  {c.userId === 'me' ? dict.catalog.comments.you : c.userId.slice(0, 8)}
                 </span>
                 <span className="text-[11px]" style={{ color: 'var(--aq-text3)' }}>
-                  {formatTime(c.createdAt)}
+                  {formatTime(c.createdAt, dict.catalog.comments.now)}
                 </span>
               </div>
               <p className="mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--aq-text2)' }}>

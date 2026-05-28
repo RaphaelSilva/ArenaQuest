@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { authApi, AuthApiError } from '@web/lib/auth-api';
 import { Spinner } from '@web/components/spinner';
 import { Logo } from '@web/components/design-system';
+import { useDict } from '@web/context/dict-context';
 
 type ActivateState =
   | { kind: 'pending' }
@@ -16,6 +17,8 @@ function ActivateInner() {
   const searchParams = useSearchParams();
   const token = searchParams?.get('token') ?? '';
   const [state, setState] = useState<ActivateState>(token ? { kind: 'pending' } : { kind: 'error', reason: 'invalid' });
+  const dict = useDict();
+  const d = dict.auth.activate;
 
   const runActivation = useCallback(async () => {
     try {
@@ -60,10 +63,10 @@ function ActivateInner() {
           <>
             <Spinner className="h-8 w-8" />
             <h1 style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 20, fontWeight: 700 }}>
-              Ativando sua conta…
+              {d.pendingTitle}
             </h1>
             <p style={{ fontSize: 13, color: 'var(--aq-text2)', lineHeight: 1.6 }}>
-              Aguarde só um instante.
+              {d.pendingMessage}
             </p>
           </>
         )}
@@ -74,17 +77,17 @@ function ActivateInner() {
               ✓
             </div>
             <h1 style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 22, fontWeight: 700 }}>
-              Conta ativada!
+              {d.successTitle}
             </h1>
             <p style={{ fontSize: 13, color: 'var(--aq-text2)', lineHeight: 1.6, maxWidth: 320 }}>
-              Sua conta está pronta. Faça login para entrar na Arena.
+              {d.successMessage}
             </p>
             <button
               type="button"
               onClick={() => router.push('/login?activated=1')}
               style={{ marginTop: 8, width: '100%', padding: 13, borderRadius: 10, border: 'none', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 15, fontWeight: 700, cursor: 'pointer', background: 'var(--aq-accent)', color: '#0B0E17', boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)' }}
             >
-              Ir para login
+              {d.successButton}
             </button>
           </>
         )}
@@ -95,12 +98,10 @@ function ActivateInner() {
               !
             </div>
             <h1 style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 22, fontWeight: 700 }}>
-              {state.reason === 'network' ? 'Não foi possível ativar' : 'Link inválido'}
+              {state.reason === 'network' ? d.errorNetworkTitle : d.errorInvalidTitle}
             </h1>
             <p style={{ fontSize: 13, color: 'var(--aq-text2)', lineHeight: 1.6, maxWidth: 340 }}>
-              {state.reason === 'network'
-                ? 'Houve um problema de conexão. Tente novamente.'
-                : 'Link inválido ou expirado. Solicite um novo cadastro ou contate o suporte.'}
+              {state.reason === 'network' ? d.errorNetworkMessage : d.errorInvalidMessage}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', marginTop: 8 }}>
               {state.reason === 'network' && (
@@ -109,7 +110,7 @@ function ActivateInner() {
                   onClick={retry}
                   style={{ width: '100%', padding: 13, borderRadius: 10, border: 'none', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 15, fontWeight: 700, cursor: 'pointer', background: 'var(--aq-accent)', color: '#0B0E17', boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)' }}
                 >
-                  Tentar novamente
+                  {d.retryButton}
                 </button>
               )}
               <button
@@ -117,7 +118,7 @@ function ActivateInner() {
                 onClick={() => router.push('/login')}
                 style={{ width: '100%', padding: 13, borderRadius: 10, border: '1px solid var(--aq-border2)', background: 'var(--aq-bg3)', fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif', fontSize: 14, fontWeight: 500, cursor: 'pointer', color: 'var(--aq-text2)' }}
               >
-                Voltar ao login
+                {d.backToLogin}
               </button>
             </div>
           </>
