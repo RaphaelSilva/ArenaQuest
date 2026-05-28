@@ -436,6 +436,7 @@ export const dictEn = {
     breadcrumb: {
       catalogue: 'Catalogue',
       back: '← Back',
+      expandEllipsis: 'Show more breadcrumbs',
     },
     topicPage: {
       progress: 'Progress',

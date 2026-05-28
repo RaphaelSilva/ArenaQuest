@@ -434,6 +434,7 @@ export const dictPt = {
     breadcrumb: {
       catalogue: 'Catálogo',
       back: '← Voltar',
+      expandEllipsis: 'Mostrar mais breadcrumbs',
     },
     topicPage: {
       progress: 'Progresso',

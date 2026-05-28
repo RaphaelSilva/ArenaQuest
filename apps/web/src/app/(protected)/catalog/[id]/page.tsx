@@ -38,6 +38,18 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   const trail = useMemo(() => (topic ? buildTrail(allTopics, id) : []), [allTopics, id, topic]);
   const totalInBranch = useMemo(() => (topic ? countDeep(allTopics, id) : 0), [allTopics, id, topic]);
 
+  const breadcrumbItems = useMemo(() => {
+    const list: Array<{ label: string; href?: string }> = [{ label: dict.catalog.breadcrumb.catalogue, href: '/catalog' }];
+    trail.forEach((t, i) => {
+      const isLast = i === trail.length - 1;
+      list.push({
+        label: t.title,
+        href: isLast ? undefined : `/catalog/${t.id}`,
+      });
+    });
+    return list;
+  }, [trail, dict]);
+
 
   useEffect(() => {
     let active = true;
@@ -99,10 +111,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
     <div className="mx-auto max-w-[900px] px-4 py-8 md:px-6 lg:px-10">
       {/* Breadcrumb */}
       <CatalogBreadcrumb
-        items={[
-          { label: dict.catalog.breadcrumb.catalogue, href: '/catalog' },
-          { label: topic.title },
-        ]}
+        items={breadcrumbItems}
         backHref="/catalog"
       />
 

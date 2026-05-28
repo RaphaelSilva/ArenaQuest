@@ -1,6 +1,6 @@
 # Task 05 — Restyle `CatalogBreadcrumb` — mid-trail collapse and token reuse (Phase 2)
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 **Milestone:** [11 — Catalog redesign](./milestone.md)
 **RFC:** [0004 — Catalog page redesign, Phase 2](../../RFCs/0004-catalog-redesign.md)
 
@@ -36,13 +36,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] At trail length ≤ 4, the breadcrumb renders every segment inline.
-- [ ] At trail length > 4, the breadcrumb collapses to `root › … › parent › current`; the ellipsis is a keyboard-activatable affordance that reveals the hidden segments.
-- [ ] The current segment is not a link; every other segment links to `/catalog/<that-id>`.
-- [ ] Color tokens match the wireframe (`--aq-text3` for links, `--aq-text2` for current, `--aq-accent` on hover).
-- [ ] No hardcoded user-facing string under the component; `check-i18n-coverage.js` passes.
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] At trail length ≤ 4, the breadcrumb renders every segment inline.
+- [x] At trail length > 4, the breadcrumb collapses to `root › … › parent › current`; the ellipsis is a keyboard-activatable affordance that reveals the hidden segments.
+- [x] The current segment is not a link; every other segment links to `/catalog/<that-id>`.
+- [x] Color tokens match the wireframe (`--aq-text3` for links, `--aq-text2` for current, `--aq-accent` on hover).
+- [x] No hardcoded user-facing string under the component; `check-i18n-coverage.js` passes.
+- [x] `make lint`, `make test-web`, and `make test-api` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
