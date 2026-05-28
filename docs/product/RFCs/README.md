@@ -9,6 +9,7 @@ This directory contains formal proposals and architectural decisions for ArenaQu
 | [0001](./0001-apps-api-test-suite-optimization.md) | Otimização da suíte de testes de `apps/api` | Draft | 2026-05-24 | raphaelsilva |
 | [0002](./0002-frontend-internationalization-i18n.md) | Frontend Internationalization (i18n) Strategy | Implemented | 2026-05-24 | Claude Code |
 | [0003](./0003-apps-api-route-organization-and-openapi.md) | Reorganização de rotas e adoção de OpenAPI/Swagger em `apps/api` | Draft | 2026-05-24 | raphaelsilva |
+| [0004](./0004-catalog-redesign.md) | Catalog page redesign — wireframe-aligned UX | Draft | 2026-05-27 | raphaelsilva |
 
 ## RFC Process
 

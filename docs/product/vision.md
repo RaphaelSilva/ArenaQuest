@@ -53,3 +53,5 @@ To track our exact progress, each phase maps to a dedicated milestone folder:
   * Launch of the mobile-friendly student portal with progress indicators.
 * **[Milestone 6: Portability & Launch](file:///home/my-ubuntu/projects/ArenaQuest/docs/product/milestones/6/milestone.md)**
   * Agnosticism proofs, provider-swap validation tests, and initial release.
+* **[Milestone 11: Catalog Redesign](file:///home/my-ubuntu/projects/ArenaQuest/docs/product/milestones/11-catalog-redesign/milestone.md)**
+  * Wireframe-aligned participant catalog UX (sidebar, header stats trio, two-column subtopic grid, inline media stages, discussion thread). Derived from RFC 0004.
