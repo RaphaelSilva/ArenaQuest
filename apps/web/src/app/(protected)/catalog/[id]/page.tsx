@@ -169,7 +169,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
             <p className="mt-3 text-[15px]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{dict.catalog.topicPage.noSubtopics}</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {topic.children.map((child, i) => (
               <SubtopicCard
                 key={child.id}
@@ -177,6 +177,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
                 subtopic={child}
                 index={i}
                 status={progressMap.get(child.id) ?? 'not_started'}
+                hasChildren={allTopics.some((t) => t.parentId === child.id)}
               />
             ))}
           </div>

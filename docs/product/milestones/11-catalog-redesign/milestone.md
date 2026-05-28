@@ -75,7 +75,7 @@ Out of scope (explicit):
 | 03 | [Restyle `CatalogSidebar` — eyebrow, search, and tree rows](./03-restyle-catalog-sidebar.task.md) | 2 | ✅ Done |
 | 04 | [Rewrite `TopicHeader` — initials, eyebrow trail, and stats trio](./04-rewrite-topic-header.task.md) | 2 | ✅ Done |
 | 05 | [Restyle `CatalogBreadcrumb` — mid-trail collapse and token reuse](./05-restyle-catalog-breadcrumb.task.md) | 2 | ✅ Done |
-| 06 | [Restyle `SubtopicCard` — two-column grid, index, and arrow chip](./06-restyle-subtopic-card.task.md) | 2 | ⏳ Planned |
+| 06 | [Restyle `SubtopicCard` — two-column grid, index, and arrow chip](./06-restyle-subtopic-card.task.md) | 2 | ✅ Done |
 | 07 | [Description card wrap, skeleton, and section empty/error fallbacks](./07-description-skeleton-empty-error.task.md) | 2 | ⏳ Planned |
 | 08 | [Mobile sidebar drawer with hamburger trigger](./08-mobile-sidebar-drawer.task.md) | 2 | ⏳ Planned |
 | 09 | [Backend — additive `mediaCount` projection on `TopicNode`](./09-backend-mediacount-projection.task.md) | 3 | ⏳ Planned |
