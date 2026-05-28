@@ -2,10 +2,11 @@
 
 export const runtime = 'edge';
 
-import { use, useEffect, useState } from 'react';
+import { use, useMemo, useEffect, useState } from 'react';
 import { useAuth } from '@web/hooks/use-auth';
 import { useApiClient } from '@web/context/auth-context';
-import type { TopicProgressStatus, TopicWithMedia } from '@web/lib/topics-api';
+import type { TopicProgressStatus, TopicWithMedia, TopicNode } from '@web/lib/topics-api';
+import { buildTrail, countDeep } from '@web/lib/topic-tree';
 import { TopicHeader } from '@web/components/catalog/TopicHeader';
 import { BadgesStrip } from '@web/components/catalog/BadgesStrip';
 import { SubtopicCard } from '@web/components/catalog/SubtopicCard';
@@ -28,13 +29,14 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   const client = useApiClient();
 
   const [topic, setTopic] = useState<TopicWithMedia | null>(null);
+  const [allTopics, setAllTopics] = useState<TopicNode[]>([]);
   const [progressMap, setProgressMap] = useState<Map<string, TopicProgressStatus>>(new Map());
   const [badges, setBadges] = useState<BadgeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-
-
+  const trail = useMemo(() => (topic ? buildTrail(allTopics, id) : []), [allTopics, id, topic]);
+  const totalInBranch = useMemo(() => (topic ? countDeep(allTopics, id) : 0), [allTopics, id, topic]);
 
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
 
     Promise.all([
       client.topics.getById(id),
+      client.topics.list(),
       client.topics.listProgress(),
       fetch(`${API_URL}/me/badges`, { headers, cache: 'no-store' })
         .then(async (r) => {
@@ -53,9 +56,10 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
           return body.map((e) => ({ id: e.badge.id, emoji: e.badge.iconEmoji, name: e.badge.name, earned: true }));
         })
         .catch(() => [] as BadgeItem[]),
-    ]).then(([t, progressEntries, b]) => {
+    ]).then(([t, allTopicsData, progressEntries, b]) => {
       if (!active) return;
       setTopic(t);
+      setAllTopics(allTopicsData);
       setProgressMap(new Map(progressEntries.map((p) => [p.topicNodeId, p.status])));
       setBadges(b);
       setLoading(false);
@@ -103,7 +107,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
       />
 
       {/* Topic header */}
-      <TopicHeader topic={topic} pct={pct} />
+      <TopicHeader topic={topic} trail={trail} totalInBranch={totalInBranch} />
 
       {/* Progress bar */}
       <div className="mb-8">
