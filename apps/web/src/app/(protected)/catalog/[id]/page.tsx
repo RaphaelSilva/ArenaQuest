@@ -12,7 +12,7 @@ import { BadgesStrip } from '@web/components/catalog/BadgesStrip';
 import { SubtopicCard } from '@web/components/catalog/SubtopicCard';
 import { ContentSection } from '@web/components/catalog/ContentSection';
 import { SectionEmpty } from '@web/components/catalog/SectionEmpty';
-import { MediaGallery } from '@web/components/catalog/MediaGallery';
+import { MediaList } from '@web/components/catalog/MediaList/MediaList';
 import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
 import { useDict } from '@web/context/dict-context';
 import { MainPaneSkeleton } from '@web/components/catalog/MainPaneSkeleton';
@@ -159,8 +159,23 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
         <ContentSection content={topic.content} />
       )}
 
-      {/* Media gallery */}
-      <MediaGallery media={topic.media || []} />
+      {/* Media section */}
+      {(!topic.media || topic.media.length === 0) ? (
+        <section className="mb-8">
+          <h2
+            className="mb-4 text-[13px] font-semibold uppercase tracking-widest"
+            style={{ color: 'var(--aq-text3)' }}
+          >
+            {dict.catalog.topicPage.mediaGalleryTitle}
+          </h2>
+          <SectionEmpty title={dict.catalog.redesign.emptyMedia} />
+        </section>
+      ) : (
+        <MediaList
+          media={topic.media}
+          onVisitTopic={() => client.topics.visit(id)}
+        />
+      )}
 
       {/* Subtopics */}
       <div>

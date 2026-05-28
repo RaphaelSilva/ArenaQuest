@@ -1,6 +1,6 @@
 # Task 10 — `MediaList` — inline-expandable video, audio, and PDF stages (Phase 3)
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 **Milestone:** [11 — Catalog redesign](./milestone.md)
 **RFC:** [0004 — Catalog page redesign, Phase 3](../../RFCs/0004-catalog-redesign.md)
 
@@ -46,16 +46,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `MediaList` mounts on the participant catalog detail page; admin surfaces continue to render `MediaGallery`.
-- [ ] Each row is collapsible; activating it reveals the appropriate inline stage (video / audio / PDF).
-- [ ] Video stage maintains 16∶9 aspect ratio with native controls. Audio stage shows play + progress + elapsed/total time. PDF stage shows a preview block and a column with Download (primary) and Open (ghost) actions; stacks to one column below `md`.
-- [ ] `VideoStage`, `AudioStage`, and `PdfStage` are loaded via `next/dynamic`; the catalog bundle does not include their code paths until first interaction.
-- [ ] Any interaction (expand, play, scrub) calls the existing progress endpoint(s). The exact call shape is whatever the current topic detail page already uses; no new endpoint is added.
-- [ ] When the topic has no media, `SectionEmpty` renders with the admin-motivating copy from the dictionary. When the media payload fails to resolve, `SectionError` renders in place of the section.
-- [ ] No hardcoded user-facing string; `check-i18n-coverage.js` passes.
-- [ ] No new external runtime dependency beyond what is already in the workspace.
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `MediaList` mounts on the participant catalog detail page; admin surfaces continue to render `MediaGallery`.
+- [x] Each row is collapsible; activating it reveals the appropriate inline stage (video / audio / PDF).
+- [x] Video stage maintains 16∶9 aspect ratio with native controls. Audio stage shows play + progress + elapsed/total time. PDF stage shows a preview block and a column with Download (primary) and Open (ghost) actions; stacks to one column below `md`.
+- [x] `VideoStage`, `AudioStage`, and `PdfStage` are loaded via `next/dynamic`; the catalog bundle does not include their code paths until first interaction.
+- [x] Any interaction (expand, play, scrub) calls the existing progress endpoint(s). The exact call shape is whatever the current topic detail page already uses; no new endpoint is added.
+- [x] When the topic has no media, `SectionEmpty` renders with the admin-motivating copy from the dictionary. When the media payload fails to resolve, `SectionError` renders in place of the section.
+- [x] No hardcoded user-facing string; `check-i18n-coverage.js` passes.
+- [x] No new external runtime dependency beyond what is already in the workspace.
+- [x] `make lint`, `make test-web`, and `make test-api` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
