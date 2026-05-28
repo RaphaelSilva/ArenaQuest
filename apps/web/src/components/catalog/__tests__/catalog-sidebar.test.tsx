@@ -130,17 +130,7 @@ describe('CatalogSidebar', () => {
     expect(screen.getByDisplayValue('Força')).toBeInTheDocument();
   });
 
-  it('shows role pill when isInstructor is true', () => {
-    renderSidebar({ isInstructor: true });
-    expect(screen.getByText(dictPt.catalog.sidebar.participantRole)).toBeInTheDocument();
-    expect(screen.getByText(dictPt.catalog.sidebar.instructorRole)).toBeInTheDocument();
-  });
 
-  it('hides role pill for participants', () => {
-    renderSidebar({ isInstructor: false });
-    expect(screen.queryByText(dictPt.catalog.sidebar.participantRole)).not.toBeInTheDocument();
-    expect(screen.queryByText(dictPt.catalog.sidebar.instructorRole)).not.toBeInTheDocument();
-  });
 
   it('shows global progress', () => {
     renderSidebar({ globalProgress: 75 });

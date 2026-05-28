@@ -10,7 +10,6 @@ type Props = {
   subtopic: TopicNode;
   index: number;
   status: TopicProgressStatus;
-  showInstructorUI: boolean;
 };
 
 const PCT: Record<TopicProgressStatus, number> = {
@@ -37,23 +36,7 @@ const STATUS_STRIPE: Record<TopicProgressStatus, string> = {
   not_started: 'transparent',
 };
 
-function EditIcon() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-      <path d="M8 1.5l1.5 1.5L3.5 9H2V7.5L8 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-      <path d="M1.5 3h8M4.5 3V2h2v1M2.5 3l.5 6.5h5L9 3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-export function SubtopicCard({ subtopic, index, status, showInstructorUI }: Props) {
+export function SubtopicCard({ subtopic, index, status }: Props) {
   const dict = useDict();
   const pct = PCT[status];
   const stripe = STATUS_STRIPE[status];
@@ -124,26 +107,7 @@ export function SubtopicCard({ subtopic, index, status, showInstructorUI }: Prop
 
       {/* Right side */}
       <div className="flex flex-shrink-0 flex-col items-end gap-2" style={{ minWidth: 100 }}>
-        {showInstructorUI && (
-          <div className="flex gap-1.5" onClick={(e) => e.preventDefault()}>
-            <button
-              type="button"
-              title={dict.common.edit}
-              className="flex h-7 w-7 items-center justify-center rounded-[7px] transition-colors"
-              style={{ border: '1px solid var(--aq-border2)', background: 'var(--aq-bg3)', color: 'var(--aq-text3)' }}
-            >
-              <EditIcon />
-            </button>
-            <button
-              type="button"
-              title={dict.common.delete}
-              className="flex h-7 w-7 items-center justify-center rounded-[7px] transition-colors"
-              style={{ border: '1px solid var(--aq-border2)', background: 'var(--aq-bg3)', color: 'var(--aq-text3)' }}
-            >
-              <TrashIcon />
-            </button>
-          </div>
-        )}
+
         <div className="w-full">
           <p className="mb-1 text-right text-[11px]" style={{ color: 'var(--aq-text3)' }}>{pct}%</p>
           <div className="h-[5px] overflow-hidden rounded-full" style={{ background: 'var(--aq-bg4)' }}>

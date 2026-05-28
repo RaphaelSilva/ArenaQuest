@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import type { TopicNode } from '@web/lib/topics-api';
@@ -76,7 +76,7 @@ type Props = {
   isInstructor: boolean;
 };
 
-export function CatalogSidebar({ topics, progressMap, globalProgress, isInstructor }: Props) {
+export function CatalogSidebar({ topics, progressMap, globalProgress }: Props) {
   const dict = useDict();
   const router = useRouter();
   const pathname = usePathname();
@@ -91,18 +91,7 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
   const [searchValue, setSearchValue] = useState(qParam);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [previewRole, setPreviewRole] = useState<'participant' | 'instructor'>(() => {
-    if (typeof window === 'undefined') return 'participant';
-    return (localStorage.getItem('aq-catalog-role') as 'participant' | 'instructor') ?? 'participant';
-  });
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('aq-catalog-role', previewRole);
-    }
-  }, [previewRole]);
-
-  const showInstructorUI = isInstructor && previewRole === 'instructor';
 
   const updateUrl = useCallback(
     (newExpandedIds: Set<string>, newQ: string) => {
@@ -283,30 +272,7 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
           {dict.catalog.breadcrumb.catalogue}
         </p>
 
-        {/* Role pill — instructor only */}
-        {isInstructor && (
-          <div
-            className="mb-3 flex rounded-[20px] p-[3px]"
-            style={{ background: 'var(--aq-bg3)', border: '1px solid var(--aq-border)' }}
-          >
-            {(['participant', 'instructor'] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setPreviewRole(r)}
-                className="flex-1 rounded-[16px] px-3 py-[5px] text-[12px] font-medium capitalize transition-all"
-                style={{
-                  background: previewRole === r ? 'var(--aq-accent)' : 'transparent',
-                  color: previewRole === r ? '#0B0E17' : 'var(--aq-text2)',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                {r === 'participant' ? dict.catalog.sidebar.participantRole : dict.catalog.sidebar.instructorRole}
-              </button>
-            ))}
-          </div>
-        )}
+
 
         {/* Global progress */}
         <div>
@@ -365,22 +331,7 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
         )}
       </nav>
 
-      {/* Instructor: add topic shortcut */}
-      {showInstructorUI && (
-        <div className="p-4" style={{ borderTop: '1px solid var(--aq-border)' }}>
-          <Link
-            href="/admin/topics"
-            className="flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-[12px] transition-all hover:border-[var(--aq-accent)] hover:text-[var(--aq-accent)]"
-            style={{
-              border: '1px dashed var(--aq-border2)',
-              color: 'var(--aq-text3)',
-            }}
-          >
-            <span>+</span>
-            <span>{dict.catalog.sidebar.manageTopics}</span>
-          </Link>
-        </div>
-      )}
+
     </div>
   );
 }

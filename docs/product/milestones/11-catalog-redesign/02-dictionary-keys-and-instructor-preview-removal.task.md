@@ -1,6 +1,6 @@
 # Task 02 — Dictionary keys for catalog redesign and instructor-preview removal (Phase 1)
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 **Milestone:** [11 — Catalog redesign](./milestone.md)
 **RFC:** [0004 — Catalog page redesign, Phase 1](../../RFCs/0004-catalog-redesign.md)
 
@@ -50,12 +50,12 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Every key listed under "Scope" is present in both `dict-en.ts` and `dict-pt.ts` with the same shape; the shared `Dictionary` type still satisfies both.
-- [ ] `check-i18n-coverage.js` passes; `make lint` and `make test-web` pass green.
-- [ ] The participant catalog (`/catalog/[id]`) no longer renders the "Adicionar subtópico" CTA, does not read or write `aq-catalog-role` in `localStorage`, and contains no `previewRole` / `showInstructorUI` branches.
-- [ ] `grep -RE "aq-catalog-role|previewRole|showInstructorUI" apps/web/src/app/(protected)/catalog apps/web/src/components/catalog` returns zero matches.
-- [ ] Admin surfaces (`/admin/topics`) continue to render and function unchanged. If `SubtopicCard` was shared, the admin import still type-checks and renders without regression.
-- [ ] No diff outside the scope guardrail.
+- [x] Every key listed under "Scope" is present in both `dict-en.ts` and `dict-pt.ts` with the same shape; the shared `Dictionary` type still satisfies both.
+- [x] `check-i18n-coverage.js` passes; `make lint` and `make test-web` pass green.
+- [x] The participant catalog (`/catalog/[id]`) no longer renders the "Adicionar subtópico" CTA, does not read or write `aq-catalog-role` in `localStorage`, and contains no `previewRole` / `showInstructorUI` branches.
+- [x] `grep -RE "aq-catalog-role|previewRole|showInstructorUI" apps/web/src/app/(protected)/catalog apps/web/src/components/catalog` returns zero matches.
+- [x] Admin surfaces (`/admin/topics`) continue to render and function unchanged. If `SubtopicCard` was shared, the admin import still type-checks and renders without regression.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

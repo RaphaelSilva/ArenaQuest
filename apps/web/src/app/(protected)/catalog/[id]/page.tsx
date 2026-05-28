@@ -3,7 +3,6 @@
 export const runtime = 'edge';
 
 import { use, useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useAuth } from '@web/hooks/use-auth';
 import { useApiClient } from '@web/context/auth-context';
 import type { TopicProgressStatus, TopicWithMedia } from '@web/lib/topics-api';
@@ -25,7 +24,7 @@ type BadgeItem = { id: string; emoji: string; name: string; earned: boolean };
 export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   const dict = useDict();
   const { id } = use(params);
-  const { user, accessToken } = useAuth();
+  const { accessToken } = useAuth();
   const client = useApiClient();
 
   const [topic, setTopic] = useState<TopicWithMedia | null>(null);
@@ -34,14 +33,9 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const isInstructor = user?.roles.some((r) => r.name === 'instructor' || r.name === 'admin') ?? false;
 
-  // Read instructor preview mode from localStorage
-  const [previewRole] = useState<'participant' | 'instructor'>(() => {
-    if (typeof window === 'undefined') return 'participant';
-    return (localStorage.getItem('aq-catalog-role') as 'participant' | 'instructor') ?? 'participant';
-  });
-  const showInstructorUI = isInstructor && previewRole === 'instructor';
+
+
 
   useEffect(() => {
     let active = true;
@@ -151,19 +145,6 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
           >
             {dict.catalog.topicPage.subtopics}
           </p>
-          {showInstructorUI && (
-            <Link
-              href="/admin/topics"
-              className="flex items-center gap-1.5 rounded-[8px] px-3.5 py-1.5 text-[12px] font-medium transition-all hover:opacity-80"
-              style={{
-                border: '1px solid var(--aq-accent)',
-                background: 'var(--aq-accent-glow)',
-                color: 'var(--aq-accent)',
-              }}
-            >
-              {dict.catalog.topicPage.addSubtopic}
-            </Link>
-          )}
         </div>
 
         {topic.children.length === 0 ? (
@@ -183,7 +164,6 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
                 subtopic={child}
                 index={i}
                 status={progressMap.get(child.id) ?? 'not_started'}
-                showInstructorUI={showInstructorUI}
               />
             ))}
           </div>
