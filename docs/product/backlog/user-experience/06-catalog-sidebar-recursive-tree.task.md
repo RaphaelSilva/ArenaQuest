@@ -1,7 +1,7 @@
 # Task 06: Catalog Sidebar — Recursive Topic Tree (N-Level Depth)
 
 ## Metadata
-- **Status:** 📋 Backlog
+- **Status:** ✅ Done
 - **Complexity:** Medium
 - **Milestone:** Catalog UX Polish
 - **Dependencies:** None (builds on existing `CatalogSidebar.tsx` and `topics-api`)
@@ -116,20 +116,20 @@ This task aligns the production sidebar with the wireframe so that deep topic st
 
 ## Acceptance Criteria
 
-- [ ] Sidebar renders the full topic tree to any depth present in the data.
-- [ ] Each row at every depth uses the same visual anatomy (chevron / icon / label / count or status).
-- [ ] Indentation visibly grows with depth and matches the wireframe spacing.
-- [ ] Navigating to a deep topic auto-expands every ancestor in the sidebar.
-- [ ] Chevron click toggles expand/collapse without triggering navigation.
-- [ ] Row click navigates to the topic page (existing behavior).
-- [ ] `?open=` query param round-trips correctly for nodes at any depth.
-- [ ] Search query matches anywhere in the subtree and expands ancestors of matches.
-- [ ] Leaf nodes show status indicator; intermediate nodes show child count.
-- [ ] Mobile drawer renders the recursive tree without horizontal overflow.
-- [ ] `make lint` passes.
-- [ ] `make test-web` passes; existing sidebar tests are updated to cover depth ≥ 3.
-- [ ] No console warnings (keys, `aria-expanded` on leaves, etc.).
-- [ ] No regressions in `__tests__/components/catalog` suites.
+- [x] Sidebar renders the full topic tree to any depth present in the data.
+- [x] Each row at every depth uses the same visual anatomy (chevron / icon / label / count or status).
+- [x] Indentation visibly grows with depth and matches the wireframe spacing.
+- [x] Navigating to a deep topic auto-expands every ancestor in the sidebar.
+- [x] Chevron click toggles expand/collapse without triggering navigation.
+- [x] Row click navigates to the topic page (existing behavior).
+- [x] `?open=` query param round-trips correctly for nodes at any depth.
+- [x] Search query matches anywhere in the subtree and expands ancestors of matches.
+- [x] Leaf nodes show status indicator; intermediate nodes show child count.
+- [x] Mobile drawer renders the recursive tree without horizontal overflow.
+- [x] `make lint` passes.
+- [x] `make test-web` passes; existing sidebar tests are updated to cover depth ≥ 3.
+- [x] No console warnings (keys, `aria-expanded` on leaves, etc.).
+- [x] No regressions in `__tests__/components/catalog` suites.
 
 ---
 
