@@ -77,7 +77,7 @@ export function SubtopicSidebar({ topicId, topicTitle, subtopicId, siblings, pro
           return (
             <Link
               key={s.id}
-              href={`/catalog/${topicId}/${s.id}`}
+              href={`/catalog/${s.id}`}
               className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--aq-bg3)]"
               style={{
                 background: isCurrent ? 'var(--aq-accent-glow)' : undefined,
@@ -135,7 +135,7 @@ export function SubtopicSidebar({ topicId, topicTitle, subtopicId, siblings, pro
       >
         {prev ? (
           <Link
-            href={`/catalog/${topicId}/${prev.id}`}
+            href={`/catalog/${prev.id}`}
             className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-2 text-[12px] font-medium transition-colors hover:bg-[var(--aq-bg3)]"
             style={{ border: '1px solid var(--aq-border2)', color: 'var(--aq-text2)' }}
           >
@@ -146,7 +146,7 @@ export function SubtopicSidebar({ topicId, topicTitle, subtopicId, siblings, pro
         )}
         {next ? (
           <Link
-            href={`/catalog/${topicId}/${next.id}`}
+            href={`/catalog/${next.id}`}
             className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-2 text-[12px] font-medium transition-colors hover:bg-[var(--aq-bg3)]"
             style={{ border: '1px solid var(--aq-border2)', color: 'var(--aq-text2)' }}
           >

@@ -53,7 +53,7 @@ function TrashIcon() {
   );
 }
 
-export function SubtopicCard({ topicId, subtopic, index, status, showInstructorUI }: Props) {
+export function SubtopicCard({ subtopic, index, status, showInstructorUI }: Props) {
   const dict = useDict();
   const pct = PCT[status];
   const stripe = STATUS_STRIPE[status];
@@ -68,7 +68,7 @@ export function SubtopicCard({ topicId, subtopic, index, status, showInstructorU
 
   return (
     <Link
-      href={`/catalog/${topicId}/${subtopic.id}`}
+      href={`/catalog/${subtopic.id}`}
       className="relative flex items-center gap-5 overflow-hidden rounded-[14px] px-6 py-5 transition-transform duration-200 hover:translate-x-[3px]"
       style={{
         background: 'var(--aq-bg2)',

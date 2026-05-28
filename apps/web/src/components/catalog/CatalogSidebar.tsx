@@ -240,11 +240,11 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
             <div>
               {visibleChildren.map((child) => {
                 const childStatus = progressMap.get(child.id) ?? 'not_started';
-                const isChildActive = pathname === `/catalog/${node.id}/${child.id}`;
+                const isChildActive = pathname === `/catalog/${child.id}`;
                 return (
                   <Link
                     key={child.id}
-                    href={`/catalog/${node.id}/${child.id}`}
+                    href={`/catalog/${child.id}`}
                     className="flex items-center gap-2 py-[7px] text-xs transition-colors hover:bg-[var(--aq-bg3)]"
                     style={{
                       paddingLeft: 54,
