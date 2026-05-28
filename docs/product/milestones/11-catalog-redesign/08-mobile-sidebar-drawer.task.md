@@ -1,6 +1,6 @@
 # Task 08 — Mobile sidebar drawer with hamburger trigger (Phase 2)
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 **Milestone:** [11 — Catalog redesign](./milestone.md)
 **RFC:** [0004 — Catalog page redesign, Phase 2](../../RFCs/0004-catalog-redesign.md)
 
@@ -41,14 +41,14 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Below `lg`, a hamburger control renders near `MobileSearchBar`; activating it slides in a drawer that hosts the `CatalogSidebar` content.
-- [ ] Tapping the scrim, activating the dismiss affordance, or pressing Escape closes the drawer.
-- [ ] Body scroll is locked while the drawer is open; focus returns to the hamburger on close.
-- [ ] At `lg+`, the drawer does not mount; the existing sidebar continues to be visible and the hamburger control is hidden.
-- [ ] Open and close affordance labels read from the dictionary; `check-i18n-coverage.js` passes.
-- [ ] If a new primitive (Radix Dialog / Headless UI Dialog) was introduced, the PR description states why and quantifies the bundle impact.
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] Below `lg`, a hamburger control renders near `MobileSearchBar`; activating it slides in a drawer that hosts the `CatalogSidebar` content.
+- [x] Tapping the scrim, activating the dismiss affordance, or pressing Escape closes the drawer.
+- [x] Body scroll is locked while the drawer is open; focus returns to the hamburger on close.
+- [x] At `lg+`, the drawer does not mount; the existing sidebar continues to be visible and the hamburger control is hidden.
+- [x] Open and close affordance labels read from the dictionary; `check-i18n-coverage.js` passes.
+- [x] If a new primitive (Radix Dialog / Headless UI Dialog) was introduced, the PR description states why and quantifies the bundle impact.
+- [x] `make lint`, `make test-web`, and `make test-api` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

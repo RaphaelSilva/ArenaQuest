@@ -6,6 +6,7 @@ import { useApiClient } from '@web/context/auth-context';
 import type { TopicNode, TopicProgressEntry, TopicProgressStatus } from '@web/lib/topics-api';
 import { CatalogSidebar } from '@web/components/catalog/CatalogSidebar';
 import { MobileSearchBar } from '@web/components/catalog/MobileSearchBar';
+import { CatalogMobileDrawer } from '@web/components/catalog/CatalogMobileDrawer';
 
 function SidebarSkeleton() {
   return (
@@ -27,6 +28,7 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
   const [topics, setTopics] = useState<TopicNode[]>([]);
   const [progressMap, setProgressMap] = useState<Map<string, TopicProgressStatus>>(new Map());
   const [globalProgress, setGlobalProgress] = useState(0);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const isInstructor =
     user?.roles.some((r) => r.name === 'instructor' || r.name === 'admin') ?? false;
@@ -58,15 +60,15 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
       className="flex flex-1 flex-col overflow-hidden"
       style={{ background: 'var(--aq-bg)' }}
     >
-      {/* Mobile search bar — visible only on md and below */}
-      <div className="hidden md:block">
+      {/* Mobile search bar / topbar — visible below lg */}
+      <div className="lg:hidden">
         <Suspense>
-          <MobileSearchBar />
+          <MobileSearchBar onOpenDrawer={() => setIsDrawerOpen(true)} />
         </Suspense>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar — hidden on md and below, visible on lg and up */}
+        {/* Sidebar — hidden below lg, visible starting at lg */}
         <aside
           className="hidden flex-shrink-0 flex-col overflow-hidden lg:flex"
           style={{
@@ -93,6 +95,18 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
           {children}
         </main>
       </div>
+
+      {/* Mobile drawer — slides in below lg */}
+      <CatalogMobileDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)}>
+        <Suspense fallback={<SidebarSkeleton />}>
+          <CatalogSidebar
+            topics={topics}
+            progressMap={progressMap}
+            globalProgress={globalProgress}
+            isInstructor={isInstructor}
+          />
+        </Suspense>
+      </CatalogMobileDrawer>
     </div>
   );
 }
