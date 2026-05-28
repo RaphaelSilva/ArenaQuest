@@ -14,6 +14,12 @@ export type TopicNode = {
   tags: { id: string; name: string; slug: string }[];
   prerequisiteIds: string[];
   media?: Media[];
+  mediaCount?: {
+    video: number;
+    audio: number;
+    pdf: number;
+    total: number;
+  };
 };
 
 export type CreateTopicInput = {

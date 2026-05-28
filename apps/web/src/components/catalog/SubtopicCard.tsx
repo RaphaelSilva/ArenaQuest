@@ -96,6 +96,34 @@ export function SubtopicCard({ subtopic, index, status, hasChildren }: Props) {
           >
             {statusLabels[status]}
           </span>
+          {subtopic.mediaCount && subtopic.mediaCount.total > 0 && (
+            <>
+              {subtopic.mediaCount.video > 0 && (
+                <span
+                  className="rounded-[6px] px-2 py-0.5 text-[11px] font-semibold flex items-center gap-1"
+                  style={{ background: 'var(--aq-bg4)', color: 'var(--aq-text2)', border: '1px solid var(--aq-border)' }}
+                >
+                  🎥 {dict.catalog.redesign.videoLabel(subtopic.mediaCount.video)}
+                </span>
+              )}
+              {subtopic.mediaCount.audio > 0 && (
+                <span
+                  className="rounded-[6px] px-2 py-0.5 text-[11px] font-semibold flex items-center gap-1"
+                  style={{ background: 'var(--aq-bg4)', color: 'var(--aq-text2)', border: '1px solid var(--aq-border)' }}
+                >
+                  🎧 {dict.catalog.redesign.audioLabel(subtopic.mediaCount.audio)}
+                </span>
+              )}
+              {subtopic.mediaCount.pdf > 0 && (
+                <span
+                  className="rounded-[6px] px-2 py-0.5 text-[11px] font-semibold flex items-center gap-1"
+                  style={{ background: 'var(--aq-bg4)', color: 'var(--aq-text2)', border: '1px solid var(--aq-border)' }}
+                >
+                  📄 {dict.catalog.redesign.pdfLabel(subtopic.mediaCount.pdf)}
+                </span>
+              )}
+            </>
+          )}
         </div>
       </div>
 

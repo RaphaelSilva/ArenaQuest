@@ -80,7 +80,7 @@ Out of scope (explicit):
 | 08 | [Mobile sidebar drawer with hamburger trigger](./08-mobile-sidebar-drawer.task.md) | 2 | ✅ Done |
 | 09 | [Backend — additive `mediaCount` projection on `TopicNode`](./09-backend-mediacount-projection.task.md) | 3 | ✅ Done |
 | 10 | [`MediaList` — inline-expandable video, audio, and PDF stages](./10-medialist-inline-players.task.md) | 3 | ✅ Done |
-| 11 | [MediaMix pills on `SubtopicCard` and `Discussion` thread component](./11-mediamix-pills-and-discussion.task.md) | 3 | ⏳ Planned |
+| 11 | [MediaMix pills on `SubtopicCard` and `Discussion` thread component](./11-mediamix-pills-and-discussion.task.md) | 3 | ✅ Done |
 | 12 | [Visual QA, closeout, and RFC 0004 status update](./12-visual-qa-and-closeout.task.md) | 3 | ⏳ Planned |
 
 Dependency graph:

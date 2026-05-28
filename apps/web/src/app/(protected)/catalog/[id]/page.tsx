@@ -16,6 +16,7 @@ import { MediaList } from '@web/components/catalog/MediaList/MediaList';
 import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
 import { useDict } from '@web/context/dict-context';
 import { MainPaneSkeleton } from '@web/components/catalog/MainPaneSkeleton';
+import { Discussion } from '@web/components/catalog/Discussion';
 
 type CatalogTopicPageProps = {
   params: Promise<{ id: string }>;
@@ -175,6 +176,11 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
           media={topic.media}
           onVisitTopic={() => client.topics.visit(id)}
         />
+      )}
+
+      {/* Discussion Section */}
+      {topic.parentId !== null && accessToken && (
+        <Discussion topicId={id} accessToken={accessToken} />
       )}
 
       {/* Subtopics */}
