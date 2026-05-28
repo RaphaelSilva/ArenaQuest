@@ -16,7 +16,7 @@ description: AI persona specialized in creating rich, dynamic, and responsive us
 |---|---|
 | **Any UI** (colors, spacing, typography, radius, shadow, motion, status pills) | `docs/architecture/web/design-system-spec.md` — mandatory; never invent values that exist as tokens |
 | **Any user-facing string** (JSX text, `alt`, `aria-label`, `title`, `placeholder`, toast, validation, empty state) | `docs/architecture/web/i18n-spec.md` — mandatory; never hardcode copy, never call `toLocaleString()` ad-hoc |
-| Visual reference for an existing page | `docs/architecture/web/wire/*.html` — `Login.html`, `Dashboard.html`, `Content.html`, `TopicDetail.html` |
+| Visual reference for an existing page | `docs/architecture/web/wireframe` |
 | Backend integration (fetch, request shape, error handling) | `apps/web/src/lib/*-api.ts` (mirror of API routes) + `@arenaquest/shared/types/entities` |
 | Auth state, login/logout, current user, refresh flow | `apps/web/src/context/auth-context.tsx` + `apps/web/src/hooks/use-auth.ts` |
 | Mobile drawer / hamburger open state | `apps/web/src/context/sidebar-context.tsx` (`useSidebar`) |
@@ -97,6 +97,7 @@ make test-web                 # vitest + React Testing Library
 make build-web                # production build (PT by default)
 make lint-web                 # ESLint (apps/web only)
 make deploy-web               # Cloudflare Pages production
+make deploy-web-en            # Cloudflare Pages production, English build
 make deploy-web-staging       # Cloudflare Pages staging
 ```
 

@@ -45,6 +45,9 @@ dev-web: ## Start only apps/web (Next.js dev server)
 dev-api: ## Start only apps/api (Wrangler dev server)
 	pnpm --filter api dev
 
+dev-web-en:
+	NEXT_PUBLIC_LANGUAGE=en $(MAKE) dev-web
+
 # ==============================================================================
 # 🏗️  BUILD
 # ==============================================================================

@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ArenaQuest — Catálogo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body { font-family: 'DM Sans', sans-serif; overflow: hidden; }
+
+.theme-dark {
+  --bg: #0B0E17; --bg2: #131825; --bg3: #1C2235; --bg4: #232B40;
+  --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+  --text: #E8EAF0; --text2: #8B92A8; --text3: #5C6480;
+  --accent: oklch(0.74 0.19 52); --accent2: oklch(0.65 0.16 240); --accent3: oklch(0.68 0.17 150);
+  --accent-glow: oklch(0.74 0.19 52 / 0.18);
+  --accent-strong: oklch(0.74 0.19 52 / 0.32);
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --logo-fg: #0B0E17;
+}
+.theme-light {
+  --bg: #F2EFE9; --bg2: #FBFAF6; --bg3: #F4F1EA; --bg4: #E8E4DA;
+  --border: rgba(0,0,0,0.08); --border2: rgba(0,0,0,0.14);
+  --text: #1A1C26; --text2: #5C6070; --text3: #9298A8;
+  --accent: oklch(0.60 0.19 52); --accent2: oklch(0.45 0.16 240); --accent3: oklch(0.48 0.17 150);
+  --accent-glow: oklch(0.60 0.19 52 / 0.12);
+  --accent-strong: oklch(0.60 0.19 52 / 0.22);
+  --shadow: 0 2px 16px rgba(0,0,0,0.08);
+  --logo-fg: #FBFAF6;
+}
+
+.app { display: flex; flex-direction: column; height: 100%; background: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; }
+
+/* ---------- TOPBAR ---------- */
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 56px; min-height: 56px; background: var(--bg2); border-bottom: 1px solid var(--border); z-index: 10; }
+.topbar-left { display: flex; align-items: center; gap: 28px; }
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.logo-mark { width: 28px; height: 28px; border-radius: 6px; background: var(--accent); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; color: var(--logo-fg); }
+.logo-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: -0.3px; color: var(--text); }
+.logo-name span { color: var(--accent); }
+.topnav { display: flex; gap: 4px; }
+.topnav a { padding: 6px 12px; font-size: 13px; color: var(--text2); text-decoration: none; border-radius: 7px; transition: all 0.15s; font-weight: 500; }
+.topnav a:hover { color: var(--text); background: var(--bg3); }
+.topnav a.active { color: var(--text); font-weight: 600; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.theme-toggle { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border2); background: var(--bg3); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text2); transition: all 0.2s; }
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: white; cursor: pointer; }
+
+/* ---------- LAYOUT ---------- */
+.body-layout { display: flex; flex: 1; overflow: hidden; }
+
+/* ---------- LEFT SIDEBAR (TREE) ---------- */
+.left { width: 300px; min-width: 300px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.left-head { padding: 20px 18px 14px; border-bottom: 1px solid var(--border); }
+.left-eyebrow { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1.1px; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+.search { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: 9px; transition: border-color 0.15s; }
+.search:focus-within { border-color: var(--accent); }
+.search input { flex: 1; background: transparent; border: none; outline: none; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; }
+.search input::placeholder { color: var(--text3); }
+.search svg { color: var(--text3); }
+
+.tree { flex: 1; overflow-y: auto; padding: 10px 0 20px; }
+.tree::-webkit-scrollbar { width: 4px; }
+.tree::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 4px; }
+
+.tn-row { display: flex; align-items: center; gap: 8px; padding: 7px 12px; cursor: pointer; transition: background 0.15s; position: relative; user-select: none; min-height: 32px; }
+.tn-row:hover { background: var(--bg3); }
+.tn-row.is-current { background: var(--accent-glow); }
+.tn-row.is-current::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; background: var(--accent); border-radius: 0 2px 2px 0; }
+.tn-row.is-current .tn-label { color: var(--accent); font-weight: 600; }
+.tn-chev { display: flex; width: 14px; height: 14px; padding: 0; background: none; border: none; cursor: pointer; color: var(--text3); align-items: center; justify-content: center; flex-shrink: 0; }
+.tn-icon { color: var(--text3); display: flex; flex-shrink: 0; }
+.tn-row.is-current .tn-icon { color: var(--accent); }
+.tn-label { flex: 1; font-size: 13px; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tn-count { font-size: 10px; color: var(--text3); padding: 1px 6px; border-radius: 8px; background: var(--bg3); font-family: 'JetBrains Mono', monospace; flex-shrink: 0; }
+.tn-row.is-current .tn-count { background: var(--accent-strong); color: var(--accent); }
+
+/* ---------- MAIN ---------- */
+.main { flex: 1; overflow-y: auto; padding: 28px 40px 80px; max-width: 100%; }
+.main::-webkit-scrollbar { width: 6px; }
+.main::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 4px; }
+.main-inner { max-width: 1040px; margin: 0 auto; }
+
+/* ---------- BREADCRUMB ---------- */
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text3); margin-bottom: 24px; flex-wrap: wrap; }
+.breadcrumb a, .breadcrumb button { color: var(--text3); text-decoration: none; transition: color 0.15s; background: none; border: none; cursor: pointer; font-family: inherit; font-size: inherit; padding: 0; }
+.breadcrumb a:hover, .breadcrumb button:hover { color: var(--accent); }
+.bc-sep { color: var(--text3); opacity: 0.6; }
+.bc-current { color: var(--text2); font-weight: 500; }
+
+/* ---------- TOPIC HEADER ---------- */
+.t-header { display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: start; padding: 24px; border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(180deg, var(--bg2), var(--bg2) 60%, transparent); margin-bottom: 24px; }
+.t-icon { width: 56px; height: 56px; border-radius: 14px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: white; font-size: 20px; }
+.t-main { min-width: 0; }
+.t-eyebrow { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1.1px; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+.t-title { font-family: 'Space Grotesk', sans-serif; font-size: 32px; font-weight: 700; letter-spacing: -0.6px; line-height: 1.1; color: var(--text); margin-bottom: 10px; text-wrap: pretty; }
+.t-subtitle { font-size: 14px; color: var(--text2); line-height: 1.5; max-width: 60ch; text-wrap: pretty; }
+.t-stats { display: flex; gap: 24px; }
+.t-stat { text-align: right; }
+.t-stat-num { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: var(--text); }
+.t-stat-num.accent { color: var(--accent); }
+.t-stat-label { font-size: 10px; color: var(--text3); letter-spacing: 0.6px; text-transform: uppercase; margin-top: 2px; }
+
+/* ---------- LOOP NOTICE ---------- */
+.loop-notice { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: oklch(0.72 0.17 60 / 0.12); border: 1px solid oklch(0.72 0.17 60 / 0.3); border-radius: 10px; color: oklch(0.78 0.17 60); font-size: 13px; margin-bottom: 20px; }
+
+/* ---------- SECTION ---------- */
+.section { margin-bottom: 36px; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; gap: 12px; }
+.section-label { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text3); }
+.section-label .count { color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+.section-aside { font-size: 12px; color: var(--text3); }
+
+/* ---------- DESCRIPTION (Markdown) ---------- */
+.desc-card { padding: 22px 24px; border-radius: 14px; background: var(--bg2); border: 1px solid var(--border); }
+.md-h { font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: var(--text); letter-spacing: -0.3px; line-height: 1.25; margin: 18px 0 10px; }
+.md-h:first-child { margin-top: 0; }
+.md-h1 { font-size: 22px; }
+.md-h2 { font-size: 18px; }
+.md-h3 { font-size: 15px; }
+.md-p { font-size: 14px; color: var(--text2); line-height: 1.65; margin: 0 0 12px; text-wrap: pretty; }
+.md-p:last-child { margin-bottom: 0; }
+.md-list { margin: 0 0 12px; padding-left: 18px; }
+.md-list li { font-size: 14px; color: var(--text2); line-height: 1.65; margin-bottom: 6px; }
+.md-list li::marker { color: var(--accent); }
+.md-quote { padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--accent-glow); color: var(--text); font-style: italic; font-size: 14px; border-radius: 0 8px 8px 0; line-height: 1.6; margin: 14px 0; }
+.md-code { font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 1px 6px; background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; color: var(--accent); }
+.md-h strong, .md-p strong { color: var(--text); }
+.md-h em, .md-p em { color: var(--accent3); font-style: italic; }
+
+/* ---------- SUBTOPIC GRID ---------- */
+.sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 1100px) { .sub-grid { grid-template-columns: 1fr; } }
+.sub-card { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 16px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg2); cursor: pointer; transition: all 0.2s; text-align: left; font-family: inherit; color: inherit; }
+.sub-card:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: var(--shadow); }
+.sub-card-num { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: var(--text3); width: 28px; }
+.sub-card:hover .sub-card-num { color: var(--accent); }
+.sub-card-body { min-width: 0; }
+.sub-card-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; letter-spacing: -0.2px; }
+.sub-card-desc { font-size: 12px; color: var(--text3); line-height: 1.4; margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sub-card-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+.meta-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text3); padding: 3px 8px; border-radius: 6px; background: var(--bg3); border: 1px solid var(--border); }
+.meta-pill svg { width: 11px; height: 11px; }
+.meta-pill.v { color: oklch(0.74 0.19 52); }
+.meta-pill.a { color: oklch(0.68 0.17 150); }
+.meta-pill.p { color: oklch(0.65 0.16 240); }
+.meta-pill.deep { color: var(--accent); border-color: var(--accent-strong); background: var(--accent-glow); }
+.sub-card-arrow { width: 28px; height: 28px; border-radius: 8px; background: var(--bg3); display: flex; align-items: center; justify-content: center; color: var(--text3); transition: all 0.2s; flex-shrink: 0; }
+.sub-card:hover .sub-card-arrow { background: var(--accent); color: var(--logo-fg); }
+
+.empty-state { padding: 28px; border: 1px dashed var(--border2); border-radius: 12px; background: var(--bg2); text-align: center; color: var(--text3); font-size: 13px; }
+
+/* ---------- MEDIA LIST ---------- */
+.media-list { display: flex; flex-direction: column; gap: 8px; }
+.media-card { border: 1px solid var(--border); border-radius: 12px; background: var(--bg2); overflow: hidden; transition: border-color 0.15s; }
+.media-card.is-open { border-color: var(--accent-strong); }
+.media-head { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 12px 16px; cursor: pointer; transition: background 0.15s; }
+.media-head:hover { background: var(--bg3); }
+.media-kind { width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.media-info { min-width: 0; }
+.media-title { font-size: 13.5px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+.media-sub { font-size: 11px; color: var(--text3); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.media-kind-label { font-weight: 600; font-family: 'Space Grotesk', sans-serif; letter-spacing: 0.4px; text-transform: uppercase; font-size: 10px; }
+.media-dot { opacity: 0.5; }
+.media-action { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border2); background: var(--bg3); color: var(--text2); font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+.media-action:hover { border-color: var(--accent); color: var(--accent); }
+.media-card.is-open .media-action { background: var(--accent); color: var(--logo-fg); border-color: transparent; }
+
+.media-body { padding: 0 16px 16px; animation: fadeUp 0.25s ease forwards; }
+
+/* video stage */
+.video-stage { aspect-ratio: 16/9; background: linear-gradient(135deg, #0a1020 0%, #1a2540 50%, #0d1525 100%); border-radius: 10px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.video-stripes { position: absolute; inset: 0; background: repeating-linear-gradient(45deg, transparent, transparent 30px, rgba(255,255,255,0.018) 30px, rgba(255,255,255,0.018) 60px); }
+.video-watermark { position: absolute; top: 14px; left: 16px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(255,255,255,0.32); letter-spacing: 0.5px; }
+.video-play-big { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--logo-fg); box-shadow: 0 0 0 12px oklch(0.74 0.19 52 / 0.18); z-index: 1; transition: transform 0.2s; }
+.video-play-big:hover { transform: scale(1.07); }
+.video-play-big svg { width: 20px; height: 20px; margin-left: 3px; }
+.video-controls { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 18px 14px; background: linear-gradient(transparent, rgba(0,0,0,0.7)); }
+.video-scrub { height: 3px; background: rgba(255,255,255,0.18); border-radius: 3px; margin-bottom: 8px; overflow: hidden; }
+.video-scrub-fill { height: 100%; background: var(--accent); border-radius: 3px; }
+.video-controls-row { display: flex; justify-content: space-between; }
+
+/* audio */
+.audio-stage { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 10px; background: var(--bg3); border: 1px solid var(--border); }
+.audio-play { width: 42px; height: 42px; border-radius: 50%; background: var(--accent); border: none; cursor: pointer; color: var(--logo-fg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.15s; }
+.audio-play:hover { transform: scale(1.06); }
+.audio-wave { flex: 1; display: flex; align-items: center; gap: 2px; height: 44px; }
+.audio-wave .bar { flex: 1; min-width: 2px; border-radius: 1px; transition: background 0.15s; }
+.audio-time { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text2); }
+
+/* pdf */
+.pdf-stage { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
+@media (max-width: 720px) { .pdf-stage { grid-template-columns: 1fr; } }
+.pdf-paper { aspect-ratio: 8.5/11; background: linear-gradient(180deg, #1a223a, #131a2e); border-radius: 8px; position: relative; overflow: hidden; max-height: 220px; display: flex; align-items: center; justify-content: center; }
+.theme-light .pdf-paper { background: linear-gradient(180deg, #FFFFFF, #F4F1EA); border: 1px solid var(--border); }
+.pdf-paper-stripes { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent 0 22px, rgba(255,255,255,0.02) 22px 23px); }
+.theme-light .pdf-paper-stripes { background: repeating-linear-gradient(0deg, transparent 0 22px, rgba(0,0,0,0.04) 22px 23px); }
+.pdf-mono { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text3); letter-spacing: 0.5px; position: relative; }
+.pdf-actions { display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+.btn-primary { padding: 11px 18px; border-radius: 9px; background: var(--accent); border: none; color: var(--logo-fg); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; transition: opacity 0.15s; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-ghost { padding: 11px 18px; border-radius: 9px; background: transparent; border: 1px solid var(--border2); color: var(--text2); font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- COMMENTS ---------- */
+.comment-input-wrap { display: flex; gap: 12px; margin-bottom: 22px; align-items: flex-start; }
+.c-input-box { flex: 1; background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px; padding: 12px 16px; transition: border-color 0.15s; }
+.c-input-box:focus-within { border-color: var(--accent); }
+.c-input-box textarea { background: transparent; border: none; outline: none; font-family: inherit; font-size: 13px; color: var(--text); resize: none; width: 100%; line-height: 1.5; min-height: 40px; caret-color: var(--accent); }
+.c-input-box textarea::placeholder { color: var(--text3); }
+.c-input-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.c-submit { padding: 7px 16px; border-radius: 8px; border: none; background: var(--accent); color: var(--logo-fg); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+.comments-list { display: flex; flex-direction: column; gap: 18px; }
+.comment { display: flex; gap: 12px; }
+.c-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; color: white; flex-shrink: 0; }
+.c-avatar.small { width: 26px; height: 26px; font-size: 9px; }
+.c-body { flex: 1; min-width: 0; }
+.c-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+.c-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.c-time { font-size: 11px; color: var(--text3); }
+.c-badge { font-size: 10px; padding: 2px 7px; border-radius: 6px; background: var(--accent-glow); color: var(--accent); font-weight: 600; border: 1px solid var(--accent-strong); }
+.c-text { font-size: 13px; color: var(--text2); line-height: 1.6; text-wrap: pretty; }
+.c-actions { display: flex; gap: 14px; margin-top: 7px; }
+.c-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text3); cursor: pointer; background: none; border: none; font-family: inherit; padding: 0; transition: color 0.15s; }
+.c-btn:hover, .c-btn.liked { color: var(--accent); }
+.c-replies { margin-top: 10px; padding-left: 14px; border-left: 2px solid var(--border2); }
+
+.empty-comments { padding: 22px; border-radius: 12px; background: var(--bg2); border: 1px dashed var(--border2); color: var(--text3); font-size: 13px; text-align: center; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.anim { animation: fadeUp 0.32s ease forwards; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="catalog/catalog-data.js"></script>
+<script type="text/babel" src="catalog/markdown.js"></script>
+<script type="text/babel" src="catalog/catalog-components.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+const { I, pathFromHash, hashFromPath, resolvePath, countDeep, TreeNode, MediaItem, SubtopicCard, Comment } = window.AQApp;
+
+function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('aq_theme') || 'dark');
+  const [path, setPath] = useState(() => pathFromHash());
+  const [expandedMedia, setExpandedMedia] = useState(new Set());
+  const [commentText, setCommentText] = useState('');
+  const [searchQ, setSearchQ] = useState('');
+  const [extraComments, setExtraComments] = useState({});
+
+  // sync hash <-> path
+  useEffect(() => {
+    const onHash = () => setPath(pathFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+  useEffect(() => {
+    const target = hashFromPath(path);
+    if (window.location.hash !== target) window.location.hash = target;
+  }, [path]);
+  useEffect(() => { localStorage.setItem('aq_theme', theme); }, [theme]);
+  useEffect(() => { setExpandedMedia(new Set()); }, [path.join('/')]);
+
+  const { trail, current, looped, loopAt } = useMemo(
+    () => resolvePath(window.CATALOG_TREE, path),
+    [path]
+  );
+
+  const isRoot = trail.length === 1;
+  const deep = useMemo(() => countDeep(current), [current]);
+  const directMedia = current.media || [];
+  const children = current.children || [];
+
+  const navigate = (newPath) => {
+    setPath(newPath);
+    document.querySelector('.main')?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const goChild = (childId) => navigate([...path, childId]);
+  const goToDepth = (depth) => navigate(path.slice(0, depth));
+
+  const toggleMedia = (id) => {
+    setExpandedMedia(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const topicComments = [
+    ...(extraComments[current.id] || []),
+    ...(window.CATALOG_COMMENTS[current.id] || []),
+  ];
+
+  const submitComment = () => {
+    if (!commentText.trim()) return;
+    setExtraComments(prev => ({
+      ...prev,
+      [current.id]: [
+        { id: Date.now(), name: 'João Silva', initials: 'JS', time: 'agora', text: commentText.trim(), likes: 0, replies: [] },
+        ...(prev[current.id] || []),
+      ],
+    }));
+    setCommentText('');
+  };
+
+  // initials for the icon
+  const titleInit = (current.title || '').split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'CT';
+
+  return (
+    <div className={`app theme-${theme}`}>
+      {/* TOPBAR */}
+      <div className="topbar">
+        <div className="topbar-left">
+          <a className="logo" href="ArenaQuest Dashboard.html">
+            <div className="logo-mark">AQ</div>
+            <div className="logo-name">Arena<span>Quest</span></div>
+          </a>
+          <nav className="topnav">
+            <a href="ArenaQuest Dashboard.html">Dashboard</a>
+            <a href="#" className="active">Catálogo</a>
+            <a href="#">Missões</a>
+            <a href="#">Configurações</a>
+          </nav>
+        </div>
+        <div className="topbar-right">
+          <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} aria-label="theme">
+            {theme === 'dark' ? <I.Sun /> : <I.Moon />}
+          </button>
+          <div className="avatar">JS</div>
+        </div>
+      </div>
+
+      <div className="body-layout">
+        {/* LEFT TREE */}
+        <aside className="left">
+          <div className="left-head">
+            <div className="left-eyebrow">Catálogo</div>
+            <div className="search">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="3.5" stroke="currentColor" strokeWidth="1.3"/><path d="M8 8L11 11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+              <input
+                placeholder="Pesquisar tópicos…"
+                value={searchQ}
+                onChange={e => setSearchQ(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="tree">
+            <div
+              className={`tn-row ${isRoot ? 'is-current' : ''}`}
+              style={{ paddingLeft: 12 }}
+              onClick={() => navigate([])}
+            >
+              <span className="tn-chev" style={{ visibility: 'hidden' }}/>
+              <span className="tn-icon"><I.Home /></span>
+              <span className="tn-label">Início do catálogo</span>
+            </div>
+            {window.CATALOG_TREE.children
+              .filter(c => !searchQ || JSON.stringify(c).toLowerCase().includes(searchQ.toLowerCase()))
+              .map(c => (
+                <TreeNode key={c.id} node={c} path={[]} currentPath={path} depth={0} onNav={navigate} />
+              ))}
+          </div>
+        </aside>
+
+        {/* MAIN */}
+        <main className="main">
+          <div className="main-inner">
+
+            {/* BREADCRUMB */}
+            <div className="breadcrumb anim">
+              <button onClick={() => navigate([])}>Catálogo</button>
+              {trail.slice(1).map((t, i) => (
+                <React.Fragment key={t.node.id}>
+                  <span className="bc-sep">›</span>
+                  {i < trail.length - 2 ? (
+                    <button onClick={() => goToDepth(i + 1)}>{t.node.title}</button>
+                  ) : (
+                    <span className="bc-current">{t.node.title}</span>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+
+            {/* LOOP NOTICE */}
+            {looped && (
+              <div className="loop-notice anim">
+                <I.Loop />
+                <span>Referência circular detectada para <strong>{loopAt}</strong>. A navegação foi interrompida para proteção.</span>
+              </div>
+            )}
+
+            {/* HEADER */}
+            <div className="t-header anim">
+              <div className="t-icon">{titleInit}</div>
+              <div className="t-main">
+                <div className="t-eyebrow">
+                  {isRoot ? 'Catálogo · raiz' : `Nível ${trail.length - 1} · ${trail.slice(0, -1).map(t => t.node.title).join(' › ')}`}
+                </div>
+                <h1 className="t-title">{current.title}</h1>
+                <p className="t-subtitle">
+                  {(current.description || '').split('\n').find(l => l.trim() && !l.startsWith('#')) || 'Explore os subtópicos e mídias deste tópico.'}
+                </p>
+              </div>
+              <div className="t-stats">
+                <div className="t-stat">
+                  <div className="t-stat-num accent">{children.length}</div>
+                  <div className="t-stat-label">Subtópicos</div>
+                </div>
+                <div className="t-stat">
+                  <div className="t-stat-num">{directMedia.length}</div>
+                  <div className="t-stat-label">Mídias</div>
+                </div>
+                <div className="t-stat">
+                  <div className="t-stat-num">{deep.topics}</div>
+                  <div className="t-stat-label">Total no ramo</div>
+                </div>
+              </div>
+            </div>
+
+            {/* DESCRIPTION */}
+            {current.description && !isRoot && (
+              <div className="section anim" style={{ animationDelay: '40ms' }}>
+                <div className="section-head">
+                  <div className="section-label">Sobre este tópico</div>
+                </div>
+                <div className="desc-card">
+                  {window.renderMarkdown(current.description)}
+                </div>
+              </div>
+            )}
+
+            {/* SUBTOPICS */}
+            <div className="section anim" style={{ animationDelay: '80ms' }}>
+              <div className="section-head">
+                <div className="section-label">
+                  Subtópicos <span className="count">[{children.length}]</span>
+                </div>
+                {children.length > 0 && (
+                  <div className="section-aside">Clique para descer um nível</div>
+                )}
+              </div>
+              {children.length > 0 ? (
+                <div className="sub-grid">
+                  {children.map((c, i) => (
+                    <SubtopicCard key={c.id} node={c} index={i + 1} onOpen={() => goChild(c.id)} />
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  Este é um <strong>tópico folha</strong> — sem subtópicos. Consuma as mídias abaixo e participe da discussão.
+                </div>
+              )}
+            </div>
+
+            {/* MEDIA */}
+            {directMedia.length > 0 && (
+              <div className="section anim" style={{ animationDelay: '120ms' }}>
+                <div className="section-head">
+                  <div className="section-label">
+                    Mídias do tópico <span className="count">[{directMedia.length}]</span>
+                  </div>
+                  <div className="section-aside">
+                    {directMedia.filter(m => m.kind === 'video').length} vídeo · {directMedia.filter(m => m.kind === 'audio').length} áudio · {directMedia.filter(m => m.kind === 'pdf').length} PDF
+                  </div>
+                </div>
+                <div className="media-list">
+                  {directMedia.map(m => (
+                    <MediaItem
+                      key={m.id}
+                      m={m}
+                      expanded={expandedMedia.has(m.id)}
+                      onToggle={() => toggleMedia(m.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* COMMENTS */}
+            {!isRoot && (
+              <div className="section anim" style={{ animationDelay: '160ms' }}>
+                <div className="section-head">
+                  <div className="section-label">
+                    Discussão <span className="count">[{topicComments.length}]</span>
+                  </div>
+                  <div className="section-aside">Comentários sobre <strong>{current.title}</strong></div>
+                </div>
+
+                <div className="comment-input-wrap">
+                  <div className="c-avatar">JS</div>
+                  <div className="c-input-box" style={{ flex: 1 }}>
+                    <textarea
+                      placeholder={`Compartilhe uma dúvida ou observação sobre "${current.title}"…`}
+                      value={commentText}
+                      onChange={e => setCommentText(e.target.value)}
+                      rows={2}
+                    />
+                    {commentText && (
+                      <div className="c-input-actions">
+                        <button className="c-submit" onClick={submitComment}>Publicar</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {topicComments.length > 0 ? (
+                  <div className="comments-list">
+                    {topicComments.map(c => <Comment key={c.id} c={c} />)}
+                  </div>
+                ) : (
+                  <div className="empty-comments">
+                    Ainda não há comentários. <strong>Seja o primeiro</strong> a contribuir com este tópico.
+                  </div>
+                )}
+              </div>
+            )}
+
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
