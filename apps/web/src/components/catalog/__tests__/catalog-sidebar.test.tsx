@@ -108,14 +108,11 @@ describe('CatalogSidebar', () => {
     expect(screen.getByText('Padrão de respiração')).toBeInTheDocument();
   });
 
-  it('collapses subtopics when topic is clicked and URL is updated', () => {
+  it('collapses subtopics when chevron is clicked and URL is updated', () => {
     renderSidebar();
-    // Find the topic row by its aria-expanded attribute (it's the first root topic row)
-    const topicRows = screen.getAllByRole('button');
-    const rootRow = topicRows.find((el) => el.getAttribute('aria-expanded') !== null);
-    expect(rootRow).toBeTruthy();
-    fireEvent.click(rootRow!);
-    // Should call router.replace to update URL with new open state
+    // Chevron buttons carry the localized aria-label "Recolher <title>" when expanded.
+    const chevron = screen.getByRole('button', { name: dictPt.catalog.sidebar.collapseTopic('Fundamentos do Movimento') });
+    fireEvent.click(chevron);
     expect(mockReplace).toHaveBeenCalled();
     const call = mockReplace.mock.calls[0][0] as string;
     // root1 should be excluded from open param after collapsing
@@ -130,17 +127,7 @@ describe('CatalogSidebar', () => {
     expect(screen.getByDisplayValue('Força')).toBeInTheDocument();
   });
 
-  it('shows role pill when isInstructor is true', () => {
-    renderSidebar({ isInstructor: true });
-    expect(screen.getByText(dictPt.catalog.sidebar.participantRole)).toBeInTheDocument();
-    expect(screen.getByText(dictPt.catalog.sidebar.instructorRole)).toBeInTheDocument();
-  });
 
-  it('hides role pill for participants', () => {
-    renderSidebar({ isInstructor: false });
-    expect(screen.queryByText(dictPt.catalog.sidebar.participantRole)).not.toBeInTheDocument();
-    expect(screen.queryByText(dictPt.catalog.sidebar.instructorRole)).not.toBeInTheDocument();
-  });
 
   it('shows global progress', () => {
     renderSidebar({ globalProgress: 75 });

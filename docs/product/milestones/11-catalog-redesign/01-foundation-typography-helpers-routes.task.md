@@ -1,6 +1,6 @@
 # Task 01 — Foundation: typography, tree helpers, and route topology cleanup (Phase 1)
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 **Milestone:** [11 — Catalog redesign](./milestone.md)
 **RFC:** [0004 — Catalog page redesign, Phase 1](../../RFCs/0004-catalog-redesign.md)
 
@@ -42,13 +42,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `apps/web/src/app/layout.tsx` imports `Space_Grotesk` and `JetBrains_Mono` from `next/font/google` and exposes both as CSS variables alongside the existing `DM_Sans` configuration. No other line in the file changes.
-- [ ] `apps/web/src/lib/topic-tree.ts` exports `countDeep` and `buildTrail`; both are typed against the `TopicNode` shape from `packages/shared` and accept the flat list already loaded by the sidebar layout.
-- [ ] Unit tests for `countDeep` and `buildTrail` cover the cases listed under "Scope" and pass green under `make test-web`.
-- [ ] `apps/web/src/app/(protected)/catalog/[id]/[subtopicId]/` does not exist after this PR.
-- [ ] `grep -RE "catalog/[^/\"\\s]+/[^/\"\\s]+" apps/web/src` returns no matches in TypeScript/TSX source files. (The grep may legitimately match documentation; only source code is required to be clean.)
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope guardrail. In particular, no component visual change ships in this PR.
+- [x] `apps/web/src/app/layout.tsx` imports `Space_Grotesk` and `JetBrains_Mono` from `next/font/google` and exposes both as CSS variables alongside the existing `DM_Sans` configuration. No other line in the file changes.
+- [x] `apps/web/src/lib/topic-tree.ts` exports `countDeep` and `buildTrail`; both are typed against the `TopicNode` shape from `packages/shared` and accept the flat list already loaded by the sidebar layout.
+- [x] Unit tests for `countDeep` and `buildTrail` cover the cases listed under "Scope" and pass green under `make test-web`.
+- [x] `apps/web/src/app/(protected)/catalog/[id]/[subtopicId]/` does not exist after this PR.
+- [x] `grep -RE "catalog/[^/\"\\s]+/[^/\"\\s]+" apps/web/src` returns no matches in TypeScript/TSX source files. (The grep may legitimately match documentation; only source code is required to be clean.)
+- [x] `make lint`, `make test-web`, and `make test-api` pass green.
+- [x] No diff outside the scope guardrail. In particular, no component visual change ships in this PR.
 
 ## Verification Plan
 

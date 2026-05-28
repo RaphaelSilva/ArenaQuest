@@ -1,6 +1,6 @@
 # Task 07 — Description card wrap, skeleton, and section empty/error fallbacks (Phase 2)
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 **Milestone:** [11 — Catalog redesign](./milestone.md)
 **RFC:** [0004 — Catalog page redesign, Phase 2](../../RFCs/0004-catalog-redesign.md)
 
@@ -42,12 +42,12 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `ContentSection` renders inside the new 14 px-radius `var(--aq-bg2)` card on the catalog detail page.
-- [ ] `MainPaneSkeleton` mounts during the topic detail load and includes a header strip, two subtopic card placeholders, and one media row placeholder.
-- [ ] `SectionEmpty` and `SectionError` are reusable presentational components that take dictionary-derived strings as props/slots. The description section uses `SectionEmpty` when there is no Markdown content.
-- [ ] No hardcoded user-facing string in the new components or in the page changes; `check-i18n-coverage.js` passes.
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `ContentSection` renders inside the new 14 px-radius `var(--aq-bg2)` card on the catalog detail page.
+- [x] `MainPaneSkeleton` mounts during the topic detail load and includes a header strip, two subtopic card placeholders, and one media row placeholder.
+- [x] `SectionEmpty` and `SectionError` are reusable presentational components that take dictionary-derived strings as props/slots. The description section uses `SectionEmpty` when there is no Markdown content.
+- [x] No hardcoded user-facing string in the new components or in the page changes; `check-i18n-coverage.js` passes.
+- [x] `make lint`, `make test-web`, and `make test-api` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

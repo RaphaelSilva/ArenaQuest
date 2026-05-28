@@ -1,6 +1,6 @@
 # Task 11 — MediaMix pills on `SubtopicCard` and `Discussion` thread component (Phase 3)
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 **Milestone:** [11 — Catalog redesign](./milestone.md)
 **RFC:** [0004 — Catalog page redesign, Phase 3](../../RFCs/0004-catalog-redesign.md)
 
@@ -46,15 +46,15 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `SubtopicCard` renders one pill per non-zero media kind (video / audio / PDF) from `subtopic.mediaCount`, alongside the "deep" pill from Task 06. When `mediaCount.total === 0`, no kind pill renders.
-- [ ] `Discussion` reads the comment list via the existing `GET /topics/:id/comments` and posts new comments via `POST /topics/:id/comments`.
-- [ ] The composer shows the publish button only when the textarea has non-empty content; submitting clears the input and the new comment appears in the list (optimistic update or refetch).
-- [ ] No like or reply affordance is rendered anywhere in `Discussion`.
-- [ ] `Discussion` does not mount at the root of the catalog (no `parentId`).
-- [ ] Empty state and error fallback for the discussion section read from the dictionary via `SectionEmpty` / `SectionError`.
-- [ ] No hardcoded user-facing string; `check-i18n-coverage.js` passes.
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `SubtopicCard` renders one pill per non-zero media kind (video / audio / PDF) from `subtopic.mediaCount`, alongside the "deep" pill from Task 06. When `mediaCount.total === 0`, no kind pill renders.
+- [x] `Discussion` reads the comment list via the existing `GET /topics/:id/comments` and posts new comments via `POST /topics/:id/comments`.
+- [x] The composer shows the publish button only when the textarea has non-empty content; submitting clears the input and the new comment appears in the list (optimistic update or refetch).
+- [x] No like or reply affordance is rendered anywhere in `Discussion`.
+- [x] `Discussion` does not mount at the root of the catalog (no `parentId`).
+- [x] Empty state and error fallback for the discussion section read from the dictionary via `SectionEmpty` / `SectionError`.
+- [x] No hardcoded user-facing string; `check-i18n-coverage.js` passes.
+- [x] `make lint`, `make test-web`, and `make test-api` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

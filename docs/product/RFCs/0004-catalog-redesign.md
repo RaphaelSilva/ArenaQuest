@@ -1,7 +1,7 @@
 # RFC 0004: Catalog page redesign — wireframe-aligned UX
 
 **Date:** 2026-05-27
-**Status:** Draft
+**Status:** Implemented
 **Author:** raphaelsilva
 **Affected:** `apps/web/src/app/(protected)/catalog` (Next.js 15 App Router)
 **Source design:** `docs/architecture/web/wireframe/project/ArenaQuest Catálogo.html`

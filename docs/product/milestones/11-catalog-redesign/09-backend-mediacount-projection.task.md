@@ -1,6 +1,6 @@
 # Task 09 — Backend: additive `mediaCount` projection on `TopicNode` (Phase 3)
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 **Milestone:** [11 — Catalog redesign](./milestone.md)
 **RFC:** [0004 — Catalog page redesign, Phase 3](../../RFCs/0004-catalog-redesign.md)
 
@@ -43,16 +43,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `Entities.Content.TopicNode` includes `mediaCount: { video: number; audio: number; pdf: number; total: number }`.
-- [ ] `GET /topics` returns the new field for every node in the flat list.
-- [ ] `GET /topics/:id` returns the new field for both the parent topic and every entry of `children`.
-- [ ] A topic with no media returns all-zero `mediaCount` (legitimate value, not an error).
-- [ ] `total === video + audio + pdf` for every returned topic.
-- [ ] The new Vitest case covers zero media, mixed kinds, and delete + re-count; it passes under `make test-api`.
-- [ ] The change is additive — no `TopicNode` field is removed, renamed, or reshaped.
-- [ ] No D1-specific import leaks into `ITopicNodeRepository` or any controller / route file.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `Entities.Content.TopicNode` includes `mediaCount: { video: number; audio: number; pdf: number; total: number }`.
+- [x] `GET /topics` returns the new field for every node in the flat list.
+- [x] `GET /topics/:id` returns the new field for both the parent topic and every entry of `children`.
+- [x] A topic with no media returns all-zero `mediaCount` (legitimate value, not an error).
+- [x] `total === video + audio + pdf` for every returned topic.
+- [x] The new Vitest case covers zero media, mixed kinds, and delete + re-count; it passes under `make test-api`.
+- [x] The change is additive — no `TopicNode` field is removed, renamed, or reshaped.
+- [x] No D1-specific import leaks into `ITopicNodeRepository` or any controller / route file.
+- [x] `make lint`, `make test-api`, and `make test-web` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -1,6 +1,6 @@
 # Task 06 — Restyle `SubtopicCard` — two-column grid, index, and arrow chip (Phase 2)
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 **Milestone:** [11 — Catalog redesign](./milestone.md)
 **RFC:** [0004 — Catalog page redesign, Phase 2](../../RFCs/0004-catalog-redesign.md)
 
@@ -38,13 +38,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The subtopic grid renders two columns on `lg+` and collapses to one column when the main pane is narrower than ~700 px.
-- [ ] Each card shows: a monospaced `01..NN` index, title, 2-line description clamp, the "deep" pill when the subtopic has children, and an arrow chip that fills with `--aq-accent` on hover.
-- [ ] The card links to `/catalog/<subtopic.id>`; the status pill (if applicable) still renders.
-- [ ] No MediaMix pills appear in this PR; the meta-pill row contains only the "deep" pill when applicable.
-- [ ] No hardcoded user-facing string under the component; `check-i18n-coverage.js` passes.
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] The subtopic grid renders two columns on `lg+` and collapses to one column when the main pane is narrower than ~700 px.
+- [x] Each card shows: a monospaced `01..NN` index, title, 2-line description clamp, the "deep" pill when the subtopic has children, and an arrow chip that fills with `--aq-accent` on hover.
+- [x] The card links to `/catalog/<subtopic.id>`; the status pill (if applicable) still renders.
+- [x] No MediaMix pills appear in this PR; the meta-pill row contains only the "deep" pill when applicable.
+- [x] No hardcoded user-facing string under the component; `check-i18n-coverage.js` passes.
+- [x] `make lint`, `make test-web`, and `make test-api` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
