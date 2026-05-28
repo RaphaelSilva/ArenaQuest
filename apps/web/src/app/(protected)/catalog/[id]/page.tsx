@@ -11,10 +11,11 @@ import { TopicHeader } from '@web/components/catalog/TopicHeader';
 import { BadgesStrip } from '@web/components/catalog/BadgesStrip';
 import { SubtopicCard } from '@web/components/catalog/SubtopicCard';
 import { ContentSection } from '@web/components/catalog/ContentSection';
+import { SectionEmpty } from '@web/components/catalog/SectionEmpty';
 import { MediaGallery } from '@web/components/catalog/MediaGallery';
 import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
-import { Spinner } from '@web/components/spinner';
 import { useDict } from '@web/context/dict-context';
+import { MainPaneSkeleton } from '@web/components/catalog/MainPaneSkeleton';
 
 type CatalogTopicPageProps = {
   params: Promise<{ id: string }>;
@@ -86,8 +87,8 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
 
   if (loading) {
     return (
-      <div className="flex h-full min-h-[50vh] items-center justify-center">
-        <Spinner className="h-8 w-8" />
+      <div className="mx-auto max-w-[900px] px-4 py-8 md:px-6 lg:px-10">
+        <MainPaneSkeleton />
       </div>
     );
   }
@@ -144,7 +145,19 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
       {badges.length > 0 && <BadgesStrip badges={badges} />}
 
       {/* Content section */}
-      <ContentSection content={topic.content} />
+      {(!topic.content || !topic.content.trim()) ? (
+        <section className="mb-8">
+          <h2
+            className="mb-4 text-[13px] font-semibold uppercase tracking-widest"
+            style={{ color: 'var(--aq-text3)' }}
+          >
+            {dict.catalog.topicPage.contentTitle}
+          </h2>
+          <SectionEmpty title={dict.catalog.redesign.emptyDescription} />
+        </section>
+      ) : (
+        <ContentSection content={topic.content} />
+      )}
 
       {/* Media gallery */}
       <MediaGallery media={topic.media || []} />
