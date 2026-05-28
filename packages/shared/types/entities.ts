@@ -124,6 +124,12 @@ export namespace Entities {
             order: number;
             estimatedMinutes: number;
             prerequisiteIds: string[];
+            mediaCount?: {
+                video: number;
+                audio: number;
+                pdf: number;
+                total: number;
+            };
         }
 
     }

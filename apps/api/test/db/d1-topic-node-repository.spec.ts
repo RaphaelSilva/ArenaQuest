@@ -188,4 +188,75 @@ describe('D1TopicNodeRepository', () => {
       expect(s!.archived).toBe(false);
     });
   });
+
+  describe('mediaCount projection', () => {
+    it('returns zero media counts for a newly created topic', async () => {
+      const node = await repo.create({ title: 'Topic without Media' });
+      expect(node.mediaCount).toEqual({
+        video: 0,
+        audio: 0,
+        pdf: 0,
+        total: 0,
+      });
+
+      const fetched = await repo.findById(node.id);
+      expect(fetched!.mediaCount).toEqual({
+        video: 0,
+        audio: 0,
+        pdf: 0,
+        total: 0,
+      });
+    });
+
+    it('returns correct counts for mixed media kinds and updates on deletion', async () => {
+      const node = await repo.create({ title: 'Topic with Media' });
+
+      const userId = crypto.randomUUID();
+      await env.DB.prepare(
+        "INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)"
+      ).bind(userId, 'Uploader', 'uploader@test.com', 'hash').run();
+
+      const m1 = crypto.randomUUID();
+      const m2 = crypto.randomUUID();
+      const m3 = crypto.randomUUID();
+      const m4 = crypto.randomUUID();
+      const m5 = crypto.randomUUID();
+      const m6 = crypto.randomUUID();
+
+      await env.DB.prepare(
+        `INSERT INTO media (id, topic_node_id, uploaded_by, storage_key, original_name, type, status) VALUES 
+         (?, ?, ?, 'key1', 'video1.mp4', 'video', 'active'),
+         (?, ?, ?, 'key2', 'video2.mp4', 'video', 'active'),
+         (?, ?, ?, 'key3', 'audio.mp3', 'audio', 'active'),
+         (?, ?, ?, 'key4', 'doc.pdf', 'pdf', 'active'),
+         (?, ?, ?, 'key5', 'deleted.mp4', 'video', 'deleted'),
+         (?, ?, ?, 'key6', 'pending.mp3', 'audio', 'pending')`
+      ).bind(
+        m1, node.id, userId,
+        m2, node.id, userId,
+        m3, node.id, userId,
+        m4, node.id, userId,
+        m5, node.id, userId,
+        m6, node.id, userId
+      ).run();
+
+      const fetched = await repo.findById(node.id);
+      expect(fetched!.mediaCount).toEqual({
+        video: 2,
+        audio: 1,
+        pdf: 1,
+        total: 4,
+      });
+
+      await env.DB.prepare("UPDATE media SET status = 'deleted' WHERE id = ?").bind(m1).run();
+
+      const afterDelete = await repo.findById(node.id);
+      expect(afterDelete!.mediaCount).toEqual({
+        video: 1,
+        audio: 1,
+        pdf: 1,
+        total: 3,
+      });
+    });
+  });
 });

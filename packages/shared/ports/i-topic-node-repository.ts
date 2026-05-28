@@ -11,6 +11,12 @@ export interface TopicNodeRecord {
   estimatedMinutes: number;
   prerequisiteIds: string[];
   archived: boolean;
+  mediaCount?: {
+    video: number;
+    audio: number;
+    pdf: number;
+    total: number;
+  };
 }
 
 export interface CreateTopicNodeInput {
