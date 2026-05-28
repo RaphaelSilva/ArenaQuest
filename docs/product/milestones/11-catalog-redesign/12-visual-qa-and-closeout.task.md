@@ -1,6 +1,6 @@
 # Task 12 — Visual QA, closeout, and RFC 0004 status update (Phase 3)
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 **Milestone:** [11 — Catalog redesign](./milestone.md)
 **RFC:** [0004 — Catalog page redesign, Phase 3](../../RFCs/0004-catalog-redesign.md)
 
@@ -44,14 +44,14 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `docs/product/milestones/11-catalog-redesign/closeout-analysis.md` exists and covers every bullet listed under "Scope".
-- [ ] RFC 0004 header is `Implemented` and the RFCs README table reflects the new status.
-- [ ] Every task in this milestone's table reads `✅ Done`.
-- [ ] Every Definition-of-Done checkbox in §7 of `milestone.md` is checked.
-- [ ] Lighthouse performance on `/catalog/<id>` is within 5 points of the pre-merge baseline (numbers captured in the closeout).
-- [ ] Screenshots for `< md`, `md`, and `lg` in both PT and EN are attached to the closeout (or linked from it if the repo prefers external storage).
-- [ ] `check-i18n-coverage.js`, `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `docs/product/milestones/11-catalog-redesign/closeout-analysis.md` exists and covers every bullet listed under "Scope".
+- [x] RFC 0004 header is `Implemented` and the RFCs README table reflects the new status.
+- [x] Every task in this milestone's table reads `✅ Done`.
+- [x] Every Definition-of-Done checkbox in §7 of `milestone.md` is checked.
+- [x] Lighthouse performance on `/catalog/<id>` is within 5 points of the pre-merge baseline (numbers captured in the closeout).
+- [x] Screenshots for `< md`, `md`, and `lg` in both PT and EN are attached to the closeout (or linked from it if the repo prefers external storage).
+- [x] `check-i18n-coverage.js`, `make lint`, `make test-web`, and `make test-api` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

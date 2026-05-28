@@ -1,6 +1,6 @@
 # Milestone 11 — Catalog page redesign (wireframe-aligned UX)
 
-**Status:** 🚧 Planned
+**Status:** ✅ Implemented
 **Scope:** `apps/web` (participant catalog surface) with one additive, backwards-compatible projection field added to `apps/api` and `packages/shared`. Derived from [RFC 0004](../../RFCs/0004-catalog-redesign.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone ports the participant catalog (`/catalog` and `/catalog/[id]`) to the wireframe at `docs/architecture/web/wireframe/project/ArenaQuest Catálogo.html`. It may touch: components under `apps/web/src/components/catalog/**`, pages under `apps/web/src/app/(protected)/catalog/**`, helpers under `apps/web/src/lib/topic-tree.ts`, the root layout font imports in `apps/web/src/app/layout.tsx`, both i18n dictionaries (`apps/web/src/i18n/dict-en.ts`, `dict-pt.ts`), and — only in the dedicated backend task — `packages/shared/types/entities.ts` plus the `D1TopicNodeRepository` reads that serialise `TopicNode`. It is **not** an opportunity to redesign other surfaces (dashboard, admin, tasks, login), introduce new authoring tooling, add a theme switcher, replace the existing design tokens (`--aq-*`), wire likes/replies for comments, or change the deployment pipeline. The admin media manager and admin topic detail keep the existing `MediaGallery`; the new `MediaList` is mounted only on participant catalog routes. Accessibility audits, analytics/telemetry, enrollment gating for comments, and per-kind media progress semantics are explicitly deferred. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
@@ -42,17 +42,17 @@ Out of scope (explicit):
 
 ## 3. Acceptance Criteria
 
-- [ ] The `/catalog` and `/catalog/[id]` routes render the layout sections in the order and proportions shown in the wireframe (sidebar ~300 px on `lg`, main pane `max-width: 1040px`, two-column subtopic grid that collapses to one column below ~1100 px effective main-pane width).
-- [ ] The `apps/web/src/app/(protected)/catalog/[id]/[subtopicId]/` directory is deleted; `grep -RE "catalog/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+" apps/web/src` returns no matches in source code.
-- [ ] `TopicNode.mediaCount` is defined in `packages/shared/types/entities.ts`, populated by `D1TopicNodeRepository` on both the flat list and the detail payload (including every `children` entry), and covered by a Vitest case in `apps/api/test/` (zero media, mixed kinds, deletion re-counts correctly).
-- [ ] `MediaList` is mounted only on participant catalog routes. The admin media manager and admin topic detail still render `MediaGallery`.
-- [ ] The discussion thread reads and writes against `GET / POST /topics/:id/comments`. No UI affordance exists for likes or threaded replies.
-- [ ] No hardcoded user-facing string is introduced under `apps/web/src/{app,components,hooks}/**`; `check-i18n-coverage.js` passes. Every new key exists in both `dict-en.ts` and `dict-pt.ts`.
-- [ ] Mobile (`< md`), tablet (`md`), and desktop (`lg`) renderings respect the per-breakpoint contract in RFC 0004 §"Mobile & responsiveness". The sidebar stays hidden below `lg` and becomes a drawer triggered from the topbar. `MobileSearchBar` still mounts.
-- [ ] Lighthouse performance score on `/catalog/[id]` stays within 5 points of the current baseline (measured locally on the same machine, pre and post merge).
-- [ ] No new runtime dependency is introduced beyond what is required for the optional mobile drawer (Radix Dialog or Headless UI Dialog), if the chosen path is not inline.
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope declared in §"Hard scope guardrail".
+- [x] The `/catalog` and `/catalog/[id]` routes render the layout sections in the order and proportions shown in the wireframe (sidebar ~300 px on `lg`, main pane `max-width: 1040px`, two-column subtopic grid that collapses to one column below ~1100 px effective main-pane width).
+- [x] The `apps/web/src/app/(protected)/catalog/[id]/[subtopicId]/` directory is deleted; `grep -RE "catalog/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+" apps/web/src` returns no matches in source code.
+- [x] `TopicNode.mediaCount` is defined in `packages/shared/types/entities.ts`, populated by `D1TopicNodeRepository` on both the flat list and the detail payload (including every `children` entry), and covered by a Vitest case in `apps/api/test/` (zero media, mixed kinds, deletion re-counts correctly).
+- [x] `MediaList` is mounted only on participant catalog routes. The admin media manager and admin topic detail still render `MediaGallery`.
+- [x] The discussion thread reads and writes against `GET / POST /topics/:id/comments`. No UI affordance exists for likes or threaded replies.
+- [x] No hardcoded user-facing string is introduced under `apps/web/src/{app,components,hooks}/**`; `check-i18n-coverage.js` passes. Every new key exists in both `dict-en.ts` and `dict-pt.ts`.
+- [x] Mobile (`< md`), tablet (`md`), and desktop (`lg`) renderings respect the per-breakpoint contract in RFC 0004 §"Mobile & responsiveness". The sidebar stays hidden below `lg` and becomes a drawer triggered from the topbar. `MobileSearchBar` still mounts.
+- [x] Lighthouse performance score on `/catalog/[id]` stays within 5 points of the current baseline (measured locally on the same machine, pre and post merge).
+- [x] No new runtime dependency is introduced beyond what is required for the optional mobile drawer (Radix Dialog or Headless UI Dialog), if the chosen path is not inline.
+- [x] `make lint`, `make test-web`, and `make test-api` pass green.
+- [x] No diff outside the scope declared in §"Hard scope guardrail".
 
 ---
 
@@ -81,7 +81,7 @@ Out of scope (explicit):
 | 09 | [Backend — additive `mediaCount` projection on `TopicNode`](./09-backend-mediacount-projection.task.md) | 3 | ✅ Done |
 | 10 | [`MediaList` — inline-expandable video, audio, and PDF stages](./10-medialist-inline-players.task.md) | 3 | ✅ Done |
 | 11 | [MediaMix pills on `SubtopicCard` and `Discussion` thread component](./11-mediamix-pills-and-discussion.task.md) | 3 | ✅ Done |
-| 12 | [Visual QA, closeout, and RFC 0004 status update](./12-visual-qa-and-closeout.task.md) | 3 | ⏳ Planned |
+| 12 | [Visual QA, closeout, and RFC 0004 status update](./12-visual-qa-and-closeout.task.md) | 3 | ✅ Done |
 
 Dependency graph:
 
@@ -120,9 +120,9 @@ The following questions from RFC 0004 §"UX decisions" are pinned for this miles
 
 ## 7. Definition of Done (milestone level)
 
-- [ ] All 12 tasks marked `✅ Done` with every acceptance box checked.
-- [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint`, `make test-api`, and `make test-web` all green in CI.
-- [ ] Closeout note at `docs/product/milestones/11-catalog-redesign/closeout-analysis.md` records: number of new dictionary keys per namespace, the decisions recorded in §6, screenshots of `/catalog/[id]` at `< md`, `md`, and `lg` viewports in both PT and EN, and a Lighthouse comparison vs. baseline.
-- [ ] RFC 0004 status updated to `Implemented` in `docs/product/RFCs/README.md` and in the RFC header. Deferred items (likes/replies, telemetry, accessibility, enrollment gating, per-kind progress) remain explicitly listed as backlog.
-- [ ] No diff outside the scope declared in §"Hard scope guardrail".
+- [x] All 12 tasks marked `✅ Done` with every acceptance box checked.
+- [x] All milestone-level acceptance criteria in §3 pass.
+- [x] `make lint`, `make test-api`, and `make test-web` all green in CI.
+- [x] Closeout note at `docs/product/milestones/11-catalog-redesign/closeout-analysis.md` records: number of new dictionary keys per namespace, the decisions recorded in §6, screenshots of `/catalog/[id]` at `< md`, `md`, and `lg` viewports in both PT and EN, and a Lighthouse comparison vs. baseline.
+- [x] RFC 0004 status updated to `Implemented` in `docs/product/RFCs/README.md` and in the RFC header. Deferred items (likes/replies, telemetry, accessibility, enrollment gating, per-kind progress) remain explicitly listed as backlog.
+- [x] No diff outside the scope declared in §"Hard scope guardrail".
