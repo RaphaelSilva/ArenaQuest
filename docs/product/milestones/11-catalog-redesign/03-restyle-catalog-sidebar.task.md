@@ -1,6 +1,6 @@
 # Task 03 — Restyle `CatalogSidebar` — eyebrow, search, and tree rows (Phase 2)
 
-**Status:** ⏳ Planned
+**Status:** ✅ Done
 **Milestone:** [11 — Catalog redesign](./milestone.md)
 **RFC:** [0004 — Catalog page redesign, Phase 2](../../RFCs/0004-catalog-redesign.md)
 
@@ -39,12 +39,12 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] On `lg+`, the catalog sidebar renders an eyebrow label, a single search input, and a tree of rows that match the wireframe slot composition.
-- [ ] Below `lg`, the sidebar continues to be hidden (drawer comes in Task 08).
-- [ ] Search still filters the tree; clicking any node still routes to `/catalog/<id>`; expand/collapse still works.
-- [ ] The eyebrow text reads from `dict.catalog.*` (Task 02 key); no hardcoded string under `apps/web/src/components/catalog/CatalogSidebar.tsx`.
-- [ ] `check-i18n-coverage.js`, `make lint`, and `make test-web` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] On `lg+`, the catalog sidebar renders an eyebrow label, a single search input, and a tree of rows that match the wireframe slot composition.
+- [x] Below `lg`, the sidebar continues to be hidden (drawer comes in Task 08).
+- [x] Search still filters the tree; clicking any node still routes to `/catalog/<id>`; expand/collapse still works.
+- [x] The eyebrow text reads from `dict.catalog.*` (Task 02 key); no hardcoded string under `apps/web/src/components/catalog/CatalogSidebar.tsx`.
+- [x] `check-i18n-coverage.js`, `make lint`, and `make test-web` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

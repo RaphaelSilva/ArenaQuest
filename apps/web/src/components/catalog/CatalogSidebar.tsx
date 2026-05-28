@@ -140,12 +140,7 @@ export function CatalogSidebar({ topics, progressMap, globalProgress }: Props) {
     }
     return visible.map((node) => {
       const isOpen = expandedIds.has(node.id);
-      const topicStatus = progressMap.get(node.id) ?? 'not_started';
       const subtopicTotal = node.children.length;
-      const subtopicDone = node.children.filter(
-        (c) => (progressMap.get(c.id) ?? 'not_started') === 'completed',
-      ).length;
-      const pct = subtopicTotal > 0 ? Math.round((subtopicDone / subtopicTotal) * 100) : 0;
 
       const isActive = pathname.startsWith(`/catalog/${node.id}`);
 
@@ -189,7 +184,7 @@ export function CatalogSidebar({ topics, progressMap, globalProgress }: Props) {
             >
               📚
             </span>
-            {/* Info */}
+            {/* Info (Slot 3 - Label) */}
             <div className="min-w-0 flex-1 py-2">
               <p
                 className="truncate text-[13px] font-medium"
@@ -197,24 +192,11 @@ export function CatalogSidebar({ topics, progressMap, globalProgress }: Props) {
               >
                 {node.title}
               </p>
-              <div className="mt-0.5 flex items-center gap-1.5">
-                <div
-                  className="h-[3px] flex-1 overflow-hidden rounded-full"
-                  style={{ background: 'var(--aq-bg4)' }}
-                >
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${pct}%`,
-                      background: topicStatus === 'completed' ? 'var(--aq-accent3)' : 'var(--aq-accent)',
-                    }}
-                  />
-                </div>
-                <span className="flex-shrink-0 text-[10px] font-semibold" style={{ color: 'var(--aq-text3)' }}>
-                  {pct}%
-                </span>
-              </div>
             </div>
+            {/* Count (Slot 4) */}
+            <span className="flex-shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-[6px]" style={{ color: 'var(--aq-text3)', background: 'var(--aq-bg3)', border: '1px solid var(--aq-border2)' }}>
+              {subtopicTotal}
+            </span>
             {/* Link to topic page */}
             <Link
               href={`/catalog/${node.id}`}
@@ -265,15 +247,6 @@ export function CatalogSidebar({ topics, progressMap, globalProgress }: Props) {
         className="px-5 pb-3 pt-5"
         style={{ borderBottom: '1px solid var(--aq-border)' }}
       >
-        <p
-          className="mb-3 text-[11px] font-semibold uppercase tracking-widest"
-          style={{ color: 'var(--aq-text3)' }}
-        >
-          {dict.catalog.breadcrumb.catalogue}
-        </p>
-
-
-
         {/* Global progress */}
         <div>
           <div className="mb-1.5 flex justify-between text-[12px]" style={{ color: 'var(--aq-text2)' }}>
@@ -295,10 +268,16 @@ export function CatalogSidebar({ topics, progressMap, globalProgress }: Props) {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="mx-4 mt-3">
+      {/* Search & Eyebrow */}
+      <div className="mx-4 mt-4">
+        <p
+          className="mb-2 text-[11px] font-semibold uppercase tracking-[1.2px]"
+          style={{ color: 'var(--aq-text3)' }}
+        >
+          {dict.catalog.breadcrumb.catalogue}
+        </p>
         <div
-          className="flex items-center gap-2 rounded-[8px] px-3 py-[7px]"
+          className="flex items-center gap-2 rounded-[9px] px-3 py-[7px]"
           style={{ background: 'var(--aq-bg3)', border: '1px solid var(--aq-border2)' }}
         >
           <span style={{ color: 'var(--aq-text3)' }}>

@@ -72,7 +72,7 @@ Out of scope (explicit):
 |---|-----------|-------|--------|
 | 01 | [Foundation: typography, tree helpers, and route topology cleanup](./01-foundation-typography-helpers-routes.task.md) | 1 | ✅ Done |
 | 02 | [Dictionary keys for catalog redesign and instructor-preview removal](./02-dictionary-keys-and-instructor-preview-removal.task.md) | 1 | ✅ Done |
-| 03 | [Restyle `CatalogSidebar` — eyebrow, search, and tree rows](./03-restyle-catalog-sidebar.task.md) | 2 | ⏳ Planned |
+| 03 | [Restyle `CatalogSidebar` — eyebrow, search, and tree rows](./03-restyle-catalog-sidebar.task.md) | 2 | ✅ Done |
 | 04 | [Rewrite `TopicHeader` — initials, eyebrow trail, and stats trio](./04-rewrite-topic-header.task.md) | 2 | ⏳ Planned |
 | 05 | [Restyle `CatalogBreadcrumb` — mid-trail collapse and token reuse](./05-restyle-catalog-breadcrumb.task.md) | 2 | ⏳ Planned |
 | 06 | [Restyle `SubtopicCard` — two-column grid, index, and arrow chip](./06-restyle-subtopic-card.task.md) | 2 | ⏳ Planned |
