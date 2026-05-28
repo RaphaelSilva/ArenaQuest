@@ -458,6 +458,8 @@ export const dictEn = {
       noResults: 'No results',
       noContent: 'No published content yet.',
       manageTopics: 'Manage topics',
+      expandTopic: (title: string) => `Expand ${title}`,
+      collapseTopic: (title: string) => `Collapse ${title}`,
     },
     subtopicPage: {
       subtopicOf: (n: number, total: number) => `Subtopic ${n} of ${total}`,

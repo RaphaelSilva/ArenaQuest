@@ -456,6 +456,8 @@ export const dictPt = {
       noResults: 'Sem resultados',
       noContent: 'Nenhum conteúdo publicado ainda.',
       manageTopics: 'Gerenciar tópicos',
+      expandTopic: (title: string) => `Expandir ${title}`,
+      collapseTopic: (title: string) => `Recolher ${title}`,
     },
     subtopicPage: {
       subtopicOf: (n: number, total: number) => `Subtópico ${n} de ${total}`,
