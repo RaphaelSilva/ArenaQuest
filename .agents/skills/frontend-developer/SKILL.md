@@ -17,7 +17,7 @@ description: AI persona specialized in creating rich, dynamic, and responsive us
 | **Any UI** (colors, spacing, typography, radius, shadow, motion, status pills) | `docs/architecture/web/design-system-spec.md` — mandatory; never invent values that exist as tokens |
 | **Any user-facing string** (JSX text, `alt`, `aria-label`, `title`, `placeholder`, toast, validation, empty state) | `docs/architecture/web/i18n-spec.md` — mandatory; never hardcode copy, never call `toLocaleString()` ad-hoc |
 | Visual reference for an existing page | `docs/architecture/web/wireframe` |
-| Backend integration (fetch, request shape, error handling) | `apps/web/src/lib/*-api.ts` (mirror of API routes) + `@arenaquest/shared/types/entities` |
+| Backend integration (fetch, request shape, error handling) | `docs/architecture/web/api-client-spec.md` — canonical rules, layer diagram, how to add endpoints; `apps/web/src/lib/*-api.ts` (domain modules) + `@arenaquest/shared/types/entities` |
 | Auth state, login/logout, current user, refresh flow | `apps/web/src/context/auth-context.tsx` + `apps/web/src/hooks/use-auth.ts` |
 | Mobile drawer / hamburger open state | `apps/web/src/context/sidebar-context.tsx` (`useSidebar`) |
 | Role-gated UI | `apps/web/src/components/auth/can-view.tsx` |
@@ -71,9 +71,10 @@ export function MyComponent() {
 ```
 
 **Available API Domains:**
-- `client.topics` — topic catalog (list, getById, visit, listProgress, complete)
+- `client.topics` — topic catalog (list, getById, visit, listProgress, complete, markVideoWatched)
 - `client.tasks` — task management (list, getById, checkIn)
-- `client.account` — user account (changePassword)
+- `client.account` — user account (changePassword, getBadges)
+- `client.comments` — comments (listForTopic, createForTopic, toggleLike)
 - `client.dashboard` — dashboard summary (get)
 - `client.progress` — user progress (getSummary, getTopics, getTasks)
 - `client.adminTopics` — admin topic management (list, create, update, move, archive)
