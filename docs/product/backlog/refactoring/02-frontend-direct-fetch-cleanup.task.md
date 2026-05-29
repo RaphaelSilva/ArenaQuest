@@ -1,7 +1,7 @@
 # Task 02: Eliminate Direct `fetch` Calls Bypassing the `ApiClient` in the Web Frontend
 
 ## Metadata
-- **Status:** 📝 To Do
+- **Status:** ✅ Done
 - **Complexity:** Medium
 - **Milestone:** Future Enhancement (technical debt)
 - **Dependencies:** Builds on Task 01 (`01-frontend-api-client-class.task.md` — ✅ Done)
@@ -167,15 +167,15 @@ Each of these:
 
 ## Acceptance Criteria
 
-- [ ] `grep -rn "fetch(\`\${API_URL}\|process.env.NEXT_PUBLIC_API_URL" apps/web/src --include="*.tsx" --include="*.ts"` returns matches **only** in `auth-api.ts`, `api-client.ts`, and `fetch-with-auth.ts`.
-- [ ] `grep -rn "Authorization: \`Bearer" apps/web/src --include="*.tsx" --include="*.ts"` returns matches **only** in `auth-api.ts` and `fetch-with-auth.ts`.
-- [ ] `comments-api.ts` exists, exports `createCommentsApi(http)` and `CommentsApiError`, and is registered on `ApiClient` as `client.comments`.
-- [ ] `/me/badges` is reachable via `client.account.getBadges()` (or `client.me.badges()` if that route is chosen).
-- [ ] `topics-api.ts` exposes `markVideoWatched(topicId, mediaId)` and `VideoPlayerWithPlaylist` uses it.
-- [ ] The four consumer files no longer import `useAuth()` solely to read `accessToken`, no longer read `NEXT_PUBLIC_API_URL`, and no longer call `fetch` directly.
-- [ ] `apps/web/src/app/(protected)/catalog/[id]/page.tsx:182` no longer conditions on `accessToken` (collapsed to `topic.parentId !== null`).
-- [ ] All listed new tests exist and pass.
-- [ ] `make lint`, `make test`, `make build` pass.
+- [x] `grep -rn "fetch(\`\${API_URL}\|process.env.NEXT_PUBLIC_API_URL" apps/web/src --include="*.tsx" --include="*.ts"` returns matches **only** in `auth-api.ts`, `api-client.ts`, and `fetch-with-auth.ts`.
+- [x] `grep -rn "Authorization: \`Bearer" apps/web/src --include="*.tsx" --include="*.ts"` returns matches **only** in `auth-api.ts` and `fetch-with-auth.ts`.
+- [x] `comments-api.ts` exists, exports `createCommentsApi(http)` and `CommentsApiError`, and is registered on `ApiClient` as `client.comments`.
+- [x] `/me/badges` is reachable via `client.account.getBadges()` (or `client.me.badges()` if that route is chosen).
+- [x] `topics-api.ts` exposes `markVideoWatched(topicId, mediaId)` and `VideoPlayerWithPlaylist` uses it.
+- [x] The four consumer files no longer import `useAuth()` solely to read `accessToken`, no longer read `NEXT_PUBLIC_API_URL`, and no longer call `fetch` directly.
+- [x] `apps/web/src/app/(protected)/catalog/[id]/page.tsx:182` no longer conditions on `accessToken` (collapsed to `topic.parentId !== null`).
+- [x] All listed new tests exist and pass.
+- [x] `make lint`, `make test`, `make build` pass.
 - [ ] Manual smoke test: catalog topic page renders badges, comments list, posts, likes, and the video-watched event fires; force a 401 mid-session and confirm silent refresh now covers these endpoints (it does **not** today — this is a behavior fix, not just a structural one).
 
 ---
