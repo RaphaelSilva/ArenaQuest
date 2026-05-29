@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useDict } from '@web/context/dict-context';
+import { useApiClient } from '@web/context/auth-context';
 
 type CommentWithMeta = {
   id: string;
@@ -16,7 +17,6 @@ type CommentWithMeta = {
 type Props = {
   topicId: string;
   initialComments: CommentWithMeta[];
-  accessToken: string;
 };
 
 function formatTime(iso: string, now: string): string {
@@ -30,9 +30,9 @@ function formatTime(iso: string, now: string): string {
   }
 }
 
-export function Comments({ topicId, initialComments, accessToken }: Props) {
+export function Comments({ topicId, initialComments }: Props) {
   const dict = useDict();
-  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+  const client = useApiClient();
   const [comments, setComments] = useState<CommentWithMeta[]>(
     initialComments.filter((c) => c.parentCommentId === null && c.body !== null),
   );
@@ -61,16 +61,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
     setSubmitError('');
 
     try {
-      const res = await fetch(`${API_URL}/topics/${topicId}/comments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ body }),
-      });
-      if (!res.ok) throw new Error(`Failed to post comment (${res.status})`);
-      const real = (await res.json()) as CommentWithMeta;
+      const real = await client.comments.createForTopic(topicId, body);
       setComments((prev) => prev.map((c) => (c.id === optimisticId ? real : c)));
     } catch (err) {
       setComments((prev) => prev.filter((c) => c.id !== optimisticId));
@@ -90,10 +81,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
       ),
     );
     try {
-      await fetch(`${API_URL}/comments/${commentId}/like`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      await client.comments.toggleLike(commentId);
     } catch {
       // rollback
       setComments((prev) =>

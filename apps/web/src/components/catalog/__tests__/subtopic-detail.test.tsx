@@ -1,12 +1,33 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { dictPt } from '@web/i18n/dict-pt';
+import { CommentsApiError } from '@web/lib/comments-api';
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [key: string]: unknown }) => (
     <a href={href} {...props}>{children}</a>
   ),
 }));
+
+const mockCreateForTopic = vi.fn();
+const mockToggleLike = vi.fn();
+const mockMarkVideoWatched = vi.fn();
+
+vi.mock('@web/context/auth-context', async () => {
+  const actual = await vi.importActual('@web/context/auth-context');
+  return {
+    ...actual,
+    useApiClient: () => ({
+      comments: {
+        createForTopic: (...args: unknown[]) => mockCreateForTopic(...args),
+        toggleLike: (...args: unknown[]) => mockToggleLike(...args),
+      },
+      topics: {
+        markVideoWatched: (...args: unknown[]) => mockMarkVideoWatched(...args),
+      },
+    }),
+  };
+});
 
 import { MediaTabs } from '../MediaTabs';
 import { Comments } from '../Comments';
@@ -39,7 +60,6 @@ describe('MediaTabs', () => {
         files={[FILE]}
         photos={[PHOTO]}
         topicId="topic1"
-        accessToken="token"
       />,
     );
     expect(screen.getByRole('tab', { name: new RegExp(dictPt.catalog.mediaTabs.videos, 'i') })).toHaveAttribute('aria-selected', 'true');
@@ -52,7 +72,6 @@ describe('MediaTabs', () => {
         files={[FILE]}
         photos={[PHOTO]}
         topicId="topic1"
-        accessToken="token"
       />,
     );
     const filesTab = screen.getByRole('tab', { name: new RegExp(dictPt.catalog.mediaTabs.files, 'i') });
@@ -68,7 +87,6 @@ describe('MediaTabs', () => {
         files={[FILE]}
         photos={[]}
         topicId="topic1"
-        accessToken="token"
       />,
     );
     fireEvent.click(screen.getByRole('tab', { name: new RegExp(dictPt.catalog.mediaTabs.files, 'i') }));
@@ -93,7 +111,7 @@ describe('Comments', () => {
   ];
 
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn());
+    vi.clearAllMocks();
   });
 
   it('renders existing comments', () => {
@@ -101,33 +119,26 @@ describe('Comments', () => {
       <Comments
         topicId="sub1"
         initialComments={INITIAL_COMMENTS}
-        accessToken="token"
       />,
     );
     expect(screen.getByText('Great content!')).toBeInTheDocument();
   });
 
   it('optimistically prepends a comment on submit', async () => {
-    const mockFetch = vi.mocked(global.fetch);
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          id: 'c2',
-          userId: 'me',
-          body: 'New comment',
-          createdAt: new Date().toISOString(),
-          likeCount: 0,
-          likedByMe: false,
-          parentCommentId: null,
-        }),
-    } as Response);
+    mockCreateForTopic.mockResolvedValueOnce({
+      id: 'c2',
+      userId: 'me',
+      body: 'New comment',
+      createdAt: new Date().toISOString(),
+      likeCount: 0,
+      likedByMe: false,
+      parentCommentId: null,
+    });
 
     render(
       <Comments
         topicId="sub1"
         initialComments={[]}
-        accessToken="token"
       />,
     );
 
@@ -140,27 +151,20 @@ describe('Comments', () => {
     // Optimistic comment should appear immediately
     expect(screen.getByText('New comment')).toBeInTheDocument();
 
-    // Wait for API call to complete
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/topics/sub1/comments'),
-        expect.objectContaining({ method: 'POST' }),
-      );
+      expect(mockCreateForTopic).toHaveBeenCalledWith('sub1', 'New comment');
     });
   });
 
   it('rolls back optimistic comment on API failure and shows error', async () => {
-    const mockFetch = vi.mocked(global.fetch);
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-    } as Response);
+    mockCreateForTopic.mockRejectedValueOnce(
+      new CommentsApiError('Unknown', 500, 'Failed (500)'),
+    );
 
     render(
       <Comments
         topicId="sub1"
         initialComments={[]}
-        accessToken="token"
       />,
     );
 
@@ -172,7 +176,7 @@ describe('Comments', () => {
 
     // After rollback an error message appears
     await waitFor(() => {
-      expect(screen.getByText(/failed to post comment/i)).toBeInTheDocument();
+      expect(screen.getByText(/failed/i)).toBeInTheDocument();
     }, { timeout: 3000 });
 
     // After rollback, comments list is empty again (header shows 0 comments)

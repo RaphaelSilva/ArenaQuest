@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useDict } from '@web/context/dict-context';
+import { useApiClient } from '@web/context/auth-context';
 import { SectionEmpty } from './SectionEmpty';
 import { SectionError } from './SectionError';
 
@@ -15,7 +16,6 @@ type Comment = {
 
 type Props = {
   topicId: string;
-  accessToken: string;
 };
 
 function formatCommentTime(iso: string, fallback: string): string {
@@ -30,9 +30,9 @@ function formatCommentTime(iso: string, fallback: string): string {
   }
 }
 
-export function Discussion({ topicId, accessToken }: Props) {
+export function Discussion({ topicId }: Props) {
   const dict = useDict();
-  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+  const client = useApiClient();
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState('');
@@ -47,17 +47,9 @@ export function Discussion({ topicId, accessToken }: Props) {
     setLoading(true);
     setError(false);
 
-    fetch(`${API_URL}/topics/${topicId}/comments`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/json',
-      },
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error();
-        const data = (await res.json()) as Comment[];
+    client.comments.listForTopic(topicId)
+      .then((data) => {
         if (active) {
-          // Filter root comments and non-null bodies
           setComments(data.filter((c) => c.parentCommentId === null && c.body !== null));
           setLoading(false);
         }
@@ -72,7 +64,7 @@ export function Discussion({ topicId, accessToken }: Props) {
     return () => {
       active = false;
     };
-  }, [topicId, accessToken, API_URL]);
+  }, [topicId, client]);
 
   const handleSubmit = async () => {
     const body = text.trim();
@@ -95,17 +87,7 @@ export function Discussion({ topicId, accessToken }: Props) {
     setText('');
 
     try {
-      const res = await fetch(`${API_URL}/topics/${topicId}/comments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ body }),
-      });
-
-      if (!res.ok) throw new Error();
-      const realComment = (await res.json()) as Comment;
+      const realComment = await client.comments.createForTopic(topicId, body);
 
       setComments((prev) =>
         prev.map((c) => (c.id === optimisticId ? realComment : c)),

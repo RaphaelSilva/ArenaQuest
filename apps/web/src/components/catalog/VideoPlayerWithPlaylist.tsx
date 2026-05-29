@@ -3,11 +3,11 @@
 import { useRef, useState } from 'react';
 import type { Media } from '@web/lib/admin-media-api';
 import { useDict } from '@web/context/dict-context';
+import { useApiClient } from '@web/context/auth-context';
 
 type Props = {
   videos: Media[];
   topicId: string;
-  accessToken: string;
   onWatched?: (mediaId: string) => void;
 };
 
@@ -27,12 +27,12 @@ function CheckIcon() {
   );
 }
 
-export function VideoPlayerWithPlaylist({ videos, topicId, accessToken, onWatched }: Props) {
+export function VideoPlayerWithPlaylist({ videos, topicId, onWatched }: Props) {
   const dict = useDict();
+  const client = useApiClient();
   const [activeId, setActiveId] = useState(videos[0]?.id ?? '');
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
   const videoRef = useRef<HTMLVideoElement>(null);
-  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
   const activeVideo = videos.find((v) => v.id === activeId) ?? videos[0];
 
@@ -40,14 +40,7 @@ export function VideoPlayerWithPlaylist({ videos, topicId, accessToken, onWatche
     if (watchedIds.has(mediaId)) return;
     setWatchedIds((prev) => new Set(prev).add(mediaId));
     onWatched?.(mediaId);
-    try {
-      await fetch(`${API_URL}/topics/${topicId}/videos/${mediaId}/watched`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-    } catch {
-      // non-blocking — XP already logged or will retry next load
-    }
+    await client.topics.markVideoWatched(topicId, mediaId);
   }
 
   function handleTimeUpdate() {

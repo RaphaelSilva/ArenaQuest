@@ -12,6 +12,7 @@ import * as adminMediaApiModule from './admin-media-api';
 import * as adminEnrollmentApiModule from './admin-enrollment-api';
 import * as progressApiModule from './progress-api';
 import * as dashboardApiModule from './dashboard-api';
+import * as commentsApiModule from './comments-api';
 
 // HTTP transport interface — injectable for testing
 export interface HttpTransport {
@@ -97,5 +98,9 @@ export class ApiClient {
 
   get dashboard() {
     return dashboardApiModule.createDashboardApi(this.http);
+  }
+
+  get comments() {
+    return commentsApiModule.createCommentsApi(this.http);
   }
 }

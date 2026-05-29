@@ -57,6 +57,14 @@ export function createTopicsApi(http: HttpTransport) {
       const body = (await res.json()) as { topicProgress: { status: string } };
       return body.topicProgress.status as TopicProgressStatus;
     },
+
+    async markVideoWatched(topicId: string, mediaId: string): Promise<void> {
+      try {
+        await http('POST', `/topics/${topicId}/videos/${mediaId}/watched`);
+      } catch {
+        // non-blocking beacon — swallow all errors
+      }
+    },
   };
 }
 

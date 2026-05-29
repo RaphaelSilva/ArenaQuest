@@ -3,9 +3,9 @@
 export const runtime = 'edge';
 
 import { use, useMemo, useEffect, useState } from 'react';
-import { useAuth } from '@web/hooks/use-auth';
 import { useApiClient } from '@web/context/auth-context';
 import type { TopicProgressStatus, TopicWithMedia, TopicNode } from '@web/lib/topics-api';
+import type { BadgeItem } from '@web/lib/account-api';
 import { buildTrail, countDeep } from '@web/lib/topic-tree';
 import { TopicHeader } from '@web/components/catalog/TopicHeader';
 import { BadgesStrip } from '@web/components/catalog/BadgesStrip';
@@ -22,12 +22,9 @@ type CatalogTopicPageProps = {
   params: Promise<{ id: string }>;
 };
 
-type BadgeItem = { id: string; emoji: string; name: string; earned: boolean };
-
 export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   const dict = useDict();
   const { id } = use(params);
-  const { accessToken } = useAuth();
   const client = useApiClient();
 
   const [topic, setTopic] = useState<TopicWithMedia | null>(null);
@@ -56,20 +53,11 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   useEffect(() => {
     let active = true;
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
-    const headers = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' };
-
     Promise.all([
       client.topics.getById(id),
       client.topics.list(),
       client.topics.listProgress(),
-      fetch(`${API_URL}/me/badges`, { headers, cache: 'no-store' })
-        .then(async (r) => {
-          if (!r.ok) return [];
-          const body = (await r.json()) as Array<{ badge: { id: string; iconEmoji: string; name: string }; earnedAt: string }>;
-          return body.map((e) => ({ id: e.badge.id, emoji: e.badge.iconEmoji, name: e.badge.name, earned: true }));
-        })
-        .catch(() => [] as BadgeItem[]),
+      client.account.getBadges().catch(() => [] as BadgeItem[]),
     ]).then(([t, allTopicsData, progressEntries, b]) => {
       if (!active) return;
       setTopic(t);
@@ -84,7 +72,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
     });
 
     return () => { active = false; };
-  }, [client, accessToken, id, dict.catalog.topicPage.errorNotFound]);
+  }, [client, id, dict.catalog.topicPage.errorNotFound]);
 
   if (loading) {
     return (
@@ -179,8 +167,8 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
       )}
 
       {/* Discussion Section */}
-      {topic.parentId !== null && accessToken && (
-        <Discussion topicId={id} accessToken={accessToken} />
+      {topic.parentId !== null && (
+        <Discussion topicId={id} />
       )}
 
       {/* Subtopics */}

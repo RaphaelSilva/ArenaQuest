@@ -12,13 +12,12 @@ type Props = {
   files: Media[];
   photos: Media[];
   topicId: string;
-  accessToken: string;
   onVideoWatched?: (mediaId: string) => void;
 };
 
 type Tab = 'videos' | 'files' | 'photos';
 
-export function MediaTabs({ videos, files, photos, topicId, accessToken, onVideoWatched }: Props) {
+export function MediaTabs({ videos, files, photos, topicId, onVideoWatched }: Props) {
   const dict = useDict();
   const tabs: Tab[] = ['videos', 'files', 'photos'];
   const counts: Record<Tab, number> = { videos: videos.length, files: files.length, photos: photos.length };
@@ -78,7 +77,6 @@ export function MediaTabs({ videos, files, photos, topicId, accessToken, onVideo
         <VideoPlayerWithPlaylist
           videos={videos}
           topicId={topicId}
-          accessToken={accessToken}
           onWatched={onVideoWatched}
         />
       </div>
