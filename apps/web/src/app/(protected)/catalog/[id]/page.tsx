@@ -38,15 +38,13 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   const totalInBranch = useMemo(() => (topic ? countDeep(allTopics, id) : 0), [allTopics, id, topic]);
 
   const breadcrumbItems = useMemo(() => {
-    const list: Array<{ label: string; href?: string }> = [{ label: dict.catalog.breadcrumb.catalogue, href: '/catalog' }];
-    trail.forEach((t, i) => {
-      const isLast = i === trail.length - 1;
-      list.push({
-        label: t.title,
-        href: isLast ? undefined : `/catalog/${t.id}`,
-      });
-    });
-    return list;
+    const root = { label: dict.catalog.breadcrumb.catalogue, href: '/catalog' };
+    const trailItems = trail.map((t, i) => ({
+      label: t.title,
+      href: i === trail.length - 1 ? undefined : `/catalog/${t.id}`,
+    }));
+    
+    return [root, ...trailItems];
   }, [trail, dict]);
 
 

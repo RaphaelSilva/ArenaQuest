@@ -38,7 +38,7 @@
  * (But this is not recommended - e2e tests are more appropriate)
  */
 
-import { render, screen, waitFor, fireEvent, within, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { TopicNode } from '@web/lib/admin-topics-api';

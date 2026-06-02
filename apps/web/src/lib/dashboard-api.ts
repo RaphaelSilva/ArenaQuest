@@ -1,6 +1,4 @@
 import type { HttpTransport } from './api-client';
-import type { paths } from './api-types.gen';
-
 
 // ---------------------------------------------------------------------------
 // Types — frontend shape (consumed by components)
