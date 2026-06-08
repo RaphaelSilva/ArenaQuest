@@ -1,0 +1,14 @@
+info:
+  name: List all published topic nodes
+  type: http
+  seq: 3
+http:
+  method: GET
+  url: "{{host}}/v1/topics"
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+​

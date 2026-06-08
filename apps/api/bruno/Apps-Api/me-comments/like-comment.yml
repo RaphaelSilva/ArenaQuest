@@ -1,0 +1,17 @@
+info:
+  name: Like Comment
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: "{{host}}/v1/me/comments/:id/like"
+  params:
+    - name: id
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

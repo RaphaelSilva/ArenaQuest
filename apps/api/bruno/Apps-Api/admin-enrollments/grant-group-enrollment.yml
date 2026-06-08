@@ -1,0 +1,26 @@
+info:
+  name: Grant Group Enrollment
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: "{{host}}/v1/admin/groups/:groupId/enrollments"
+  headers:
+    - name: "content-type"
+      value: application/json
+  params:
+    - name: groupId
+      value: "group-id"
+      type: path
+  body:
+    type: json
+    data: |-
+        {
+          "topicNodeId": "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+        }
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,23 +1,20 @@
 info:
-  name: auth-api
+  name: Activate Account
   type: http
   seq: 1
-
 http:
   method: POST
-  url: "{{host}}/auth/login"
+  url: "{{host}}/v1/auth/activate"
   headers:
-    - name: content-type
+    - name: "content-type"
       value: application/json
   body:
     type: json
     data: |-
-      {
-        "email": "eng.raphaelsn@gmail.com",
-        "password": "qwertasdfgzxcvb123456789"
-      }
+        {
+          "token": "some-activation-token"
+        }
   auth: inherit
-
 settings:
   encodeUrl: true
   timeout: 0

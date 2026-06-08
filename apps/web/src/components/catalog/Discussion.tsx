@@ -30,7 +30,7 @@ function formatCommentTime(iso: string, fallback: string): string {
   }
 }
 
-export function Discussion({ topicId }: Props) {
+export function Discussion({ topicId }: Props) {  
   const dict = useDict();
   const client = useApiClient();
 
@@ -111,6 +111,7 @@ export function Discussion({ topicId }: Props) {
   }
 
   if (error) {
+    console.log(`Error: ${error}`);
     return <SectionError message={dict.catalog.redesign.sectionError} />;
   }
 

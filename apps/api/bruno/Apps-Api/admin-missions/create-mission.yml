@@ -1,0 +1,30 @@
+info:
+  name: Create Mission
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: "{{host}}/v1/admin/missions"
+  headers:
+    - name: "content-type"
+      value: application/json
+  body:
+    type: json
+    data: |-
+        {
+          "active": true,
+          "badgeId": null,
+          "description": "Complete 3 topics.",
+          "endAt": "2023-01-08T12:00:00Z",
+          "predicateKind": "topics_completed",
+          "predicateParams": "3",
+          "startAt": "2023-01-01T12:00:00Z",
+          "title": "Weekly Sprint",
+          "xpReward": 500
+        }
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

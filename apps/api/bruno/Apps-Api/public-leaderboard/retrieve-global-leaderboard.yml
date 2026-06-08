@@ -1,0 +1,29 @@
+info:
+  name: Retrieve global leaderboard
+  type: http
+  seq: 1
+http:
+  method: GET
+  url: "{{host}}/v1/leaderboard"
+  params:
+    - name: scope
+      value: global
+      type: query
+    - name: topicId
+      value: string
+      type: query
+    - name: period
+      value: all_time
+      type: query
+    - name: limit
+      value: 50
+      type: query
+    - name: offset
+      value: 0
+      type: query
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

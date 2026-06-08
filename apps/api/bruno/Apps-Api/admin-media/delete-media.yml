@@ -1,0 +1,20 @@
+info:
+  name: Delete Media
+  type: http
+  seq: 3
+http:
+  method: DELETE
+  url: "{{host}}/v1/admin/topics/:topicId/media/:mediaId"
+  params:
+    - name: topicId
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+    - name: mediaId
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

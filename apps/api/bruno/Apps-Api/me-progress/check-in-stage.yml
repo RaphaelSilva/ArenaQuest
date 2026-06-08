@@ -1,0 +1,20 @@
+info:
+  name: Check In Stage
+  type: http
+  seq: 4
+http:
+  method: POST
+  url: "{{host}}/v1/me/tasks/:id/stages/:stageId/check-in"
+  params:
+    - name: id
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+    - name: stageId
+      value: "f8e7d6c5-b4a3-2109-8765-43210fedcba9"
+      type: path
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

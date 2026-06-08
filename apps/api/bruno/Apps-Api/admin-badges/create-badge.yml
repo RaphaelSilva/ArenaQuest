@@ -1,0 +1,28 @@
+info:
+  name: Create Badge
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: "{{host}}/v1/admin/badges"
+  headers:
+    - name: "content-type"
+      value: application/json
+  body:
+    type: json
+    data: |-
+        {
+          "description": "Complete a streak.",
+          "iconEmoji": "🔥",
+          "name": "Perfect Streak",
+          "ruleKind": "streak_days",
+          "ruleParams": "7",
+          "slug": "perfect-streak",
+          "xpReward": 100
+        }
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

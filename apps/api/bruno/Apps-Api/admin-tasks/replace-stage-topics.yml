@@ -1,0 +1,31 @@
+info:
+  name: Replace Stage Topics
+  type: http
+  seq: 10
+http:
+  method: POST
+  url: "{{host}}/v1/admin/tasks/:id/stages/:stageId/topics"
+  headers:
+    - name: "content-type"
+      value: application/json
+  params:
+    - name: id
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+    - name: stageId
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+  body:
+    type: json
+    data: |-
+        {
+          "topicNodeIds": [
+            "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+          ]
+        }
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

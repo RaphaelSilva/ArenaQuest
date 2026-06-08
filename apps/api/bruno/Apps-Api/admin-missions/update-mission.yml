@@ -1,0 +1,34 @@
+info:
+  name: Update Mission
+  type: http
+  seq: 4
+http:
+  method: PATCH
+  url: "{{host}}/v1/admin/missions/:id"
+  headers:
+    - name: "content-type"
+      value: application/json
+  params:
+    - name: id
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+  body:
+    type: json
+    data: |-
+        {
+          "active": true,
+          "badgeId": null,
+          "description": "New description",
+          "endAt": "2023-01-08T12:00:00Z",
+          "predicateKind": "topics_completed",
+          "predicateParams": "4",
+          "startAt": "2023-01-01T12:00:00Z",
+          "title": "Updated Sprint",
+          "xpReward": 600
+        }
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
