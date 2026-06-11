@@ -135,3 +135,18 @@ export const ResetPasswordRequestSchema = z.object({
   newPassword: z.string().openapi({ example: 'newpassword123' }),
 }).openapi('ResetPasswordRequest');
 
+export const CommentSchema = z.object({
+  id: z.string().uuid().openapi({ example: 'a1b2c3d4-e5f6-7890-1234-567890abcdef' }),
+  topicNodeId: z.string().openapi({ example: 'cmt-topic-1' }),
+  parentCommentId: z.string().uuid().nullable().openapi({ example: null }),
+  userId: z.string().openapi({ example: 'cmt-student-a' }),
+  body: z.string().nullable().openapi({ example: 'This topic was very helpful!' }),
+  createdAt: z.string().datetime().openapi({ example: '2024-01-01T12:00:00Z' }),
+  deletedAt: z.string().datetime().nullable().openapi({ example: null }),
+}).openapi('Comment');
+
+export const CommentWithMetaSchema = CommentSchema.extend({
+  likeCount: z.number().int().openapi({ example: 3 }),
+  likedByMe: z.boolean().openapi({ example: false }),
+}).openapi('CommentWithMeta');
+

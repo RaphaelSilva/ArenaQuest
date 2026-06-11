@@ -14,6 +14,99 @@
         ],
         "type": "object"
       },
+      "Comment": {
+        "properties": {
+          "body": {
+            "example": "This topic was very helpful!",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "example": "2024-01-01T12:00:00Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "example": null,
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+            "format": "uuid",
+            "type": "string"
+          },
+          "parentCommentId": {
+            "example": null,
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "topicNodeId": {
+            "example": "cmt-topic-1",
+            "type": "string"
+          },
+          "userId": {
+            "example": "cmt-student-a",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "topicNodeId",
+          "parentCommentId",
+          "userId",
+          "body",
+          "createdAt",
+          "deletedAt"
+        ],
+        "type": "object"
+      },
+      "CommentWithMeta": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Comment"
+          },
+          {
+            "properties": {
+              "likeCount": {
+                "example": 3,
+                "type": "integer"
+              },
+              "likedByMe": {
+                "example": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "likeCount",
+              "likedByMe"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "ErrorBody": {
+        "additionalProperties": true,
+        "description": "Standard error response body with optional metadata fields",
+        "properties": {
+          "error": {
+            "description": "Error code or message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
       "ForgotPasswordRequest": {
         "properties": {
           "email": {
@@ -6472,6 +6565,178 @@
         "summary": "Retrieve a single published topic node by ID",
         "tags": [
           "public:catalog"
+        ]
+      }
+    },
+    "/v1/topics/{id}/comments": {
+      "get": {
+        "description": "Returns all comments on a topic node ordered top-level DESC then replies ASC. Requires enrollment.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "cmt-topic-1",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/CommentWithMeta"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Comments retrieved successfully"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden — user is not enrolled in this topic"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List comments on a topic",
+        "tags": [
+          "topics:comments"
+        ]
+      },
+      "post": {
+        "description": "Creates a top-level comment or a reply. Awards XP on success. Requires enrollment.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "cmt-topic-1",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "body": {
+                    "maxLength": 2000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "parentCommentId": {
+                    "format": "uuid",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "body"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Comment"
+                }
+              }
+            },
+            "description": "Comment created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Bad request — malformed body, validation error, or nested reply forbidden"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Forbidden — user is not enrolled in this topic"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Unprocessable — parent comment not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a comment on a topic",
+        "tags": [
+          "topics:comments"
         ]
       }
     }

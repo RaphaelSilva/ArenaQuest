@@ -187,6 +187,18 @@ describe('POST /topics/:id/comments', () => {
     expect(body.body).toBe('Bold text');
     expect(body.body).not.toContain('<b>');
   });
+
+  it('returns 400 for malformed JSON body', async () => {
+    const request = new IncomingRequest(`http://example.com/topics/${TOPIC_ID}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+      body: 'not-valid-json{{{',
+    });
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(request, env as AppEnv, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(res.status).toBe(400);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -242,6 +254,22 @@ describe('DELETE /me/comments/:id', () => {
 
     const deleteRes = await req('DELETE', `/me/comments/${comment.id}`, { token: adminToken });
     expect(deleteRes.status).toBe(204);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OpenAPI contract
+// ---------------------------------------------------------------------------
+
+describe('OpenAPI contract', () => {
+  it('comment endpoints appear in /openapi.json', async () => {
+    const res = await req('GET', '/openapi.json');
+    expect(res.status).toBe(200);
+    const doc = await res.json<{ paths: Record<string, unknown> }>();
+    const commentPath = doc.paths['/v1/topics/{id}/comments'] as Record<string, unknown> | undefined;
+    expect(commentPath).toBeDefined();
+    expect(commentPath).toHaveProperty('get');
+    expect(commentPath).toHaveProperty('post');
   });
 });
 
