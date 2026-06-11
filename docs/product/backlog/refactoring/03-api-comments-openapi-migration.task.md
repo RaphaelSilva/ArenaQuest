@@ -1,7 +1,7 @@
 # Task 03: Migrate the Comments Router to `OpenAPIHono` (RFC 0003 — R1)
 
 ## Metadata
-- **Status:** Open
+- **Status:** ✅ Done
 - **Complexity:** Medium
 - **Team:** Backend API
 - **Milestone:** RFC 0003 — Route reorganization & OpenAPI (remaining work R1)
@@ -88,13 +88,13 @@ Issues:
 ---
 
 ## Acceptance Criteria
-- [ ] `comments.router.ts` uses `OpenAPIHono` + `createRoute`; no raw `Hono` handlers remain in the file.
-- [ ] `GET /v1/topics/{id}/comments` and `POST /v1/topics/{id}/comments` appear in `/openapi.json` and render in `/docs`.
-- [ ] A malformed JSON body on POST returns `400` (not `500`).
-- [ ] Responses go through `respondWith` / `respondCreated`; no `as 400 | 403 | 422` casts remain.
-- [ ] Enrollment access guard and the `comment_posted` XP award behave exactly as before.
-- [ ] `apps/api/openapi.json` regenerated and committed.
-- [ ] `make lint`, `make test-api`, `make build` pass.
+- [x] `comments.router.ts` uses `OpenAPIHono` + `createRoute`; no raw `Hono` handlers remain in the file.
+- [x] `GET /v1/topics/{id}/comments` and `POST /v1/topics/{id}/comments` appear in `/openapi.json` and render in `/docs`.
+- [x] A malformed JSON body on POST returns `400` (not `500`).
+- [x] Responses go through `respondWith` / `respondCreated`; no `as 400 | 403 | 422` casts remain.
+- [x] Enrollment access guard and the `comment_posted` XP award behave exactly as before.
+- [x] `apps/api/openapi.json` regenerated and committed.
+- [x] `make lint`, `make test-api`, `make build` pass.
 
 ---
 
