@@ -89,7 +89,7 @@ export function buildCommentsRouter(slice: {
   const router = new OpenAPIHono();
   const controller = new CommentsController(commentRepo);
 
-  router.use('*', authGuard);
+  router.use('/topics/*', authGuard);
 
   router.openapi(listCommentsRoute, async (c) => {
     const userId = c.get('user').sub;
