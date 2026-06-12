@@ -94,6 +94,14 @@ async function seedInactiveUser(email: string): Promise<string> {
 // ---------------------------------------------------------------------------
 
 describe('POST /auth/activate', () => {
+  it('returns standardized 400 for empty body', async () => {
+    const res = await request('/auth/activate', { body: {}, ip: '203.0.113.79' });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('ValidationError');
+    expect(Array.isArray(body.issues)).toBe(true);
+  });
+
   it('valid token flips user to ACTIVE and returns 200 activated', async () => {
     const userId = await seedInactiveUser('happy@activate-test.local');
     const plainToken = 'happy-path-plaintext-token';

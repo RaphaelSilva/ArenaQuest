@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { PasswordController } from '@api/controllers/password.controller';
 import { ForgotPasswordRequestSchema, ResetPasswordRequestSchema } from '@api/openapi/components/entities';
+import { ValidationErrorBody } from '@api/openapi/components/errors';
 import { respondWith } from '@api/routes/_shared/envelope';
 import type { IRateLimiter } from '@arenaquest/shared/ports';
 
@@ -25,6 +26,11 @@ export const forgotPasswordRoute = createRoute({
     },
     400: {
       description: 'Bad Request / Validation Failed',
+      content: {
+        'application/json': {
+          schema: ValidationErrorBody,
+        },
+      },
     },
     429: {
       description: 'Too Many Requests',
@@ -53,6 +59,11 @@ export const resetPasswordRoute = createRoute({
     },
     400: {
       description: 'Bad Request / Invalid or Expired Token',
+      content: {
+        'application/json': {
+          schema: ValidationErrorBody,
+        },
+      },
     },
   },
 });
@@ -66,7 +77,13 @@ export function buildPasswordRouter(deps: {
   forgotPasswordLimiter: IRateLimiter;
 }) {
   const { controller, forgotPasswordLimiter } = deps;
-  const router = new OpenAPIHono();
+  const router = new OpenAPIHono({
+    defaultHook: (result, c) => {
+      if (!result.success) {
+        return c.json({ error: 'ValidationError' as const, issues: result.error.issues }, 400);
+      }
+    },
+  });
 
   router.openapi(forgotPasswordRoute, async (c) => {
     const ip = extractIp(c.req.header('cf-connecting-ip'));

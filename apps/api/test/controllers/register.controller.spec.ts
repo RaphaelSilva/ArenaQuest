@@ -145,13 +145,15 @@ describe('RegisterController', () => {
     ]);
   });
 
-  it('email casing/trimming: normalizes to lowercase + trimmed before persist', async () => {
+  it('email casing/trimming: controller persists pre-normalized email from route schema', async () => {
     const { repo, state } = makeMockUserRepo();
     const ctrl = new RegisterController(repo, auth, emitter.emit);
 
+    // Route schema applies trim()+toLowerCase() before the controller receives input.
+    // Controller must persist the value as-is (no double-normalization).
     const result = await ctrl.register({
-      name: '  Joana  ',
-      email: '  Joana@Example.COM  ',
+      name: 'Joana',
+      email: 'joana@example.com',
       password: 'hunter22a',
     });
 
@@ -160,97 +162,20 @@ describe('RegisterController', () => {
     expect(state.created[0].name).toBe('Joana');
   });
 
-  it('duplicate detection is case-insensitive after normalization', async () => {
+  it('duplicate detection: pre-normalized email matches stored record', async () => {
     const { repo, state } = makeMockUserRepo({ email: 'taken@example.com' });
     const ctrl = new RegisterController(repo, auth, emitter.emit);
 
+    // Route schema has already lowercased/trimmed the email before controller runs.
     const result = await ctrl.register({
       name: 'Joana',
-      email: 'TAKEN@EXAMPLE.COM',
+      email: 'taken@example.com',
       password: 'hunter22a',
     });
 
     expect(result.ok).toBe(true);
     expect(state.created).toHaveLength(0);
     expect(emitter.events[0].type).toBe('USER_REGISTRATION_DUPLICATE');
-  });
-
-  describe('validation failures', () => {
-    it('missing name → 400 ValidationFailed with field=name', async () => {
-      const { repo } = makeMockUserRepo();
-      const ctrl = new RegisterController(repo, auth, emitter.emit);
-
-      const result = await ctrl.register({
-        name: '',
-        email: 'joana@example.com',
-        password: 'hunter22a',
-      });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.status).toBe(400);
-      expect(result.error).toBe('ValidationFailed');
-      const fields = (result.meta?.fields ?? []) as Array<{ field: string; code: string }>;
-      expect(fields.some((f) => f.field === 'name')).toBe(true);
-    });
-
-    it('malformed email → 400 ValidationFailed with field=email', async () => {
-      const { repo } = makeMockUserRepo();
-      const ctrl = new RegisterController(repo, auth, emitter.emit);
-
-      const result = await ctrl.register({
-        name: 'Joana',
-        email: 'not-an-email',
-        password: 'hunter22a',
-      });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      const fields = (result.meta?.fields ?? []) as Array<{ field: string; code: string }>;
-      expect(fields.some((f) => f.field === 'email' && f.code === 'Invalid')).toBe(true);
-    });
-
-    it('password < 8 chars → 400 with field=password code=TooShort', async () => {
-      const { repo } = makeMockUserRepo();
-      const ctrl = new RegisterController(repo, auth, emitter.emit);
-
-      const result = await ctrl.register({
-        name: 'Joana',
-        email: 'joana@example.com',
-        password: 'short1',
-      });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      const fields = (result.meta?.fields ?? []) as Array<{ field: string; code: string }>;
-      expect(fields.some((f) => f.field === 'password' && f.code === 'TooShort')).toBe(true);
-    });
-
-    it('password without a digit → 400 with field=password code=NoDigit', async () => {
-      const { repo } = makeMockUserRepo();
-      const ctrl = new RegisterController(repo, auth, emitter.emit);
-
-      const result = await ctrl.register({
-        name: 'Joana',
-        email: 'joana@example.com',
-        password: 'allletters',
-      });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      const fields = (result.meta?.fields ?? []) as Array<{ field: string; code: string }>;
-      expect(fields.some((f) => f.field === 'password' && f.code === 'NoDigit')).toBe(true);
-    });
-
-    it('does not create or emit on validation failure', async () => {
-      const { repo, state } = makeMockUserRepo();
-      const ctrl = new RegisterController(repo, auth, emitter.emit);
-
-      await ctrl.register({ name: '', email: 'bad', password: 'x' });
-
-      expect(state.created).toHaveLength(0);
-      expect(emitter.events).toHaveLength(0);
-    });
   });
 
   it('hashing isolation: stored hash is not raw password and not a SHA-256 of it', async () => {

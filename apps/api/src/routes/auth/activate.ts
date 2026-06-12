@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { ActivateController } from '@api/controllers/activate.controller';
 import { ActivateRequestSchema } from '@api/openapi/components/entities';
+import { ValidationErrorBody } from '@api/openapi/components/errors';
 import { respondWith } from '@api/routes/_shared/envelope';
 import type { IRateLimiter } from '@arenaquest/shared/ports';
 
@@ -33,6 +34,11 @@ export const activateRoute = createRoute({
     },
     400: {
       description: 'Bad Request / Invalid or Expired Token',
+      content: {
+        'application/json': {
+          schema: ValidationErrorBody,
+        },
+      },
     },
     429: {
       description: 'Too Many Requests',
@@ -49,7 +55,13 @@ export function buildActivateRouter(deps: {
   limiter: IRateLimiter;
 }) {
   const { controller, limiter } = deps;
-  const router = new OpenAPIHono();
+  const router = new OpenAPIHono({
+    defaultHook: (result, c) => {
+      if (!result.success) {
+        return c.json({ error: 'ValidationError' as const, issues: result.error.issues }, 400);
+      }
+    },
+  });
 
   router.openapi(activateRoute, async (c) => {
     const ip = extractIp(c.req.header('cf-connecting-ip'));

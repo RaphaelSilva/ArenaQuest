@@ -68,6 +68,14 @@ describe('POST /auth/forgot-password', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /auth/reset-password', () => {
+  it('returns standardized 400 with issues for invalid body', async () => {
+    const res = await post('/auth/reset-password', { newPassword: 'weak' });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('ValidationError');
+    expect(Array.isArray(body.issues)).toBe(true);
+  });
+
   it('returns 400 for a missing token', async () => {
     const res = await post('/auth/reset-password', { newPassword: 'ValidPass1' });
     expect(res.status).toBe(400);

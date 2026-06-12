@@ -54,6 +54,14 @@ async function request(
 // ---------------------------------------------------------------------------
 
 describe('POST /auth/register', () => {
+  it('returns standardized 400 for missing required field', async () => {
+    const res = await request('/auth/register', { body: { email: 'x@y.com', password: 'Pass1234' }, ip: '203.0.113.99' });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('ValidationError');
+    expect(Array.isArray(body.issues)).toBe(true);
+  });
+
   it('creates an INACTIVE user with status=pending_activation on a fresh email', async () => {
     const email = 'fresh@register-test.local';
     const res = await request('/auth/register', {

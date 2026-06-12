@@ -1,5 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { AdminBadgesController } from '@api/controllers/admin-badges.controller';
+import { CreateBadgeBodySchema, UpdateBadgeBodySchema } from '@api/openapi/components/entities';
+import { ValidationErrorBody } from '@api/openapi/components/errors';
 import { respondWith } from '@api/routes/_shared/envelope';
 import type { AppContainer } from '@api/container';
 
@@ -56,21 +58,7 @@ export const createBadgeRoute = createRoute({
     body: {
       content: {
         'application/json': {
-          schema: z.object({
-            slug: z.string().min(1).openapi({ example: 'perfect-streak' }),
-            name: z.string().min(1).openapi({ example: 'Perfect Streak' }),
-            iconEmoji: z.string().min(1).openapi({ example: '🔥' }),
-            description: z.string().optional().openapi({ example: 'Complete a streak.' }),
-            xpReward: z.number().int().min(0).optional().openapi({ example: 100 }),
-            ruleKind: z.enum([
-              'streak_days',
-              'topic_completed',
-              'videos_watched_in_period',
-              'total_xp',
-              'mission_completed',
-            ]).openapi({ example: 'streak_days' }),
-            ruleParams: z.string().optional().openapi({ example: '7' }),
-          }),
+          schema: CreateBadgeBodySchema,
         },
       },
     },
@@ -88,6 +76,11 @@ export const createBadgeRoute = createRoute({
     },
     400: {
       description: 'Bad Request / Validation Failed',
+      content: {
+        'application/json': {
+          schema: ValidationErrorBody,
+        },
+      },
     },
   },
 });
@@ -106,21 +99,7 @@ export const updateBadgeRoute = createRoute({
     body: {
       content: {
         'application/json': {
-          schema: z.object({
-            name: z.string().min(1).optional().openapi({ example: 'New Badge Name' }),
-            iconEmoji: z.string().min(1).optional().openapi({ example: '🏆' }),
-            description: z.string().optional().openapi({ example: 'New description' }),
-            xpReward: z.number().int().min(0).optional().openapi({ example: 200 }),
-            ruleKind: z.enum([
-              'streak_days',
-              'topic_completed',
-              'videos_watched_in_period',
-              'total_xp',
-              'mission_completed',
-            ]).optional().openapi({ example: 'total_xp' }),
-            ruleParams: z.string().optional().openapi({ example: '1000' }),
-            active: z.boolean().optional().openapi({ example: true }),
-          }),
+          schema: UpdateBadgeBodySchema,
         },
       },
     },
@@ -138,6 +117,11 @@ export const updateBadgeRoute = createRoute({
     },
     400: {
       description: 'Bad Request / Validation Failed',
+      content: {
+        'application/json': {
+          schema: ValidationErrorBody,
+        },
+      },
     },
     404: {
       description: 'Badge not found',
@@ -178,7 +162,13 @@ export const awardBadgeRoute = createRoute({
 export function buildAdminBadgesRouter(container: AppContainer) {
   const { badgeRepo } = container.gamification;
   const controller = new AdminBadgesController(badgeRepo);
-  const router = new OpenAPIHono();
+  const router = new OpenAPIHono({
+    defaultHook: (result, c) => {
+      if (!result.success) {
+        return c.json({ error: 'ValidationError' as const, issues: result.error.issues }, 400);
+      }
+    },
+  });
 
   router.openapi(listBadgesRoute, async (c) => {
     const result = await controller.list();

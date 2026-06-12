@@ -117,22 +117,22 @@ export const LoginResponseSchema = z.object({
 }).openapi('LoginResponse');
 
 export const RegisterRequestSchema = z.object({
-  name: z.string().openapi({ example: 'John Doe' }),
-  email: z.string().email().openapi({ example: 'student@arenaquest.app' }),
-  password: z.string().openapi({ example: 'password123' }),
+  name: z.string().trim().min(2).max(80).openapi({ example: 'John Doe' }),
+  email: z.string().trim().toLowerCase().email().openapi({ example: 'student@arenaquest.app' }),
+  password: z.string().min(8).regex(/\d/).openapi({ example: 'password123' }),
 }).openapi('RegisterRequest');
 
 export const ActivateRequestSchema = z.object({
-  token: z.string().openapi({ example: 'some-activation-token' }),
+  token: z.string().min(1).openapi({ example: 'some-activation-token' }),
 }).openapi('ActivateRequest');
 
 export const ForgotPasswordRequestSchema = z.object({
-  email: z.string().email().openapi({ example: 'student@arenaquest.app' }),
+  email: z.string().trim().toLowerCase().email().openapi({ example: 'student@arenaquest.app' }),
 }).openapi('ForgotPasswordRequest');
 
 export const ResetPasswordRequestSchema = z.object({
-  token: z.string().openapi({ example: 'some-reset-token' }),
-  newPassword: z.string().openapi({ example: 'newpassword123' }),
+  token: z.string().min(1).openapi({ example: 'some-reset-token' }),
+  newPassword: z.string().min(8).regex(/\d/).openapi({ example: 'newpassword123' }),
 }).openapi('ResetPasswordRequest');
 
 export const CommentSchema = z.object({
@@ -149,4 +149,35 @@ export const CommentWithMetaSchema = CommentSchema.extend({
   likeCount: z.number().int().openapi({ example: 3 }),
   likedByMe: z.boolean().openapi({ example: false }),
 }).openapi('CommentWithMeta');
+
+export const BADGE_RULE_KINDS = [
+  'streak_days',
+  'topic_completed',
+  'videos_watched_in_period',
+  'total_xp',
+  'mission_completed',
+] as const;
+
+export const CreateBadgeBodySchema = z.object({
+  slug: z.string().min(1).openapi({ example: 'perfect-streak' }),
+  name: z.string().min(1).openapi({ example: 'Perfect Streak' }),
+  iconEmoji: z.string().min(1).openapi({ example: '🔥' }),
+  description: z.string().optional().openapi({ example: 'Complete a streak.' }),
+  xpReward: z.number().int().min(0).optional().openapi({ example: 100 }),
+  ruleKind: z.enum(BADGE_RULE_KINDS).openapi({ example: 'streak_days' }),
+  ruleParams: z.string().optional().openapi({ example: '7' }),
+}).openapi('CreateBadgeBody');
+
+export const UpdateBadgeBodySchema = z.object({
+  name: z.string().min(1).optional().openapi({ example: 'New Badge Name' }),
+  iconEmoji: z.string().min(1).optional().openapi({ example: '🏆' }),
+  description: z.string().optional().openapi({ example: 'New description' }),
+  xpReward: z.number().int().min(0).optional().openapi({ example: 200 }),
+  ruleKind: z.enum(BADGE_RULE_KINDS).optional().openapi({ example: 'total_xp' }),
+  ruleParams: z.string().optional().openapi({ example: '1000' }),
+  active: z.boolean().optional().openapi({ example: true }),
+}).openapi('UpdateBadgeBody');
+
+export type CreateBadgeInput = z.infer<typeof CreateBadgeBodySchema>;
+export type UpdateBadgeInput = z.infer<typeof UpdateBadgeBodySchema>;
 

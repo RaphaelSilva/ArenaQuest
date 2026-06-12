@@ -1,6 +1,8 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { RegisterController } from '@api/controllers/register.controller';
 import { RegisterRequestSchema } from '@api/openapi/components/entities';
+import { ValidationErrorBody } from '@api/openapi/components/errors';
+import { respondWith } from '@api/routes/_shared/envelope';
 import type { IRateLimiter } from '@arenaquest/shared/ports';
 
 export const registerRoute = createRoute({
@@ -32,6 +34,11 @@ export const registerRoute = createRoute({
     },
     400: {
       description: 'Bad Request / Validation Failed',
+      content: {
+        'application/json': {
+          schema: ValidationErrorBody,
+        },
+      },
     },
     429: {
       description: 'Too Many Requests',
@@ -48,7 +55,13 @@ export function buildRegisterRouter(deps: {
   limiter: IRateLimiter;
 }) {
   const { controller, limiter } = deps;
-  const router = new OpenAPIHono();
+  const router = new OpenAPIHono({
+    defaultHook: (result, c) => {
+      if (!result.success) {
+        return c.json({ error: 'ValidationError' as const, issues: result.error.issues }, 400);
+      }
+    },
+  });
 
   router.openapi(registerRoute, async (c) => {
     const ip = extractIp(c.req.header('cf-connecting-ip'));
@@ -66,20 +79,14 @@ export function buildRegisterRouter(deps: {
     const body = c.req.valid('json');
     const result = await controller.register(body);
 
-    if (!(result.ok === false && result.status === 400)) {
-      try {
-        await limiter.hit(ip);
-      } catch (err) {
-        console.error('[rate-limit] register hit failed', err);
-      }
+    try {
+      await limiter.hit(ip);
+    } catch (err) {
+      console.error('[rate-limit] register hit failed', err);
     }
 
     if (!result.ok) {
-      const payload: Record<string, unknown> = { error: result.error };
-      if (result.error === 'ValidationFailed' && result.meta?.fields) {
-        payload.fields = result.meta.fields;
-      }
-      return c.json(payload, result.status as 400 | 429);
+      return respondWith(c, result);
     }
 
     return c.json(result.data, 202);

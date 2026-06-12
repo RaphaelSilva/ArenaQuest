@@ -6,6 +6,7 @@
         "properties": {
           "token": {
             "example": "some-activation-token",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -92,6 +93,56 @@
             "type": "object"
           }
         ]
+      },
+      "CreateBadgeBody": {
+        "properties": {
+          "description": {
+            "example": "Complete a streak.",
+            "type": "string"
+          },
+          "iconEmoji": {
+            "example": "🔥",
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "example": "Perfect Streak",
+            "minLength": 1,
+            "type": "string"
+          },
+          "ruleKind": {
+            "enum": [
+              "streak_days",
+              "topic_completed",
+              "videos_watched_in_period",
+              "total_xp",
+              "mission_completed"
+            ],
+            "example": "streak_days",
+            "type": "string"
+          },
+          "ruleParams": {
+            "example": "7",
+            "type": "string"
+          },
+          "slug": {
+            "example": "perfect-streak",
+            "minLength": 1,
+            "type": "string"
+          },
+          "xpReward": {
+            "example": 100,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "iconEmoji",
+          "ruleKind"
+        ],
+        "type": "object"
       },
       "ErrorBody": {
         "additionalProperties": true,
@@ -289,10 +340,14 @@
           },
           "name": {
             "example": "John Doe",
+            "maxLength": 80,
+            "minLength": 2,
             "type": "string"
           },
           "password": {
             "example": "password123",
+            "minLength": 8,
+            "pattern": "\\d",
             "type": "string"
           }
         },
@@ -307,10 +362,13 @@
         "properties": {
           "newPassword": {
             "example": "newpassword123",
+            "minLength": 8,
+            "pattern": "\\d",
             "type": "string"
           },
           "token": {
             "example": "some-reset-token",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -537,6 +595,82 @@
           "prerequisiteIds"
         ],
         "type": "object"
+      },
+      "UpdateBadgeBody": {
+        "properties": {
+          "active": {
+            "example": true,
+            "type": "boolean"
+          },
+          "description": {
+            "example": "New description",
+            "type": "string"
+          },
+          "iconEmoji": {
+            "example": "🏆",
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "example": "New Badge Name",
+            "minLength": 1,
+            "type": "string"
+          },
+          "ruleKind": {
+            "enum": [
+              "streak_days",
+              "topic_completed",
+              "videos_watched_in_period",
+              "total_xp",
+              "mission_completed"
+            ],
+            "example": "total_xp",
+            "type": "string"
+          },
+          "ruleParams": {
+            "example": "1000",
+            "type": "string"
+          },
+          "xpReward": {
+            "example": 200,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ValidationErrorBody": {
+        "description": "Validation error response with Zod issues",
+        "properties": {
+          "error": {
+            "description": "Fixed error code for validation failures",
+            "enum": [
+              "ValidationError"
+            ],
+            "type": "string"
+          },
+          "issues": {
+            "description": "Zod validation issues array",
+            "example": [
+              {
+                "code": "invalid_type",
+                "expected": "string",
+                "message": "Required",
+                "path": [
+                  "email"
+                ],
+                "received": "undefined"
+              }
+            ],
+            "items": {},
+            "type": "array"
+          }
+        },
+        "required": [
+          "error",
+          "issues"
+        ],
+        "type": "object"
       }
     }
   },
@@ -676,54 +810,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "properties": {
-                  "description": {
-                    "example": "Complete a streak.",
-                    "type": "string"
-                  },
-                  "iconEmoji": {
-                    "example": "🔥",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "name": {
-                    "example": "Perfect Streak",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "ruleKind": {
-                    "enum": [
-                      "streak_days",
-                      "topic_completed",
-                      "videos_watched_in_period",
-                      "total_xp",
-                      "mission_completed"
-                    ],
-                    "example": "streak_days",
-                    "type": "string"
-                  },
-                  "ruleParams": {
-                    "example": "7",
-                    "type": "string"
-                  },
-                  "slug": {
-                    "example": "perfect-streak",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "xpReward": {
-                    "example": 100,
-                    "minimum": 0,
-                    "type": "integer"
-                  }
-                },
-                "required": [
-                  "slug",
-                  "name",
-                  "iconEmoji",
-                  "ruleKind"
-                ],
-                "type": "object"
+                "$ref": "#/components/schemas/CreateBadgeBody"
               }
             }
           }
@@ -814,6 +901,13 @@
             "description": "Successfully created badge"
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorBody"
+                }
+              }
+            },
             "description": "Bad Request / Validation Failed"
           }
         },
@@ -933,47 +1027,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "properties": {
-                  "active": {
-                    "example": true,
-                    "type": "boolean"
-                  },
-                  "description": {
-                    "example": "New description",
-                    "type": "string"
-                  },
-                  "iconEmoji": {
-                    "example": "🏆",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "name": {
-                    "example": "New Badge Name",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "ruleKind": {
-                    "enum": [
-                      "streak_days",
-                      "topic_completed",
-                      "videos_watched_in_period",
-                      "total_xp",
-                      "mission_completed"
-                    ],
-                    "example": "total_xp",
-                    "type": "string"
-                  },
-                  "ruleParams": {
-                    "example": "1000",
-                    "type": "string"
-                  },
-                  "xpReward": {
-                    "example": 200,
-                    "minimum": 0,
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
+                "$ref": "#/components/schemas/UpdateBadgeBody"
               }
             }
           }
@@ -1064,6 +1118,13 @@
             "description": "Successfully updated badge"
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorBody"
+                }
+              }
+            },
             "description": "Bad Request / Validation Failed"
           },
           "404": {
@@ -5254,6 +5315,13 @@
             "description": "Account successfully activated"
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorBody"
+                }
+              }
+            },
             "description": "Bad Request / Invalid or Expired Token"
           },
           "429": {
@@ -5283,6 +5351,13 @@
             "description": "Request successfully processed"
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorBody"
+                }
+              }
+            },
             "description": "Bad Request / Validation Failed"
           },
           "429": {
@@ -5472,6 +5547,13 @@
             "description": "Registration request accepted (pending activation)"
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorBody"
+                }
+              }
+            },
             "description": "Bad Request / Validation Failed"
           },
           "429": {
@@ -5501,6 +5583,13 @@
             "description": "Password successfully reset"
           },
           "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorBody"
+                }
+              }
+            },
             "description": "Bad Request / Invalid or Expired Token"
           }
         },

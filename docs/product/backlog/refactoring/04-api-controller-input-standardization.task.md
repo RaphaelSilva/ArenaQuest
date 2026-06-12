@@ -1,7 +1,7 @@
 # Task 04: Standardize Controller Input on Pattern B (RFC 0003 — R2)
 
 ## Metadata
-- **Status:** Open
+- **Status:** ✅ Done
 - **Complexity:** Medium
 - **Team:** Backend API
 - **Milestone:** RFC 0003 — Route reorganization & OpenAPI (remaining work R2)
@@ -85,13 +85,13 @@ Pattern A means the same request shape is conceptually validated twice (route co
 ---
 
 ## Acceptance Criteria
-- [ ] `register`, `password`, `activate`, and `admin-badges` controllers accept typed input; no `safeParse(unknown)` remains in them.
-- [ ] Their routes declare `request.body` schemas and use `c.req.valid('json')`.
-- [ ] All body-validation failures across these routes return the **same** standardized 400 body.
-- [ ] Domain-error paths (status codes + messages) are unchanged and still covered by tests.
-- [ ] No `@ValidateBody` / `@Body` decorator is introduced anywhere.
-- [ ] `apps/api/openapi.json` regenerated and committed.
-- [ ] `make lint`, `make test-api`, `make build` pass.
+- [x] `register`, `password`, `activate`, and `admin-badges` controllers accept typed input; no `safeParse(unknown)` remains in them.
+- [x] Their routes declare `request.body` schemas and use `c.req.valid('json')`.
+- [x] All body-validation failures across these routes return the **same** standardized 400 body.
+- [x] Domain-error paths (status codes + messages) are unchanged and still covered by tests.
+- [x] No `@ValidateBody` / `@Body` decorator is introduced anywhere.
+- [x] `apps/api/openapi.json` regenerated and committed.
+- [x] `make lint`, `make test-api`, `make build` pass.
 
 ---
 
