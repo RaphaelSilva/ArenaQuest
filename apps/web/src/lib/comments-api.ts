@@ -56,7 +56,7 @@ export function createCommentsApi(http: HttpTransport) {
     async toggleLike(commentId: string): Promise<void> {
       let res: Response;
       try {
-        res = await http('POST', `/comments/${commentId}/like`);
+        res = await http('POST', `/me/comments/${commentId}/like`);
       } catch {
         throw new CommentsApiError('NetworkError', 0, 'Network failure.');
       }

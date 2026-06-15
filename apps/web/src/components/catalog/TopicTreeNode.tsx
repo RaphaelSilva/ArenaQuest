@@ -40,7 +40,7 @@ function ChevronIcon({ open }: { open: boolean }) {
 type Props = {
   node: TopicTreeData;
   depth: number;
-  expandedIds: Set<string>;
+  expandedIds: ReadonlySet<string>;
   progressMap: Map<string, TopicProgressStatus>;
   activeId: string | null;
   onToggle: (id: string) => void;

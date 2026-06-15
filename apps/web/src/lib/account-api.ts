@@ -33,7 +33,7 @@ export function createAccountApi(http: HttpTransport) {
     async changePassword(currentPassword: string, newPassword: string): Promise<void> {
       let res: Response;
       try {
-        res = await http('POST', '/account/change-password', {
+        res = await http('POST', '/me/change-password', {
           body: JSON.stringify({ currentPassword, newPassword }),
         });
       } catch {

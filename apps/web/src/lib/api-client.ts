@@ -2,6 +2,8 @@
 
 import type { FetchWithAuthOptions } from './fetch-with-auth';
 import { fetchWithAuth } from './fetch-with-auth';
+
+const API_VERSION = '/v1';
 import * as topicsApiModule from './topics-api';
 import * as tasksApiModule from './tasks-api';
 import * as accountApiModule from './account-api';
@@ -29,7 +31,7 @@ export function createFetchTransport(
   return async (method: string, path: string, options?: FetchWithAuthOptions): Promise<Response> => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
     return fetchWithAuth(
-      `${apiUrl}${path}`,
+      `${apiUrl}${API_VERSION}${path}`,
       {
         ...options,
         method,

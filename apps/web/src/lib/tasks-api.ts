@@ -50,7 +50,7 @@ export function createTasksApi(http: HttpTransport) {
     },
 
     async checkIn(taskId: string, stageId: string): Promise<{ result: CheckInResult; created: boolean } | { error: CheckInError }> {
-      const res = await http('POST', `/tasks/${taskId}/stages/${stageId}/check-in`);
+      const res = await http('POST', `/me/tasks/${taskId}/stages/${stageId}/check-in`);
       if (res.ok) {
         const body = (await res.json()) as CheckInResult;
         return { result: body, created: res.status === 201 };

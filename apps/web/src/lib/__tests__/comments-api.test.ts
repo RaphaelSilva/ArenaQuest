@@ -110,7 +110,7 @@ describe('createCommentsApi', () => {
       const http = makeTransport([makeResponse({ status: 200 })]);
       const api = createCommentsApi(http);
       await expect(api.toggleLike('c1')).resolves.toBeUndefined();
-      expect(http).toHaveBeenCalledWith('POST', '/comments/c1/like');
+      expect(http).toHaveBeenCalledWith('POST', '/me/comments/c1/like');
     });
 
     it('throws Unauthorized on 401', async () => {

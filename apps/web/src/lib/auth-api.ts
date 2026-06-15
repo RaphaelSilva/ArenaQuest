@@ -1,6 +1,7 @@
 import type { Entities } from '@arenaquest/shared/types/entities';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+const API_VERSION = '/v1';
 
 export type LoginResponse = {
   accessToken: string;
@@ -45,7 +46,7 @@ export const authApi = {
   async login(email: string, password: string): Promise<LoginResponse> {
     let res: Response;
     try {
-      res = await fetch(`${API_URL}/auth/login`, {
+      res = await fetch(`${API_URL}${API_VERSION}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -69,14 +70,14 @@ export const authApi = {
   },
 
   async logout(): Promise<void> {
-    await fetch(`${API_URL}/auth/logout`, {
+    await fetch(`${API_URL}${API_VERSION}/auth/logout`, {
       method: 'POST',
       credentials: 'include',
     });
   },
 
   async refresh(): Promise<{ accessToken: string } | null> {
-    const res = await fetch(`${API_URL}/auth/refresh`, {
+    const res = await fetch(`${API_URL}${API_VERSION}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
     });
@@ -88,7 +89,7 @@ export const authApi = {
   async register(input: { name: string; email: string; password: string }): Promise<{ status: 'pending_activation' }> {
     let res: Response;
     try {
-      res = await fetch(`${API_URL}/auth/register`, {
+      res = await fetch(`${API_URL}${API_VERSION}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -118,7 +119,7 @@ export const authApi = {
   async forgotPassword(email: string): Promise<void> {
     let res: Response;
     try {
-      res = await fetch(`${API_URL}/auth/forgot-password`, {
+      res = await fetch(`${API_URL}${API_VERSION}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -137,7 +138,7 @@ export const authApi = {
   async resetPassword(token: string, newPassword: string): Promise<void> {
     let res: Response;
     try {
-      res = await fetch(`${API_URL}/auth/reset-password`, {
+      res = await fetch(`${API_URL}${API_VERSION}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, newPassword }),
@@ -159,7 +160,7 @@ export const authApi = {
   async activate(input: { token: string }): Promise<{ status: 'activated' | 'already_active' }> {
     let res: Response;
     try {
-      res = await fetch(`${API_URL}/auth/activate`, {
+      res = await fetch(`${API_URL}${API_VERSION}/auth/activate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
