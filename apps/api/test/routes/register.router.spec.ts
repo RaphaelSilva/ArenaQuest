@@ -2,6 +2,7 @@ import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
 
 // ---------------------------------------------------------------------------
 // DB setup
@@ -37,7 +38,7 @@ async function request(
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (ip) headers['CF-Connecting-IP'] = ip;
 
-  const req = new IncomingRequest(`http://example.com${path}`, {
+  const req = new IncomingRequest(`http://example.com${v1(path)}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,

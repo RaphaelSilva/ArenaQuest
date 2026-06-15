@@ -4,6 +4,7 @@ import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { sha256Hex } from '@api/adapters/db/hash';
 import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
 
 // Admin token signed with the test JWT_SECRET — avoids a real login round-trip.
 let adminToken: string;
@@ -36,7 +37,7 @@ async function req(
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.token) headers['Authorization'] = `Bearer ${options.token}`;
 
-  const request = new IncomingRequest(`http://example.com${path}`, {
+  const request = new IncomingRequest(`http://example.com${v1(path)}`, {
     method,
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -402,7 +403,7 @@ describe('Session revocation on admin mutations (S-02)', () => {
 
     // Refresh attempt with the pre-deactivation cookie must fail.
     const refreshReq = new (Request as typeof globalThis.Request)(
-      'http://example.com/auth/refresh',
+      `http://example.com${v1('/auth/refresh')}`,
       { method: 'POST', headers: { Cookie: refreshCookie } },
     );
     const ctx = createExecutionContext();

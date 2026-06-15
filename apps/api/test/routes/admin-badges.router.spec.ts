@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
 
 let adminToken: string;
 
@@ -29,7 +30,7 @@ async function adminRequest(
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const request = new IncomingRequest(`http://example.com${path}`, {
+  const request = new IncomingRequest(`http://example.com${v1(path)}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,

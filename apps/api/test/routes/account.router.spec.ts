@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
 
 // ---------------------------------------------------------------------------
 // DB setup
@@ -26,7 +27,7 @@ async function post(
   if (options.token) headers['Authorization'] = `Bearer ${options.token}`;
   if (options.cookie) headers['Cookie'] = options.cookie;
 
-  const req = new IncomingRequest(`http://example.com${path}`, {
+  const req = new IncomingRequest(`http://example.com${v1(path)}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),

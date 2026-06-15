@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
 
 // ---------------------------------------------------------------------------
 // DB setup
@@ -14,7 +15,7 @@ const TEST_USER_ID = 'test-user-pw-router';
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
 async function post(path: string, body: unknown, ip = '1.2.3.4'): Promise<Response> {
-  const req = new IncomingRequest(`http://example.com${path}`, {
+  const req = new IncomingRequest(`http://example.com${v1(path)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip },
     body: JSON.stringify(body),

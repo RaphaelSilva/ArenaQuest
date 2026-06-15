@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
 
 // ---------------------------------------------------------------------------
 // DB bootstrap
@@ -22,7 +23,7 @@ let listedTopic: string;   // pre-granted to STUDENT_ID for the GET test
 let groupTopic: string;    // pre-granted to GROUP_ID for the group GET test
 
 async function post(path: string, body: unknown, token = adminToken) {
-  const req = new Request(`http://localhost${path}`, {
+  const req = new Request(`http://localhost${v1(path)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -34,7 +35,7 @@ async function post(path: string, body: unknown, token = adminToken) {
 }
 
 async function get(path: string, token = adminToken) {
-  const req = new Request(`http://localhost${path}`, {
+  const req = new Request(`http://localhost${v1(path)}`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -45,7 +46,7 @@ async function get(path: string, token = adminToken) {
 }
 
 async function del(path: string, token = adminToken, body?: unknown) {
-  const req = new Request(`http://localhost${path}`, {
+  const req = new Request(`http://localhost${v1(path)}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -57,7 +58,7 @@ async function del(path: string, token = adminToken, body?: unknown) {
 }
 
 async function noAuthGet(path: string) {
-  const req = new Request(`http://localhost${path}`, { method: 'GET' });
+  const req = new Request(`http://localhost${v1(path)}`, { method: 'GET' });
   const ctx = createExecutionContext();
   const res = await worker.fetch(req, env as AppEnv, ctx);
   await waitOnExecutionContext(ctx);

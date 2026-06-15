@@ -2,6 +2,7 @@ import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:
 import { describe, it, expect, beforeAll } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 
 // ---------------------------------------------------------------------------
@@ -46,7 +47,7 @@ async function request(
   if (cookie) headers['Cookie'] = cookie;
   if (ip) headers['CF-Connecting-IP'] = ip;
 
-  const req = new IncomingRequest(`http://example.com${path}`, {
+  const req = new IncomingRequest(`http://example.com${v1(path)}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
