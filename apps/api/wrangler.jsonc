@@ -30,7 +30,7 @@
 		// Google OAuth — replace with your production OAuth client values.
 		// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET`
 		"GOOGLE_CLIENT_ID": "",
-		"GOOGLE_REDIRECT_URI": "https://api.arenaquest.app/auth/google/callback"
+		"GOOGLE_REDIRECT_URI": "https://api.arenaquest.app/v1/auth/google/callback"
 	},
 	/**
 	 * D1 Databases
@@ -114,7 +114,7 @@
 				// Google OAuth — replace with your staging OAuth client values.
 				// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET --env staging`
 				"GOOGLE_CLIENT_ID": "",
-				"GOOGLE_REDIRECT_URI": "https://api-staging.arenaquest.app/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api-staging.arenaquest.app/v1/auth/google/callback"
 			},
 			"observability": {
 				"enabled": true,
