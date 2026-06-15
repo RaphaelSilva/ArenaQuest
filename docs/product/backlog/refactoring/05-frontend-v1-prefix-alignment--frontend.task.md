@@ -1,7 +1,7 @@
 # Task 05: Align Web Clients to the `/v1` Contract & Adopt Generated Types — Frontend (RFC 0003 — R3)
 
 ## Metadata
-- **Status:** Open
+- **Status:** ✅ Done
 - **Complexity:** Medium
 - **Team:** Frontend Web
 - **Milestone:** RFC 0003 — Route reorganization & OpenAPI (remaining work R3)
@@ -89,12 +89,12 @@ Resolve in planning whether the prefix is best expressed as a constant prepended
 ---
 
 ## Acceptance Criteria
-- [ ] Every transport-routed call resolves to `/v1/...`; the prefix is defined in exactly one place in `api-client.ts`.
-- [ ] `auth-api.ts` and the `login/page.tsx` OAuth link target `/v1/auth/...`.
-- [ ] No `*-api.ts` module hardcodes `/v1` in individual path strings.
-- [ ] At least the public/catalog and comments client methods consume types from `api-types.gen.ts`.
-- [ ] `.env.example` documents the base-URL convention; no `/v1/v1` double-prefix can occur.
-- [ ] `make lint`, `make test-web`, `make build` pass.
+- [x] Every transport-routed call resolves to `/v1/...`; the prefix is defined in exactly one place in `api-client.ts`.
+- [x] `auth-api.ts` and the `login/page.tsx` OAuth link target `/v1/auth/...`.
+- [x] No `*-api.ts` module hardcodes `/v1` in individual path strings.
+- [x] At least the public/catalog and comments client methods consume types from `api-types.gen.ts`.
+- [x] `.env.example` documents the base-URL convention; no `/v1/v1` double-prefix can occur.
+- [x] `make lint`, `make test-web`, `make build` pass.
 - [ ] Manual smoke test passes against a local API **with the shim still present** (this task does not remove it).
 
 ---
