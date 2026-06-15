@@ -64,6 +64,15 @@ export class AppRouter {
     // Mount unversioned public health route first
     app.route('/', buildHealthRouter());
 
+    // Google OAuth redirect shim: Google Console keeps pointing to /auth/google/*
+    // (no version prefix), but the real handlers live under /v1. These two routes
+    // forward the browser to the versioned paths, preserving all query parameters.
+    app.get('/auth/google', (c) => c.redirect('/v1/auth/google', 302));
+    app.get('/auth/google/callback', (c) => {
+      const { search } = new URL(c.req.url);
+      return c.redirect(`/v1/auth/google/callback${search}`, 302);
+    });
+
     // Consolidate versioned business routes under /v1 sub-app
     const v1 = new OpenAPIHono();
     v1.route('/', buildPublicRouter(container));

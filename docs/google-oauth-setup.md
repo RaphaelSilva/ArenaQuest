@@ -20,9 +20,9 @@ Add one URI per environment:
 
 | Environment | Redirect URI |
 |-------------|--------------|
-| Local dev   | `http://localhost:8787/v1/auth/google/callback` |
-| Staging     | `https://api-staging.arenaquest.app/v1/auth/google/callback` |
-| Production  | `https://api.arenaquest.app/v1/auth/google/callback` |
+| Local dev   | `http://localhost:8787/auth/google/callback` |
+| Staging     | `https://api-staging.arenaquest.app/auth/google/callback` |
+| Production  | `https://api.arenaquest.app/auth/google/callback` |
 
 > You can create separate OAuth clients per environment (recommended) or a single
 > client with all three redirect URIs listed.
@@ -43,7 +43,7 @@ Add one URI per environment:
    ```
    GOOGLE_CLIENT_ID=<paste Client ID here>
    GOOGLE_CLIENT_SECRET=<paste Client Secret here>
-   GOOGLE_REDIRECT_URI=http://localhost:8787/v1/auth/google/callback
+   GOOGLE_REDIRECT_URI=http://localhost:8787/auth/google/callback
    ```
 
 3. Start the API:
@@ -88,8 +88,8 @@ No additional APIs are required for the basic sign-in flow implemented in Task 0
 
 After configuration, test the full flow:
 
-1. `GET /v1/auth/google` — should redirect to Google's OAuth consent screen.
-2. Complete the consent flow — Google redirects back to `/v1/auth/google/callback`.
+1. `GET /auth/google` — should redirect to Google's OAuth consent screen.
+2. Complete the consent flow — Google redirects back to `/auth/google/callback`.
 3. The API should respond with a redirect to `<WEB_BASE_URL>/auth/callback?token=…`.
 
 If the redirect URI in the request doesn't match the Console configuration, Google

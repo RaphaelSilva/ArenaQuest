@@ -29,4 +29,4 @@ WEB_BASE_URL=http://localhost:3000
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 # Must match one of the Authorised Redirect URIs configured in the Google Console.
-GOOGLE_REDIRECT_URI=http://localhost:8787/v1/auth/google/callback
+GOOGLE_REDIRECT_URI=http://localhost:8787/auth/google/callback
