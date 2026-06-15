@@ -1,7 +1,7 @@
 # Task 06: Align API Tests to `/v1` & Remove the Legacy-Rewrite Shim (RFC 0003 — R4)
 
 ## Metadata
-- **Status:** Open
+- **Status:** ✅ Done
 - **Complexity:** Medium
 - **Team:** Backend API
 - **Milestone:** RFC 0003 — Route reorganization & OpenAPI (remaining work R4)
@@ -76,12 +76,12 @@ The same shim also covers the **web app** in local/staging. If the shim is remov
 ---
 
 ## Acceptance Criteria
-- [ ] A shared helper centralizes the `/v1` prefix for tests; no spec hardcodes the prefix ad hoc.
-- [ ] All affected route specs target `/v1/...`; `grep -rn "req('[A-Z]*', '/\(auth\|topics\|tasks\|me\|admin\|leaderboard\)" apps/api/test` shows no un-prefixed business paths.
-- [ ] The legacy-rewrite block is removed from `apps/api/src/index.ts`.
-- [ ] A test asserts an un-prefixed business path now `404`s and its `/v1` counterpart succeeds.
-- [ ] Task 05 is merged before the commit that removes the shim.
-- [ ] `make lint`, `make test-api`, `make build` pass; full suite green against the un-shimmed worker.
+- [x] A shared helper centralizes the `/v1` prefix for tests; no spec hardcodes the prefix ad hoc.
+- [x] All affected route specs target `/v1/...`; `grep -rn "req('[A-Z]*', '/\(auth\|topics\|tasks\|me\|admin\|leaderboard\)" apps/api/test` shows no un-prefixed business paths.
+- [x] The legacy-rewrite block is removed from `apps/api/src/index.ts`.
+- [x] A test asserts an un-prefixed business path now `404`s and its `/v1` counterpart succeeds.
+- [x] Task 05 is merged before the commit that removes the shim.
+- [x] `make lint`, `make test-api`, `make build` pass; full suite green against the un-shimmed worker.
 
 ---
 
