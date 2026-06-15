@@ -2,6 +2,7 @@ import { env, createExecutionContext, waitOnExecutionContext, fetchMock } from '
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
 
 // ---------------------------------------------------------------------------
 // DB setup
@@ -11,7 +12,7 @@ import { applyMigrations } from '../helpers/apply-migrations';
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
 async function get(path: string): Promise<Response> {
-  const req = new IncomingRequest(`http://example.com${path}`, { method: 'GET' });
+  const req = new IncomingRequest(`http://example.com${v1(path)}`, { method: 'GET' });
   const ctx = createExecutionContext();
   const res = await worker.fetch(req, env as AppEnv, ctx);
   await waitOnExecutionContext(ctx);

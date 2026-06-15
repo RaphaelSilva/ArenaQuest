@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
 
 let adminToken: string;
 let contentCreatorToken: string;
@@ -33,7 +34,7 @@ async function req(
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.token) headers['Authorization'] = `Bearer ${options.token}`;
 
-  const request = new IncomingRequest(`http://example.com${path}`, {
+  const request = new IncomingRequest(`http://example.com${v1(path)}`, {
     method,
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,

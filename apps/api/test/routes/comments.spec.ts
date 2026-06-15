@@ -2,6 +2,7 @@ import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:
 import { describe, it, expect, beforeAll } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 
 // ---------------------------------------------------------------------------
@@ -61,7 +62,7 @@ async function req(method: string, path: string, options: { body?: unknown; toke
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.token) headers['Authorization'] = `Bearer ${options.token}`;
 
-  const request = new IncomingRequest(`http://example.com${path}`, {
+  const request = new IncomingRequest(`http://example.com${v1(path)}`, {
     method,
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -189,7 +190,7 @@ describe('POST /topics/:id/comments', () => {
   });
 
   it('returns 400 for malformed JSON body', async () => {
-    const request = new IncomingRequest(`http://example.com/topics/${TOPIC_ID}/comments`, {
+    const request = new IncomingRequest(`http://example.com${v1(`/topics/${TOPIC_ID}/comments`)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
       body: 'not-valid-json{{{',
@@ -263,7 +264,11 @@ describe('DELETE /me/comments/:id', () => {
 
 describe('OpenAPI contract', () => {
   it('comment endpoints appear in /openapi.json', async () => {
-    const res = await req('GET', '/openapi.json');
+    // /openapi.json is unversioned — call worker.fetch directly to avoid the v1() prefix in req()
+    const r = new IncomingRequest('http://example.com/openapi.json', { method: 'GET' });
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(r, env as AppEnv, ctx);
+    await waitOnExecutionContext(ctx);
     expect(res.status).toBe(200);
     const doc = await res.json<{ paths: Record<string, unknown> }>();
     const commentPath = doc.paths['/v1/topics/{id}/comments'] as Record<string, unknown> | undefined;
