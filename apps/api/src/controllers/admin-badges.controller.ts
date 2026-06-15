@@ -1,6 +1,10 @@
 import type { IBadgeRepository, BadgeRecord, UserBadgeRecord } from '@arenaquest/shared/ports';
 import type { ControllerResult } from '@api/core/result';
-import { type CreateBadgeInput, type UpdateBadgeInput } from '@api/openapi/components/entities';
+import { z } from 'zod';
+import { CreateBadgeBodySchema, UpdateBadgeBodySchema } from '@api/openapi/components/entities';
+
+export type CreateBadgeInput = z.infer<typeof CreateBadgeBodySchema>;
+export type UpdateBadgeInput = z.infer<typeof UpdateBadgeBodySchema>;
 
 export class AdminBadgesController {
   constructor(private readonly repo: IBadgeRepository) {}

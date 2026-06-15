@@ -178,6 +178,5 @@ export const UpdateBadgeBodySchema = z.object({
   active: z.boolean().optional().openapi({ example: true }),
 }).openapi('UpdateBadgeBody');
 
-export type CreateBadgeInput = z.infer<typeof CreateBadgeBodySchema>;
-export type UpdateBadgeInput = z.infer<typeof UpdateBadgeBodySchema>;
+
 
