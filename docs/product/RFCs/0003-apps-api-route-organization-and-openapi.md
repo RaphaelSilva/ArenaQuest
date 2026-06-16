@@ -1,6 +1,6 @@
 # RFC 0003 — Route reorganization and OpenAPI/Swagger adoption in `apps/api`
 
-- **Status:** Partially Implemented — Revised 2026-06-11 (originally Draft 2026-05-24)
+- **Status:** Implemented — Revised 2026-06-16 (originally Draft 2026-05-24; "Partially Implemented" revision 2026-06-11)
 - **Author:** raphaelsilva
 - **Scope:** `apps/api/src/routes/**`, `apps/api/src/index.ts`, `apps/api/src/controllers/**` (signatures), `apps/web/src/lib/*-api.ts`, `apps/api/test/**`, public API documentation
 
@@ -12,17 +12,18 @@
 |---|---|---|
 | `/v1` prefix on all business routes | ✅ Done | `routes/index.ts:76` (`app.route('/v1', v1)`) |
 | Folder structure (`public/`, `auth/`, `me/`, `admin/`, `_shared/`, `openapi/`) | ✅ Done | `routes/public/catalog.topics.ts`, `routes/me/index.ts`, `routes/auth/*` |
-| `OpenAPIHono` + declarative routes with schema | 🟡 Partial | `admin/tasks.ts`, `catalog.topics.ts` use `createRoute`/`router.openapi`; `comments.router.ts` still raw `Hono` |
+| `OpenAPIHono` + declarative routes with schema | ✅ Done | All mounted routers use `createRoute`/`router.openapi` (incl. `comments.router.ts`, `routes/auth/*`) |
 | Unified envelope (`respondWith`/`respondCreated`/`respondNoContent`) | ✅ Done | imported in `catalog.topics.ts:4` (`@api/routes/_shared/envelope`) |
 | `AppContainer` per bounded context | ✅ Done | `routes/index.ts:28`, `@api/container` |
 | Scalar `/docs` + `/openapi.json` | ✅ Done | `index.ts:13,32`, `openapi/document.ts:12` (`doc31`) |
 | `dump-openapi` script + committed `openapi.json` | ✅ Done | `apps/api/scripts/dump-openapi.ts`, `apps/api/openapi.json` |
-| Generated types in `apps/web` | 🟡 Exists, not wired | `apps/web/src/lib/api-types.gen.ts` present but the hand-written clients don't use it |
-| Comments router migrated to OpenAPI | ❌ To do | `comments.router.ts` is raw `Hono` → absent from `/docs` |
-| Controller input standardized | ❌ To do | three patterns coexist (see §4.3) |
-| Frontend aligned to `/v1` | ❌ To do | clients still call un-prefixed paths (see §6) |
-| Tests aligned to the new paths | ❌ To do | ~64 spec files hit literal paths (see §7) |
+| Generated types in `apps/web` | ✅ Wired | `api-types.gen.ts` now consumed by the clients (e.g. `topics-api.ts`); coverage expands as clients are touched |
+| Comments router migrated to OpenAPI | ✅ Done | `comments.router.ts` is `OpenAPIHono`; `/topics/{id}/comments` present in `openapi.json` (Task 03 / R1) |
+| Controller input standardized | ✅ Done | Pattern B everywhere in scope: `routes/auth/*` + `admin/badges.ts` declarative + `c.req.valid('json')` (Task 04 / R2) |
+| Frontend aligned to `/v1` | ✅ Done | `/v1` centralized in `api-client.ts` (`API_VERSION`), `auth-api.ts`, OAuth link in `login/page.tsx` (Tasks 01/02/05 / R3) |
+| Tests aligned to the new paths | ✅ Done | `test/helpers/v1.ts` prepends `/v1`; legacy-rewrite shim removed from `src/index.ts` (Task 06 / R4) |
 | `oasdiff` contract gate in CI | ⏸️ Deferred | postponed until production (see §9, PD3) |
+| **Residual cleanup** — orphaned legacy routers | ✅ Done (2026-06-16) | `routes/{register,password,activate}.router.ts` (dead duplicates left by Task 04, superseded by `routes/auth/*.ts`) deleted; suite green (62 files / 621 tests), build passes. |
 
 ## 1. Context
 
@@ -165,17 +166,19 @@ This directly answers **PD4** (§9): `@ValidateBody`/`@Body` decorators do **not
 - `/docs` — Scalar UI via `@scalar/hono-api-reference` (`index.ts:32`).
 - `apps/api/scripts/dump-openapi.ts` exports the committed `apps/api/openapi.json`; `apps/web/src/lib/api-types.gen.ts` is generated from it (consumption still pending — see §6).
 
-## 5. Remaining Work (single cutover)
+## 5. Remaining Work (single cutover) — ✅ completed 2026-06
 
-> **The application is not in production.** There are no live clients to keep compatible, so the original incremental, backward-compatible roadmap (legacy rewrites, deprecation windows, "frontend will not break") no longer applies and has been removed. The remaining work is a single coordinated cutover validated by the test suite.
+> **The application is not in production.** There are no live clients to keep compatible, so the original incremental, backward-compatible roadmap (legacy rewrites, deprecation windows, "frontend will not break") no longer applies and has been removed. The remaining work was a single coordinated cutover validated by the test suite — **now complete**. Each deliverable shipped as a `docs/product/backlog/refactoring/` task; see the mapping below.
 
-| # | Deliverable | Notes |
-|---|---|---|
-| R1 | **Migrate `comments.router.ts` to `OpenAPIHono`** | Make `/v1/topics/:id/comments` (create/list) declarative so it appears in `/docs`/`openapi.json`; reuse `respondWith`/`respondCreated`; add try/catch on body parse (today malformed JSON → 500). Document the comments resource model (topic-scoped create/list vs `/me/comments` actions). |
-| R2 | **Standardize controllers on Pattern B** | Remove `unknown`+`safeParse` from register/password/activate/admin-badges; move their schemas to route `request.body`; unify the 400 error body. |
-| R3 | **Frontend alignment** (see §6) | Point `apps/web/src/lib/*-api.ts` at `/v1/...` and start consuming `api-types.gen.ts`. |
-| R4 | **Test alignment + remove legacy shim** (see §7) | Update literal paths in `apps/api/test/**` to `/v1/...` (path-constants helper); then remove the legacy-rewrite shim in `src/index.ts:42-55` (depends on R3 being merged so the web app keeps working). |
-| R5 | **Defer `oasdiff` contract gate** | Out of scope until production; only the committed-`openapi.json` drift check runs for now (see §9, PD3). |
+| # | Deliverable | Backlog task | Status |
+|---|---|---|---|
+| R1 | **Migrate `comments.router.ts` to `OpenAPIHono`** — `/v1/topics/:id/comments` declarative, in `/docs`/`openapi.json`; `respondWith`/`respondCreated`; try/catch on body parse. | `03-api-comments-openapi-migration` | ✅ Done |
+| R2 | **Standardize controllers on Pattern B** — removed `unknown`+`safeParse` from register/password/activate/admin-badges; schemas moved to route `request.body`; unified 400 body. | `04-api-controller-input-standardization` | ✅ Done |
+| R3 | **Frontend alignment** (see §6) — `/v1` centralized in `api-client.ts`; clients begin consuming `api-types.gen.ts`. | `01`/`02`/`05-frontend-v1-prefix-alignment` | ✅ Done |
+| R4 | **Test alignment + remove legacy shim** (see §7) — `/v1` prepended via `test/helpers/v1.ts`; legacy-rewrite shim deleted from `src/index.ts`. | `06-api-test-v1-paths-and-remove-legacy-shim` | ✅ Done |
+| R5 | **Defer `oasdiff` contract gate** | — | ⏸️ Deferred until production (see §9, PD3) |
+
+**Residual (resolved 2026-06-16):** R2's implementation introduced `routes/auth/{register,activate,password}.ts` (declarative, mounted via `routes/auth/index.ts`) but left the superseded top-level `routes/{register,password,activate}.router.ts` files in the tree. They were **orphaned** (imported by nothing; the live routes and tests use `routes/auth/*`) and have now been deleted — suite green (62 files / 621 tests), build passes. Note: `routes/comments.router.ts` and `routes/topics.router.ts` are **not** orphans — those are still imported by `routes/index.ts`.
 
 ## 6. Frontend alignment (new — in scope)
 
