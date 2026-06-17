@@ -16,6 +16,7 @@ let studentToken: string;
 
 // Topic IDs populated in beforeAll
 let publishedTopicId: string;
+let ungrantedTopicId: string;
 let readyMediaStorageKey: string;
 
 beforeAll(async () => {
@@ -41,6 +42,14 @@ beforeAll(async () => {
   });
   const pubTopic = await pubRes.json<{ id: string }>();
   publishedTopicId = pubTopic.id;
+
+  // Create a second published root topic (not granted to student).
+  const ungrantedRes = await req('POST', '/admin/topics', {
+    token: adminToken,
+    body: { title: 'Ungranted Root', status: 'published' },
+  });
+  const ungrantedTopic = await ungrantedRes.json<{ id: string }>();
+  ungrantedTopicId = ungrantedTopic.id;
 
   // Create a draft root topic.
   await req('POST', '/admin/topics', {
@@ -185,5 +194,42 @@ describe('GET /topics/:id', () => {
   it('sets Cache-Control: private, max-age=30', async () => {
     const res = await req('GET', `/topics/${publishedTopicId}`, { token: studentToken });
     expect(res.headers.get('Cache-Control')).toBe('private, max-age=30');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 0 — enrollment enforcement
+// ---------------------------------------------------------------------------
+
+describe('Phase 0 — enrollment enforcement', () => {
+  it('GET /topics as student returns only granted topics, not ungranted ones', async () => {
+    const res = await req('GET', '/topics', { token: studentToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { id: string }[] }>();
+    const topicIds = body.data.map(t => t.id);
+    expect(topicIds).toContain(publishedTopicId);
+    expect(topicIds).not.toContain(ungrantedTopicId);
+  });
+
+  it('GET /topics as admin returns all published topics', async () => {
+    const res = await req('GET', '/topics', { token: adminToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { id: string }[] }>();
+    const topicIds = body.data.map(t => t.id);
+    expect(topicIds).toContain(publishedTopicId);
+    expect(topicIds).toContain(ungrantedTopicId);
+  });
+
+  it('GET /topics/{ungrantedId} as student returns 404', async () => {
+    const res = await req('GET', `/topics/${ungrantedTopicId}`, { token: studentToken });
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /topics/{ungrantedId} as admin returns 200', async () => {
+    const res = await req('GET', `/topics/${ungrantedTopicId}`, { token: adminToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ id: string; title: string }>();
+    expect(body.id).toBe(ungrantedTopicId);
+    expect(body.title).toBe('Ungranted Root');
   });
 });
