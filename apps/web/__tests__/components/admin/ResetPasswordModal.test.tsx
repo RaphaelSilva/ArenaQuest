@@ -171,7 +171,9 @@ describe('ResetPasswordModal', () => {
 
       expect(noteField.value).toHaveLength(500);
       expect(screen.getByText(new RegExp(d.noteCharCount(500), 'i'))).toBeInTheDocument();
-    });
+      // Typing 600 chars re-renders the controlled textarea 600× (~1.5s on its own); give
+      // generous headroom so parallel-suite CPU contention can't push it past the timeout.
+    }, 15000);
 
     it('calls API with correct payload on confirm', async () => {
       const user = userEvent.setup();
