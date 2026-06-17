@@ -44,15 +44,21 @@ staging walk-through (see §6 for the one remaining manual step).
 
 ## 3. Test summary
 
-Verified via **targeted specs** (the full `make test-api` is unstable on the WSL2 host —
-see §5). Aggregate of the milestone-relevant suites on the candidate branch:
+Both full suites pass green on the candidate branch:
 
-- **Backend — 114 tests green** across 7 specs: `topics.router`, `d1-enrollment-repository`
-  (incl. benchmark), `d1-topic-node-repository`, `topics.controller`,
-  `admin-topics.controller`, `comments`, `admin-groups.router`.
-- **Web — 23 tests green** across 4 specs: `admin-topics-api`, `admin-groups-api`,
-  `i18n-plumbing`, `users` (list). `check-i18n-coverage.js` passes (zero hardcoded strings).
+- **`make test-api` — 651 passed | 3 skipped (63 files).** Includes all milestone specs
+  (`topics.router`, `d1-enrollment-repository` incl. benchmark, `d1-topic-node-repository`,
+  `topics.controller`, `admin-topics.controller`, `comments`, `admin-groups.router`).
+- **`make test-web` — 183 passed | 6 skipped (26 files).** `check-i18n-coverage.js` passes
+  (zero hardcoded strings).
 - New/changed files lint clean (scoped). Shared package builds.
+
+> **Post-merge fix (2026-06-17):** the resolver benchmark added in Task 03 originally asserted
+> the *worst-of-20* wall-clock sample against a hard 50 ms ceiling, which flaked under full-suite
+> parallel CPU contention (a single jittery sample > 50 ms) despite the query running ~11–21 ms
+> median. It now warms up, asserts the stable **median < 50 ms** (the RFC target) plus a generous
+> worst-case ceiling (< 250 ms) that still catches a catastrophic algorithmic regression. After
+> this, `make test-api` passes cleanly across repeated runs.
 
 ## 4. Notable decisions & deviations
 
@@ -80,10 +86,10 @@ see §5). Aggregate of the milestone-relevant suites on the candidate branch:
 - **`make lint` (repo-wide) is red on `apps/api/scripts/generate-bruno.ts`** — 14
   pre-existing `no-explicit-any` errors in an out-of-scope file (red on the clean base).
   Per the scope guardrail it was not bundled. All milestone-changed files lint clean.
-- **Full `make test-api` is unstable on this WSL2 host** — the
-  `@cloudflare/vitest-pool-workers` RPC times out (`Timeout calling "onTaskUpdate"`) when
-  all 62 specs run in parallel, producing phantom failures. Verification was done via
-  targeted spec batches throughout.
+- **`make test-api` can be noisy on this WSL2 host under heavy back-to-back load** — the
+  `@cloudflare/vitest-pool-workers` RPC occasionally times out (`Timeout calling "onTaskUpdate"`)
+  when invocations overlap. Run on its own it passes deterministically (651 tests). During
+  development, intermediate verification used targeted spec batches; the final full run is green.
 - **Strict `tsc --noEmit` is pre-red on both `apps/api` and `apps/web`** (Hono/OpenAPI
   handler-type friction; a pre-existing `User.timezone`/`updatedAt` drift on the API side;
   6 pre-existing `TopicNode` fixture errors on the web side). The project gates on
