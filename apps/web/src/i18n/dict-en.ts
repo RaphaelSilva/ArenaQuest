@@ -218,8 +218,6 @@ export const dictEn = {
       detail: {
         backToUsers: '← Back to users',
         resetPasswordButton: 'Reset Password',
-        tabEnrollments: 'enrolments',
-        tabProfile: 'profile',
         rolesLabel: 'Roles',
         statusLabel: 'Status',
         memberSinceLabel: 'Member since',
@@ -416,6 +414,7 @@ export const dictEn = {
       searchGroupsPlaceholder: 'Search groups…',
       pickPrincipalPrompt: 'Select a user or group to manage their topic access.',
       membersCount: (n: number) => `${n} ${n === 1 ? 'member' : 'members'}`,
+      manageLink: 'Manage access',
     },
   },
   catalog: {

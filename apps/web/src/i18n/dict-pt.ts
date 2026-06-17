@@ -216,8 +216,6 @@ export const dictPt = {
       detail: {
         backToUsers: '← Voltar para usuários',
         resetPasswordButton: 'Redefinir Senha',
-        tabEnrollments: 'matrículas',
-        tabProfile: 'perfil',
         rolesLabel: 'Permissões',
         statusLabel: 'Status',
         memberSinceLabel: 'Membro desde',
@@ -414,6 +412,7 @@ export const dictPt = {
       searchGroupsPlaceholder: 'Pesquisar grupos…',
       pickPrincipalPrompt: 'Selecione um usuário ou grupo para gerenciar seus acessos.',
       membersCount: (n: number) => `${n} ${n === 1 ? 'membro' : 'membros'}`,
+      manageLink: 'Gerenciar acesso',
     },
   },
   catalog: {
