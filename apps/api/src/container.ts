@@ -12,6 +12,7 @@ import { D1PasswordResetTokenRepository } from '@api/adapters/db/d1-password-res
 import { D1OAuthAccountRepository } from '@api/adapters/db/d1-oauth-account-repository';
 import { D1ProgressRepository } from '@api/adapters/db/d1-progress-repository';
 import { D1EnrollmentRepository } from '@api/adapters/db/d1-enrollment-repository';
+import { D1UserGroupRepository } from '@api/adapters/db/d1-user-group-repository';
 import { D1QuestRepository } from '@api/adapters/db/d1-quest-repository';
 import { D1BadgeRepository } from '@api/adapters/db/d1-badge-repository';
 import { D1GamificationRepository } from '@api/adapters/db/d1-gamification-repository';
@@ -47,6 +48,7 @@ import type {
   ITaskLinkingRepository,
   IProgressRepository,
   IEnrollmentRepository,
+  IUserGroupRepository,
   IQuestRepository,
   IBadgeRepository,
   IGamificationRepository,
@@ -69,6 +71,7 @@ export interface IdentityContext {
   passwordResetTokens: IPasswordResetTokenRepository;
   oauthAccounts: IOAuthAccountRepository;
   authService: AuthService;
+  userGroups: IUserGroupRepository;
 }
 
 export interface ContentContext {
@@ -175,6 +178,9 @@ export function buildContainer(env: Env): AppContainer {
   const taskLinks = new D1TaskLinkingRepository(env.DB);
   const commentRepo = new D1CommentRepository(env.DB);
 
+  // Identity: user groups
+  const userGroups = new D1UserGroupRepository(env.DB);
+
   // Progress repos
   const progressRepo = new D1ProgressRepository(env.DB);
   const enrollmentRepo = new D1EnrollmentRepository(env.DB);
@@ -256,7 +262,7 @@ export function buildContainer(env: Env): AppContainer {
   const activateController = new ActivateController(activationTokens);
 
   return {
-    identity: { users, tokens, activationTokens, passwordResetTokens, oauthAccounts, authService },
+    identity: { users, tokens, activationTokens, passwordResetTokens, oauthAccounts, authService, userGroups },
     content: { topics, tags, media, storage },
     engagement: { taskRepo, taskStages, taskLinks, commentRepo },
     progress: { progressRepo, enrollmentRepo },
