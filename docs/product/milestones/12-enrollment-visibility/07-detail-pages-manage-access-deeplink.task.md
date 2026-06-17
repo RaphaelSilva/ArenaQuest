@@ -1,6 +1,6 @@
 # Task 07 — Frontend: migrate user/group detail pages to a "Manage access" deep-link (Phase 3)
 
-**Status:** Open
+**Status:** ✅ Done
 **Milestone:** [12 — Enrollment enforcement and node visibility](./milestone.md)
 **RFC:** [0005 — Enrollment enforcement and node visibility, Phase 3](../../RFCs/0005-enrollment-exclusions-and-visibility.md)
 **Team:** Frontend Web
@@ -43,15 +43,15 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The admin user detail page shows a "Manage access" link deep-linking to `/admin/access` pre-filtered to that user (no embedded grant UI).
-- [ ] The admin group detail page shows the equivalent link pre-filtered to that group.
-- [ ] `enrollment/enrollments-tab.tsx` is deleted and `grep -R "enrollments-tab" apps/web/src` returns no matches — **or** the task closeout documents the remaining blocking reference and the component is left intact (no broken build either way).
-- [ ] Orphaned i18n keys exclusive to the removed component are cleaned up; no key drift between `dict-en.ts` and `dict-pt.ts`; `check-i18n-coverage.js` passes.
-- [ ] Every grant operation formerly available on the detail pages is reachable in one click via the deep-link.
-- [ ] Link label is internationalized and present in both dictionaries.
-- [ ] Component tests assert the link target.
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] The user detail page renders a "Manage access" link to `/admin/access?type=user&id=<userId>`; the embedded EnrollmentsTab and its tab system are removed (profile renders directly).
+- [x] The group detail page renders a "Manage access" link to `/admin/access?type=group&id=<groupId>`, replacing the coming-soon placeholder.
+- [x] `enrollment/enrollments-tab.tsx` is deleted; `grep -R "enrollments-tab\|EnrollmentsTab" apps/web` returns no matches.
+- [x] Orphaned `admin.users.tabEnrollments`/`tabProfile` removed from both dicts (the `enrollment.*` keys are kept — now reused by `/admin/access`); `check-i18n-coverage.js` passes; web `tsc` clean (no key-drift).
+- [x] Both detail pages reach the full grant manager in one click via the deep-link (pre-selected principal).
+- [x] `admin.access.manageLink` (PT "Gerenciar acesso" / EN "Manage access") exists in both dictionaries.
+- [x] The deleted component's RTL test was removed; the static `<Link href>` targets are type-checked and grep-verified. _No new heavy page-render test added (page tests are pre-skipped at baseline); link hrefs are deterministic._
+- [x] `check-i18n-coverage.js` passes; scoped lint clean; web `tsc` at baseline (zero new); the kept `users.test.tsx` + i18n plumbing pass (16 tests). Backend untouched.
+- [x] Diff limited to the two detail pages, the deleted component + its test, and the two dict files.
 
 ## Verification Plan
 

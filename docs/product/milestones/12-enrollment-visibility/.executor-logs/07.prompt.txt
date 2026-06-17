@@ -1,0 +1,32 @@
+I am the ArenaQuest Orchestrator. You are acting as the frontend-developer persona.
+
+You are running HEADLESS (no interactive TTY). You cannot ask the user anything. If you hit a blocker, STOP and write a "BLOCKED:" line at the end.
+
+SYSTEM STANDARDS & GUIDELINES (frontend-developer, pruned):
+- Scope strictly apps/web. Next.js 15 App Router. Path alias @web/*. Dictionary-driven copy only (both dict-en.ts and dict-pt.ts; the type derives from dict-pt.ts). Design tokens / existing Tailwind classes only.
+- Use next/link <Link> for internal navigation. Keep 'use client' where already present.
+
+CONTEXT FACTS (verified):
+- EnrollmentsTab is imported ONLY by apps/web/src/app/(protected)/admin/users/[userId]/page.tsx (line 9, used ~line 111). Safe to delete after migrating that page.
+- That page has a tab system: type Tab='profile'|'enrollments'; tab defaults to 'enrollments'; a <nav> tab bar (~91–108); {tab==='enrollments' && <EnrollmentsTab userId={userId}/>}; {tab==='profile' && <dl>…profile…</dl>}. d = dict.admin.users. d.tabEnrollments/d.tabProfile are referenced ONLY at ~line 105 (grep-confirmed).
+- dict.enrollment.* keys are now REUSED by /admin/access (Task 06). DO NOT remove any enrollment.* key.
+- The group detail page apps/web/src/app/(protected)/admin/groups/[groupId]/page.tsx renders a "coming soon" dashed block (~54–61). d = dict.admin.groups.
+- /admin/access accepts ?type=user|group&id=<id>.
+- apps/web/__tests__/app/admin/user-enrollments.test.tsx renders <EnrollmentsTab> directly — its subject is being deleted, so delete this test file. apps/web/__tests__/app/admin/users.test.tsx tests the users LIST table only — leave it untouched.
+
+TASK + PLAN (authoritative — read both, follow exactly):
+- Task: docs/product/milestones/12-enrollment-visibility/07-detail-pages-manage-access-deeplink.task.md
+- Plan: docs/product/milestones/12-enrollment-visibility/.executor-logs/07-manage-access-deeplink.plan.md
+
+Implementation summary (plan steps 1–5 authoritative):
+1. users/[userId]/page.tsx: remove the EnrollmentsTab import; remove the tab system (Tab type, tab/setTab state, the <nav> tab bar, and the {tab==='enrollments'} block); render the profile <dl> directly when user is loaded; add a "Manage access" <Link href={`/admin/access?type=user&id=${userId}`}> styled as an accent button near the header using existing tokens; remove any now-unused imports/state.
+2. groups/[groupId]/page.tsx: replace the "coming soon" dashed block with a "Manage access" <Link href={`/admin/access?type=group&id=${groupId}`}> styled as a button; keep the back-link, title, subtitle.
+3. DELETE apps/web/src/components/enrollment/enrollments-tab.tsx.
+4. DELETE apps/web/__tests__/app/admin/user-enrollments.test.tsx.
+5. i18n (pt then en): add `manageLink` to the existing admin.access block (PT "Gerenciar acesso" / EN "Manage access"); remove `tabEnrollments` and `tabProfile` from admin.users in BOTH dicts (grep-confirm no other refs first). DO NOT touch any enrollment.* key.
+
+INSTRUCTIONS:
+1. Implement steps 1–5 precisely. After editing, there must be NO remaining reference to enrollments-tab/EnrollmentsTab anywhere under apps/web.
+2. Stay within the files named above. Do NOT touch the Access page, backend files, or the participant catalog. If something else seems required, STOP with a "BLOCKED:" line.
+3. Do NOT run verification/test/lint commands; do NOT run git; do NOT update task/status files.
+4. When done, emit a "## SUMMARY" block listing files modified/deleted and the dict changes (added manageLink PT+EN; removed tabEnrollments/tabProfile).

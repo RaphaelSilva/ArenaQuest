@@ -51,14 +51,13 @@ export default function AdminGroupDetailPage({ params }: Props) {
       <p className="mb-6 text-sm" style={{ color: 'var(--text2)' }}>
         {d.detailSubtitle}
       </p>
-      <div
-        className="rounded-xl border border-dashed py-12 text-center"
-        style={{ borderColor: 'var(--border)' }}
+      <Link
+        href={`/admin/access?type=group&id=${groupId}`}
+        className="inline-block rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
+        style={{ background: 'var(--accent)' }}
       >
-        <p className="text-sm font-medium" style={{ color: 'var(--text3)' }}>
-          {d.detailComingSoon}
-        </p>
-      </div>
+        {dict.admin.access.manageLink}
+      </Link>
     </main>
   );
 }
