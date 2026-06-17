@@ -8,6 +8,7 @@ export type TopicNode = {
   title: string;
   content: string;
   status: 'draft' | 'published' | 'archived';
+  visibility?: 'public' | 'restricted' | 'private';
   archived: boolean;
   order: number;
   estimatedMinutes: number;
@@ -27,6 +28,7 @@ export type CreateTopicInput = {
   parentId?: string | null;
   content?: string;
   status?: 'draft' | 'published' | 'archived';
+  visibility?: 'public' | 'restricted' | 'private';
   estimatedMinutes?: number;
   tagIds?: string[];
   prerequisiteIds?: string[];
@@ -36,6 +38,7 @@ export type UpdateTopicInput = {
   title?: string;
   content?: string;
   status?: 'draft' | 'published' | 'archived';
+  visibility?: 'public' | 'restricted' | 'private';
   estimatedMinutes?: number;
   tagIds?: string[];
   prerequisiteIds?: string[];

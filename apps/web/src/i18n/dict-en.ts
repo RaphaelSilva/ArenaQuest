@@ -291,6 +291,11 @@ export const dictEn = {
         statusDraft: 'Draft',
         statusPublished: 'Published',
         statusArchived: 'Archived',
+        visibilityLabel: 'Visibility',
+        visibilityPublic: 'Public',
+        visibilityRestricted: 'Restricted',
+        visibilityPrivate: 'Private',
+        visibilityHelp: 'Public: visible to everyone. Restricted: active enrolments only. Private: admins and creators only.',
       },
       media: {
         sectionTitle: 'Media Attachments',

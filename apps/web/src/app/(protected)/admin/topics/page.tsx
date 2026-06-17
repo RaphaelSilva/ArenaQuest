@@ -254,6 +254,7 @@ export default function AdminTopicsPage() {
   const [detailTitle, setDetailTitle] = useState('');
   const [detailContent, setDetailContent] = useState('');
   const [detailStatus, setDetailStatus] = useState<'draft' | 'published' | 'archived'>('draft');
+  const [detailVisibility, setDetailVisibility] = useState<'public' | 'restricted' | 'private'>('restricted');
   const [detailMinutes, setDetailMinutes] = useState(0);
   const [detailTagIds, setDetailTagIds] = useState('');
   const [detailPrereqIds, setDetailPrereqIds] = useState('');
@@ -309,6 +310,7 @@ export default function AdminTopicsPage() {
       setDetailTitle('');
       setDetailContent('');
       setDetailStatus('draft');
+      setDetailVisibility('restricted');
       setDetailMinutes(0);
       setDetailTagIds('');
       setDetailPrereqIds('');
@@ -318,6 +320,7 @@ export default function AdminTopicsPage() {
     setDetailTitle(selectedNode.title);
     setDetailContent(selectedNode.content);
     setDetailStatus(selectedNode.status);
+    setDetailVisibility(selectedNode.visibility ?? 'restricted');
     setDetailMinutes(selectedNode.estimatedMinutes);
     setDetailTagIds(selectedNode.tags.map((t) => t.id).join(', '));
     setDetailPrereqIds(selectedNode.prerequisiteIds.join(', '));
@@ -482,6 +485,7 @@ export default function AdminTopicsPage() {
         title: detailTitle,
         content: detailContent,
         status: detailStatus,
+        visibility: detailVisibility,
         estimatedMinutes: detailMinutes,
         tagIds,
         prerequisiteIds: prereqIds,
@@ -891,6 +895,23 @@ export default function AdminTopicsPage() {
                   <option value="published">{d.detail.statusPublished}</option>
                   <option value="archived">{d.detail.statusArchived}</option>
                 </select>
+              </div>
+
+              <div>
+                <label htmlFor="dp-visibility" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {d.detail.visibilityLabel}
+                </label>
+                <select
+                  id="dp-visibility"
+                  value={detailVisibility}
+                  onChange={(e) => setDetailVisibility(e.target.value as typeof detailVisibility)}
+                  className="w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+                >
+                  <option value="public">{d.detail.visibilityPublic}</option>
+                  <option value="restricted">{d.detail.visibilityRestricted}</option>
+                  <option value="private">{d.detail.visibilityPrivate}</option>
+                </select>
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{d.detail.visibilityHelp}</p>
               </div>
 
               <div>

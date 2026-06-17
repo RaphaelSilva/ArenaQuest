@@ -289,6 +289,11 @@ export const dictPt = {
         statusDraft: 'Rascunho',
         statusPublished: 'Publicado',
         statusArchived: 'Arquivado',
+        visibilityLabel: 'Visibilidade',
+        visibilityPublic: 'Público',
+        visibilityRestricted: 'Restrito',
+        visibilityPrivate: 'Privado',
+        visibilityHelp: 'Público: visível para todos. Restrito: somente matrículas ativas. Privado: somente admins e criadores.',
       },
       media: {
         sectionTitle: 'Anexos de Mídia',
