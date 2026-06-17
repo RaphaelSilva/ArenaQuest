@@ -15,6 +15,7 @@ type TopicNodeRow = {
   sort_order: number;
   estimated_minutes: number;
   archived: number;
+  visibility: string;
   created_at: string;
   updated_at: string;
 };
@@ -99,6 +100,7 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
       estimatedMinutes: row.estimated_minutes,
       prerequisiteIds,
       archived: row.archived === 1,
+      visibility: row.visibility as Entities.Config.TopicVisibility,
       mediaCount,
     };
   }
@@ -205,6 +207,7 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
       estimatedMinutes: row.estimated_minutes,
       prerequisiteIds: prereqsMap.get(row.id) ?? [],
       archived: row.archived === 1,
+      visibility: row.visibility as Entities.Config.TopicVisibility,
     }));
   }
 
@@ -230,12 +233,14 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
       sortOrder = (maxRow?.mx ?? -1) + 1;
     }
 
+    const visibility = data.visibility ?? 'restricted';
+
     const stmts = [
       this.db
         .prepare(
-          'INSERT INTO topic_nodes (id, parent_id, title, content, status, sort_order, estimated_minutes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO topic_nodes (id, parent_id, title, content, status, sort_order, estimated_minutes, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         )
-        .bind(id, parentId, data.title, content, status, sortOrder, estimatedMinutes),
+        .bind(id, parentId, data.title, content, status, sortOrder, estimatedMinutes, visibility),
       ...(data.tagIds ?? []).map(tagId =>
         this.db
           .prepare('INSERT OR IGNORE INTO topic_node_tags (topic_node_id, tag_id) VALUES (?, ?)')
@@ -269,6 +274,7 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
       }
     }
     if (data.estimatedMinutes !== undefined) { setClauses.push('estimated_minutes = ?'); values.push(data.estimatedMinutes); }
+    if (data.visibility !== undefined) { setClauses.push('visibility = ?'); values.push(data.visibility); }
 
     values.push(id);
     await this.db

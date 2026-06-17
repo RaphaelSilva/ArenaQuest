@@ -18,6 +18,7 @@ const TOPIC: TopicNodeRecord = {
   estimatedMinutes: 0,
   prerequisiteIds: [],
   archived: false,
+  visibility: Entities.Config.TopicVisibility.RESTRICTED,
 };
 
 const MEDIA_PENDING: Entities.Content.Media = {

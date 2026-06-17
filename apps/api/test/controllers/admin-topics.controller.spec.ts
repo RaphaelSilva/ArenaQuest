@@ -18,6 +18,7 @@ const ROOT: TopicNodeRecord = {
   estimatedMinutes: 0,
   prerequisiteIds: [],
   archived: false,
+  visibility: Entities.Config.TopicVisibility.RESTRICTED,
 };
 
 const CHILD: TopicNodeRecord = { ...ROOT, id: 'child-1', parentId: 'root-1', title: 'Child' };
