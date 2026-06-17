@@ -17,6 +17,7 @@ const STUDENT_B = 'cmt-student-b';
 const STUDENT_C = 'cmt-student-c'; // never enrolled
 const ADMIN_ID = 'cmt-admin-1';
 const TOPIC_ID = 'cmt-topic-1';
+const PUBLIC_TOPIC_ID = 'cmt-public-topic-1';
 
 let tokenA: string;
 let tokenB: string;
@@ -37,6 +38,8 @@ beforeAll(async () => {
       .bind(ADMIN_ID, 'Admin', 'admin@cmt.test', 'hash'),
     env.DB.prepare(`INSERT OR IGNORE INTO topic_nodes (id, title) VALUES (?, ?)`)
       .bind(TOPIC_ID, 'Test Topic'),
+    env.DB.prepare(`INSERT OR IGNORE INTO topic_nodes (id, title, status, visibility) VALUES (?, ?, ?, ?)`)
+      .bind(PUBLIC_TOPIC_ID, 'Public Topic', 'published', 'public'),
     // Enroll student A in the topic
     env.DB.prepare(`INSERT OR IGNORE INTO enrollments_user (id, user_id, topic_node_id, granted_by) VALUES (?, ?, ?, ?)`)
       .bind('enroll-a', STUDENT_A, TOPIC_ID, ADMIN_ID),
@@ -305,5 +308,26 @@ describe('POST /me/comments/:id/like', () => {
   it('returns 404 for unknown comment', async () => {
     const res = await req('POST', '/me/comments/00000000-0000-0000-0000-000000000000/like', { token: tokenA });
     expect(res.status).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Public topic visibility — unenrolled access
+// ---------------------------------------------------------------------------
+
+describe('public topic visibility — unenrolled access', () => {
+  it('unenrolled tokenC can GET comments on a public topic', async () => {
+    const res = await req('GET', `/topics/${PUBLIC_TOPIC_ID}/comments`, { token: tokenC });
+    expect(res.status).toBe(200);
+  });
+
+  it('unenrolled tokenC can POST a comment on a public topic', async () => {
+    const res = await req('POST', `/topics/${PUBLIC_TOPIC_ID}/comments`, {
+      token: tokenC,
+      body: { body: 'Public topic comment from unenrolled user' },
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json<{ id: string; body: string }>();
+    expect(body.body).toBe('Public topic comment from unenrolled user');
   });
 });
