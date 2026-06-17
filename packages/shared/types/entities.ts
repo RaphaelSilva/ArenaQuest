@@ -20,6 +20,16 @@ export namespace Entities {
             ARCHIVED = 'archived',
         }
 
+        /** Controls which authenticated users can see a topic node. */
+        export enum TopicVisibility {
+            /** Any authenticated user can see this node. */
+            PUBLIC = 'public',
+            /** A grant (enrollment) is required; this is the production default. */
+            RESTRICTED = 'restricted',
+            /** Visible to admins and the node creator only. */
+            PRIVATE = 'private',
+        }
+
         export enum MediaStatus {
             PENDING = 'pending',
             READY = 'ready',
