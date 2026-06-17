@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-28
 **Revised:** 2026-06-16 (scope cut — catalog gating defect made prerequisite; denies deferred; visibility-only chosen)
-**Status:** Draft
+**Status:** Implemented
 **Author:** raphaelsilva
 **Affected:**
 - `packages/shared/ports/i-topic-node-repository.ts`
