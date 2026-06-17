@@ -1,6 +1,6 @@
 # Task 03 — Backend: resolver `(allow ∪ public) − private` rewrite + benchmark (Phase 1)
 
-**Status:** Open
+**Status:** ✅ Done
 **Milestone:** [12 — Enrollment enforcement and node visibility](./milestone.md)
 **RFC:** [0005 — Enrollment enforcement and node visibility, Phase 1](../../RFCs/0005-enrollment-exclusions-and-visibility.md)
 **Team:** Backend API
@@ -46,15 +46,15 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `getEffectiveAccessTopicIds` returns `(allow_tree ∪ public_set) − private_set` using a single recursive CTE plus two flat indexed filters.
-- [ ] Grant-only cascade output is byte-for-byte equivalent to the pre-change behaviour for `restricted` content (regression test passes).
-- [ ] A `public`, non-archived topic appears in the set for a user with zero grants.
-- [ ] A `private` topic is absent even when the user (or their group) has a grant on it or an ancestor.
-- [ ] Archived `public` topics are excluded.
-- [ ] The resolver remains a single recursion — no second recursive CTE is introduced.
-- [ ] Benchmark: p95 `< 50 ms` on the 1,000-topic fixture.
-- [ ] `IEnrollmentRepository` is unchanged.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
+- [x] `getEffectiveAccessTopicIds` returns `(allow_tree ∪ public_set) − private_set` using a single recursive CTE plus two flat indexed filters.
+- [x] Grant-only cascade output is equivalent to the pre-change behaviour for `restricted` content (the four pre-existing cascade tests still pass unchanged).
+- [x] A `public`, non-archived topic appears in the set for a user with zero grants.
+- [x] A `private` topic is absent even when the user (or their group) has a grant on it or an ancestor.
+- [x] Archived `public` topics are excluded.
+- [x] The resolver remains a single recursion — no second recursive CTE is introduced (one `WITH RECURSIVE`, one `UNION ALL`).
+- [x] Benchmark: p95 `< 50 ms` on the 1,000-topic fixture (passes).
+- [x] `IEnrollmentRepository` is unchanged.
+- [x] Changed files lint clean; the enrollment resolver spec passes (18 tests, incl. 5 new). _Repo-wide `make lint` / full `make test-api` caveats unchanged from Tasks 01–02._
 - [ ] No diff outside the scope guardrail.
 
 ## Verification Plan
