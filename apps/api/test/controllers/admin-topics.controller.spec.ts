@@ -108,6 +108,12 @@ describe('AdminTopicsController', () => {
       const callArg = (topicsRepo.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(callArg.content).not.toContain('<script>');
     });
+
+    it('forwards visibility to the topics repo', async () => {
+      await controller.create({ title: 'Private Topic', visibility: 'private' });
+      const callArg = (topicsRepo.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(callArg.visibility).toBe('private');
+    });
   });
 
   // ── getById ───────────────────────────────────────────────────────────────
@@ -159,6 +165,12 @@ describe('AdminTopicsController', () => {
       await controller.update('root-1', { content: '<iframe src="evil.com"></iframe>' });
       const callArg = (topicsRepo.update as ReturnType<typeof vi.fn>).mock.calls[0][1];
       expect(callArg.content).not.toContain('<iframe');
+    });
+
+    it('forwards visibility to the topics repo', async () => {
+      await controller.update('root-1', { visibility: 'public' });
+      const callArg = (topicsRepo.update as ReturnType<typeof vi.fn>).mock.calls[0][1];
+      expect(callArg.visibility).toBe('public');
     });
   });
 

@@ -1,0 +1,32 @@
+I am the ArenaQuest Orchestrator. You are acting as the backend-developer persona.
+
+You are running HEADLESS (no interactive TTY). You cannot ask the user anything. If you hit a blocker that would require human input, STOP and write a clear "BLOCKED:" line at the end of your output.
+
+SYSTEM STANDARDS & GUIDELINES (backend-developer, pruned):
+- Scope strictly apps/api. Controllers return ControllerResult<T>; validation via Zod schemas. Cloud-agnostic.
+- Path aliases: @api/* -> apps/api/src/*; @arenaquest/shared/* -> packages/shared/*.
+- Tests use @cloudflare/vitest-pool-workers + the existing apply-migrations helper and each spec's existing req()/token/seed scaffolding.
+
+PROJECT CONTEXT (verified — read carefully):
+- The admin topic write path is gated by TWO schemas. The route (apps/api/src/routes/admin/topics.ts) validates the body via its OpenAPI schema; c.req.valid('json') STRIPS any field not in that schema. The controller (apps/api/src/controllers/admin-topics.controller.ts) re-types body via its OWN UpdateTopicSchema/CreateTopicSchema and DESTRUCTURES only listed fields, dropping the rest. Therefore `visibility` must be added to BOTH the route schema AND the controller schema, AND destructured/passed through in BOTH create and update — otherwise it is silently lost.
+- The adapter already persists visibility (CreateTopicNodeInput/UpdateTopicNodeInput carry visibility?; D1TopicNodeRepository writes it). Entities.Config.TopicVisibility exists (public/restricted/private).
+- The public catalog controller (apps/api/src/controllers/topics.controller.ts) ALREADY enforces the policy: listPublished(userId) filters by the resolver only when userId is set; getPublishedById returns 404 when a non-admin's effective set lacks the id. Admin/creator callers pass userId=undefined and thus see ALL published topics incl. private. So NO behaviour change is needed there — only explicit doc comments per RFC §3.
+- Comments already inherit the resolver (comments.router.ts resolves getEffectiveAccessTopicIds and 403s when absent). After the Task 03 resolver, a public topic is in every user's set (commentable by any authenticated user); a lacked restricted topic 403s. NO comment-path code change.
+
+TASK + PLAN (authoritative — read both and follow exactly):
+- Task: docs/product/milestones/12-enrollment-visibility/04-controller-bypass-and-admin-patch.task.md
+- Plan: docs/product/milestones/12-enrollment-visibility/.executor-logs/04-controller-bypass-admin-patch.plan.md
+
+Implementation summary (plan steps 1–6 authoritative):
+1. admin-topics.controller.ts: add visibility (z.enum(['public','restricted','private']).optional()) to CreateTopicSchema and UpdateTopicSchema; destructure visibility in create and update; pass it (cast like the existing `status as Entities.Config...` style, i.e. `visibility as Entities.Config.TopicVisibility`) into this.topics.create/update. Omitting it must preserve the stored value (adapter handles partial patch).
+2. routes/admin/topics.ts: add a TopicVisibilitySchema = z.enum(['public','restricted','private']); add `visibility: TopicVisibilitySchema.optional()` to the PATCH body schema (updateTopicRoute) AND the create body schema; add `visibility: TopicVisibilitySchema` to the TopicNodeRecordSchema response object.
+3. topics.controller.ts: add concise doc comments to listPublished and getPublishedById making the admin/creator bypass explicit (userId undefined => full access incl. private; everyone else => (allow ∪ public) − private). NO logic change.
+4. test/routes/topics.router.spec.ts: integration cases — create+PATCH a topic to private (student GET /topics excludes; student GET /topics/{id} 404; admin GET /topics/{id} 200; admin GET /topics includes); create+PATCH a topic to public (zero-grant student GET /topics includes it); PATCH round-trip then GET /admin/topics/{id} returns visibility:'private'; invalid PATCH visibility:'bogus' => 400.
+5. test/routes/comments.spec.ts: seed a published topic with visibility='public' (direct INSERT, following the file's existing seed style) and assert the unenrolled tokenC can POST a comment and GET comments on it (success). Leave existing tests intact.
+6. test/controllers/admin-topics.controller.spec.ts: assert update (and create) forwards visibility to the mocked topics repo.
+
+INSTRUCTIONS:
+1. Implement steps 1–6 precisely. The dual-schema passthrough in steps 1–2 is the crux — verify visibility reaches this.topics.update/create.
+2. Stay within the files named above. Do NOT modify the resolver, any comment controller/router code, the adapter, the port, or any frontend file. If such an edit seems required, STOP with a "BLOCKED:" line.
+3. Do NOT run verification/test/lint commands; do NOT run git; do NOT update task/status files.
+4. When done, emit a "## SUMMARY" block listing files touched and the cases added.

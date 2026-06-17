@@ -10,6 +10,8 @@ import type { AppContainer } from '@api/container';
 
 const TopicStatusSchema = z.enum(['draft', 'published', 'archived']);
 
+const TopicVisibilitySchema = z.enum(['public', 'restricted', 'private']);
+
 const MediaStatusSchema = z.enum(['pending', 'ready', 'deleted']);
 
 const TagSchema = z.object({
@@ -38,6 +40,7 @@ const TopicNodeRecordSchema = z.object({
   title: z.string(),
   content: z.string(),
   status: TopicStatusSchema,
+  visibility: TopicVisibilitySchema,
   order: z.number().int(),
   estimatedMinutes: z.number().int(),
   prerequisiteIds: z.array(z.string().uuid()),
@@ -97,6 +100,7 @@ export const createTopicRoute = createRoute({
             title: z.string().min(1),
             content: z.string().optional(),
             status: TopicStatusSchema.optional(),
+            visibility: TopicVisibilitySchema.optional(),
             estimatedMinutes: z.number().int().min(0).optional(),
             tagIds: z.array(z.string()).optional(),
             prerequisiteIds: z.array(z.string()).optional(),
@@ -165,6 +169,7 @@ export const updateTopicRoute = createRoute({
             title: z.string().min(1).optional(),
             content: z.string().optional(),
             status: TopicStatusSchema.optional(),
+            visibility: TopicVisibilitySchema.optional(),
             estimatedMinutes: z.number().int().min(0).optional(),
             tagIds: z.array(z.string()).optional(),
             prerequisiteIds: z.array(z.string()).optional(),
