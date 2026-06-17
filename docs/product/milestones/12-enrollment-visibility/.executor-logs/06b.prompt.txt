@@ -1,0 +1,37 @@
+I am the ArenaQuest Orchestrator. You are acting as the frontend-developer persona.
+
+You are running HEADLESS (no interactive TTY). You cannot ask the user anything. If you hit a blocker, STOP and write a "BLOCKED:" line at the end.
+
+SYSTEM STANDARDS & GUIDELINES (frontend-developer, pruned):
+- Scope strictly apps/web. Next.js 15 App Router, React 19, Tailwind v4. Path alias @web/* -> apps/web/src/*.
+- Dictionary-driven copy ONLY (no hardcoded user-facing strings under src/{app,components,hooks}/**). Client components use useDict(). A key exists in BOTH dict-en.ts and dict-pt.ts or neither. Reuse existing keys where possible.
+- Design tokens (the CSS var()s like var(--text), var(--accent), var(--border)) and Tailwind classes as used by the existing enrollment component — do not invent values.
+- API via the centralized client: useApiClient() from @web/context/auth-context. New backend area => new src/lib/*-api.ts mirroring the route, wired into api-client.ts.
+- 'use client' only where needed; this page needs it (hooks, search params).
+
+CONTEXT FACTS (verified):
+- Backend GET /admin/groups (just added) returns { data: { id, name, description, memberCount, createdAt }[] }.
+- ApiClient getter pattern in apps/web/src/lib/api-client.ts: `import * as adminGroupsApiModule from './admin-groups-api';` then a `get adminGroups() { return adminGroupsApiModule.createAdminGroupsApi(this.http); }` next to get adminUsers(). Transport is this.http (HttpTransport from ./api-client).
+- client.adminUsers.list(page,pageSize) -> { data: User[]; total } (User has id, name, email).
+- client.adminEnrollment has listUserGrants/grantUserTopic/revokeUserTopic(userId,topicId,cascade) AND listGroupGrants/grantGroupTopic/revokeGroupTopic(groupId,topicId,cascade). UserGrant/GroupGrant = { id, topicNodeId, grantedAt }.
+- client.adminTopics.list() -> TopicNode[] (parentId, status, archived, title).
+- The EXISTING dict.enrollment.* namespace already has pickerTitle, searchPlaceholder, noTopicsFound, alreadyGranted, cancelButton, grantButton, revokeButton, noGrants, grantedAt, errorLoading/errorGrant/errorRevoke, revokeDialog.{title,cascade,cancelButton,revokeButton}, directGrantsTitle(n), and users/groups labels. REUSE these; do not duplicate. The existing component apps/web/src/components/enrollment/enrollments-tab.tsx is the reference implementation for the grant list, picker dialog, and revoke dialog — mirror its markup/logic.
+- Admin guard pattern: mirror apps/web/src/app/(protected)/admin/groups/page.tsx (useHasRole(ROLES.ADMIN), redirect to /dashboard, Spinner while useAuth().isLoading).
+- Dictionary type derives from dict-pt.ts; add keys to dict-pt.ts first then mirror in dict-en.ts. The i18n coverage gate forbids hardcoded copy.
+
+TASK + PLAN (authoritative — read both, follow exactly):
+- Parent task: docs/product/milestones/12-enrollment-visibility/06-unified-access-page.task.md
+- Plan: docs/product/milestones/12-enrollment-visibility/.executor-logs/06b-access-page.plan.md
+
+Implementation summary (plan steps 1–5 authoritative):
+1. NEW apps/web/src/lib/admin-groups-api.ts: createAdminGroupsApi(http) with async list(): Promise<AdminGroup[]> hitting GET /admin/groups and returning body.data; AdminGroup type; mirror admin-enrollment-api.ts style incl. any _err stub object.
+2. api-client.ts: add the import + get adminGroups() getter.
+3. NEW apps/web/src/app/(protected)/admin/access/page.tsx ('use client'): admin-guarded principal-centric page. Read useSearchParams() type(user|group)+id to init/pre-select the principal. Principal selector = User|Group toggle (reuse enrollment.users/groups labels) + searchable principal list (users via adminUsers.list showing name+email; groups via adminGroups.list showing name+memberCount). On select, load grants (listUserGrants/listGroupGrants) + adminTopics.list(); render the granted list + a grant picker dialog (published, non-archived topics in HIERARCHICAL/tree order — build parent->child order from parentId, indent by depth) + a revoke dialog with cascade checkbox, reusing the enrollments-tab markup/logic and enrollment.* copy. Grant/revoke via the correct user/group endpoints (cascade on revoke). Empty 'pick a principal' state when none selected. NO denies/Excluded-topics surface.
+4. i18n: add a minimal admin.access block (PT then EN): title, subtitle, searchUsersPlaceholder, searchGroupsPlaceholder, pickPrincipalPrompt, membersCount(n) function entry. Reuse enrollment.* for the picker/list/revoke. Translate both languages fully.
+5. NEW apps/web/src/lib/__tests__/admin-groups-api.test.ts (mirror admin-topics-api.test.ts): mock http; assert list() issues GET /admin/groups and returns data. Full page render test is optional — skip if it needs heavy provider scaffolding.
+
+INSTRUCTIONS:
+1. Implement steps 1–5 precisely. Maximise reuse of enrollment.* copy and the enrollments-tab patterns to limit new surface.
+2. Stay within the files named above. Do NOT modify enrollments-tab.tsx, the user/group detail pages, any backend file, or the participant catalog. If such an edit seems required, STOP with a "BLOCKED:" line.
+3. Do NOT run verification/test/lint commands; do NOT run git; do NOT update task/status files.
+4. When done, emit a "## SUMMARY" block listing files created/modified and the new dict keys (PT+EN values).
