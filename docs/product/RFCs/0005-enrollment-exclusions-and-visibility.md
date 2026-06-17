@@ -1,114 +1,136 @@
-# RFC 0005: Enrollment strategy review — topic exclusions and node visibility
+# RFC 0005: Enrollment enforcement and node visibility
 
 **Date:** 2026-05-28
+**Revised:** 2026-06-16 (scope cut — catalog gating defect made prerequisite; denies deferred; visibility-only chosen)
 **Status:** Draft
 **Author:** raphaelsilva
 **Affected:**
-- `packages/shared/ports/i-enrollment-repository.ts`
 - `packages/shared/ports/i-topic-node-repository.ts`
-- `packages/shared/types/entities.ts` (`Entities.Identity`, `Entities.Content`)
+- `packages/shared/types/entities.ts` (`Entities.Config`, `Entities.Content`)
 - `apps/api/src/adapters/db/d1-enrollment-repository.ts`
 - `apps/api/src/adapters/db/d1-topic-node-repository.ts`
 - `apps/api/src/controllers/topics.controller.ts`
-- `apps/api/src/core/enrollment/enrollment-service.ts`
-- `apps/api/src/routes/admin/enrollments.ts`
-- `apps/api/migrations/*` (new migration)
-- `apps/web/src/app/(protected)/admin/users/**` and `admin/topics/**` (visibility + deny UI)
+- `apps/api/src/routes/public/catalog.topics.ts` (**prerequisite fix** — wire enrollment into catalog reads)
+- `apps/api/src/routes/admin/topics.ts` (`visibility?` on the topic patch)
+- `apps/api/migrations/*` (new migration — `visibility` column)
+- `apps/web/src/app/(protected)/admin/access/**` (new unified Access page — grants for users and groups)
+- `apps/web/src/app/(protected)/admin/topics/**` (per-node visibility selector)
+- `apps/web/src/app/(protected)/admin/users/**` and `admin/groups/**` ("Manage access" deep-link only)
 
 ---
 
 ## Summary
 
-The current enrollment model is **purely additive and cascading**: a grant
-on a `TopicNode` (direct user grant or group grant) extends access to every
+The enrollment model is **additive and cascading**: a grant on a
+`TopicNode` (direct user grant or group grant) extends access to every
 descendant of that subtree, computed on the fly by a recursive CTE in
-`D1EnrollmentRepository.getEffectiveAccessTopicIds`. There is no way to
-say *"a user (or group) can see subtree X **except** node Y (and its
-descendants)"*, and there is no per-node visibility primitive that
-distinguishes "open to all enrolled" from "open only to explicit
-grantees". As content becomes more granular — sensitive subtopics inside
-otherwise public branches, instructor-only material, NDA-locked modules,
-preview content gated by phase — the only available workaround is to
-restructure the topic tree, which corrupts the pedagogical ordering and
-breaks deep links.
+`D1EnrollmentRepository.getEffectiveAccessTopicIds`.
 
-This RFC reviews the enrollment strategy and proposes two additive,
-backwards-compatible mechanisms:
+Two gaps motivated this RFC. During review, the first turned out to be a
+**latent defect rather than a design gap**, which reframes the whole
+effort:
 
-1. **Negative grants (denies)** — `enrollments_user_deny` and
-   `enrollments_user_group_deny`. A deny cascades to descendants exactly
-   like an allow, and **deny wins** in the resolver. This lets an admin
-   say *"grant subtree X, then deny node Y"* without touching the tree.
+0. **The catalog does not actually enforce enrollment today.** The public
+   catalog endpoints build the topics controller with **no enrollment
+   adapter**, so `GET /topics` / `GET /topics/{id}` return *every*
+   published topic to *every* authenticated user, regardless of grants
+   (see Current State). Fixing this is the **prerequisite** for any
+   per-node policy to mean anything.
+1. **There is no per-node visibility primitive** distinguishing "open to
+   all authenticated users", "open only to explicit grantees" (today's
+   intended behaviour), and "admin/creator only".
+
+This RFC therefore proposes a **minimal, single-CTE design**:
+
+1. **Fix catalog enforcement** (Phase 0) — inject the enrollment adapter
+   so the existing cascade resolver actually gates the catalog.
 2. **Node-level visibility** — a `visibility` column on `topic_nodes`
    with three values: `PUBLIC` (visible to any authenticated user),
-   `RESTRICTED` (visible only via an explicit allow grant — current
-   behaviour, becomes the default for back-compat), and `PRIVATE`
-   (invisible to anyone but admins and content creators, regardless of
-   grants).
+   `RESTRICTED` (visible only via an explicit grant on the node or an
+   ancestor — today's intended behaviour, the back-compat default), and
+   `PRIVATE` (invisible to anyone but admins and content creators,
+   regardless of grants).
 
-The combination covers the gating scenarios product has surfaced
-without introducing per-node ACLs or a separate policy engine.
+**Negative grants ("denies") are explicitly deferred** — see
+[Deferred: negative grants](#deferred-negative-grants-denies). They add a
+second recursive CTE and a large CRUD/UI surface to solve per-principal,
+mid-subtree exclusions (instructor-only sections, cohort-only previews)
+that the product does not currently need. Default-restricted content plus
+`PRIVATE` covers the cases we have, on a resolver no more expensive than
+today's.
 
 ## Motivation
 
-Concrete cases we cannot model today:
+Concrete cases, and how the chosen (visibility-only) design handles each:
 
-1. **"Grant the whole course except the final exam topic."** Today this
-   requires either (a) splitting the exam off the course subtree, which
-   reorders content and breaks links, or (b) granting every individual
-   sibling of the exam one by one and hoping no new siblings are added
-   later.
-2. **Instructor-only / staff-only sections inside a participant
-   subtree.** Same problem in reverse: there is no way to keep a node
-   under a participant-facing branch but hide it from participants.
-3. **NDA / cohort-gated previews.** A subtopic should be visible only
-   to a specific cohort group, even though the rest of its subtree is
-   open. Today the only option is restructure-and-cross-link.
-4. **Default-private content.** New topics are reachable as soon as an
-   ancestor is granted, which makes "draft inside a published branch"
-   unsafe. `Entities.Config.TopicNodeStatus.DRAFT` already filters
-   drafts out, but there is no equivalent for *published-but-restricted*
-   nodes.
-5. **Auditability.** Today, revoking access to a single descendant of
-   a granted subtree is impossible without also revoking the ancestor,
-   so the audit trail conflates "we never granted this" with "we
-   intentionally excluded this".
+| # | Case | Covered by this RFC? |
+|---|---|---|
+| 0 | A participant sees topics they were never granted (catalog ignores enrollment) | ✅ **Phase 0** — the core defect this RFC fixes first |
+| 1 | "Grant the whole course **except** the final exam" — exam hidden from **everyone** | ✅ mark the exam `PRIVATE` |
+| 4 | Default-private content (published-but-restricted nodes / drafts inside a published branch) | ✅ `PRIVATE` (plus existing `DRAFT` status) |
+| 2 | Instructor-only / staff-only section **inside** a participant subtree (visible to some, hidden from others) | ⛔ **Deferred** — needs denies (see Deferred section) |
+| 3 | Cohort-only preview — one node open to a cohort while its parent subtree is open to all | ⛔ **Deferred** — needs denies |
+| 5 | Auditability of *intentional* per-node exclusion vs "never granted" | ⛔ **Deferred** — a deny-specific concern |
 
-The current cascade is correct for the happy path (enroll a student in
-a course → they see the course). The gap is that **exclusions are
-structurally impossible** in the current model, and every workaround
-involves restructuring content for a permissions concern.
+Cases 2, 3 and 5 are the only ones that require per-principal exclusion of
+a node *within* an otherwise-granted subtree. They are real but not
+currently on the roadmap; the Deferred section preserves their design so
+it can be picked up without re-derivation.
 
 ## Goals & Non-Goals
 
 **Goals**
-- Allow an admin to **exclude** a specific topic (and its descendants)
-  from a user or group, even when an ancestor of that topic is granted.
-- Allow an admin to mark a topic as `RESTRICTED` (must be explicitly
-  granted) or `PRIVATE` (admin/creator only) at the node level.
-- Keep the existing additive cascade behaviour intact — no migration of
-  existing grants required, no behaviour change for currently enrolled
-  users.
-- Keep the resolver O(grants + descendants), single-query, no
-  materialised cache.
-- Preserve the **Ports & Adapters** boundary: all new semantics live in
-  `IEnrollmentRepository` / `ITopicNodeRepository` and the
-  `EnrollmentService`; adapters can swap to Postgres / DynamoDB without
-  re-deriving the policy.
+- **Make the catalog enforce enrollment** (Phase 0). A non-admin sees a
+  published topic only if they (or one of their groups) have a grant on
+  it or an ancestor — the cascade that already exists in the resolver but
+  is not wired into the catalog reads.
+- Allow an admin to mark a topic `PUBLIC` (any authenticated user),
+  `RESTRICTED` (grant required — default), or `PRIVATE` (admin/creator
+  only) at the node level.
+- Keep the existing additive **cascade** behaviour intact — granting a
+  parent still grants its descendants. No migration of existing grants,
+  no behaviour change for currently enrolled users.
+- Keep the resolver **a single recursive CTE** plus cheap indexed
+  filters — no second CTE, no materialised cache, same cost class as
+  today (`< 50 ms` on the 1,000-topic fixture).
+- Preserve the **Ports & Adapters** boundary: visibility semantics live
+  in `ITopicNodeRepository` and the resolver; adapters can swap to
+  Postgres / DynamoDB without re-deriving the policy.
+- **Make the authorization model explicit and uniform.** `ROLES.ADMIN`
+  and `ROLES.CONTENT_CREATOR` fully bypass visibility and grants and see
+  **all** content (including `PRIVATE`), platform-wide. Every other
+  principal is subject to the resolver (§3).
+- **Keep comment access derived, not granted.** Reading and writing
+  comments is gated by the *same* effective-access set as topic
+  visibility — already true today (§7). `PRIVATE` therefore propagates to
+  the discussion automatically, with no separate comment primitive.
+- **Make the admin grant picker tree-shaped.** The grant picker renders
+  topics as an ordered tree consistent with the participant catalog, so
+  admins navigate the same hierarchy they gate (§6).
+- **Consolidate access management into one page** (§6) — replace the
+  per-user and per-group entry points with a single principal-centric
+  Access page.
 
 **Non-Goals**
+- **Negative grants (denies).** Deferred to a follow-up; see the Deferred
+  section. The visibility column does not preclude them.
 - Generic ACLs (per-node read/write/comment grids). The model stays
   binary: *can see* vs *cannot see*.
-- Time-bounded access (`grantedUntil`). Tracked as a separate backlog
-  item; the schema additions here do not preclude it.
-- Per-media exclusions (hide a single video inside an otherwise
-  granted topic). Media inherits its parent topic's effective access.
-- A new role beyond the existing `ROLES.ADMIN` /
-  `ROLES.CONTENT_CREATOR`. Visibility bypass for those roles is
-  enforced in the controller, not as a new role.
-- Frontend redesign of the catalog. This RFC is about the policy
-  layer; RFC 0004 owns the participant catalog UX. The admin UI
-  changes here are minimal additions to existing surfaces.
+- Time-bounded access (`grantedUntil`). Separate backlog item.
+- Per-media exclusions (hide a single video inside an otherwise granted
+  topic). Media inherits its parent topic's effective access.
+- A new role beyond `ROLES.ADMIN` / `ROLES.CONTENT_CREATOR`. No new role
+  is introduced; the full bypass for those roles is enforced in the
+  controller.
+- **Per-creator content scoping.** The bypass is platform-wide: a content
+  creator sees every topic, including other creators' `PRIVATE` drafts.
+  Scoping a creator to content they own requires a topic-ownership
+  concept that does not exist today — separate backlog item.
+- A topic-centric access matrix ("who can see this node", managed from
+  the topic screen). The unified Access page (§6) stays principal-centric
+  (pick a user or group), so no reverse-lookup port methods are added.
+- Frontend redesign of the catalog. RFC 0004 owns the participant catalog
+  UX; the admin UI changes here consolidate existing surfaces.
 
 ## Current State (for reference)
 
@@ -120,7 +142,8 @@ listUserGrants / grantUser / revokeUser({ cascade });
 listGroupGrants / grantGroup / revokeGroup({ cascade });
 ```
 
-`D1EnrollmentRepository.getEffectiveAccessTopicIds`:
+`D1EnrollmentRepository.getEffectiveAccessTopicIds` already **cascades**
+and already includes **group** grants (single recursive CTE):
 
 ```sql
 WITH RECURSIVE
@@ -140,9 +163,34 @@ WITH RECURSIVE
 SELECT DISTINCT id FROM tree
 ```
 
-`TopicsController.listPublished` / `getPublishedById` already gate by
-the result set when a `userId` is supplied. Routes pass `undefined`
-for admins / content creators, which is how the bypass works today.
+`TopicsController.listPublished` / `getPublishedById` *can* gate by this
+set, but **only when both a `userId` and an enrollment adapter are
+supplied** (`topics.controller.ts:41`, `:55`):
+
+```ts
+if (userId && this.enrollment) { /* filter by effective access */ }
+return published; // otherwise: ALL published topics
+```
+
+> **⚠️ Known defect (found during RFC review, 2026-06-16).** The live
+> catalog endpoints do **not** gate by enrollment for anyone. The public
+> catalog router builds the controller with **no enrollment adapter**:
+> ```ts
+> // apps/api/src/routes/public/catalog.topics.ts
+> // "enrollment is not needed for public catalog reads"
+> const controller = new TopicsController(topics, media, storage, undefined);
+> ```
+> Because `this.enrollment` is `undefined`, the guard above is skipped and
+> `GET /topics` / `GET /topics/{id}` return **every** published topic to
+> **every** authenticated user, regardless of grants. (Verified manually:
+> a user with 1 of 3 topics granted sees all 3 in the catalog.) The
+> cascading resolver *is* correctly wired into other paths — comments
+> (`comments.router.ts:97`) and the video-watched check
+> (`topics.router.ts:26`) — but **not** the catalog read path.
+
+This defect is why the RFC's original premise ("the catalog is gated by
+enrollment, we just can't express exceptions") was wrong: the catalog is
+gated by nothing. Phase 0 fixes it.
 
 ## Proposed Design
 
@@ -155,8 +203,8 @@ Add a `visibility` column to `topic_nodes`:
 export enum TopicVisibility {
   /** Visible to any authenticated user, regardless of grants. */
   PUBLIC = 'public',
-  /** Visible only when the user (or one of their groups) has an
-   *  allow-grant on this node or an ancestor. Current default semantics. */
+  /** Visible only when the user (or one of their groups) has a grant on
+   *  this node or an ancestor. Today's intended semantics. */
   RESTRICTED = 'restricted',
   /** Invisible to everyone except admins and content creators,
    *  regardless of grants. */
@@ -169,64 +217,28 @@ export enum TopicVisibility {
 visibility: Entities.Config.TopicVisibility;
 ```
 
-Migration: add the column with default `'restricted'` and **backfill
-all existing rows to `'restricted'`**. That preserves today's
-behaviour exactly — a topic is reachable only via an allow grant on
-itself or an ancestor.
+Migration: add the column with default `'restricted'` and **backfill all
+existing rows to `'restricted'`**. Combined with the Phase 0 fix, that
+makes the catalog behave the way the product always intended — a topic is
+reachable only via a grant on itself or an ancestor.
 
-> **Rationale for `RESTRICTED` as default rather than `PUBLIC`:**
-> the platform today treats published topics as gated by enrollment,
-> not as world-readable. Flipping the default to `PUBLIC` would silently
-> open every existing topic to every authenticated user — a security
-> regression. Admins can opt into `PUBLIC` per node once the column
-> ships.
+> **Rationale for `RESTRICTED` as default rather than `PUBLIC`:** the
+> platform treats published topics as gated by enrollment, not as
+> world-readable. Defaulting to `PUBLIC` would open every existing topic
+> to every authenticated user — a security regression. Admins opt into
+> `PUBLIC` per node once the column ships.
 
-### 2. Negative grants (denies)
+### 2. Resolver semantics — single CTE + two filters
 
-Two new tables, mirroring the existing allow tables:
+`getEffectiveAccessTopicIds` returns
+`(allow_tree ∪ public_set) − private_set`:
 
-```sql
-CREATE TABLE enrollments_user_deny (
-  id            TEXT PRIMARY KEY,
-  user_id       TEXT NOT NULL,
-  topic_node_id TEXT NOT NULL,
-  granted_by    TEXT NOT NULL,
-  granted_at    TEXT NOT NULL DEFAULT (datetime('now')),
-  UNIQUE (user_id, topic_node_id)
-);
-
-CREATE TABLE enrollments_user_group_deny (
-  id            TEXT PRIMARY KEY,
-  group_id      TEXT NOT NULL,
-  topic_node_id TEXT NOT NULL,
-  granted_by    TEXT NOT NULL,
-  granted_at    TEXT NOT NULL DEFAULT (datetime('now')),
-  UNIQUE (group_id, topic_node_id)
-);
-```
-
-A row in either table means *"this user (or group) is denied access to
-this topic and to all its descendants"*. Like allow grants, denies
-cascade down the tree.
-
-### 3. Resolver semantics — deny wins
-
-Updated `getEffectiveAccessTopicIds` returns
-`allow_set − deny_set − private_set`, where:
-
-- `allow_set` = today's recursive expansion of allow grants
-  (descendants of any allow-granted node).
-- `deny_set` = recursive expansion of deny grants (descendants of any
-  deny-granted node) for the same user / their groups.
-- `private_set` = all topics with `visibility = 'private'` (always
-  removed for non-admin users).
-
-`PUBLIC` topics are unioned in **after** the deny filter, on the
-assumption that an explicit deny on a public topic still means
-"hidden for this user". A `PUBLIC` topic with no explicit deny is
-visible even with no allow grant.
-
-Concrete D1 query (single round-trip):
+- `allow_tree` = today's recursive cascade of grants (descendants of any
+  granted node) — **unchanged**.
+- `public_set` = all topics with `visibility = 'public'` (and not
+  archived), visible without any grant.
+- `private_set` = all topics with `visibility = 'private'`, always removed
+  for non-admin users.
 
 ```sql
 WITH RECURSIVE
@@ -238,23 +250,10 @@ WITH RECURSIVE
       JOIN user_group_members ugm ON ugm.group_id = eg.group_id
      WHERE ugm.user_id = ?1
   ),
-  deny_seed(id) AS (
-    SELECT topic_node_id FROM enrollments_user_deny WHERE user_id = ?1
-    UNION
-    SELECT egd.topic_node_id
-      FROM enrollments_user_group_deny egd
-      JOIN user_group_members ugm ON ugm.group_id = egd.group_id
-     WHERE ugm.user_id = ?1
-  ),
   allow_tree(id) AS (
     SELECT id FROM allow_seed
     UNION ALL
     SELECT tn.id FROM topic_nodes tn JOIN allow_tree ON tn.parent_id = allow_tree.id
-  ),
-  deny_tree(id) AS (
-    SELECT id FROM deny_seed
-    UNION ALL
-    SELECT tn.id FROM topic_nodes tn JOIN deny_tree ON tn.parent_id = deny_tree.id
   ),
   public_set(id) AS (
     SELECT id FROM topic_nodes WHERE visibility = 'public' AND archived = 0
@@ -264,275 +263,297 @@ SELECT DISTINCT id FROM (
   UNION
   SELECT id FROM public_set
 )
-WHERE id NOT IN (SELECT id FROM deny_tree)
-  AND id NOT IN (SELECT id FROM topic_nodes WHERE visibility = 'private');
+WHERE id NOT IN (SELECT id FROM topic_nodes WHERE visibility = 'private');
 ```
 
-**Why "deny wins" and not "most-specific wins":**
+This is the **same single recursive CTE as today**, plus a `UNION` with a
+flat indexed lookup (`public_set`) and a `NOT IN` against another flat
+indexed lookup (`private_set`). No second recursion; the cost class is
+unchanged. (An index on `topic_nodes(visibility)` keeps both filters
+cheap.)
 
-- *Predictability:* an admin who applies a deny expects it to take
-  effect; a sibling allow further down should not silently re-open the
-  branch.
-- *Least privilege:* matches how most access systems (IAM, file ACLs)
-  resolve conflicts.
-- *Cheap to reason about:* the resolver is "subtract one set from
-  another", no per-edge precedence calculation.
+### 3. Admin / content-creator bypass
 
-The alternative — "the closest grant to the node wins" — is documented
-under [Alternatives](#alternatives-considered) and rejected.
+Callers pass `userId: undefined` when the requester is an admin or content
+creator (see `topics.router.ts:26`), which makes the controller skip the
+resolver. This RFC keeps that bypass **and extends it to the `PRIVATE`
+filter**. The rule, stated in full:
 
-### 4. Admin bypass
+> **`ROLES.ADMIN` and `ROLES.CONTENT_CREATOR` are never subject to the
+> resolver.** They see *all* content — every grant, every `PRIVATE`
+> topic — across the whole platform. Every other principal is filtered by
+> `(allow ∪ public) − private`.
 
-Today, callers pass `undefined` for `userId` when the requester is an
-admin or content creator (see `topics.router.ts:26`). This RFC keeps
-that bypass for the allow / deny layer **and extends it to the
-`PRIVATE` filter**: admins and content creators see `PRIVATE` topics;
-nobody else does. No new role; the gate is enforced in
-`TopicsController` exactly where the `userId` decision is made today.
+No new role; the gate is enforced in `TopicsController` exactly where the
+`userId` decision is made today. Making it explicit (rather than an
+implicit consequence of `userId === undefined`) is the point of this
+section — reviewers were unsure whether creators retained full access.
 
-### 5. Port additions
+**Scope note:** the bypass is platform-wide and trust-based — a content
+creator can see other creators' `PRIVATE` drafts. Restricting a creator to
+content they own is out of scope (no topic-ownership concept today); see
+Non-Goals.
+
+### 4. Port additions
+
+Only `ITopicNodeRepository` changes; **`IEnrollmentRepository` is
+unchanged** in this RFC (the deny methods belong to the Deferred section).
 
 ```ts
-// packages/shared/ports/i-enrollment-repository.ts
-export interface EnrollmentUserDenyRecord {
-  id: string;
-  userId: string;
-  topicNodeId: string;
-  grantedBy: string;
-  grantedAt: string;
-}
-export interface EnrollmentGroupDenyRecord {
-  id: string;
-  groupId: string;
-  topicNodeId: string;
-  grantedBy: string;
-  grantedAt: string;
-}
-
-export interface IEnrollmentRepository {
-  // unchanged
-  getEffectiveAccessTopicIds(userId: string): Promise<string[]>;
-  listUserGrants(userId: string): Promise<EnrollmentUserRecord[]>;
-  grantUser(...): Promise<EnrollmentUserRecord>;
-  revokeUser(...): Promise<void>;
-  listGroupGrants(...): Promise<EnrollmentGroupRecord[]>;
-  grantGroup(...): Promise<EnrollmentGroupRecord>;
-  revokeGroup(...): Promise<void>;
-
-  // new
-  listUserDenies(userId: string): Promise<EnrollmentUserDenyRecord[]>;
-  denyUser(userId: string, topicNodeId: string, grantedBy: string): Promise<EnrollmentUserDenyRecord>;
-  undenyUser(userId: string, topicNodeId: string): Promise<void>;
-
-  listGroupDenies(groupId: string): Promise<EnrollmentGroupDenyRecord[]>;
-  denyGroup(groupId: string, topicNodeId: string, grantedBy: string): Promise<EnrollmentGroupDenyRecord>;
-  undenyGroup(groupId: string, topicNodeId: string): Promise<void>;
-}
+// packages/shared/ports/i-topic-node-repository.ts
+// TopicNodeRecord
+visibility: Entities.Config.TopicVisibility;
+// CreateTopicNodeInput / UpdateTopicNodeInput
+visibility?: Entities.Config.TopicVisibility;
 ```
 
-`EnrollmentService` grows the mirror operations (`denyUser`,
-`undenyUser`, `denyGroup`, `undenyGroup`), each emitting the same
-structured `console.info` audit line as the existing grant methods,
-with `event: 'enrollment.deny_user' | 'enrollment.undeny_user' | …`.
+The repository's update path already handles partial patches; reading and
+writing the new column is the only adapter change.
 
-`ITopicNodeRepository` exposes `visibility` on
-`TopicNodeRecord`, `CreateTopicNodeInput.visibility?`, and
-`UpdateTopicNodeInput.visibility?`. The repository's update path
-already handles partial patches; no resolver changes needed there.
+### 5. HTTP surface (admin)
 
-### 6. HTTP surface (admin)
+No new routes. `PATCH /admin/topics/{id}` already accepts a partial
+update; extend its schema to accept `visibility?: TopicVisibility`. Grant
+and revoke routes are unchanged.
 
-Additive routes under `apps/api/src/routes/admin/enrollments.ts`:
+### 6. Frontend impact (admin only)
 
-| Method | Path | Body | Notes |
-|---|---|---|---|
-| `GET`    | `/users/{userId}/denies`               | —                     | List per-user denies. |
-| `POST`   | `/users/{userId}/denies`               | `{ topicNodeId }`     | Add (idempotent). `201` created / `200` already-denied. |
-| `DELETE` | `/users/{userId}/denies/{topicId}`     | —                     | Remove. `204`. |
-| `GET`    | `/groups/{groupId}/denies`             | —                     | List per-group denies. |
-| `POST`   | `/groups/{groupId}/denies`             | `{ topicNodeId }`     | Add (idempotent). |
-| `DELETE` | `/groups/{groupId}/denies/{topicId}`   | —                     | Remove. `204`. |
-
-`PATCH /admin/topics/{id}` already accepts a partial update; extend its
-schema to accept `visibility?: TopicVisibility`. No new route needed
-for visibility.
-
-All routes follow RFC 0003's OpenAPI / `createRoute` pattern and
-return the same envelope shapes as the existing allow routes.
-
-### 7. Data model summary
-
-```
-topic_nodes
-  + visibility TEXT NOT NULL DEFAULT 'restricted'
-    CHECK (visibility IN ('public','restricted','private'))
-
-enrollments_user_deny       (id, user_id, topic_node_id, granted_by, granted_at)
-enrollments_user_group_deny (id, group_id, topic_node_id, granted_by, granted_at)
-```
-
-Unique constraints on `(user_id, topic_node_id)` and
-`(group_id, topic_node_id)` so `INSERT OR IGNORE` is idempotent, matching
-the existing allow-table behaviour.
-
-### 8. Frontend impact (admin only)
-
-- **Topic editor** (`apps/web/src/app/(protected)/admin/topics/**`) —
-  add a `visibility` select with three options
+- **Topic editor** (`apps/web/src/app/(protected)/admin/topics/**`) — add
+  a `visibility` select with three options
   (`public` / `restricted` / `private`), wired to the patched topic
   update endpoint. Inline copy explains the semantics; copy goes through
   the i18n dict per RFC 0002.
-- **User enrollment manager** — add an "Excluded topics" tab alongside
-  the existing "Granted topics" view. Same picker, opposite intent.
-- **Group enrollment manager** — same addition for groups.
+- **New unified Access page**
+  (`apps/web/src/app/(protected)/admin/access/**`) — a single
+  principal-centric surface that replaces the two separate entry points
+  (per-user tab + per-group tab) currently provided by the shared
+  `enrollment/enrollments-tab.tsx` component. Layout:
+  1. **Principal selector** — toggle `User | Group`, then search/pick the
+     principal. Verb-first flow ("manage access → pick whom").
+  2. **Granted topics** — the grant picker (existing allow behaviour).
+     *(An "Excluded topics" tab is added only if denies ship — Deferred.)*
+  3. **Tree picker** — renders the topic hierarchy as an **ordered tree**
+     reusing the catalog's tree component, so the admin gates the same
+     structure participants browse.
+- **User / Group detail pages** keep only a lightweight **"Manage
+  access"** link that deep-links into the unified Access page,
+  pre-filtered to that principal. Single source of truth; the detail
+  pages no longer embed the full enrollment component.
 
-The participant catalog (RFC 0004) needs **no changes**: it already
-calls `GET /topics` / `GET /topics/:id` with the user's JWT, and those
-endpoints now return the deny-aware, visibility-aware set. The 404
-that the controller already returns for non-accessible topics covers
-the deny path identically.
+The participant catalog (RFC 0004) needs **no UI change**: once Phase 0
+lands, it already calls `GET /topics` / `GET /topics/:id` with the user's
+JWT, and those endpoints return the enrollment-aware, visibility-aware
+set. The 404 the controller already returns for non-accessible topics
+covers `PRIVATE` identically.
+
+### 7. Comments inherit effective access (no separate primitive)
+
+Comment read/write is **already** gated by the same effective-access set
+as topic visibility: `comments.router.ts` resolves
+`getEffectiveAccessTopicIds(userId)` and `CommentsController.listComments`
+/ `createComment` reject with `403` when the topic is not in that set.
+This RFC adds **no comment-specific permission**.
+
+Consequences, free of any new code in the comment path:
+
+- A **`PRIVATE`** topic exposes its discussion only to admins / content
+  creators, identical to its content.
+- A **`PUBLIC`** topic, being in every authenticated user's effective set,
+  is **commentable by any authenticated user** — the intended behaviour
+  (comment access follows visibility). The abuse/spam surface is flagged
+  in Open Questions, not solved here.
+- Once Phase 0 lands, comment access on `RESTRICTED` topics is gated by
+  the same cascade as the catalog — already true in code, but only
+  meaningful once the catalog is gated too.
 
 ## Alternatives Considered
 
-1. **"Most-specific wins" instead of "deny wins".** A more-specific
-   allow below a deny ancestor (or vice-versa) would override the
-   ancestor. *Rejected:* harder to reason about, easier to
-   misconfigure into a security hole, requires per-node distance
-   computation in the resolver.
-2. **Per-node ACL table** (`(topic_id, principal_id, principal_kind,
-   action)`). *Rejected:* over-engineered for the binary
-   visibility model; complicates the recursive CTE; makes audits
-   harder.
-3. **Tag-based gating** — denylist topics by tag rather than by id.
-   *Rejected:* couples permissions to authoring metadata; renaming a
-   tag silently changes who sees what.
-4. **Structural restructure** (the current workaround — move the
-   restricted node out of the public subtree). *Rejected on
-   principle:* permissions concerns should not dictate pedagogical
-   ordering.
-5. **Visibility column only, no denies.** Covers default-private but
-   not "grant subtree X except Y" without lifting Y out of X.
-   *Rejected as insufficient* — case 1 in Motivation stays unsolved.
-6. **Denies only, no visibility column.** Covers exclusions but
-   leaves no way to mark a topic admin-only without remembering to
-   deny every existing user / group. *Rejected as insufficient* —
-   case 4 in Motivation stays unsolved.
-
-The two mechanisms are complementary and together close the gap.
+1. **Negative grants ("denies") in this RFC.** The original proposal.
+   *Deferred, not rejected:* denies uniquely solve per-principal
+   mid-subtree exclusion (Motivation 2, 3, 5), but those cases are not on
+   the roadmap, and denies add a second recursive CTE plus a large
+   CRUD/UI surface. Full design preserved in the Deferred section.
+2. **"Most-specific wins" precedence** (a deny/allow closer to the node
+   overrides an ancestor). *Rejected:* only relevant once denies exist,
+   and harder to reason about than "deny wins"; revisit with the Deferred
+   work.
+3. **Per-node ACL table** (`(topic_id, principal_id, kind, action)`).
+   *Rejected:* over-engineered for a binary model; complicates the CTE;
+   makes audits harder.
+4. **Tag-based gating** — denylist topics by tag. *Rejected:* couples
+   permissions to authoring metadata; renaming a tag silently changes who
+   sees what.
+5. **Structural restructure** (move the restricted node out of its
+   subtree). *Rejected on principle:* permissions should not dictate
+   pedagogical ordering.
+6. **Visibility column only, no denies (chosen).** Covers
+   default-restricted enforcement, `PUBLIC` opt-in, and admin-only
+   `PRIVATE` on a single-CTE resolver. Does not cover "grant subtree X
+   except node Y" for a *subset* of principals — accepted, since that is
+   the Deferred case.
 
 ## Implementation Plan
 
-Estimated total: **~4–5 dev days** across three milestones, all
-shippable independently.
+Estimated total: **~3–3.5 dev days**, all shippable independently.
 
-### Phase 1 — Schema + ports (~1 d)
+### Phase 0 — Prerequisite: make the catalog enforce enrollment (~0.5 d)
+**The design assumes the catalog is gated by enrollment. It is not
+today** (see Current State defect). Before any new primitive ships:
+- Inject the enrollment adapter into the catalog controller in
+  `apps/api/src/routes/public/catalog.topics.ts` (currently `undefined`).
+- Confirm `GET /topics` / `GET /topics/{id}` filter by
+  `getEffectiveAccessTopicIds(user.sub)` for non-admins and keep the
+  admin / content-creator bypass.
+- Regression test: a participant with a grant on 1 of N topics sees
+  exactly that subtree (cascade), not all N. **This test would fail on
+  `main` today** — it pins the fix.
+- Ship-able and verifiable on its own, independent of visibility.
+
+### Phase 1 — Schema + resolver + ports (~1 d)
 - Migration: add `visibility` to `topic_nodes` (default `'restricted'`,
-  backfill); create `enrollments_user_deny` and
-  `enrollments_user_group_deny` with unique constraints.
+  backfill, `CHECK` constraint); add index on `topic_nodes(visibility)`.
 - Extend `Entities.Config.TopicVisibility` enum.
-- Extend `TopicNodeRecord` / inputs and `IEnrollmentRepository` with
-  the new methods and records.
+- Extend `TopicNodeRecord` / create / update inputs with `visibility`.
 - Update `D1TopicNodeRepository` to read/write the new column.
-- Update `D1EnrollmentRepository`: implement deny CRUD + the
-  expanded `getEffectiveAccessTopicIds` query above.
+- Update `D1EnrollmentRepository.getEffectiveAccessTopicIds` to the
+  `(allow_tree ∪ public) − private` query above.
 - Vitest coverage (`@cloudflare/vitest-pool-workers`):
-  - `getEffectiveAccessTopicIds` with allow only, deny only,
-    allow ∩ deny, allow ⊃ deny (descendant denied), deny ⊃ allow
-    (deny ancestor + redundant allow descendant — confirm deny wins),
-    `PUBLIC` topic with deny, `PRIVATE` topic with allow.
-  - Idempotency: double `denyUser` returns the same row.
+  - grant-only (cascade) unchanged from today; `PUBLIC` topic visible with
+    no grant; `PRIVATE` topic hidden even with a grant.
+  - Benchmark: resolver p95 stays `< 50 ms` on the 1,000-topic fixture.
 
-### Phase 2 — Controller + admin routes (~1.5 d)
-- Extend `EnrollmentService` with `denyUser` / `undenyUser` /
-  `denyGroup` / `undenyGroup`, mirroring the existing audit logs.
-- Add the six new admin routes in
-  `apps/api/src/routes/admin/enrollments.ts` (OpenAPI via
-  `createRoute` per RFC 0003).
-- Extend the existing admin `PATCH /topics/{id}` schema with
-  `visibility?`.
-- Update `TopicsController.getPublishedById` / `listPublished` so
-  the admin / content-creator bypass also includes `PRIVATE` topics
-  (today the bypass is implicit via the `userId === undefined`
-  branch — make the `PRIVATE` rule explicit in that branch).
-- Integration tests against an in-memory D1 covering: participant
-  cannot see denied topic, admin can see private topic, public
-  topic visible without grant.
+### Phase 2 — Controller + admin route (~0.5–1 d)
+- Extend the admin `PATCH /topics/{id}` schema with `visibility?`.
+- Make the admin / content-creator bypass include `PRIVATE` explicitly in
+  the `userId === undefined` branch of `TopicsController`.
+- Integration tests against an in-memory D1: admin sees `PRIVATE`,
+  participant does not; `PUBLIC` visible without a grant; `RESTRICTED`
+  gated by cascade.
+- Regression test confirming **comments** inherit the resolver: an
+  authenticated user can comment on a `PUBLIC` topic with no grant; a
+  participant cannot comment on a `RESTRICTED` topic they lack (no
+  comment-controller edit expected).
 
 ### Phase 3 — Admin UI (~1.5 d)
-- Topic editor: visibility selector with help copy (PT + EN dict
-  keys); calls the patched update endpoint.
-- User / group enrollment managers: "Excluded topics" tab with the
-  same topic picker UI as the existing "Granted topics" tab; calls
-  the new deny endpoints.
+- Topic editor: visibility selector with help copy (PT + EN dict keys);
+  calls the patched update endpoint.
+- **New unified Access page** (`admin/access/**`): principal selector
+  (`User | Group`), "Granted topics" tab using the catalog's ordered-tree
+  picker, wired to the existing grant endpoints.
+- Migrate `enrollment/enrollments-tab.tsx` usages off the user/group
+  detail pages; replace with a "Manage access" deep-link.
+- All new strings in `dict-pt.ts` + `dict-en.ts`; `check-i18n-coverage.js`
+  passes.
 - Visual QA on staging.
 
-No frontend change ships in the participant catalog.
+No frontend change ships in the participant catalog beyond the Phase 0
+enforcement (which is server-side).
 
 ## Tradeoffs & Risks
 
 | Risk | Mitigation |
 |---|---|
-| **Mental model becomes harder** (allow + deny + visibility) | The default after migration is *identical* to today's behaviour; teams only learn the new primitives when they reach for them. Admin UI copy explains precedence on the visibility selector and the deny tab. |
-| Resolver query grows from one recursive CTE to two | Both CTEs are bounded by `grants + descendants`; in practice the deny set is small (≤ 10 per user expected). Benchmark in Phase 1 against the same 1,000-topic fixture as today; abort and reconsider if > 100 ms on D1. |
-| **Silent re-grants when an admin re-enables a denied node** by mistake (e.g. uses the allow UI instead of removing the deny) | Admin "Granted topics" UI surfaces a warning chip when a granted topic is shadowed by a deny on the same user / one of their groups; resolver still does the right thing — UI just clarifies intent. |
-| Backfill picks the "wrong" default | The default is `RESTRICTED`, which preserves *current* behaviour exactly. Flipping topics to `PUBLIC` is an explicit per-node action; nothing is auto-opened. |
-| Deny rows orphaned when a topic is hard-deleted | Add `ON DELETE CASCADE` on `topic_node_id` foreign keys for both deny tables (mirror what the existing allow tables do, or add it consistently to all four if missing). |
-| Group denies vs user allows: who wins? | Deny always wins. A user with an explicit allow on a topic whose group is denied still cannot see the topic. Documented in the admin UI; tested in Phase 1. |
-| Audit gap: revoking a deny is silent today | `undenyUser` / `undenyGroup` emit the same structured `console.info` audit log as the existing revoke methods (`event: 'enrollment.undeny_user'` etc.). |
-| Migration failure in production | Migration is additive (one nullable-with-default column, two new tables). No data rewrite. Safe to roll forward; rollback is `DROP TABLE` + `ALTER TABLE DROP COLUMN` (D1 supports it as of 2024). |
+| **Phase 0 changes catalog behaviour for existing users** — anyone who relied on seeing ungranted topics loses them | This is the intended fix (the current behaviour is a security defect). Before deploy, audit existing grants so genuinely-enrolled users keep their access; communicate the change. Phase 0 ships first and is independently verifiable on staging. |
+| **Mental model adds a visibility axis** | The default after migration (`RESTRICTED` + Phase 0) is the behaviour the product always intended; teams learn `PUBLIC`/`PRIVATE` only when they reach for them. Admin UI copy explains each level on the selector. |
+| Backfill picks the "wrong" default | Default is `RESTRICTED`, preserving intended behaviour. Flipping to `PUBLIC` is an explicit per-node action; nothing is auto-opened. |
+| Resolver cost | One recursive CTE (as today) + two indexed flat filters. Benchmark in Phase 1; the index on `visibility` keeps `public_set` / `private_set` cheap. |
+| Migration failure in production | Additive: one nullable-with-default column + a `CHECK` + an index. No data rewrite. Rollback is `ALTER TABLE DROP COLUMN` (D1 supports it). |
 
 ## Success Criteria
 
-- An admin can grant a subtree on a user, then deny one descendant, and
-  the user (a) sees the rest of the subtree and (b) does not see the
-  denied node or any of *its* descendants — verified end-to-end via
-  `GET /topics` and `GET /topics/:id`.
-- An admin can mark a topic `PRIVATE` and confirm it disappears from
-  every non-admin response while remaining reachable in the
-  `/admin/topics/*` surfaces.
-- `PUBLIC` topics appear in `GET /topics` for a freshly-registered
-  user with zero grants.
-- Existing grants behave identically to today (regression suite from
-  Phase 1 of `D1EnrollmentRepository` tests stays green; no migration
-  of existing rows).
-- `getEffectiveAccessTopicIds` p95 stays under ~50 ms on the existing
-  1,000-topic benchmark fixture extended with 10 deny rows.
-- All new admin-facing strings ship in both `dict-pt.ts` and
-  `dict-en.ts`; `check-i18n-coverage.js` passes.
+- **Phase 0:** a participant granted 1 of N topics sees exactly that
+  subtree in `GET /topics` — not all N. (The bug reproduced during review
+  no longer reproduces.)
+- An admin can mark a topic `PRIVATE` and confirm it disappears from every
+  non-admin response while remaining reachable in `/admin/topics/*`.
+- `PUBLIC` topics appear in `GET /topics` for a freshly-registered user
+  with zero grants.
+- Existing grants behave identically to today (cascade preserved; no
+  migration of existing rows).
+- `getEffectiveAccessTopicIds` p95 stays `< 50 ms` on the 1,000-topic
+  benchmark fixture.
+- All new admin-facing strings ship in both `dict-pt.ts` and `dict-en.ts`;
+  `check-i18n-coverage.js` passes.
 
 ## Open Questions
 
-These are flagged for product input before moving to **Proposed**:
-
 1. **Should `PUBLIC` ignore `archived = true`?** Current draft excludes
-   archived nodes from `public_set`. Confirm this matches the
-   editorial workflow.
-2. **Should we expose denies in the participant-facing UI** ("This
-   topic is restricted")? Default in this RFC is *no* — denied topics
-   are simply absent from the catalog payload, identical to
-   not-granted topics. Surfacing "you don't have access to X" risks
-   information disclosure.
-3. **Group precedence**: when a user belongs to multiple groups,
-   one granting and one denying the same topic, deny wins. Is that
-   what product expects for cohort overlaps?
-4. **Time-bounded grants / denies** (`grantedUntil`): out of scope
-   here; confirm we want to track separately rather than fold into
-   this RFC.
+   archived nodes from `public_set`. Confirm this matches the editorial
+   workflow.
+2. **`PUBLIC` comment abuse surface.** Because comment access follows
+   visibility (§7), a `PUBLIC` topic is commentable by *any* authenticated
+   user. If `PUBLIC` topics carry high-traffic / open content, do we need
+   rate limiting, moderation, or a "comments require a grant even when
+   read is public" toggle? Decision: ship the simple coupling; revisit if
+   `PUBLIC` adoption makes spam real. (If we never use `PUBLIC`, consider
+   dropping it and keeping just `RESTRICTED` + `PRIVATE`.)
+3. **Phase 0 rollout safety.** Do we need a grants audit / backfill before
+   enforcing the catalog, to avoid locking out users who legitimately
+   should keep access but were never explicitly granted?
+
+---
+
+## Deferred: negative grants ("denies")
+
+> **Status: deferred — not part of this RFC's implementation.** Captured
+> so the design survives if the per-principal exclusion cases (Motivation
+> 2, 3, 5) reach the roadmap. Picking this up re-opens
+> `IEnrollmentRepository`, adds two tables, a second recursive CTE, six
+> admin routes, and an "Excluded topics" tab on the Access page.
+
+**When this becomes necessary:** when a node must be visible to *some*
+principals but hidden from *others* while its parent subtree stays granted
+— e.g. an instructor-only section inside a participant course, or a
+cohort-only preview. `PRIVATE` cannot express this (it hides from
+non-admins entirely); only a per-principal deny can.
+
+**Design (preserved from the original RFC draft):**
+
+- **Two tables**, mirroring the allow tables, keyed `(user_id|group_id,
+  topic_node_id)` with `UNIQUE` for idempotent `INSERT OR IGNORE`:
+  `enrollments_user_deny`, `enrollments_user_group_deny`. A deny cascades
+  to descendants exactly like an allow.
+- **Resolver — "deny wins":** `(allow_tree ∪ public) − deny_tree −
+  private`. The deny set is a *second* recursive CTE. "Deny wins" (not
+  "most-specific wins") for predictability, least privilege, and a
+  set-subtraction resolver with no per-edge precedence. Group deny beats
+  user allow.
+- **Ports:** `IEnrollmentRepository` gains
+  `listUserDenies` / `denyUser` / `undenyUser` and the group equivalents,
+  returning `EnrollmentUserDenyRecord` / `EnrollmentGroupDenyRecord`.
+  `EnrollmentService` mirrors the audit-logged grant operations
+  (`event: 'enrollment.deny_user' | 'enrollment.undeny_user' | …`).
+- **HTTP:** six additive routes under `routes/admin/enrollments.ts`
+  (`GET`/`POST`/`DELETE` of `/users/{id}/denies` and
+  `/groups/{id}/denies`), OpenAPI per RFC 0003.
+- **UI:** an "Excluded topics" tab on the unified Access page (same
+  ordered-tree picker, opposite intent) + a warning chip when a granted
+  topic is shadowed by a deny on the same principal/group.
+- **FK hygiene:** `ON DELETE CASCADE` on `topic_node_id` for both deny
+  tables to avoid orphans on hard-delete.
+- **Tests:** allow ∩ deny, allow ⊃ deny (descendant denied), deny ⊃ allow
+  (confirm deny wins), `PUBLIC` topic with deny, idempotent double-deny.
+
+**Deferred open questions** (resolve when this is picked up):
+- Surface denies in the participant UI ("this topic is restricted") or
+  keep them silently absent (information-disclosure risk)?
+- Group precedence on cohort overlaps — confirm "deny wins" matches
+  product expectation.
+- Time-bounded grants/denies (`grantedUntil`) — fold in or keep separate.
 
 ## References
 
-- Current enrollment port:
-  `packages/shared/ports/i-enrollment-repository.ts`
-- Current resolver:
-  `apps/api/src/adapters/db/d1-enrollment-repository.ts:51`
-- Current access enforcement:
-  `apps/api/src/controllers/topics.controller.ts:35`,
-  `apps/api/src/controllers/topics.controller.ts:50`
-- Admin enrollment routes (extension point):
-  `apps/api/src/routes/admin/enrollments.ts`
-- Entity model:
-  `packages/shared/types/entities.ts` (`Entities.Identity.EnrollmentUser`,
-  `Entities.Identity.EnrollmentUserGroup`, `Entities.Content.TopicNode`)
-- Related: RFC 0003 (route organisation / OpenAPI), RFC 0004
-  (catalog UX — consumer of the resolver output), RFC 0002 (i18n
-  contract for new admin strings).
+- Enrollment port: `packages/shared/ports/i-enrollment-repository.ts`
+- Resolver (cascade): `apps/api/src/adapters/db/d1-enrollment-repository.ts:51`
+- **Catalog gating defect:** `apps/api/src/routes/public/catalog.topics.ts`
+  (controller built with `enrollment = undefined`)
+- Access enforcement guard: `apps/api/src/controllers/topics.controller.ts:41`, `:55`
+- Comment access coupling (§7): `apps/api/src/routes/comments.router.ts`,
+  `apps/api/src/controllers/comments.controller.ts`
+- Existing shared enrollment UI being consolidated (§6):
+  `apps/web/src/components/enrollment/enrollments-tab.tsx`
+- Entity model: `packages/shared/types/entities.ts`
+  (`Entities.Content.TopicNode`, `Entities.Identity.EnrollmentUser`,
+  `Entities.Identity.EnrollmentUserGroup`)
+- Related: RFC 0003 (route organisation / OpenAPI), RFC 0004 (catalog UX),
+  RFC 0002 (i18n contract for new admin strings).
