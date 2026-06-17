@@ -453,7 +453,7 @@ enforcement (which is server-side).
 
 | Risk | Mitigation |
 |---|---|
-| **Phase 0 changes catalog behaviour for existing users** — anyone who relied on seeing ungranted topics loses them | This is the intended fix (the current behaviour is a security defect). Before deploy, audit existing grants so genuinely-enrolled users keep their access; communicate the change. Phase 0 ships first and is independently verifiable on staging. |
+| **Phase 0 changes catalog behaviour for existing users** — anyone who relied on seeing ungranted topics loses them | This is the intended fix (the current behaviour is a security defect). **The project is pre-production with no live users (resolved decision 3), so no grants audit / backfill is required** — Phase 0 simply enables the intended enforcement. Still ships first and is independently verifiable on staging. |
 | **Mental model adds a visibility axis** | The default after migration (`RESTRICTED` + Phase 0) is the behaviour the product always intended; teams learn `PUBLIC`/`PRIVATE` only when they reach for them. Admin UI copy explains each level on the selector. |
 | Backfill picks the "wrong" default | Default is `RESTRICTED`, preserving intended behaviour. Flipping to `PUBLIC` is an explicit per-node action; nothing is auto-opened. |
 | Resolver cost | One recursive CTE (as today) + two indexed flat filters. Benchmark in Phase 1; the index on `visibility` keeps `public_set` / `private_set` cheap. |
@@ -468,6 +468,9 @@ enforcement (which is server-side).
   non-admin response while remaining reachable in `/admin/topics/*`.
 - `PUBLIC` topics appear in `GET /topics` for a freshly-registered user
   with zero grants.
+- **`DRAFT` and `archived` topics never appear in `GET /topics` /
+  `GET /topics/:id` for anyone — including admins and content creators**
+  (resolved decision 1); they are reachable only via `/admin/topics/*`.
 - Existing grants behave identically to today (cascade preserved; no
   migration of existing rows).
 - `getEffectiveAccessTopicIds` p95 stays `< 50 ms` on the 1,000-topic
@@ -475,21 +478,29 @@ enforcement (which is server-side).
 - All new admin-facing strings ship in both `dict-pt.ts` and `dict-en.ts`;
   `check-i18n-coverage.js` passes.
 
-## Open Questions
+## Resolved Decisions
 
-1. **Should `PUBLIC` ignore `archived = true`?** Current draft excludes
-   archived nodes from `public_set`. Confirm this matches the editorial
-   workflow.
-2. **`PUBLIC` comment abuse surface.** Because comment access follows
-   visibility (§7), a `PUBLIC` topic is commentable by *any* authenticated
-   user. If `PUBLIC` topics carry high-traffic / open content, do we need
-   rate limiting, moderation, or a "comments require a grant even when
-   read is public" toggle? Decision: ship the simple coupling; revisit if
-   `PUBLIC` adoption makes spam real. (If we never use `PUBLIC`, consider
-   dropping it and keeping just `RESTRICTED` + `PRIVATE`.)
-3. **Phase 0 rollout safety.** Do we need a grants audit / backfill before
-   enforcing the catalog, to avoid locking out users who legitimately
-   should keep access but were never explicitly granted?
+_Resolved by product, 2026-06-16._
+
+1. **`PUBLIC` (and the catalog) must continue to exclude `archived` —
+   and `DRAFT`.** Neither archived nor draft nodes are listed or shown in
+   the catalog **to anyone, including admins/creators**. The
+   participant-facing catalog is published-and-not-archived only; draft /
+   archived content is reachable solely through the `/admin/topics/*`
+   authoring surfaces. The resolver keeps `AND archived = 0` on
+   `public_set`, and the controller's existing
+   `status === PUBLISHED && !archived` filter (applied **before** the
+   access check, independent of `userId`) enforces this for every caller.
+   → reflected in Success Criteria.
+2. **`PUBLIC` comment abuse is not a concern for now.** The user base is
+   small in this phase; we ship the simple coupling (comment access
+   follows visibility, §7) with no rate limiting or moderation toggle.
+   Revisit only if `PUBLIC` adoption and user volume make spam real.
+3. **No Phase 0 grants audit / backfill needed.** The project is
+   pre-production with no live users to lock out, so the rollout risk does
+   not exist. Phase 0 simply turns on the intended enforcement; the
+   migration backfills `visibility = 'restricted'` and existing grants
+   already describe who should see what.
 
 ---
 
