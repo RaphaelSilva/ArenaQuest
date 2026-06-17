@@ -55,7 +55,7 @@ Out:
 - [x] Benchmark: p95 `< 50 ms` on the 1,000-topic fixture (passes).
 - [x] `IEnrollmentRepository` is unchanged.
 - [x] Changed files lint clean; the enrollment resolver spec passes (18 tests, incl. 5 new). _Repo-wide `make lint` / full `make test-api` caveats unchanged from Tasks 01–02._
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
