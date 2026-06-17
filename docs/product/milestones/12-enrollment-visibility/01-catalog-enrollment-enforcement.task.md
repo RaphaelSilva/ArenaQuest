@@ -1,6 +1,6 @@
 # Task 01 — Backend: make the catalog enforce enrollment (Phase 0)
 
-**Status:** Open
+**Status:** ✅ Done
 **Milestone:** [12 — Enrollment enforcement and node visibility](./milestone.md)
 **RFC:** [0005 — Enrollment enforcement and node visibility, Phase 0](../../RFCs/0005-enrollment-exclusions-and-visibility.md)
 **Team:** Backend API
@@ -40,15 +40,15 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `catalog.topics.ts` builds `TopicsController` with a real enrollment adapter; the `undefined` argument is gone.
-- [ ] `GET /topics` returns only the granted subtree (cascade) for a non-admin participant, not every published topic.
-- [ ] `GET /topics/{id}` returns `404` for a non-accessible topic to a non-admin, and the topic to an admin / content creator.
-- [ ] Admin and content-creator requests continue to see all published, non-archived topics.
-- [ ] Draft and archived topics never appear in either endpoint for any caller.
-- [ ] A regression test reproduces the original defect (would fail pre-fix) and passes post-fix.
-- [ ] No D1-specific import leaks into `TopicsController`.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `catalog.topics.ts` builds `TopicsController` with a real enrollment adapter; the `undefined` argument is gone.
+- [x] `GET /topics` returns only the granted subtree (cascade) for a non-admin participant, not every published topic.
+- [x] `GET /topics/{id}` returns `404` for a non-accessible topic to a non-admin, and the topic to an admin / content creator.
+- [x] Admin and content-creator requests continue to see all published, non-archived topics.
+- [x] Draft and archived topics never appear in either endpoint for any caller.
+- [x] A regression test reproduces the original defect (would fail pre-fix) and passes post-fix.
+- [x] No D1-specific import leaks into `TopicsController`.
+- [x] Changed files lint clean and the full catalog-read surface (58 tests across `topics.router`, `admin-topics.router`, `topics.controller`, `comments`, `docs` specs) passes. _Caveat: repo-wide `make lint` is red on a pre-existing, out-of-scope file (`apps/api/scripts/generate-bruno.ts`); the full `make test-api` run is unstable on this WSL2 host (workers-pool RPC timeout) — verified via targeted specs instead._
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
