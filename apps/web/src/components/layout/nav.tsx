@@ -27,6 +27,7 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
     { label: dict.layout.adminSidebar.topics, href: '/admin/topics', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.tasks, href: '/admin/tasks', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.groups, href: '/admin/groups', roles: [ROLES.ADMIN] },
+    { label: dict.layout.adminSidebar.access, href: '/admin/access', roles: [ROLES.ADMIN] },
   ];
 
   return (

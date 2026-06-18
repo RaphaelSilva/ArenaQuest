@@ -113,8 +113,8 @@
 				"WEB_BASE_URL": "https://arenaquest-web-staging.pages.dev",
 				// Google OAuth — replace with your staging OAuth client values.
 				// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET --env staging`
-				"GOOGLE_CLIENT_ID": "",
-				"GOOGLE_REDIRECT_URI": "https://api-staging.arenaquest.app/auth/google/callback"
+				//"GOOGLE_CLIENT_ID": "",
+				"GOOGLE_REDIRECT_URI": "https://api-staging.raphael-1d2.workers.dev/auth/google/callback"
 			},
 			"observability": {
 				"enabled": true,

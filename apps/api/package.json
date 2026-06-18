@@ -17,7 +17,9 @@
 		"db:apply:migrations:staging": "wrangler d1 migrations apply arenaquest-db-staging --env staging",		
 		"cf-typegen": "wrangler types",
 		"dump-openapi": "tsx scripts/dump-openapi.ts",
-		"generate-bruno": "tsx scripts/generate-bruno.ts"
+		"generate-bruno": "tsx scripts/generate-bruno.ts",
+		"create-google-client-secret": "wrangler secret put GOOGLE_CLIENT_SECRET --env staging",
+		"create-google-client-id": "wrangler secret put GOOGLE_CLIENT_ID --env staging"
 	},
 	"dependencies": {
 		"@arenaquest/shared": "workspace:*",
