@@ -368,7 +368,7 @@ export default function AdminUsersPage() {
                           href={`/admin/users/${u.id}`}
                           className="text-indigo-600 hover:underline dark:text-indigo-400"
                         >
-                          {d.actions.enrollments}
+                          {d.actions.details}
                         </Link>
                         <button
                           onClick={() => { setEditTarget(u); setShowForm(true); }}
