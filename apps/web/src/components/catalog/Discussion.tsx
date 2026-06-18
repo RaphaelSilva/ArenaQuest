@@ -111,7 +111,6 @@ export function Discussion({ topicId }: Props) {
   }
 
   if (error) {
-    console.log(`Error: ${error}`);
     return <SectionError message={dict.catalog.redesign.sectionError} />;
   }
 

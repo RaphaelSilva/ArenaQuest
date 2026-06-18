@@ -4,7 +4,14 @@ import tseslint from "typescript-eslint";
 export default defineConfig([
   ...tseslint.configs.recommended,
   {
-    ignores: ["dist/**", "node_modules/**", ".wrangler/**", "worker-configuration.d.ts"],
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      ".wrangler/**",
+      "worker-configuration.d.ts",
+      "scripts/**",
+      "bruno/**"
+    ],
   },
   {
     rules: {
