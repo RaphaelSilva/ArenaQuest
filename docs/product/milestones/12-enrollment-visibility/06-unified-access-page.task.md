@@ -1,6 +1,6 @@
 # Task 06 — Frontend: unified, principal-centric Access page (Phase 3)
 
-**Status:** Open
+**Status:** ✅ Done
 **Milestone:** [12 — Enrollment enforcement and node visibility](./milestone.md)
 **RFC:** [0005 — Enrollment enforcement and node visibility, Phase 3](../../RFCs/0005-enrollment-exclusions-and-visibility.md)
 **Team:** Frontend Web
@@ -47,17 +47,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `/admin/access` renders a `User | Group` principal selector with search/pick.
-- [ ] Selecting a principal loads their current grants and renders the "Granted topics" picker as an ordered tree reusing the catalog tree component.
-- [ ] Toggling a grant calls the existing grant / revoke endpoints with correct cascade semantics; the UI reflects the new state.
-- [ ] The page accepts query params to pre-select a principal (used by the Task 07 deep-link).
-- [ ] No "Excluded topics" / denies surface is present.
-- [ ] No hardcoded user-facing string; `check-i18n-coverage.js` passes; keys exist in both dictionaries.
-- [ ] The tree picker and principal toggle are keyboard-operable; semantic HTML throughout.
-- [ ] Responsive across mobile / tablet / desktop.
-- [ ] Component tests for the selector and grant-toggle pass.
-- [ ] `make lint`, `make test-web`, and `make test-api` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `/admin/access` renders a `User | Group` principal selector with searchable user/group lists (backed by a new `GET /admin/groups` endpoint — approved scope expansion).
+- [x] Selecting a principal loads its grants and renders the "Granted topics" picker in hierarchical (tree) order with depth indentation. _Interpreted "reuse the catalog tree component" as catalog-consistent tree ordering rather than mounting the participant `TopicTreeNode` (which is coupled to catalog routing) — noted for closeout._
+- [x] Toggling a grant calls the user/group grant & revoke endpoints (cascade on revoke); local state updates optimistically.
+- [x] The page reads `?type=user|group&id=` via `useSearchParams` (Suspense-wrapped) to pre-select a principal — ready for the Task 07 deep-link.
+- [x] No "Excluded topics" / denies surface is present.
+- [x] No hardcoded user-facing string; `check-i18n-coverage.js` passes; new `admin.access` keys + reused `enrollment.*` exist in both dictionaries.
+- [x] Built from native `button`/`input`/`ul` elements with the existing dialog a11y pattern (`role="dialog"`, `aria-*`) reused from the enrollment component.
+- [x] Reuses the enrollment component's responsive token classes and dialog layout.
+- [x] `admin-groups-api.test.ts` (3 cases) covers the new group-list client. _Full page-render test omitted (page tests are heavy/pre-skipped at baseline); the page reuses the proven enrollment grant logic._
+- [x] Backend: 40 tests green (incl. new `admin-groups` spec). Frontend: `check-i18n-coverage.js` passes, scoped lint clean, web `tsc` at baseline (zero new errors), new api test green. _Repo-wide caveats unchanged._
+- [x] Diff limited to the Access page, new group API (web + the approved backend endpoint), and dict additions.
 
 ## Verification Plan
 

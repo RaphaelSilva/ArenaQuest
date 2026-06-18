@@ -216,8 +216,6 @@ export const dictPt = {
       detail: {
         backToUsers: '← Voltar para usuários',
         resetPasswordButton: 'Redefinir Senha',
-        tabEnrollments: 'matrículas',
-        tabProfile: 'perfil',
         rolesLabel: 'Permissões',
         statusLabel: 'Status',
         memberSinceLabel: 'Membro desde',
@@ -289,6 +287,11 @@ export const dictPt = {
         statusDraft: 'Rascunho',
         statusPublished: 'Publicado',
         statusArchived: 'Arquivado',
+        visibilityLabel: 'Visibilidade',
+        visibilityPublic: 'Público',
+        visibilityRestricted: 'Restrito',
+        visibilityPrivate: 'Privado',
+        visibilityHelp: 'Público: visível para todos. Restrito: somente matrículas ativas. Privado: somente admins e criadores.',
       },
       media: {
         sectionTitle: 'Anexos de Mídia',
@@ -401,6 +404,15 @@ export const dictPt = {
       detailSubtitle: 'O gerenciamento detalhado de grupos aguarda os endpoints de CRUD de grupos no backend.',
       detailComingSoon: 'Interface de gerenciamento de grupos em breve.',
       backToGroups: '← Voltar para grupos',
+    },
+    access: {
+      title: 'Controle de Acesso',
+      subtitle: 'Gerencie quais tópicos cada usuário ou grupo pode acessar.',
+      searchUsersPlaceholder: 'Pesquisar usuários…',
+      searchGroupsPlaceholder: 'Pesquisar grupos…',
+      pickPrincipalPrompt: 'Selecione um usuário ou grupo para gerenciar seus acessos.',
+      membersCount: (n: number) => `${n} ${n === 1 ? 'membro' : 'membros'}`,
+      manageLink: 'Gerenciar acesso',
     },
   },
   catalog: {
@@ -621,6 +633,8 @@ export const dictPt = {
     },
   },
   enrollment: {
+    users: 'Usuários',
+    groups: 'Grupos',
     directGrantsTitle: (count: number) => `Acessos Diretos (${count})`,
     grantButton: 'Conceder acesso ao tópico',
     noGrants: 'Nenhum tópico concedido ainda.',

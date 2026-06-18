@@ -4,7 +4,7 @@ import { TopicsController } from '@api/controllers/topics.controller';
 import { respondWith } from '@api/routes/_shared/envelope';
 import { authGuard } from '@api/middleware/auth-guard';
 import { ROLES } from '@arenaquest/shared/constants/roles';
-import type { ContentContext } from '@api/container';
+import type { ContentContext, ProgressContext } from '@api/container';
 
 export const listTopicsRoute = createRoute({
   method: 'get',
@@ -56,10 +56,12 @@ export const getTopicByIdRoute = createRoute({
 
 export function buildCatalogTopicsRouter(slice: {
   content: ContentContext;
+  progress: ProgressContext;
 }) {
   const { topics, media, storage } = slice.content;
-  // enrollment is not needed for public catalog reads, so pass null or undefined
-  const controller = new TopicsController(topics, media, storage, undefined);
+  const { enrollmentRepo } = slice.progress;
+  // enrollment adapter gates non-admin reads against the effective-access set
+  const controller = new TopicsController(topics, media, storage, enrollmentRepo);
 
   const router = new OpenAPIHono();
 

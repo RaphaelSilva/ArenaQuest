@@ -12,6 +12,7 @@ import * as adminTasksApiModule from './admin-tasks-api';
 import * as adminUsersApiModule from './admin-users-api';
 import * as adminMediaApiModule from './admin-media-api';
 import * as adminEnrollmentApiModule from './admin-enrollment-api';
+import * as adminGroupsApiModule from './admin-groups-api';
 import * as progressApiModule from './progress-api';
 import * as dashboardApiModule from './dashboard-api';
 import * as commentsApiModule from './comments-api';
@@ -92,6 +93,10 @@ export class ApiClient {
 
   get adminEnrollment() {
     return adminEnrollmentApiModule.createAdminEnrollmentApi(this.http);
+  }
+
+  get adminGroups() {
+    return adminGroupsApiModule.createAdminGroupsApi(this.http);
   }
 
   get progress() {

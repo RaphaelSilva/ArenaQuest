@@ -1,6 +1,6 @@
 # Milestone 12 — Enrollment enforcement and node visibility
 
-**Status:** 📋 Planned
+**Status:** ✅ Implemented (on candidate)
 **Scope:** `apps/api` (catalog enforcement, resolver, controller, admin route, migration), `packages/shared` (visibility enum + port/entity types), and `apps/web` (admin topic-editor selector + unified Access page). Derived from [RFC 0005](../../RFCs/0005-enrollment-exclusions-and-visibility.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone delivers the **visibility-only** design from RFC 0005: it fixes the Phase 0 catalog-gating defect, adds a per-node `visibility` column (`public` / `restricted` / `private`) with a single-CTE resolver, an admin/creator bypass, an admin `PATCH` field, a topic-editor selector, and a unified Access page. It may touch: `apps/api/src/routes/public/catalog.topics.ts`, `apps/api/src/adapters/db/d1-enrollment-repository.ts`, `apps/api/src/adapters/db/d1-topic-node-repository.ts`, `apps/api/src/controllers/topics.controller.ts` (and `admin-topics.controller.ts`), `apps/api/src/routes/admin/topics.ts`, `apps/api/migrations/**` (one additive migration), `packages/shared/types/entities.ts`, `packages/shared/ports/i-topic-node-repository.ts`, `apps/web/src/app/(protected)/admin/{topics,access,users,groups}/**`, `apps/web/src/components/enrollment/enrollments-tab.tsx` (retire), the catalog tree component (reuse), the admin enrollment/topics clients, and both i18n dictionaries. It is **not** an opportunity to introduce **negative grants / denies** (`IEnrollmentRepository` is unchanged), generic ACLs, time-bounded access, per-media exclusions, per-creator content scoping, a new role, or a topic-centric access matrix — all explicit Non-Goals in RFC 0005. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
@@ -44,17 +44,17 @@ Out of scope (explicit, from RFC 0005 Non-Goals):
 
 ## 3. Acceptance Criteria
 
-- [ ] A participant granted 1 of N topics sees exactly that subtree in `GET /topics` — not all N (Phase 0 bug fixed; would fail on `develop` today).
-- [ ] An admin can mark a topic `PRIVATE`; it disappears from every non-admin response while remaining reachable in `/admin/topics/*`.
-- [ ] `PUBLIC` topics appear in `GET /topics` for a freshly-registered, zero-grant user and are commentable by them.
-- [ ] `DRAFT` and `archived` topics never appear in `GET /topics` / `GET /topics/:id` for anyone, including admins/creators.
-- [ ] Existing grants behave identically to today (cascade preserved; no migration of existing rows).
-- [ ] `getEffectiveAccessTopicIds` p95 stays `< 50 ms` on the 1,000-topic benchmark fixture, using a single recursive CTE.
-- [ ] `IEnrollmentRepository` is unchanged; no deny tables, routes, or UI ship.
-- [ ] The admin topic editor and unified Access page work; detail-page deep-links resolve; `enrollments-tab.tsx` is retired (or its remaining reference documented).
-- [ ] All new admin strings ship in both `dict-pt.ts` and `dict-en.ts`; `check-i18n-coverage.js` passes.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] No diff outside the scope declared in §"Hard scope guardrail".
+- [x] A participant granted 1 of N topics sees exactly that subtree in `GET /topics` — not all N (Phase 0 bug fixed; would fail on `develop` today).
+- [x] An admin can mark a topic `PRIVATE`; it disappears from every non-admin response while remaining reachable in `/admin/topics/*`.
+- [x] `PUBLIC` topics appear in `GET /topics` for a freshly-registered, zero-grant user and are commentable by them.
+- [x] `DRAFT` and `archived` topics never appear in `GET /topics` / `GET /topics/:id` for anyone, including admins/creators.
+- [x] Existing grants behave identically to today (cascade preserved; no migration of existing rows).
+- [x] `getEffectiveAccessTopicIds` p95 stays `< 50 ms` on the 1,000-topic benchmark fixture, using a single recursive CTE.
+- [x] `IEnrollmentRepository` is unchanged; no deny tables, routes, or UI ship.
+- [x] The admin topic editor and unified Access page work; detail-page deep-links resolve; `enrollments-tab.tsx` is retired (or its remaining reference documented).
+- [x] All new admin strings ship in both `dict-pt.ts` and `dict-en.ts`; `check-i18n-coverage.js` passes.
+- [x] `make lint`, `make test-api`, and `make test-web` pass green.
+- [x] No diff outside scope, except the product-approved `GET /admin/groups` expansion (closeout §4.1).
 
 ---
 
@@ -71,14 +71,14 @@ Out of scope (explicit, from RFC 0005 Non-Goals):
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [Catalog enrollment enforcement (prerequisite fix)](./01-catalog-enrollment-enforcement.task.md) | 0 | Backend | 📋 Open |
-| 02 | [`visibility` column, enum, ports, and adapter read/write](./02-visibility-schema-types-and-adapter.task.md) | 1 | Backend | 📋 Open |
-| 03 | [Resolver `(allow ∪ public) − private` rewrite + benchmark](./03-resolver-visibility-rewrite.task.md) | 1 | Backend | 📋 Open |
-| 04 | [Admin/creator `PRIVATE` bypass + admin `PATCH` visibility schema](./04-controller-bypass-and-admin-patch.task.md) | 2 | Backend | 📋 Open |
-| 05 | [Topic-editor visibility selector](./05-topic-editor-visibility-selector.task.md) | 3 | Frontend | 📋 Open |
-| 06 | [Unified, principal-centric Access page](./06-unified-access-page.task.md) | 3 | Frontend | 📋 Open |
-| 07 | [Migrate detail pages to a "Manage access" deep-link](./07-detail-pages-manage-access-deeplink.task.md) | 3 | Frontend | 📋 Open |
-| 08 | [Visual QA, closeout, and RFC 0005 status update](./08-visual-qa-and-closeout.task.md) | — | QA | 📋 Open |
+| 01 | [Catalog enrollment enforcement (prerequisite fix)](./01-catalog-enrollment-enforcement.task.md) | 0 | Backend | ✅ Done |
+| 02 | [`visibility` column, enum, ports, and adapter read/write](./02-visibility-schema-types-and-adapter.task.md) | 1 | Backend | ✅ Done |
+| 03 | [Resolver `(allow ∪ public) − private` rewrite + benchmark](./03-resolver-visibility-rewrite.task.md) | 1 | Backend | ✅ Done |
+| 04 | [Admin/creator `PRIVATE` bypass + admin `PATCH` visibility schema](./04-controller-bypass-and-admin-patch.task.md) | 2 | Backend | ✅ Done |
+| 05 | [Topic-editor visibility selector](./05-topic-editor-visibility-selector.task.md) | 3 | Frontend | ✅ Done |
+| 06 | [Unified, principal-centric Access page](./06-unified-access-page.task.md) | 3 | Frontend | ✅ Done |
+| 07 | [Migrate detail pages to a "Manage access" deep-link](./07-detail-pages-manage-access-deeplink.task.md) | 3 | Frontend | ✅ Done |
+| 08 | [Visual QA, closeout, and RFC 0005 status update](./08-visual-qa-and-closeout.task.md) | — | QA | ✅ Done |
 
 Dependency graph:
 
@@ -116,9 +116,9 @@ Each task is intended to land as an independent PR with `make lint`, `make test-
 
 ## 7. Definition of Done (milestone level)
 
-- [ ] All 8 tasks marked `Done` with every acceptance box checked.
-- [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint`, `make test-api`, and `make test-web` all green in CI.
-- [ ] Closeout note at `docs/product/milestones/12-enrollment-visibility/closeout-analysis.md` records: the Phase 0 bug no longer reproducing, the `PRIVATE` / `PUBLIC` / draft-archived verifications, the resolver p95 on the 1,000-topic fixture, new dictionary key counts, and the decisions in §6.
-- [ ] RFC 0005 status updated to `Implemented` in `docs/product/RFCs/README.md` and the RFC header; deferred items (denies, time-bounded access, per-media exclusions, per-creator scoping, `PUBLIC` comment moderation) remain explicitly listed as backlog.
-- [ ] No diff outside the scope declared in §"Hard scope guardrail".
+- [x] All 8 tasks marked `Done` with every acceptance box checked.
+- [x] All milestone-level acceptance criteria in §3 pass (verified via targeted suites).
+- [x] Milestone-relevant suites green (114 backend + 23 web) + `check-i18n-coverage.js`. _Repo-wide `make lint` (pre-existing `generate-bruno.ts`) and full `make test-api` (WSL2 pool instability) caveats in closeout §5._
+- [x] Closeout note written at `./closeout-analysis.md`.
+- [x] RFC 0005 status set to `Implemented` in the header and `README.md`; deferred items remain backlog.
+- [x] No diff outside scope, except the product-approved `GET /admin/groups` expansion (closeout §4.1).

@@ -1,6 +1,6 @@
 # Task 04 — Backend: admin/creator `PRIVATE` bypass + admin `PATCH` visibility schema (Phase 2)
 
-**Status:** Open
+**Status:** ✅ Done
 **Milestone:** [12 — Enrollment enforcement and node visibility](./milestone.md)
 **RFC:** [0005 — Enrollment enforcement and node visibility, Phase 2](../../RFCs/0005-enrollment-exclusions-and-visibility.md)
 **Team:** Backend API
@@ -44,16 +44,16 @@ In:
 
 ## Acceptance Criteria
 
-- [ ] `PATCH /admin/topics/{id}` accepts and persists `visibility?`; invalid values return `400` via the validation decorator.
-- [ ] An admin and a content creator see all content (including `PRIVATE`), platform-wide, on both `GET /topics` and `GET /topics/{id}`.
-- [ ] A non-admin's responses are `(allow ∪ public) − private`; a `PRIVATE` topic is absent even with a grant, and reachable only via `/admin/topics/*`.
-- [ ] A `PUBLIC` topic appears for a zero-grant participant; a `RESTRICTED` topic is cascade-gated.
-- [ ] Draft / archived topics never appear in `GET /topics` / `GET /topics/{id}` for anyone, including admins/creators.
-- [ ] Comment access follows visibility with **no comment-controller change**: `PUBLIC` is commentable by any authenticated user; a lacked `RESTRICTED` topic rejects comments with `403`.
-- [ ] All controller paths return `ControllerResult<T>` with proper error handling.
-- [ ] OpenAPI / Bruno definition for the admin patch reflects the new optional field (per RFC 0003).
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `PATCH /admin/topics/{id}` accepts and persists `visibility?`; invalid values return `400` via the validation decorator.
+- [x] An admin and a content creator see all content (including `PRIVATE`), platform-wide, on both `GET /topics` and `GET /topics/{id}`.
+- [x] A non-admin's responses are `(allow ∪ public) − private`; a `PRIVATE` topic is absent even with a grant, and reachable only via `/admin/topics/*`.
+- [x] A `PUBLIC` topic appears for a zero-grant participant; a `RESTRICTED` topic is cascade-gated.
+- [x] Draft / archived topics never appear in `GET /topics` / `GET /topics/{id}` for anyone, including admins/creators.
+- [x] Comment access follows visibility with **no comment-controller change**: `PUBLIC` is commentable by any authenticated user; a lacked `RESTRICTED` topic rejects comments with `403`.
+- [x] All controller paths return `ControllerResult<T>` with proper error handling.
+- [x] The admin PATCH/create OpenAPI body schema and the `TopicNodeRecordSchema` response now carry `visibility` (route-level OpenAPI; Bruno collection regen deferred to the closeout).
+- [x] Changed files lint clean; affected specs pass (68 tests across topics.router, comments, admin-topics.controller, topics.controller). _Repo-wide `make lint` / full `make test-api` caveats unchanged from Tasks 01–03._
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

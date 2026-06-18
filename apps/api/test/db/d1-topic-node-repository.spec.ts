@@ -189,6 +189,33 @@ describe('D1TopicNodeRepository', () => {
     });
   });
 
+  describe('visibility', () => {
+    it('create with explicit visibility round-trips', async () => {
+      const node = await repo.create({ title: 'Public Node', visibility: Entities.Config.TopicVisibility.PUBLIC });
+      expect(node.visibility).toBe(Entities.Config.TopicVisibility.PUBLIC);
+
+      const fetched = await repo.findById(node.id);
+      expect(fetched!.visibility).toBe(Entities.Config.TopicVisibility.PUBLIC);
+    });
+
+    it('create without visibility defaults to restricted', async () => {
+      const node = await repo.create({ title: 'Default Visibility Node' });
+      expect(node.visibility).toBe(Entities.Config.TopicVisibility.RESTRICTED);
+    });
+
+    it('update changes visibility to private', async () => {
+      const node = await repo.create({ title: 'Visibility Change Node' });
+      const updated = await repo.update(node.id, { visibility: Entities.Config.TopicVisibility.PRIVATE });
+      expect(updated.visibility).toBe(Entities.Config.TopicVisibility.PRIVATE);
+    });
+
+    it('update omitting visibility preserves the stored value', async () => {
+      const node = await repo.create({ title: 'Preserved Visibility Node', visibility: Entities.Config.TopicVisibility.PUBLIC });
+      const updated = await repo.update(node.id, { title: 'Updated Title Only' });
+      expect(updated.visibility).toBe(Entities.Config.TopicVisibility.PUBLIC);
+    });
+  });
+
   describe('mediaCount projection', () => {
     it('returns zero media counts for a newly created topic', async () => {
       const node = await repo.create({ title: 'Topic without Media' });

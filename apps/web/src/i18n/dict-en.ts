@@ -218,8 +218,6 @@ export const dictEn = {
       detail: {
         backToUsers: '← Back to users',
         resetPasswordButton: 'Reset Password',
-        tabEnrollments: 'enrolments',
-        tabProfile: 'profile',
         rolesLabel: 'Roles',
         statusLabel: 'Status',
         memberSinceLabel: 'Member since',
@@ -291,6 +289,11 @@ export const dictEn = {
         statusDraft: 'Draft',
         statusPublished: 'Published',
         statusArchived: 'Archived',
+        visibilityLabel: 'Visibility',
+        visibilityPublic: 'Public',
+        visibilityRestricted: 'Restricted',
+        visibilityPrivate: 'Private',
+        visibilityHelp: 'Public: visible to everyone. Restricted: active enrolments only. Private: admins and creators only.',
       },
       media: {
         sectionTitle: 'Media Attachments',
@@ -403,6 +406,15 @@ export const dictEn = {
       detailSubtitle: 'Detailed group management is waiting for group CRUD endpoints in the backend.',
       detailComingSoon: 'Group management interface coming soon.',
       backToGroups: '← Back to groups',
+    },
+    access: {
+      title: 'Access Control',
+      subtitle: 'Manage which topics each user or group can access.',
+      searchUsersPlaceholder: 'Search users…',
+      searchGroupsPlaceholder: 'Search groups…',
+      pickPrincipalPrompt: 'Select a user or group to manage their topic access.',
+      membersCount: (n: number) => `${n} ${n === 1 ? 'member' : 'members'}`,
+      manageLink: 'Manage access',
     },
   },
   catalog: {
@@ -623,6 +635,8 @@ export const dictEn = {
     },
   },
   enrollment: {
+    users: 'Users',
+    groups: 'Groups',
     directGrantsTitle: (count: number) => `Direct Grants (${count})`,
     grantButton: 'Grant topic access',
     noGrants: 'No topics granted yet.',

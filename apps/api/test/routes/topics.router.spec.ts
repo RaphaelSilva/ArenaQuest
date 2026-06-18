@@ -6,6 +6,12 @@ import { applyMigrations } from '../helpers/apply-migrations';
 import { v1 } from '../helpers/v1';
 
 // ---------------------------------------------------------------------------
+// Additional IDs for visibility tests
+// ---------------------------------------------------------------------------
+
+const ZERO_GRANT_USER_ID = 'zero-grant-visibility-user';
+
+// ---------------------------------------------------------------------------
 // DB bootstrap
 // ---------------------------------------------------------------------------
 
@@ -16,6 +22,7 @@ let studentToken: string;
 
 // Topic IDs populated in beforeAll
 let publishedTopicId: string;
+let ungrantedTopicId: string;
 let readyMediaStorageKey: string;
 
 beforeAll(async () => {
@@ -41,6 +48,14 @@ beforeAll(async () => {
   });
   const pubTopic = await pubRes.json<{ id: string }>();
   publishedTopicId = pubTopic.id;
+
+  // Create a second published root topic (not granted to student).
+  const ungrantedRes = await req('POST', '/admin/topics', {
+    token: adminToken,
+    body: { title: 'Ungranted Root', status: 'published' },
+  });
+  const ungrantedTopic = await ungrantedRes.json<{ id: string }>();
+  ungrantedTopicId = ungrantedTopic.id;
 
   // Create a draft root topic.
   await req('POST', '/admin/topics', {
@@ -185,5 +200,135 @@ describe('GET /topics/:id', () => {
   it('sets Cache-Control: private, max-age=30', async () => {
     const res = await req('GET', `/topics/${publishedTopicId}`, { token: studentToken });
     expect(res.headers.get('Cache-Control')).toBe('private, max-age=30');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 0 — enrollment enforcement
+// ---------------------------------------------------------------------------
+
+describe('Phase 0 — enrollment enforcement', () => {
+  it('GET /topics as student returns only granted topics, not ungranted ones', async () => {
+    const res = await req('GET', '/topics', { token: studentToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { id: string }[] }>();
+    const topicIds = body.data.map(t => t.id);
+    expect(topicIds).toContain(publishedTopicId);
+    expect(topicIds).not.toContain(ungrantedTopicId);
+  });
+
+  it('GET /topics as admin returns all published topics', async () => {
+    const res = await req('GET', '/topics', { token: adminToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { id: string }[] }>();
+    const topicIds = body.data.map(t => t.id);
+    expect(topicIds).toContain(publishedTopicId);
+    expect(topicIds).toContain(ungrantedTopicId);
+  });
+
+  it('GET /topics/{ungrantedId} as student returns 404', async () => {
+    const res = await req('GET', `/topics/${ungrantedTopicId}`, { token: studentToken });
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /topics/{ungrantedId} as admin returns 200', async () => {
+    const res = await req('GET', `/topics/${ungrantedTopicId}`, { token: adminToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ id: string; title: string }>();
+    expect(body.id).toBe(ungrantedTopicId);
+    expect(body.title).toBe('Ungranted Root');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Visibility filter
+// ---------------------------------------------------------------------------
+
+describe('Visibility filter', () => {
+  let privateTopicId: string;
+  let publicTopicId: string;
+  let zeroGrantStudentToken: string;
+
+  beforeAll(async () => {
+    await env.DB
+      .prepare("INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, 'ZeroGrant', 'zero@vis.test', 'x')")
+      .bind(ZERO_GRANT_USER_ID)
+      .run();
+
+    const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900, pbkdf2Iterations: 1 });
+    zeroGrantStudentToken = await adapter.signAccessToken({ sub: ZERO_GRANT_USER_ID, email: 'zero@vis.test', roles: ['student'] });
+
+    const privRes = await req('POST', '/admin/topics', {
+      token: adminToken,
+      body: { title: 'Private Topic', status: 'published', visibility: 'private' },
+    });
+    const privTopic = await privRes.json<{ id: string }>();
+    privateTopicId = privTopic.id;
+
+    const pubRes = await req('POST', '/admin/topics', {
+      token: adminToken,
+      body: { title: 'Public Topic', status: 'published', visibility: 'public' },
+    });
+    const pubTopic = await pubRes.json<{ id: string }>();
+    publicTopicId = pubTopic.id;
+  });
+
+  it('student GET /topics excludes private topic', async () => {
+    const res = await req('GET', '/topics', { token: studentToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { id: string }[] }>();
+    expect(body.data.map(t => t.id)).not.toContain(privateTopicId);
+  });
+
+  it('student GET /topics/{privateId} returns 404', async () => {
+    const res = await req('GET', `/topics/${privateTopicId}`, { token: studentToken });
+    expect(res.status).toBe(404);
+  });
+
+  it('admin GET /topics/{privateId} returns 200', async () => {
+    const res = await req('GET', `/topics/${privateTopicId}`, { token: adminToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ id: string }>();
+    expect(body.id).toBe(privateTopicId);
+  });
+
+  it('admin GET /topics includes private topic', async () => {
+    const res = await req('GET', '/topics', { token: adminToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { id: string }[] }>();
+    expect(body.data.map(t => t.id)).toContain(privateTopicId);
+  });
+
+  it('zero-grant student GET /topics includes public topic', async () => {
+    const res = await req('GET', '/topics', { token: zeroGrantStudentToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { id: string }[] }>();
+    expect(body.data.map(t => t.id)).toContain(publicTopicId);
+  });
+
+  it('PATCH round-trip: GET /admin/topics/{id} returns visibility:private', async () => {
+    const createRes = await req('POST', '/admin/topics', {
+      token: adminToken,
+      body: { title: 'Round-trip Visibility', status: 'published' },
+    });
+    const created = await createRes.json<{ id: string }>();
+
+    await req('PATCH', `/admin/topics/${created.id}`, {
+      token: adminToken,
+      body: { visibility: 'private' },
+    });
+
+    const getRes = await req('GET', `/admin/topics/${created.id}`, { token: adminToken });
+    expect(getRes.status).toBe(200);
+    const body = await getRes.json<{ visibility: string }>();
+    expect(body.visibility).toBe('private');
+  });
+
+  it('PATCH with invalid visibility returns 400', async () => {
+    const res = await req('PATCH', `/admin/topics/${privateTopicId}`, {
+      token: adminToken,
+      body: { visibility: 'bogus' },
+    });
+    expect(res.status).toBe(400);
   });
 });

@@ -1,0 +1,32 @@
+I am the ArenaQuest Orchestrator. You are acting as the backend-developer persona.
+
+You are running HEADLESS (no interactive TTY). You cannot ask the user anything. If you hit a blocker, STOP and write a "BLOCKED:" line at the end.
+
+SYSTEM STANDARDS & GUIDELINES (backend-developer, pruned):
+- Scope strictly apps/api + packages/shared/ports. Ports & Adapters: port in packages/shared/ports, adapter in apps/api/src/adapters/db, wired in container.ts, injected into a controller, route translates ControllerResult to HTTP.
+- Controllers return ControllerResult<T>. Path aliases: @api/* -> apps/api/src/*; @arenaquest/shared/* -> packages/shared/*.
+- Adapters constructed per request in the container. Tests use @cloudflare/vitest-pool-workers + the apply-migrations helper.
+
+CONTEXT FACTS (verified):
+- Tables exist (migration 0011): user_groups (id TEXT PK, name TEXT UNIQUE, description TEXT DEFAULT '', created_at) and user_group_members (group_id, user_id). No group repository/port exists yet.
+- Admin routes: apps/api/src/routes/admin/index.ts -> buildAdminRouter applies authGuard + requireRole(ADMIN, CONTENT_CREATOR) to '*' already. The enrollments router is mounted at '/' and owns '/groups/{groupId}/enrollments'. Mount a NEW groups router at '/groups' with GET '/' to yield GET /admin/groups (no collision).
+- Mirror these patterns: D1UserRepository (constructor (private readonly db: D1Database)); buildAdminUsersRouter(container) destructures container.identity, builds a controller, returns an OpenAPIHono. Match how the admin users LIST route shapes its JSON response (respondWith or c.json({ data })) — read routes/admin/users.ts and mirror it.
+
+TASK + PLAN (authoritative — read both, follow exactly):
+- Parent task: docs/product/milestones/12-enrollment-visibility/06-unified-access-page.task.md
+- Plan: docs/product/milestones/12-enrollment-visibility/.executor-logs/06a-backend-groups-list.plan.md
+
+Implementation summary (plan steps 1–7 authoritative):
+1. NEW packages/shared/ports/i-user-group-repository.ts: UserGroupRecord { id, name, description, memberCount, createdAt } + IUserGroupRepository { listAll(): Promise<UserGroupRecord[]> }. Export from packages/shared/ports/index.ts.
+2. NEW apps/api/src/adapters/db/d1-user-group-repository.ts: D1UserGroupRepository implements IUserGroupRepository; listAll() runs SELECT g.id,g.name,g.description,g.created_at,(SELECT COUNT(*) FROM user_group_members m WHERE m.group_id=g.id) AS member_count FROM user_groups g ORDER BY g.name ASC; map to records.
+3. NEW apps/api/src/controllers/admin-groups.controller.ts: AdminGroupsController(groups: IUserGroupRepository) with async listAll(): ControllerResult<UserGroupRecord[]>.
+4. NEW apps/api/src/routes/admin/groups.ts: buildAdminGroupsRouter(container) -> const { userGroups } = container.identity; new AdminGroupsController(userGroups); a GET '/' OpenAPI route (tags ['admin:groups'], security bearerAuth, 200 -> { data: array of group schema }); return the OpenAPIHono.
+5. apps/api/src/routes/admin/index.ts: import buildAdminGroupsRouter and add app.route('/groups', buildAdminGroupsRouter(container)).
+6. apps/api/src/container.ts: import D1UserGroupRepository + IUserGroupRepository type; add `userGroups: IUserGroupRepository` to IdentityContext; instantiate `const userGroups = new D1UserGroupRepository(env.DB)` and include it in the returned identity object.
+7. NEW apps/api/test/routes/admin-groups.router.spec.ts (mirror admin-users.router.spec.ts harness): seed 2 user_groups + some user_group_members; admin token; assert GET /admin/groups returns 200 with data array ordered by name and correct memberCount; assert a forbidden case (no/insufficient token) is rejected.
+
+INSTRUCTIONS:
+1. Implement steps 1–7 precisely; mirror existing file styles exactly.
+2. ONLY the list endpoint — no group CRUD, membership editing, or detail endpoint. No frontend files. If something else seems required, STOP with a "BLOCKED:" line.
+3. Do NOT run verification/test/lint/migration commands; do NOT run git; do NOT update task/status files.
+4. When done, emit a "## SUMMARY" block listing files created/modified.

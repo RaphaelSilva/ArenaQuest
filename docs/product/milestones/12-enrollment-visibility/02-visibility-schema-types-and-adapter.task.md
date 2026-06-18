@@ -1,6 +1,6 @@
 # Task 02 — Backend: `visibility` column, enum, ports, and adapter read/write (Phase 1)
 
-**Status:** Open
+**Status:** ✅ Done
 **Milestone:** [12 — Enrollment enforcement and node visibility](./milestone.md)
 **RFC:** [0005 — Enrollment enforcement and node visibility, Phase 1](../../RFCs/0005-enrollment-exclusions-and-visibility.md)
 **Team:** Backend API
@@ -44,15 +44,15 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `Entities.Config.TopicVisibility` exists with `PUBLIC = 'public'`, `RESTRICTED = 'restricted'`, `PRIVATE = 'private'`.
-- [ ] `TopicNodeRecord.visibility` is required; create / update inputs carry `visibility?`.
-- [ ] The migration adds the column with `DEFAULT 'restricted'`, backfills existing rows to `'restricted'`, enforces a `CHECK` over the three values, and indexes `topic_nodes(visibility)`.
-- [ ] `make db-migrations-dev` applies the migration cleanly against local D1.
-- [ ] `D1TopicNodeRepository` returns `visibility` on every `TopicNodeRecord` projection and persists it on create and partial update; omitting it on update preserves the stored value.
-- [ ] Adapter tests cover create-with-value, create-default, update-changes, and update-omits cases.
-- [ ] No D1-specific import leaks into `ITopicNodeRepository` or any controller.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `Entities.Config.TopicVisibility` exists with `PUBLIC = 'public'`, `RESTRICTED = 'restricted'`, `PRIVATE = 'private'`.
+- [x] `TopicNodeRecord.visibility` is required; create / update inputs carry `visibility?`.
+- [x] The migration adds the column with `DEFAULT 'restricted'`, backfills existing rows to `'restricted'`, enforces a `CHECK` over the three values, and indexes `topic_nodes(visibility)`.
+- [x] The migration applies cleanly via the test loader (`apply-migrations` globs `migrations/*.sql`; the adapter spec's `beforeAll` applies `0025` and all 22 cases pass). _`make db-migrations-dev` against a live local D1 not run in this headless flow._
+- [x] `D1TopicNodeRepository` returns `visibility` on every `TopicNodeRecord` projection (`rowToRecord` + `listAll` mapper) and persists it on create and partial update; omitting it on update preserves the stored value.
+- [x] Adapter tests cover create-with-value, create-default, update-changes, and update-omits cases (4 new cases green).
+- [x] No D1-specific import leaks into `ITopicNodeRepository` or any controller.
+- [x] Changed files lint clean; shared package builds; the affected specs (71 tests across the adapter + 3 controller specs) pass. _Caveats unchanged from Task 01: repo-wide `make lint` red on pre-existing out-of-scope `generate-bruno.ts`; full `make test-api` unstable on this WSL2 host; strict `tsc --noEmit` is pre-red project-wide (Hono/OpenAPI handler-type friction + a pre-existing `User.timezone`/`updatedAt` drift) — my change adds zero new type errors and no `visibility`-literal errors._
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

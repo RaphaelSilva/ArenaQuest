@@ -32,6 +32,8 @@ export class TopicsController {
     private readonly enrollment: IEnrollmentRepository | null = null,
   ) {}
 
+  // Admin/creator callers pass userId=undefined → full access incl. private.
+  // Authenticated non-admin callers pass userId → visible set is (allow ∪ public) − private via the resolver.
   async listPublished(userId?: string): Promise<ControllerResult<TopicNodeRecord[]>> {
     const all = await this.topics.listAll();
     let published = all.filter(
@@ -47,6 +49,8 @@ export class TopicsController {
     return { ok: true, data: published };
   }
 
+  // Admin/creator callers pass userId=undefined → bypass enrollment check, returns private topics.
+  // Authenticated non-admin callers pass userId → 404 when the resolver's effective set lacks the id.
   async getPublishedById(id: string, userId?: string): Promise<ControllerResult<TopicWithMedia>> {
     const node = await this.topics.findById(id);
     if (!node || node.status !== Entities.Config.TopicNodeStatus.PUBLISHED || node.archived) {
