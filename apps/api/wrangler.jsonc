@@ -27,9 +27,6 @@
 		"MAIL_DRIVER": "resend",
 		"MAIL_FROM": "ArenaQuest <noreply@arenaquest.app>",
 		"WEB_BASE_URL": "https://arenaquest-web.pages.dev",
-		// Google OAuth — replace with your production OAuth client values.
-		// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET`
-		"GOOGLE_CLIENT_ID": "",
 		"GOOGLE_REDIRECT_URI": "https://api.arenaquest.app/auth/google/callback"
 	},
 	/**
