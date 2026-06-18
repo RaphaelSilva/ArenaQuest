@@ -41,6 +41,7 @@ export function AdminSidebar() {
     { label: dict.layout.adminSidebar.topics, href: '/admin/topics', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.tasks, href: '/admin/tasks', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.groups, href: '/admin/groups', requiredRoles: [ROLES.ADMIN] },
+    { label: dict.layout.adminSidebar.access, href: '/admin/access', requiredRoles: [ROLES.ADMIN] },
   ];
 
   return (
