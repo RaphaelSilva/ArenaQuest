@@ -30,6 +30,7 @@ export default function AdminGroupDetailPage({ params }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [studentsOnly, setStudentsOnly] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -63,12 +64,13 @@ export default function AdminGroupDetailPage({ params }: Props) {
 
   const candidates = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return [];
     return allUsers
       .filter((u) => !memberIds.has(u.id))
-      .filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [search, allUsers, memberIds]);
+      .filter((u) => (studentsOnly ? u.roles.some((r) => r.name === ROLES.STUDENT) : true))
+      .filter((u) =>
+        q ? u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) : true,
+      );
+  }, [search, studentsOnly, allUsers, memberIds]);
 
   const handleAdd = async (userId: string) => {
     setBusy(true);
@@ -78,7 +80,6 @@ export default function AdminGroupDetailPage({ params }: Props) {
       setMembers((prev) =>
         prev.some((m) => m.userId === member.userId) ? prev : [...prev, member],
       );
-      setSearch('');
     } catch (err) {
       setError(err instanceof Error ? err.message : d.errorMembers);
     } finally {
@@ -136,37 +137,67 @@ export default function AdminGroupDetailPage({ params }: Props) {
       )}
 
       {/* Add member */}
-      <div className="mb-6">
-        <label className="mb-1 block text-xs" style={{ color: 'var(--text2)' }}>
+      <div
+        className="mb-8 rounded-xl border p-4"
+        style={{ borderColor: 'var(--border)', background: 'var(--bg2)' }}
+      >
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text3)' }}>
           {d.addMember}
-        </label>
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={d.addMemberPlaceholder}
-          disabled={busy}
-          className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none"
-          style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-        />
-        {candidates.length > 0 && (
+        </h2>
+        <div className="mb-3 flex items-center gap-3">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={d.addMemberPlaceholder}
+            disabled={busy}
+            className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none"
+            style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+          />
+          <label
+            className="flex flex-shrink-0 cursor-pointer items-center gap-2 text-sm"
+            style={{ color: 'var(--text2)' }}
+          >
+            <input
+              type="checkbox"
+              checked={studentsOnly}
+              onChange={(e) => setStudentsOnly(e.target.checked)}
+            />
+            {d.studentsOnly}
+          </label>
+        </div>
+
+        {candidates.length === 0 ? (
+          <p className="py-4 text-center text-sm" style={{ color: 'var(--text2)' }}>
+            {d.noUsersToAdd}
+          </p>
+        ) : (
           <ul
-            className="mt-1 overflow-hidden rounded-lg border"
-            style={{ borderColor: 'var(--border)', background: 'var(--bg2)' }}
+            className="max-h-72 overflow-y-auto rounded-lg border"
+            style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}
           >
             {candidates.map((u) => (
-              <li key={u.id}>
+              <li
+                key={u.id}
+                className="flex items-center justify-between gap-3 border-b px-3 py-2 last:border-b-0"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium" style={{ color: 'var(--text)' }}>
+                    {u.name}
+                  </p>
+                  <p className="truncate text-xs" style={{ color: 'var(--text3)' }}>
+                    {u.email}
+                  </p>
+                </div>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => void handleAdd(u.id)}
-                  className="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[color:var(--bg3)] disabled:opacity-50"
-                  style={{ color: 'var(--text)' }}
+                  className="flex-shrink-0 rounded-lg px-3 py-1 text-xs font-semibold transition-all disabled:opacity-50"
+                  style={{ background: 'var(--accent)', color: '#0B0E17' }}
                 >
-                  <span className="font-medium">{u.name}</span>
-                  <span className="ml-2 text-xs" style={{ color: 'var(--text3)' }}>
-                    {u.email}
-                  </span>
+                  {d.add}
                 </button>
               </li>
             ))}
