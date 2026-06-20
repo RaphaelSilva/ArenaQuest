@@ -1,6 +1,6 @@
 # Task 01 — Frontend: Brand config module and Logo wordmark (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [13 — White-label branding](./milestone.md)
 **RFC:** [RFC 0006](../../RFCs/0006-white-label-branding-and-build-tooling.md)
 **Team:** Frontend Web
@@ -70,18 +70,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] With no `NEXT_PUBLIC_BRAND_*` set, `<Logo>` renders the `AQ` badge and
+- [x] With no `NEXT_PUBLIC_BRAND_*` set, `<Logo>` renders the `AQ` badge and
       `Arena` + accented `Quest` wordmark — visually identical to `main`.
-- [ ] Setting `NEXT_PUBLIC_BRAND_SIGLA` / `_NAME_PREFIX` / `_NAME_ACCENT` changes
+- [x] Setting `NEXT_PUBLIC_BRAND_SIGLA` / `_NAME_PREFIX` / `_NAME_ACCENT` changes
       the badge and wordmark, with the accent treatment unchanged.
-- [ ] An empty `NEXT_PUBLIC_BRAND_NAME_ACCENT` yields a single-tone wordmark with
+- [x] An empty `NEXT_PUBLIC_BRAND_NAME_ACCENT` yields a single-tone wordmark with
       no accent `<span>` rendered.
-- [ ] `brand.fullName`, `brand.isCustom`, and `brand.showPoweredBy` resolve per
+- [x] `brand.fullName`, `brand.isCustom`, and `brand.showPoweredBy` resolve per
       the rules above (covered by a unit/component test).
-- [ ] No new hardcoded user-facing string is introduced; `node
+- [x] No new hardcoded user-facing string is introduced; `node
       apps/web/scripts/check-i18n-coverage.js` passes.
-- [ ] Changed files lint clean; `make test-web` green for the affected tests.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-web` green for the affected tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

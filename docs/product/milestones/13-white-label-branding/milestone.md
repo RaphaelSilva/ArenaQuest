@@ -96,7 +96,7 @@ can otherwise proceed independently.
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [Brand config module and Logo wordmark](./01-brand-config-module-and-logo-wordmark.task.md) | 1 | Frontend | ☐ Open |
+| 01 | [Brand config module and Logo wordmark](./01-brand-config-module-and-logo-wordmark.task.md) | 1 | Frontend | ✅ Done |
 | 02 | [Brand surfaces, callback de-dup and Powered-by attribution](./02-brand-surfaces-callback-de-dup-and-powered-by-attr.task.md) | 2 | Frontend | ☐ Open |
 | 03 | [Build-time static favicon from sigla badge](./03-build-time-static-favicon-from-sigla-badge.task.md) | 2 | Frontend | ☐ Open |
 | 04 | [Brand env docs and CI build threading](./04-brand-env-docs-and-ci-build-threading.task.md) | 3 | Frontend | ☐ Open |
