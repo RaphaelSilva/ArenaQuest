@@ -153,6 +153,12 @@ export const dictEn = {
       backToLogin: 'Back to sign in',
     },
   },
+  landing: {
+    footer: {
+      rights: 'All rights reserved.',
+      poweredBy: 'Powered by',
+    },
+  },
   admin: {
     dashboard: {
       title: 'Admin Dashboard',

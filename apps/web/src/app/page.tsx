@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { Logo } from '@web/components/design-system';
+import { dict } from '@web/i18n';
+import { brand, PLATFORM_NAME } from '@web/lib/brand';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -403,7 +405,14 @@ export default function LandingPage() {
         style={{ borderColor: 'var(--aq-border)', color: 'var(--aq-text3)' }}
       >
         <Logo textOnly className="text-sm" />
-        <span>© {new Date().getFullYear()} ArenaQuest. Todos os direitos reservados.</span>
+        <span>
+          © {new Date().getFullYear()} {brand.fullName}. {dict.landing.footer.rights}
+          {brand.showPoweredBy && (
+            <span style={{ marginLeft: 8, color: 'var(--aq-text3)' }}>
+              {dict.landing.footer.poweredBy} {PLATFORM_NAME}
+            </span>
+          )}
+        </span>
         <Link
           href="/login"
           className="font-medium transition-colors"
