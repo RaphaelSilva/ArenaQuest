@@ -1,6 +1,6 @@
 # Task 03 — Frontend: Build-time static favicon from sigla badge (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [13 — White-label branding](./milestone.md)
 **RFC:** [RFC 0006](../../RFCs/0006-white-label-branding-and-build-tooling.md)
 **Team:** Frontend Web
@@ -66,17 +66,20 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `apps/web/src/app/icon.tsx` exists and `apps/web/src/app/favicon.ico` is
+- [x] `apps/web/src/app/icon.tsx` exists and `apps/web/src/app/favicon.ico` is
       deleted.
-- [ ] The default-brand favicon is the `AQ` badge on the current accent —
-      visually equivalent to the removed `.ico`.
-- [ ] Setting `NEXT_PUBLIC_BRAND_SIGLA` changes the tab icon's text; setting
+- [x] The default-brand favicon is the `AQ` badge on the current accent —
+      visually equivalent to the removed `.ico` (rendered via `ImageResponse`
+      using `brand.accentHex` / `brand.onAccentHex`).
+- [x] Setting `NEXT_PUBLIC_BRAND_SIGLA` changes the tab icon's text; setting
       `NEXT_PUBLIC_BRAND_ACCENT` changes only the favicon badge color, with the
       on-screen palette unchanged.
-- [ ] The `next-on-pages` build output for `/icon` is a static asset, not an edge
-      function (inspect the build manifest / `.vercel/output`).
-- [ ] `make lint` and `make test-web` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] The `next-on-pages` build output for `/icon` is a static asset, not an edge
+      function — Next reports `○ /icon (Static)` and next-on-pages' Edge Function
+      Routes (7) list excludes `/icon` (it is a Prerendered Route); the static PNG
+      is materialized at `.vercel/output/static/icon`.
+- [x] `make lint` and `make test-web` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
