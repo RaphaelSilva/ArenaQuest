@@ -1142,6 +1142,156 @@
         ]
       }
     },
+    "/v1/admin/groups": {
+      "get": {
+        "description": "Retrieve all user groups with member counts.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "createdAt": {
+                            "example": "2024-01-01T00:00:00Z",
+                            "type": "string"
+                          },
+                          "description": {
+                            "example": "All year-one students",
+                            "type": "string"
+                          },
+                          "id": {
+                            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+                            "type": "string"
+                          },
+                          "memberCount": {
+                            "example": 42,
+                            "type": "integer"
+                          },
+                          "name": {
+                            "example": "Year 1 Students",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "description",
+                          "memberCount",
+                          "createdAt"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successfully retrieved group list"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List Groups",
+        "tags": [
+          "admin:groups"
+        ]
+      },
+      "post": {
+        "description": "Create a new user group.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "description": {
+                    "example": "All year-one students",
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  "name": {
+                    "example": "Year 1 Students",
+                    "maxLength": 100,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "createdAt": {
+                      "example": "2024-01-01T00:00:00Z",
+                      "type": "string"
+                    },
+                    "description": {
+                      "example": "All year-one students",
+                      "type": "string"
+                    },
+                    "id": {
+                      "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+                      "type": "string"
+                    },
+                    "memberCount": {
+                      "example": 42,
+                      "type": "integer"
+                    },
+                    "name": {
+                      "example": "Year 1 Students",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "memberCount",
+                    "createdAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Group created"
+          },
+          "400": {
+            "description": "Bad Request / Validation Failed"
+          },
+          "409": {
+            "description": "A group with this name already exists"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create Group",
+        "tags": [
+          "admin:groups"
+        ]
+      }
+    },
     "/v1/admin/groups/{groupId}/enrollments": {
       "get": {
         "description": "Retrieve a list of topic node enrollments granted to a specific group.",
@@ -1396,6 +1546,196 @@
         "summary": "Revoke Group Enrollment",
         "tags": [
           "admin:enrollments"
+        ]
+      }
+    },
+    "/v1/admin/groups/{groupId}/members": {
+      "get": {
+        "description": "Retrieve the members of a group.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "example": "group-id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "email": {
+                            "example": "jane@example.com",
+                            "type": "string"
+                          },
+                          "name": {
+                            "example": "Jane Doe",
+                            "type": "string"
+                          },
+                          "userId": {
+                            "example": "student-id",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "userId",
+                          "name",
+                          "email"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successfully retrieved members"
+          },
+          "404": {
+            "description": "Group not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List Group Members",
+        "tags": [
+          "admin:groups"
+        ]
+      },
+      "post": {
+        "description": "Add a user to a group (idempotent).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "example": "group-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "userId": {
+                    "example": "student-id",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "userId"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "email": {
+                      "example": "jane@example.com",
+                      "type": "string"
+                    },
+                    "name": {
+                      "example": "Jane Doe",
+                      "type": "string"
+                    },
+                    "userId": {
+                      "example": "student-id",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "userId",
+                    "name",
+                    "email"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Member added"
+          },
+          "400": {
+            "description": "Bad Request / Validation Failed"
+          },
+          "404": {
+            "description": "Group or User not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add Group Member",
+        "tags": [
+          "admin:groups"
+        ]
+      }
+    },
+    "/v1/admin/groups/{groupId}/members/{userId}": {
+      "delete": {
+        "description": "Remove a user from a group.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "example": "group-id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "example": "student-id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Member removed"
+          },
+          "404": {
+            "description": "Group not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove Group Member",
+        "tags": [
+          "admin:groups"
         ]
       }
     },
@@ -3160,6 +3500,14 @@
                           },
                           "title": {
                             "type": "string"
+                          },
+                          "visibility": {
+                            "enum": [
+                              "public",
+                              "restricted",
+                              "private"
+                            ],
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -3168,6 +3516,7 @@
                           "title",
                           "content",
                           "status",
+                          "visibility",
                           "order",
                           "estimatedMinutes",
                           "prerequisiteIds"
@@ -3240,6 +3589,14 @@
                   },
                   "title": {
                     "minLength": 1,
+                    "type": "string"
+                  },
+                  "visibility": {
+                    "enum": [
+                      "public",
+                      "restricted",
+                      "private"
+                    ],
                     "type": "string"
                   }
                 },
@@ -3379,6 +3736,14 @@
                     },
                     "title": {
                       "type": "string"
+                    },
+                    "visibility": {
+                      "enum": [
+                        "public",
+                        "restricted",
+                        "private"
+                      ],
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -3387,6 +3752,7 @@
                     "title",
                     "content",
                     "status",
+                    "visibility",
                     "order",
                     "estimatedMinutes",
                     "prerequisiteIds"
@@ -3585,6 +3951,14 @@
                     },
                     "title": {
                       "type": "string"
+                    },
+                    "visibility": {
+                      "enum": [
+                        "public",
+                        "restricted",
+                        "private"
+                      ],
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -3593,6 +3967,7 @@
                     "title",
                     "content",
                     "status",
+                    "visibility",
                     "order",
                     "estimatedMinutes",
                     "prerequisiteIds"
@@ -3664,6 +4039,14 @@
                   },
                   "title": {
                     "minLength": 1,
+                    "type": "string"
+                  },
+                  "visibility": {
+                    "enum": [
+                      "public",
+                      "restricted",
+                      "private"
+                    ],
                     "type": "string"
                   }
                 },
@@ -3800,6 +4183,14 @@
                     },
                     "title": {
                       "type": "string"
+                    },
+                    "visibility": {
+                      "enum": [
+                        "public",
+                        "restricted",
+                        "private"
+                      ],
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -3808,6 +4199,7 @@
                     "title",
                     "content",
                     "status",
+                    "visibility",
                     "order",
                     "estimatedMinutes",
                     "prerequisiteIds"
@@ -4003,6 +4395,14 @@
                     },
                     "title": {
                       "type": "string"
+                    },
+                    "visibility": {
+                      "enum": [
+                        "public",
+                        "restricted",
+                        "private"
+                      ],
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -4011,6 +4411,7 @@
                     "title",
                     "content",
                     "status",
+                    "visibility",
                     "order",
                     "estimatedMinutes",
                     "prerequisiteIds"
