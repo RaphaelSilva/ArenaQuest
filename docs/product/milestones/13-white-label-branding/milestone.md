@@ -89,25 +89,28 @@ Out of scope (explicit, from RFC 0006 Non-Goals):
 
 ## 5. Task Breakdown
 
-The execution plan. Each row is a `.task.md` file authored separately with
-`task-writer` — split backend and frontend into distinct tasks (frontend gets
-the `--frontend` suffix and depends on its backend task). Fill the table once
-the task files exist; keep the dependency graph and recommended order in sync.
+The execution plan. This milestone is frontend + build only (§4: `apps/api` and
+`packages/shared` are untouched), so every task is **Frontend Web**. Task 01 is
+the foundation that defines the brand contract; 02, 03, and 04 each consume it and
+can otherwise proceed independently.
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [<title>](./01-<slug>.task.md) | 0 | Backend | ☐ Open |
+| 01 | [Brand config module and Logo wordmark](./01-brand-config-module-and-logo-wordmark.task.md) | 1 | Frontend | ☐ Open |
+| 02 | [Brand surfaces, callback de-dup and Powered-by attribution](./02-brand-surfaces-callback-de-dup-and-powered-by-attr.task.md) | 2 | Frontend | ☐ Open |
+| 03 | [Build-time static favicon from sigla badge](./03-build-time-static-favicon-from-sigla-badge.task.md) | 2 | Frontend | ☐ Open |
+| 04 | [Brand env docs and CI build threading](./04-brand-env-docs-and-ci-build-threading.task.md) | 3 | Frontend | ☐ Open |
 
 Dependency graph:
 
 ```
-01 (independent)
-      │
-      ▼
-02 ──► 03
+01 (foundation: brand.ts + Logo + next.config env)
+ ├──► 02 (surfaces: callback, footer, metadata, Powered-by + i18n)
+ ├──► 03 (favicon: app/icon.tsx, remove favicon.ico)
+ └──► 04 (env docs + CI threading)
 ```
 
-**Recommended execution order:** `01` → `02` → `03`.
+**Recommended execution order:** `01` → `02` → `03` → `04`.
 
 Each task is intended to land as an independent PR with `make lint`,
 `make test-api`, and `make test-web` passing.
