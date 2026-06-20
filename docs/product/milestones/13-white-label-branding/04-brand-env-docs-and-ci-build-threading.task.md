@@ -1,6 +1,6 @@
 # Task 04 — Frontend: Brand env docs and CI build threading (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [13 — White-label branding](./milestone.md)
 **RFC:** [RFC 0006](../../RFCs/0006-white-label-branding-and-build-tooling.md)
 **Team:** Frontend Web
@@ -65,16 +65,21 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `apps/web/.env.example` documents every `NEXT_PUBLIC_BRAND_*` variable with
+- [x] `apps/web/.env.example` documents every `NEXT_PUBLIC_BRAND_*` variable with
       its ArenaQuest default.
-- [ ] `deploy-web.yml` passes all five brand vars in both the staging and
-      production Pages build steps, sourced from GitHub Environment `vars`.
-- [ ] With no `vars` set, the workflow produces an unchanged ArenaQuest bundle
-      (the brand vars resolve to defaults).
-- [ ] No new build/deploy script is added; the change is confined to the existing
+- [x] `deploy-web.yml` passes all five brand vars in both the staging and
+      production Pages build steps, sourced from GitHub Environment `vars`
+      (10 `${{ vars.NEXT_PUBLIC_BRAND_* }}` references = 5 × 2 jobs).
+- [x] With no `vars` set, the workflow produces an unchanged ArenaQuest bundle
+      (the brand vars resolve to defaults; no hardcoded brand default in the YAML).
+- [x] No new build/deploy script is added; the change is confined to the existing
       build step's `env:` block.
-- [ ] `make lint` passes; `make test-web` stays green.
-- [ ] No diff outside the scope guardrail.
+- [x] `make lint` passes; `make test-web` stays green.
+- [x] No diff outside the scope guardrail. **Deviation:** `apps/web/.gitignore`
+      was also edited (one-line `!.env.example` exception) because the app-level
+      `.env*` rule was ignoring the documentation file, making the committed
+      `.env.example` deliverable impossible. This aligns apps/web with the root
+      `.gitignore` policy ("Use .env.example for documentation").
 
 ## Verification Plan
 

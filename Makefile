@@ -48,6 +48,14 @@ dev-api: ## Start only apps/api (Wrangler dev server)
 dev-web-en:
 	NEXT_PUBLIC_LANGUAGE=en $(MAKE) dev-web
 
+dev-web-srd:
+	# NEXT_PUBLIC_BRAND_ACCENT="#9F171D" \
+	NEXT_PUBLIC_BRAND_SIGLA="SRD" \
+	NEXT_PUBLIC_BRAND_NAME_PREFIX="Spazio" \
+	NEXT_PUBLIC_BRAND_NAME_ACCENT="RD" \
+	NEXT_PUBLIC_BRAND_POWERED_BY="false" \
+	$(MAKE) dev-web
+
 # ==============================================================================
 # 🏗️  BUILD
 # ==============================================================================

@@ -80,6 +80,13 @@ jobs:
         run: pnpm --filter web pages:build
         env:
           NEXT_PUBLIC_API_URL: https://api-staging.raphael-1d2.workers.dev
+          # White-label branding — sourced from the staging GitHub Environment
+          # vars; unset → empty → ArenaQuest defaults in brand.ts/next.config.ts.
+          NEXT_PUBLIC_BRAND_SIGLA: ${{ vars.NEXT_PUBLIC_BRAND_SIGLA }}
+          NEXT_PUBLIC_BRAND_NAME_PREFIX: ${{ vars.NEXT_PUBLIC_BRAND_NAME_PREFIX }}
+          NEXT_PUBLIC_BRAND_NAME_ACCENT: ${{ vars.NEXT_PUBLIC_BRAND_NAME_ACCENT }}
+          NEXT_PUBLIC_BRAND_POWERED_BY: ${{ vars.NEXT_PUBLIC_BRAND_POWERED_BY }}
+          NEXT_PUBLIC_BRAND_ACCENT: ${{ vars.NEXT_PUBLIC_BRAND_ACCENT }}
 
       - name: Deploy to Cloudflare Pages (Staging)
         uses: cloudflare/wrangler-action@v3
@@ -122,6 +129,13 @@ jobs:
         run: pnpm --filter web pages:build
         env:
           NEXT_PUBLIC_API_URL: https://api.raphael-1d2.workers.dev
+          # White-label branding — sourced from the production GitHub Environment
+          # vars; unset → empty → ArenaQuest defaults in brand.ts/next.config.ts.
+          NEXT_PUBLIC_BRAND_SIGLA: ${{ vars.NEXT_PUBLIC_BRAND_SIGLA }}
+          NEXT_PUBLIC_BRAND_NAME_PREFIX: ${{ vars.NEXT_PUBLIC_BRAND_NAME_PREFIX }}
+          NEXT_PUBLIC_BRAND_NAME_ACCENT: ${{ vars.NEXT_PUBLIC_BRAND_NAME_ACCENT }}
+          NEXT_PUBLIC_BRAND_POWERED_BY: ${{ vars.NEXT_PUBLIC_BRAND_POWERED_BY }}
+          NEXT_PUBLIC_BRAND_ACCENT: ${{ vars.NEXT_PUBLIC_BRAND_ACCENT }}
 
       - name: Deploy to Cloudflare Pages (Production)
         uses: cloudflare/wrangler-action@v3

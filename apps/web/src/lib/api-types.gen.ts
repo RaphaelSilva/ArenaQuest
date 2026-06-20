@@ -116,25 +116,7 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": {
-                        /** @example Complete a streak. */
-                        description?: string;
-                        /** @example 🔥 */
-                        iconEmoji: string;
-                        /** @example Perfect Streak */
-                        name: string;
-                        /**
-                         * @example streak_days
-                         * @enum {string}
-                         */
-                        ruleKind: "streak_days" | "topic_completed" | "videos_watched_in_period" | "total_xp" | "mission_completed";
-                        /** @example 7 */
-                        ruleParams?: string;
-                        /** @example perfect-streak */
-                        slug: string;
-                        /** @example 100 */
-                        xpReward?: number;
-                    };
+                    "application/json": components["schemas"]["CreateBadgeBody"];
                 };
             };
             responses: {
@@ -180,7 +162,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ValidationErrorBody"];
+                    };
                 };
             };
         };
@@ -287,25 +271,7 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": {
-                        /** @example true */
-                        active?: boolean;
-                        /** @example New description */
-                        description?: string;
-                        /** @example 🏆 */
-                        iconEmoji?: string;
-                        /** @example New Badge Name */
-                        name?: string;
-                        /**
-                         * @example total_xp
-                         * @enum {string}
-                         */
-                        ruleKind?: "streak_days" | "topic_completed" | "videos_watched_in_period" | "total_xp" | "mission_completed";
-                        /** @example 1000 */
-                        ruleParams?: string;
-                        /** @example 200 */
-                        xpReward?: number;
-                    };
+                    "application/json": components["schemas"]["UpdateBadgeBody"];
                 };
             };
             responses: {
@@ -351,7 +317,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ValidationErrorBody"];
+                    };
                 };
                 /** @description Badge not found */
                 404: {
@@ -362,6 +330,115 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/v1/admin/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Groups
+         * @description Retrieve all user groups with member counts.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successfully retrieved group list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** @example 2024-01-01T00:00:00Z */
+                                createdAt: string;
+                                /** @example All year-one students */
+                                description: string;
+                                /** @example a1b2c3d4-e5f6-7890-1234-567890abcdef */
+                                id: string;
+                                /** @example 42 */
+                                memberCount: number;
+                                /** @example Year 1 Students */
+                                name: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create Group
+         * @description Create a new user group.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @example All year-one students */
+                        description?: string;
+                        /** @example Year 1 Students */
+                        name: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Group created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example 2024-01-01T00:00:00Z */
+                            createdAt: string;
+                            /** @example All year-one students */
+                            description: string;
+                            /** @example a1b2c3d4-e5f6-7890-1234-567890abcdef */
+                            id: string;
+                            /** @example 42 */
+                            memberCount: number;
+                            /** @example Year 1 Students */
+                            name: string;
+                        };
+                    };
+                };
+                /** @description Bad Request / Validation Failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description A group with this name already exists */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/admin/groups/{groupId}/enrollments": {
@@ -557,6 +634,163 @@ export interface paths {
                     content?: never;
                 };
                 /** @description Enrollment not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/groups/{groupId}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Group Members
+         * @description Retrieve the members of a group.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    groupId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successfully retrieved members */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** @example jane@example.com */
+                                email: string;
+                                /** @example Jane Doe */
+                                name: string;
+                                /** @example student-id */
+                                userId: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Group not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Add Group Member
+         * @description Add a user to a group (idempotent).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    groupId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @example student-id */
+                        userId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Member added */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example jane@example.com */
+                            email: string;
+                            /** @example Jane Doe */
+                            name: string;
+                            /** @example student-id */
+                            userId: string;
+                        };
+                    };
+                };
+                /** @description Bad Request / Validation Failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Group or User not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/groups/{groupId}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Group Member
+         * @description Remove a user from a group.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    groupId: string;
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Member removed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Group not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -1645,6 +1879,8 @@ export interface paths {
                                     slug: string;
                                 }[];
                                 title: string;
+                                /** @enum {string} */
+                                visibility: "public" | "restricted" | "private";
                             }[];
                         };
                     };
@@ -1675,6 +1911,8 @@ export interface paths {
                         status?: "draft" | "published" | "archived";
                         tagIds?: string[];
                         title: string;
+                        /** @enum {string} */
+                        visibility?: "public" | "restricted" | "private";
                     };
                 };
             };
@@ -1720,6 +1958,8 @@ export interface paths {
                                 slug: string;
                             }[];
                             title: string;
+                            /** @enum {string} */
+                            visibility: "public" | "restricted" | "private";
                         };
                     };
                 };
@@ -1801,6 +2041,8 @@ export interface paths {
                                 slug: string;
                             }[];
                             title: string;
+                            /** @enum {string} */
+                            visibility: "public" | "restricted" | "private";
                         };
                     };
                 };
@@ -1871,6 +2113,8 @@ export interface paths {
                         status?: "draft" | "published" | "archived";
                         tagIds?: string[];
                         title?: string;
+                        /** @enum {string} */
+                        visibility?: "public" | "restricted" | "private";
                     };
                 };
             };
@@ -1916,6 +2160,8 @@ export interface paths {
                                 slug: string;
                             }[];
                             title: string;
+                            /** @enum {string} */
+                            visibility: "public" | "restricted" | "private";
                         };
                     };
                 };
@@ -2010,6 +2256,8 @@ export interface paths {
                                 slug: string;
                             }[];
                             title: string;
+                            /** @enum {string} */
+                            visibility: "public" | "restricted" | "private";
                         };
                     };
                 };
@@ -2951,7 +3199,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ValidationErrorBody"];
+                    };
                 };
                 /** @description Too Many Requests */
                 429: {
@@ -3006,7 +3256,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ValidationErrorBody"];
+                    };
                 };
                 /** @description Too Many Requests */
                 429: {
@@ -3308,7 +3560,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ValidationErrorBody"];
+                    };
                 };
                 /** @description Too Many Requests */
                 429: {
@@ -3363,7 +3617,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ValidationErrorBody"];
+                    };
                 };
             };
         };
@@ -4406,6 +4662,124 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/topics/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List comments on a topic
+         * @description Returns all comments on a topic node ordered top-level DESC then replies ASC. Requires enrollment.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Comments retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["CommentWithMeta"][];
+                        };
+                    };
+                };
+                /** @description Forbidden — user is not enrolled in this topic */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create a comment on a topic
+         * @description Creates a top-level comment or a reply. Awards XP on success. Requires enrollment.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        body: string;
+                        /** Format: uuid */
+                        parentCommentId?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Comment created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Comment"];
+                    };
+                };
+                /** @description Bad request — malformed body, validation error, or nested reply forbidden */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Forbidden — user is not enrolled in this topic */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Unprocessable — parent comment not found */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4413,6 +4787,66 @@ export interface components {
         ActivateRequest: {
             /** @example some-activation-token */
             token: string;
+        };
+        Comment: {
+            /** @example This topic was very helpful! */
+            body: string | null;
+            /**
+             * Format: date-time
+             * @example 2024-01-01T12:00:00Z
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @example null
+             */
+            deletedAt: string | null;
+            /**
+             * Format: uuid
+             * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @example null
+             */
+            parentCommentId: string | null;
+            /** @example cmt-topic-1 */
+            topicNodeId: string;
+            /** @example cmt-student-a */
+            userId: string;
+        };
+        CommentWithMeta: components["schemas"]["Comment"] & {
+            /** @example 3 */
+            likeCount: number;
+            /** @example false */
+            likedByMe: boolean;
+        };
+        CreateBadgeBody: {
+            /** @example Complete a streak. */
+            description?: string;
+            /** @example 🔥 */
+            iconEmoji: string;
+            /** @example Perfect Streak */
+            name: string;
+            /**
+             * @example streak_days
+             * @enum {string}
+             */
+            ruleKind: "streak_days" | "topic_completed" | "videos_watched_in_period" | "total_xp" | "mission_completed";
+            /** @example 7 */
+            ruleParams?: string;
+            /** @example perfect-streak */
+            slug: string;
+            /** @example 100 */
+            xpReward?: number;
+        };
+        /** @description Standard error response body with optional metadata fields */
+        ErrorBody: {
+            /** @description Error code or message */
+            error: string;
+        } & {
+            [key: string]: unknown;
         };
         ForgotPasswordRequest: {
             /**
@@ -4619,6 +5053,48 @@ export interface components {
             tags: components["schemas"]["Tag"][];
             /** @example Introduction to Programming */
             title: string;
+        };
+        UpdateBadgeBody: {
+            /** @example true */
+            active?: boolean;
+            /** @example New description */
+            description?: string;
+            /** @example 🏆 */
+            iconEmoji?: string;
+            /** @example New Badge Name */
+            name?: string;
+            /**
+             * @example total_xp
+             * @enum {string}
+             */
+            ruleKind?: "streak_days" | "topic_completed" | "videos_watched_in_period" | "total_xp" | "mission_completed";
+            /** @example 1000 */
+            ruleParams?: string;
+            /** @example 200 */
+            xpReward?: number;
+        };
+        /** @description Validation error response with Zod issues */
+        ValidationErrorBody: {
+            /**
+             * @description Fixed error code for validation failures
+             * @enum {string}
+             */
+            error: "ValidationError";
+            /**
+             * @description Zod validation issues array
+             * @example [
+             *       {
+             *         "code": "invalid_type",
+             *         "expected": "string",
+             *         "message": "Required",
+             *         "path": [
+             *           "email"
+             *         ],
+             *         "received": "undefined"
+             *       }
+             *     ]
+             */
+            issues: unknown[];
         };
     };
     responses: never;

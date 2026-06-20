@@ -1,6 +1,6 @@
 # Task 02 — Frontend: Brand surfaces, callback de-dup and Powered-by attribution (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [13 — White-label branding](./milestone.md)
 **RFC:** [RFC 0006](../../RFCs/0006-white-label-branding-and-build-tooling.md)
 **Team:** Frontend Web
@@ -73,16 +73,19 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `apps/web/src/app/(auth)/auth/callback/page.tsx` renders `<Logo />` and no
+- [x] `apps/web/src/app/(auth)/auth/callback/page.tsx` renders `<Logo />` and no
       longer contains an inline badge/wordmark (verifiable by `grep`).
-- [ ] Footer copyright reads `© {year} {brand.fullName}.` and the document
+- [x] Footer copyright reads `© {year} {brand.fullName}.` and the document
       `<title>` reflects `brand.fullName` (verified with a custom name).
-- [ ] "Powered by ArenaQuest" appears when `brand.showPoweredBy` is true and is
+- [x] "Powered by ArenaQuest" appears when `brand.showPoweredBy` is true and is
       absent when false.
-- [ ] `"Powered by"` exists with identical keys in `dict-en.ts` and `dict-pt.ts`;
-      `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [ ] Changed files lint clean; `make test-web` green for the affected tests.
-- [ ] No diff outside the scope guardrail.
+- [x] `"Powered by"` exists with identical keys in `dict-en.ts` and `dict-pt.ts`;
+      `node apps/web/scripts/check-i18n-coverage.js` passes. (Note: a second key,
+      `landing.footer.rights`, was added alongside it — resolved with the user — so
+      interpolating `brand.fullName` keeps the trailing sentence i18n and the
+      checker green.)
+- [x] Changed files lint clean; `make test-web` green for the affected tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

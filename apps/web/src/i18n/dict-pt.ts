@@ -151,6 +151,12 @@ export const dictPt = {
       backToLogin: 'Voltar ao login',
     },
   },
+  landing: {
+    footer: {
+      rights: 'Todos os direitos reservados.',
+      poweredBy: 'Desenvolvido por',
+    },
+  },
   admin: {
     dashboard: {
       title: 'Admin Dashboard',
