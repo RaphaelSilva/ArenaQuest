@@ -1,4 +1,4 @@
-# RFC 0006: White-label branding and Cloudflare build tooling
+# RFC 0006: White-label branding
 
 **Date:** 2026-06-19
 **Status:** Draft
@@ -13,9 +13,21 @@
 - `apps/web/src/lib/brand.ts` (**new** — single source of truth for brand config)
 - `apps/web/src/app/icon.tsx` (**new** — build-time per-brand favicon)
 - `apps/web/src/app/favicon.ico` (**removed** — replaced by the generated icon)
-- `scripts/BuildToCloudFlare.sh` (**new** — white-label build/deploy helper)
-- `apps/web/.env.whitelabel.example` (**new** — documented brand variables)
+- `apps/web/.env.example` (document the new `NEXT_PUBLIC_BRAND_*` variables)
+- `.github/workflows/deploy-web.yml` (thread brand env into the Pages build step)
 - `docs/product/RFCs/README.md` (index entry)
+
+> **Scope note.** This RFC is **branding only**. The broader concern of
+> *validating a deployment is configured correctly* (brand vars **and**
+> generic config — API endpoints, Google OAuth, CORS, mail secrets in
+> Cloudflare) is deliberately **out of scope** and is owned by
+> **RFC 0007 — Deployment preflight & configuration validation**. An
+> earlier draft of this RFC proposed a `BuildToCloudFlare.sh`
+> build+deploy helper; that was dropped because deploys are already
+> automated by GitHub Actions (`deploy-web.yml` / `deploy-api.yml`), and
+> a second local deploy path would only drift from the pipeline. What
+> survives here is the minimal, honest integration: thread the new brand
+> variables into the **existing** CI build step.
 
 ---
 
@@ -38,49 +50,38 @@ The **browser favicon is generated per brand at build time** from the
 same sigla badge, so a rebranded deployment also gets a matching tab
 icon — no hand-made `.ico` required.
 
-To keep the growing list of build-time knobs (API URL, language, and
-now the brand variables) from being forgotten, we add a single
-**`scripts/BuildToCloudFlare.sh`** that assembles every required
-variable from a brand profile, runs the Cloudflare Pages build, and
-optionally pushes the deploy — **inspired by the `Makefile` targets but
-without modifying the `Makefile`**, which keeps owning the default
-(always-ArenaQuest) flow.
+The brand is configured through `NEXT_PUBLIC_BRAND_*` variables, baked
+at build time exactly like the existing `NEXT_PUBLIC_LANGUAGE` /
+`NEXT_PUBLIC_API_URL`. They are threaded into the **existing**
+`deploy-web.yml` Pages build step — **no new build or deploy script**
+(see Scope note; tooling that *validates* the full config lives in
+RFC 0007).
 
 ## Motivation
 
 The product is being offered as a white-label platform: partners want
 their own sigla and name on the shell, but the visual identity
 (layout, spacing, and the **color palette**) should stay the
-platform's. Two concrete problems block this today:
+platform's. The blocker is concrete:
 
-1. **The brand is hardcoded in several places, inconsistently.** The
-   canonical `Logo` component literally renders the string `AQ` and the
-   split wordmark `Arena`+`Quest`
-   ([Logo.tsx:42](../../../apps/web/src/components/design-system/Logo.tsx#L42),
-   [:54](../../../apps/web/src/components/design-system/Logo.tsx#L54)).
-   Worse, the OAuth callback screen **re-implements the same badge
-   inline** instead of using `<Logo>`
-   ([auth/callback/page.tsx:70](../../../apps/web/src/app/(auth)/auth/callback/page.tsx#L70)),
-   so any rebrand has to be done twice. The footer copyright
-   ([page.tsx:406](../../../apps/web/src/app/page.tsx#L406)) and the
-   document metadata ([layout.tsx:28](../../../apps/web/src/app/layout.tsx#L28))
-   each carry their own literal `"ArenaQuest"`.
+**The brand is hardcoded in several places, inconsistently.** The
+canonical `Logo` component literally renders the string `AQ` and the
+split wordmark `Arena`+`Quest`
+([Logo.tsx:42](../../../apps/web/src/components/design-system/Logo.tsx#L42),
+[:54](../../../apps/web/src/components/design-system/Logo.tsx#L54)).
+Worse, the OAuth callback screen **re-implements the same badge inline**
+instead of using `<Logo>`
+([auth/callback/page.tsx:70](../../../apps/web/src/app/(auth)/auth/callback/page.tsx#L70)),
+so any rebrand has to be done twice. The footer copyright
+([page.tsx:406](../../../apps/web/src/app/page.tsx#L406)), the document
+metadata ([layout.tsx:28](../../../apps/web/src/app/layout.tsx#L28)), and
+the static favicon each carry their own ArenaQuest identity that nothing
+can override.
 
-2. **Build-time configuration is spread across two mechanisms and easy
-   to forget.** `NEXT_PUBLIC_LANGUAGE` is wired through
-   `next.config.ts`'s `env` block
-   ([next.config.ts:11](../../../apps/web/next.config.ts#L11)), while
-   `NEXT_PUBLIC_API_URL` is injected ad-hoc on the `deploy-web` /
-   `deploy-web-staging` Makefile lines
-   ([Makefile:94](../../../Makefile#L94),
-   [:98](../../../Makefile#L98)). Adding three or four brand variables
-   to this scattered setup invites a half-configured deploy (right name,
-   wrong API URL, missing sigla).
-
-A white-label build is exactly the situation where "I forgot one
-variable" produces an embarrassing result (a partner's site that still
-says ArenaQuest). Centralising the brand into one config module and one
-build script removes that failure mode.
+A white-label build is exactly the situation where "I forgot one place"
+produces an embarrassing result (a partner's site that still says
+ArenaQuest in the tab title or the footer). Centralising the brand into
+**one config module** read by every surface removes that failure mode.
 
 ## Goals & Non-Goals
 
@@ -92,15 +93,14 @@ build script removes that failure mode.
   on its trailing segment, and no palette variable is renamed or
   recolored by this RFC.
 - **One source of truth** for brand values (`src/lib/brand.ts`), read by
-  every surface (`Logo`, footer, metadata, the de-duplicated callback
-  screen).
+  every surface (`Logo`, footer, metadata, favicon, the de-duplicated
+  callback screen).
 - A **"Powered by ArenaQuest"** footer attribution that survives
   rebranding.
 - A **per-brand favicon generated at build time** from the sigla badge,
   staying in sync with the on-screen mark with no manual asset work.
-- A single **`BuildToCloudFlare.sh`** that gathers all build-time
-  variables from a brand profile, builds, and optionally deploys —
-  **leaving the `Makefile` untouched** as the default-brand path.
+- **Thread the brand variables into the existing CI build** so a
+  white-label deploy needs no new pipeline — only env values.
 - **Zero behaviour change for the stock build** — with no overrides the
   output is identical to today (defaults = ArenaQuest).
 - **Respect the i18n contract (RFC 0002).** Brand values are *config*,
@@ -108,9 +108,16 @@ build script removes that failure mode.
   ("Powered by") goes through the dictionaries.
 
 **Non-Goals**
+- **Deployment-configuration validation / preflight** (does the target
+  Cloudflare env have the brand vars, the right API URL, OAuth secrets,
+  CORS, mail secrets?). **Owned by RFC 0007.** This RFC only *adds* the
+  brand vars; verifying a deploy is fully wired is 0007's job.
+- **A bespoke build/deploy script.** Deploys are already automated by
+  GitHub Actions; we integrate with that pipeline instead of forking it
+  (see Scope note).
 - **Theme/palette customisation per tenant.** Colors stay as they are;
-  swapping `--aq-accent` and friends per deployer is a separate,
-  larger effort (see Alternatives → "Full theming").
+  swapping `--aq-accent` and friends per deployer is a separate, larger
+  effort (see Alternatives → "Full theming").
 - **Runtime / multi-tenant branding.** This is **build-time, one brand
   per deployment**, matching how `NEXT_PUBLIC_*` already works. A single
   Worker/Pages project serving many brands from one build is out of
@@ -119,13 +126,10 @@ build script removes that failure mode.
   `sigla badge + wordmark` construction; uploading a raster/SVG logo is
   a follow-up.
 - **OG / social share image** per brand. The favicon **is** covered
-  (§9); the Open-Graph preview image is a follow-up — it needs layout
+  (§8); the Open-Graph preview image is a follow-up — it needs layout
   design beyond the badge, not just the sigla.
 - **Changing the API.** Branding is entirely a frontend + build concern;
   `apps/api` is not touched.
-- **Modifying the `Makefile`.** It keeps owning the default ArenaQuest
-  build/deploy; the new script wraps the same commands for white-label
-  profiles.
 
 ## Current State (for reference)
 
@@ -154,9 +158,17 @@ the Next.js file convention (there is no `<link rel="icon">` in
 `layout.tsx`). It is the ArenaQuest mark, baked once; nothing reads the
 brand config.
 
-**Build-time config** — two mechanisms:
+**Build-time config** — two mechanisms, both already in place:
 - `next.config.ts` `env: { NEXT_PUBLIC_LANGUAGE }` (build-baked).
-- Makefile deploy lines prefix `NEXT_PUBLIC_API_URL=…` per environment.
+- CI injects `NEXT_PUBLIC_API_URL` per environment in the Pages build
+  step of `deploy-web.yml`
+  ([deploy-web.yml:82](../../../.github/workflows/deploy-web.yml#L82),
+  [:124](../../../.github/workflows/deploy-web.yml#L124)). The Makefile
+  mirrors the same for local deploys
+  ([Makefile:94](../../../Makefile#L94)).
+
+The brand variables follow this **existing** precedent — no new
+mechanism is introduced.
 
 ## Proposed Design
 
@@ -290,6 +302,7 @@ env: {
   NEXT_PUBLIC_BRAND_NAME_PREFIX: process.env.NEXT_PUBLIC_BRAND_NAME_PREFIX || 'Arena',
   NEXT_PUBLIC_BRAND_NAME_ACCENT: process.env.NEXT_PUBLIC_BRAND_NAME_ACCENT || 'Quest',
   NEXT_PUBLIC_BRAND_POWERED_BY: process.env.NEXT_PUBLIC_BRAND_POWERED_BY || '',
+  NEXT_PUBLIC_BRAND_ACCENT: process.env.NEXT_PUBLIC_BRAND_ACCENT || '',
 },
 ```
 
@@ -305,53 +318,7 @@ still passes; if it flags the platform-constant `"ArenaQuest"` in the
 constant (`PLATFORM_NAME = 'ArenaQuest'`) so no literal sits in a
 component.
 
-### 8. `BuildToCloudFlare.sh` — white-label build helper
-
-A new `scripts/BuildToCloudFlare.sh` that:
-
-1. **Loads a brand profile** — an env file passed as `--profile <file>`
-   (e.g. `apps/web/.env.whitelabel`), or individual `--sigla`,
-   `--name-prefix`, `--name-accent`, `--api-url`, `--language`,
-   `--powered-by` flags, or plain environment variables. Flags override
-   the profile; the profile overrides the shell env.
-2. **Defaults to ArenaQuest** for any variable left unset — so running
-   it with no profile reproduces the stock build (parity with the
-   Makefile).
-3. **Validates** that the required variables resolve (notably
-   `NEXT_PUBLIC_API_URL` and the target Pages project) and **prints a
-   summary table** of the effective brand + URLs before building, so a
-   misconfiguration is caught before deploy, not after.
-4. **Builds** via the same command the Makefile uses
-   (`pnpm --filter web pages:build`) with the assembled
-   `NEXT_PUBLIC_*` exported.
-5. **Optionally deploys** when `--deploy` (or `--deploy --env staging`)
-   is passed, calling the same
-   `wrangler pages deploy .vercel/output/static --project-name=…` line
-   as `deploy-web` / `deploy-web-staging`. Without `--deploy` it stops
-   after the build (dry-run friendly).
-
-```bash
-# Default ArenaQuest build (parity with `make deploy-web`, build only):
-scripts/BuildToCloudFlare.sh --api-url https://api.raphael-1d2.workers.dev
-
-# White-label partner, build + deploy to a Pages project:
-scripts/BuildToCloudFlare.sh \
-  --profile apps/web/.env.whitelabel.acme \
-  --api-url https://api.acme.example.com \
-  --project acme-web \
-  --deploy
-```
-
-The script **does not modify the Makefile** and is **inspired by**, not
-a replacement for, its targets: the Makefile remains the canonical
-default-brand (always-ArenaQuest) flow; the script is the white-label
-superset that guarantees every knob is set in one place.
-
-A committed **`apps/web/.env.whitelabel.example`** documents every
-variable with the ArenaQuest defaults, so a new partner profile is a
-copy-and-edit.
-
-### 9. Per-brand favicon (build-time, static)
+### 8. Per-brand favicon (build-time, static)
 
 Today the favicon is a static `app/favicon.ico` that nothing reads the
 brand from. Replace it with a generated icon driven by `brand`, using
@@ -415,6 +382,37 @@ Key points:
 - **OG/social image stays out of scope** (Non-Goals): it needs a
   composed layout, not just the sigla, and is a follow-up.
 
+### 9. CI integration (existing pipeline, not a new script)
+
+Deploys already run through GitHub Actions: `deploy-web.yml` builds with
+`pnpm --filter web pages:build` and passes `NEXT_PUBLIC_API_URL` per
+environment in the build step's `env:` block. Branding plugs into the
+**same** step — add the brand variables alongside the API URL:
+
+```yaml
+# .github/workflows/deploy-web.yml — Pages build step (per environment)
+- name: Build for Cloudflare Pages (Production)
+  run: pnpm --filter web pages:build
+  env:
+    NEXT_PUBLIC_API_URL: https://api.raphael-1d2.workers.dev
+    # Brand: unset → ArenaQuest defaults (current behaviour).
+    # For a white-label deployment, source these from the GitHub
+    # Environment (vars/secrets) for that target.
+    NEXT_PUBLIC_BRAND_SIGLA:       ${{ vars.NEXT_PUBLIC_BRAND_SIGLA }}
+    NEXT_PUBLIC_BRAND_NAME_PREFIX: ${{ vars.NEXT_PUBLIC_BRAND_NAME_PREFIX }}
+    NEXT_PUBLIC_BRAND_NAME_ACCENT: ${{ vars.NEXT_PUBLIC_BRAND_NAME_ACCENT }}
+    NEXT_PUBLIC_BRAND_POWERED_BY:  ${{ vars.NEXT_PUBLIC_BRAND_POWERED_BY }}
+    NEXT_PUBLIC_BRAND_ACCENT:      ${{ vars.NEXT_PUBLIC_BRAND_ACCENT }}
+```
+
+Unset GitHub `vars` resolve to empty strings, which `brand.ts` and
+`next.config.ts` map back to the ArenaQuest defaults — so the **stock
+ArenaQuest pipeline is unchanged** until a deployer sets the vars for a
+target environment. `apps/web/.env.example` documents the variables for
+local builds. **No new script is added** (validating that an environment
+has the full, coherent config — brand *and* endpoints/OAuth/CORS — is
+RFC 0007).
+
 ## Alternatives Considered
 
 1. **Single `NEXT_PUBLIC_BRAND_NAME` (no prefix/accent split).**
@@ -422,27 +420,29 @@ Key points:
    heuristic for where to apply the accent. The two-segment model
    reproduces today's rendering exactly and is still simple for a
    single-tone brand (empty `nameAccent`).
-2. **Full per-tenant theming (palette via env / CSS variables).**
-   *Deferred, not rejected:* the user explicitly wants the colors kept
-   as-is, and theming multiplies QA surface (contrast, accent on text,
-   dark shell). Out of scope here; the `brand.ts` seam leaves room for a
-   later `theme.ts` sibling.
-3. **Runtime branding (one build, brand chosen per request/host).**
+2. **A `BuildToCloudFlare.sh` build+deploy helper (earlier draft).**
+   *Rejected:* deploys are already automated by GitHub Actions
+   (`deploy-web.yml` / `deploy-api.yml`); a local script that also builds
+   and pushes creates a **second deploy path that drifts** from CI. The
+   genuinely useful part — *validating* the target is configured — is
+   broader than branding and is split into **RFC 0007** (preflight /
+   config validation). This RFC keeps only the minimal CI-env threading.
+3. **Full per-tenant theming (palette via env / CSS variables).**
+   *Deferred, not rejected:* the request is to keep the colors as-is, and
+   theming multiplies QA surface (contrast, accent on text, dark shell).
+   Out of scope here; the `brand.ts` seam leaves room for a later
+   `theme.ts` sibling.
+4. **Runtime branding (one build, brand chosen per request/host).**
    *Rejected for now:* the platform's config is uniformly build-time
    `NEXT_PUBLIC_*`; runtime branding needs a tenant resolver, edge
    config, and cache-key changes — a different RFC.
-4. **Add brand vars to the Makefile deploy lines.** *Rejected by
-   request:* the Makefile must stay the default (ArenaQuest) flow
-   untouched. A dedicated script avoids per-partner Makefile edits and
-   centralises validation/summary that the Makefile one-liners cannot
-   express cleanly.
 5. **Upload a logo image per brand.** *Rejected for v1:* heavier
    (storage, sizing, dark/light variants); the sigla+wordmark covers the
    stated need (`<Sigla> <LabelName>`). Follow-up.
 
 ## Implementation Plan
 
-Estimated total: **~1–1.5 dev days.**
+Estimated total: **~1 dev day.**
 
 ### Phase 1 — Brand config + component wiring (~0.5 d)
 - Add `apps/web/src/lib/brand.ts` with defaults = ArenaQuest.
@@ -458,21 +458,22 @@ Estimated total: **~1–1.5 dev days.**
   `NEXT_PUBLIC_BRAND_ACCENT`).
 - Verify `check-i18n-coverage.js` passes.
 
-### Phase 2 — Build tooling (~0.5 d)
-- Add `scripts/BuildToCloudFlare.sh` (profile loading, defaults,
-  validation, summary, build, optional deploy).
-- Add `apps/web/.env.whitelabel.example` documenting every variable.
-- Smoke-test: default invocation builds an ArenaQuest bundle identical
-  to `make deploy-web` (build step); a sample partner profile builds a
-  rebranded bundle.
+### Phase 2 — CI + docs (~0.25 d)
+- Thread the `NEXT_PUBLIC_BRAND_*` vars into the Pages build step of
+  `deploy-web.yml` (staging + production), sourced from GitHub
+  Environment `vars`.
+- Document every variable (with ArenaQuest defaults) in
+  `apps/web/.env.example`.
+- Confirm the default pipeline (no vars set) produces an unchanged
+  ArenaQuest bundle.
 
 ### Phase 3 — Verification (~0.25 d)
 - Default build: visually identical to today (badge, wordmark accent,
-  footer, title) — **regression gate**.
+  footer, title, favicon) — **regression gate**.
 - Custom build: `<Sigla> <LabelName>` everywhere the mark appears
   (landing, nav, auth screens, OAuth callback), footer copyright shows
-  the brand, document title shows the brand, "Powered by ArenaQuest"
-  visible.
+  the brand, document title shows the brand, favicon shows the sigla,
+  "Powered by ArenaQuest" visible.
 - Toggle check: `NEXT_PUBLIC_BRAND_POWERED_BY=false` hides the
   attribution on a custom build; `=true` shows it on the default build.
 
@@ -480,12 +481,11 @@ Estimated total: **~1–1.5 dev days.**
 
 | Risk | Mitigation |
 |---|---|
-| **Build-time only** — a brand change requires a rebuild/redeploy | Accepted and intended; matches every other `NEXT_PUBLIC_*` knob. Runtime branding is a separate RFC (Alternatives 3). |
-| A partner forgets a variable and ships a half-rebrand | `BuildToCloudFlare.sh` validates required vars and prints an effective-config summary **before** building; unset vars fall back to ArenaQuest rather than to blanks. |
-| Two build paths (Makefile + script) drift | The script calls the **same** `pages:build` / `wrangler pages deploy` commands the Makefile uses; the Makefile stays the default-brand canonical path, the script is its white-label superset. A test asserts default-script output matches the Makefile build. |
+| **Build-time only** — a brand change requires a rebuild/redeploy | Accepted and intended; matches every other `NEXT_PUBLIC_*` knob. Runtime branding is a separate RFC (Alternatives 4). |
+| A partner forgets a variable and ships a half-rebrand | Unset vars fall back to ArenaQuest (never blanks), so the failure mode is "still says ArenaQuest", not a broken page. **Catching a half-configured deploy before it ships is RFC 0007's preflight.** |
 | i18n checker flags the new strings | "Powered by" is dictionarised; brand values come from env (not literals); the platform constant, if flagged, moves into `brand.ts`. Checker run is part of Phase 1's exit. |
 | Accent split looks wrong for some names | `nameAccent` is optional — empty yields a clean single-tone wordmark; colors are unchanged either way. |
-| **Favicon generation adds an edge function / runtime cost** on Cloudflare | `export const dynamic = 'force-static'` pre-renders the PNG at build time into a static asset; Phase 1 explicitly verifies the `next-on-pages` output has no function for `/icon`. If a build ever can't statically pre-render it, fall back to a script-generated static SVG icon (no `ImageResponse`). |
+| **Favicon generation adds an edge function / runtime cost** on Cloudflare | `export const dynamic = 'force-static'` pre-renders the PNG at build time into a static asset; Phase 1 explicitly verifies the `next-on-pages` output has no function for `/icon`. If a build ever can't statically pre-render it, fall back to a build-time static SVG icon (no `ImageResponse`). |
 | **Accent hex drifts from the `oklch()` palette** | `brand.accentHex` is documented as the sRGB mirror of `--aq-accent`, used only by the off-DOM image renderer; the on-screen palette still comes from the CSS variable, so the *page* never drifts. A custom favicon colour is an explicit opt-in (`NEXT_PUBLIC_BRAND_ACCENT`). |
 | OG/social image still says ArenaQuest on a custom brand | Explicit Non-Goal / follow-up (needs a composed layout, not just the sigla) — a known gap, not a surprise. |
 
@@ -493,7 +493,7 @@ Estimated total: **~1–1.5 dev days.**
 
 - With **no overrides**, the build is visually and behaviourally
   identical to today (defaults resolve to `AQ` / `ArenaQuest`); the i18n
-  coverage check passes.
+  coverage check passes and the CI pipeline behaves unchanged.
 - Setting `NEXT_PUBLIC_BRAND_SIGLA` / `_NAME_PREFIX` / `_NAME_ACCENT`
   changes the mark to `<Sigla> <LabelName>` **everywhere** — landing,
   nav, all auth screens, and the OAuth callback — with the **same
@@ -507,28 +507,26 @@ Estimated total: **~1–1.5 dev days.**
   build time as a **static** asset (the `next-on-pages` output has no
   edge function for `/icon`); the default build's favicon is the `AQ`
   badge on the current accent.
-- `scripts/BuildToCloudFlare.sh` produces a default ArenaQuest bundle
-  equivalent to `make deploy-web` (build step) and a rebranded bundle
-  from a partner profile, printing an effective-config summary first;
-  the **`Makefile` is unchanged**.
+- A white-label deploy requires **only setting the GitHub Environment
+  vars** for the target — no new pipeline, no code change.
 
 ## Open Questions
 
 1. **Default for `showPoweredBy`** — proposed: shown on customised
    builds, hidden on the stock ArenaQuest build (which already *is*
    ArenaQuest). Confirm this matches the licensing/attribution intent.
-2. **Profile location & secrecy** — committed example
-   (`.env.whitelabel.example`) plus per-partner gitignored profiles?
-   Confirm whether partner profiles live in this repo or in deploy CI
-   secrets.
-3. **OG / social share image** per brand — deferred to a follow-up RFC
+2. **OG / social share image** per brand — deferred to a follow-up RFC
    (needs a composed layout beyond the sigla). The favicon is included
-   here (§9); confirm the OG image can wait.
-4. **Optional `NEXT_PUBLIC_BRAND_ACCENT`** — the only colour knob, and it
+   here (§8); confirm the OG image can wait.
+3. **Optional `NEXT_PUBLIC_BRAND_ACCENT`** — the only colour knob, and it
    is **favicon-only** (the on-screen palette stays the CSS `oklch()`
    variables, unchanged per the request). Confirm we want to expose even
    this favicon-scoped override now, or hardcode the accent hex and add
    the override later.
+4. **Where partner brand values live** — GitHub Environment `vars` per
+   target (proposed), so the brand travels with the deploy environment
+   rather than a committed file. Confirm; the per-environment
+   *completeness* check belongs to RFC 0007.
 
 ## References
 
@@ -539,6 +537,7 @@ Estimated total: **~1–1.5 dev days.**
 - Favicon to replace: `apps/web/src/app/favicon.ico` (static, brand-agnostic)
 - Dynamic-icon convention: Next.js App Router `app/icon.tsx` + `ImageResponse` (`next/og`)
 - Build-time env precedent: `apps/web/next.config.ts:10` (`NEXT_PUBLIC_LANGUAGE`)
-- Deploy commands to mirror (not modify): `Makefile:93-99` (`deploy-web*`)
+- CI build step to extend: `.github/workflows/deploy-web.yml:79-83`, `:121-124`
 - i18n contract: RFC 0002, `apps/web/scripts/check-i18n-coverage.js`
 - CSS palette kept intact: `apps/web/src/app/globals.css` (`--aq-*`)
+- **Deployment preflight / config validation: RFC 0007** (sibling)

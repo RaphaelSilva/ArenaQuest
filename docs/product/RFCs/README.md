@@ -11,6 +11,8 @@ This directory contains formal proposals and architectural decisions for ArenaQu
 | [0003](./0003-apps-api-route-organization-and-openapi.md) | Reorganização de rotas e adoção de OpenAPI/Swagger em `apps/api` | Draft | 2026-05-24 | raphaelsilva |
 | [0004](./0004-catalog-redesign.md) | Catalog page redesign — wireframe-aligned UX | Implemented | 2026-05-27 | raphaelsilva |
 | [0005](./0005-enrollment-exclusions-and-visibility.md) | Enrollment strategy review — topic exclusions and node visibility | Implemented | 2026-05-28 | raphaelsilva |
+| [0006](./0006-white-label-branding-and-build-tooling.md) | White-label branding | Draft | 2026-06-19 | raphaelsilva |
+| [0007](./0007-deployment-preflight-and-config-validation.md) | Deployment preflight & configuration validation | Draft | 2026-06-19 | raphaelsilva |
 
 ## RFC Process
 
