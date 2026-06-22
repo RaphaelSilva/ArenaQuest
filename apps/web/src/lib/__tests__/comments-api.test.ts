@@ -33,7 +33,7 @@ describe('createCommentsApi', () => {
 
   describe('listForTopic', () => {
     it('returns array of comments on success', async () => {
-      const http = makeTransport([makeResponse({ jsonData: [COMMENT] })]);
+      const http = makeTransport([makeResponse({ jsonData: { data: [COMMENT] } })]);
       const api = createCommentsApi(http);
       const result = await api.listForTopic('topic1');
       expect(result).toEqual([COMMENT]);

@@ -16,13 +16,16 @@ const STUDENT_A = 'cmt-student-a';
 const STUDENT_B = 'cmt-student-b';
 const STUDENT_C = 'cmt-student-c'; // never enrolled
 const ADMIN_ID = 'cmt-admin-1';
+const CREATOR_ID = 'cmt-creator-1';
 const TOPIC_ID = 'cmt-topic-1';
 const PUBLIC_TOPIC_ID = 'cmt-public-topic-1';
+const RESTRICTED_TOPIC_ID = 'cmt-restricted-topic-1'; // restricted, nobody enrolled
 
 let tokenA: string;
 let tokenB: string;
 let tokenC: string;
 let adminToken: string;
+let creatorToken: string;
 
 beforeAll(async () => {
   await applyMigrations(env.DB);
@@ -36,10 +39,14 @@ beforeAll(async () => {
       .bind(STUDENT_C, 'Student C', 'c@cmt.test', 'hash'),
     env.DB.prepare(`INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)`)
       .bind(ADMIN_ID, 'Admin', 'admin@cmt.test', 'hash'),
+    env.DB.prepare(`INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)`)
+      .bind(CREATOR_ID, 'Creator', 'creator@cmt.test', 'hash'),
     env.DB.prepare(`INSERT OR IGNORE INTO topic_nodes (id, title) VALUES (?, ?)`)
       .bind(TOPIC_ID, 'Test Topic'),
     env.DB.prepare(`INSERT OR IGNORE INTO topic_nodes (id, title, status, visibility) VALUES (?, ?, ?, ?)`)
       .bind(PUBLIC_TOPIC_ID, 'Public Topic', 'published', 'public'),
+    env.DB.prepare(`INSERT OR IGNORE INTO topic_nodes (id, title, status, visibility) VALUES (?, ?, ?, ?)`)
+      .bind(RESTRICTED_TOPIC_ID, 'Restricted Topic', 'published', 'restricted'),
     // Enroll student A in the topic
     env.DB.prepare(`INSERT OR IGNORE INTO enrollments_user (id, user_id, topic_node_id, granted_by) VALUES (?, ?, ?, ?)`)
       .bind('enroll-a', STUDENT_A, TOPIC_ID, ADMIN_ID),
@@ -52,11 +59,12 @@ beforeAll(async () => {
   ]);
 
   const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
-  [tokenA, tokenB, tokenC, adminToken] = await Promise.all([
+  [tokenA, tokenB, tokenC, adminToken, creatorToken] = await Promise.all([
     adapter.signAccessToken({ sub: STUDENT_A, email: 'a@cmt.test', roles: ['student'] }),
     adapter.signAccessToken({ sub: STUDENT_B, email: 'b@cmt.test', roles: ['student'] }),
     adapter.signAccessToken({ sub: STUDENT_C, email: 'c@cmt.test', roles: ['student'] }),
     adapter.signAccessToken({ sub: ADMIN_ID, email: 'admin@cmt.test', roles: ['admin'] }),
+    adapter.signAccessToken({ sub: CREATOR_ID, email: 'creator@cmt.test', roles: ['content_creator'] }),
   ]);
 });
 
@@ -124,6 +132,38 @@ describe('enrollment access', () => {
   it('GET /topics/:id/comments returns 200 for enrolled user', async () => {
     const res = await req('GET', `/topics/${TOPIC_ID}/comments`, { token: tokenA });
     expect(res.status).toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Privileged bypass — admins/content creators read & write on restricted
+// topics they are NOT enrolled in (mirrors topic-read bypass in catalog router).
+// ---------------------------------------------------------------------------
+
+describe('privileged bypass on restricted topic (unenrolled)', () => {
+  it('plain student gets 403 on a restricted topic they are not enrolled in', async () => {
+    const res = await req('GET', `/topics/${RESTRICTED_TOPIC_ID}/comments`, { token: tokenC });
+    expect(res.status).toBe(403);
+  });
+
+  it('admin can GET comments without enrollment', async () => {
+    const res = await req('GET', `/topics/${RESTRICTED_TOPIC_ID}/comments`, { token: adminToken });
+    expect(res.status).toBe(200);
+  });
+
+  it('content creator can GET comments without enrollment', async () => {
+    const res = await req('GET', `/topics/${RESTRICTED_TOPIC_ID}/comments`, { token: creatorToken });
+    expect(res.status).toBe(200);
+  });
+
+  it('content creator can POST a comment without enrollment', async () => {
+    const res = await req('POST', `/topics/${RESTRICTED_TOPIC_ID}/comments`, {
+      token: creatorToken,
+      body: { body: 'Creator comment on restricted topic' },
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json<{ body: string }>();
+    expect(body.body).toBe('Creator comment on restricted topic');
   });
 });
 

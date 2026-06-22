@@ -35,7 +35,8 @@ export function createCommentsApi(http: HttpTransport) {
       if (res.status === 401) throw new CommentsApiError('Unauthorized', 401, 'Unauthorized.');
       if (res.status === 404) throw new CommentsApiError('NotFound', 404, 'Topic not found.');
       if (!res.ok) throw new CommentsApiError('Unknown', res.status, `Failed (${res.status})`);
-      return res.json() as Promise<CommentItem[]>;
+      const body = (await res.json()) as { data: CommentItem[] };
+      return body.data;
     },
 
     async createForTopic(topicId: string, body: string): Promise<CommentItem> {

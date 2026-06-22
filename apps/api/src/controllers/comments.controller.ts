@@ -21,8 +21,11 @@ export class CommentsController {
     topicNodeId: string,
     userId: string,
     enrolledTopicIds: string[],
+    isPrivileged = false,
   ): Promise<ControllerResult<CommentWithMeta[]>> {
-    if (!enrolledTopicIds.includes(topicNodeId)) {
+    // Admins/content creators bypass the enrollment gate, mirroring topic reads
+    // (catalog.topics router) so they can moderate comments on any topic they can view.
+    if (!isPrivileged && !enrolledTopicIds.includes(topicNodeId)) {
       return { ok: false, status: 403, error: 'Forbidden' };
     }
 
@@ -45,8 +48,9 @@ export class CommentsController {
     userId: string,
     input: CreateCommentInput,
     enrolledTopicIds: string[],
+    isPrivileged = false,
   ): Promise<ControllerResult<CommentRecord>> {
-    if (!enrolledTopicIds.includes(topicNodeId)) {
+    if (!isPrivileged && !enrolledTopicIds.includes(topicNodeId)) {
       return { ok: false, status: 403, error: 'Forbidden' };
     }
 

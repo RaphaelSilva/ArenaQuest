@@ -1,4 +1,5 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import { ROLES } from '@arenaquest/shared/constants/roles';
 import { authGuard } from '@api/middleware/auth-guard';
 import { CommentsController, CreateCommentSchema } from '@api/controllers/comments.controller';
 import { CommentSchema, CommentWithMetaSchema } from '@api/openapi/components/entities';
@@ -92,20 +93,24 @@ export function buildCommentsRouter(slice: {
   router.use('/topics/*', authGuard);
 
   router.openapi(listCommentsRoute, async (c) => {
-    const userId = c.get('user').sub;
+    const user = c.get('user');
+    const userId = user.sub;
+    const isPrivileged = user.roles.includes(ROLES.ADMIN) || user.roles.includes(ROLES.CONTENT_CREATOR);
     const topicId = c.req.valid('param').id;
     const enrolledIds = await enrollmentRepo.getEffectiveAccessTopicIds(userId);
-    const result = await controller.listComments(topicId, userId, enrolledIds);
+    const result = await controller.listComments(topicId, userId, enrolledIds, isPrivileged);
     if (!result.ok) return respondWith(c, result);
     return c.json({ data: result.data }, 200);
   });
 
   router.openapi(createCommentRoute, async (c) => {
-    const userId = c.get('user').sub;
+    const user = c.get('user');
+    const userId = user.sub;
+    const isPrivileged = user.roles.includes(ROLES.ADMIN) || user.roles.includes(ROLES.CONTENT_CREATOR);
     const topicId = c.req.valid('param').id;
     const body = c.req.valid('json');
     const enrolledIds = await enrollmentRepo.getEffectiveAccessTopicIds(userId);
-    const result = await controller.createComment(topicId, userId, body, enrolledIds);
+    const result = await controller.createComment(topicId, userId, body, enrolledIds, isPrivileged);
     if (!result.ok) return respondWith(c, result);
     if (xpEngine) {
       const todayKey = new Date().toISOString().slice(0, 10);
