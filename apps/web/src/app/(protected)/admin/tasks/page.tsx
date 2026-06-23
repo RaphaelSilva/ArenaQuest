@@ -251,7 +251,7 @@ export default function AdminTasksPage() {
       {/* Body */}
       <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--aq-bg)' }}>
         {/* Left: task list — full width on mobile, responsive on desktop */}
-        <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:max-w-[50%] lg:max-w-[620px] min-w-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
+        <div className={`${selectedId ? 'hidden detail:flex' : 'flex'} w-full detail:max-w-[50%] min-w-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
           {error && (
             <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{error}</p>
           )}
@@ -331,12 +331,12 @@ export default function AdminTasksPage() {
         </div>
 
         {/* Right: detail pane */}
-        <div className={`${selectedId ? 'flex' : 'hidden md:flex'} flex-1 flex-col overflow-y-auto p-6 md:p-8`}>
+        <div className={`${selectedId ? 'flex' : 'hidden detail:flex'} flex-1 flex-col overflow-y-auto p-6 detail:p-8`}>
           {/* Mobile back button */}
           {selectedTask && (
             <button
               onClick={() => setSelectedId(null)}
-              className="mb-4 flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 md:hidden"
+              className="mb-4 flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 detail:hidden"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

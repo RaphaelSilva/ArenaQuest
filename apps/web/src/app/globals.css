@@ -53,6 +53,11 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Master-detail split breakpoint. Below this width the admin list/detail
+     screens collapse to a single pane (list, then tap to open the detail);
+     side-by-side only kicks in on very wide viewports. */
+  --breakpoint-detail: 1500px;
 }
 
 @media (prefers-color-scheme: dark) {

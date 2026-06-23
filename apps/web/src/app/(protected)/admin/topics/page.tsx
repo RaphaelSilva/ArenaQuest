@@ -600,7 +600,7 @@ export default function AdminTopicsPage() {
                   ? 'bg-indigo-50 text-indigo-900 shadow-sm dark:bg-indigo-500/10 dark:text-indigo-300'
                   : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/50'
             } ${node.archived ? 'opacity-40 grayscale-[0.5]' : ''} ${
-              movingNodeId && movingNodeId !== node.id ? 'cursor-pointer md:cursor-default' : ''
+              movingNodeId && movingNodeId !== node.id ? 'cursor-pointer detail:cursor-default' : ''
             } ${
               targetParentId === node.id ? 'ring-2 ring-green-500 dark:ring-green-400' : ''
             } ${dropIndicatorClass}`}
@@ -705,7 +705,7 @@ export default function AdminTopicsPage() {
 
             {/* Mobile reordering buttons */}
             {movingNodeId === node.id ? (
-              <div className="flex items-center gap-1 md:hidden flex-wrap">
+              <div className="flex items-center gap-1 detail:hidden flex-wrap">
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); moveNodeLocally(node.id, 'up'); }}
@@ -755,7 +755,7 @@ export default function AdminTopicsPage() {
                   e.stopPropagation();
                   setMovingNodeId(node.id);
                 }}
-                className="flex-shrink-0 text-xs text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 md:hidden"
+                className="flex-shrink-0 text-xs text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 detail:hidden"
                 aria-label={d.reorderTitle}
                 title={d.reorderTitle}
               >
@@ -811,7 +811,7 @@ export default function AdminTopicsPage() {
       {/* Body */}
       <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--aq-bg)' }}>
         {/* Left: tree panel — full width on mobile, responsive on desktop */}
-        <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:max-w-[50%] lg:max-w-[620px] min-w-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
+        <div className={`${selectedId ? 'hidden detail:flex' : 'flex'} w-full detail:max-w-[50%] min-w-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
           {fetchError && (
             <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{fetchError}</p>
           )}
@@ -830,12 +830,12 @@ export default function AdminTopicsPage() {
         </div>
 
         {/* Right: detail pane */}
-        <div className={`${selectedId ? 'flex' : 'hidden md:flex'} flex-1 flex-col overflow-y-auto p-6 md:p-8`}>
+        <div className={`${selectedId ? 'flex' : 'hidden detail:flex'} flex-1 flex-col overflow-y-auto p-6 detail:p-8`}>
           {/* Mobile back button */}
           {selectedNode && (
             <button
               onClick={() => setSelectedId(null)}
-              className="mb-4 flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 md:hidden"
+              className="mb-4 flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 detail:hidden"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
