@@ -75,7 +75,7 @@ export default function AdminGroupsPage() {
   if (!isAdmin) return null;
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-6 py-12">
       <h1 className="mb-2 text-2xl font-bold" style={{ color: 'var(--text)' }}>
         {d.title}
       </h1>

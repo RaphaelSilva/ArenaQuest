@@ -446,7 +446,7 @@ function AccessPageContent() {
   const visibleGroups = groups.filter((g) => g.name.toLowerCase().includes(searchLower));
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto px-6 py-12">
       <h1 className="mb-1 text-2xl font-bold" style={{ color: 'var(--text)' }}>
         {d.title}
       </h1>
