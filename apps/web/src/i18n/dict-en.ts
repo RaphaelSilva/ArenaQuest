@@ -633,18 +633,18 @@ export const dictEn = {
     },
   },
   tasks: {
-    title: 'Missions',
-    empty: 'No missions available right now. Check back soon!',
-    errorLoading: 'Failed to load missions.',
+    title: 'Tasks',
+    empty: 'No tasks available right now. Check back soon!',
+    errorLoading: 'Failed to load tasks.',
     card: {
       stageCount: (n: number) => n === 1 ? '1 stage' : `${n} stages`,
       topicCount: (n: number) => n === 1 ? '1 topic' : `${n} topics`,
       explore: 'Explore →',
     },
     detail: {
-      loadError: 'Failed to load mission.',
-      backToMissions: '← Back to missions',
-      completedLabel: '✓ Mission completed!',
+      loadError: 'Failed to load task.',
+      backToMissions: '← Back to tasks',
+      completedLabel: '✓ Task completed!',
       stagesTitle: 'Stages',
       noStages: 'No stages defined yet.',
       stageLabel: (n: number) => `Stage ${n}`,
@@ -715,7 +715,7 @@ export const dictEn = {
     nav: {
       dashboard: 'Dashboard',
       catalog: 'Catalogue',
-      tasks: 'Missions',
+      tasks: 'Tasks',
       settings: 'Settings',
       admin: 'Admin',
       signOut: 'Sign out',
