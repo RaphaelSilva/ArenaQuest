@@ -565,6 +565,8 @@ export const dictPt = {
       empty: 'Seja o primeiro a comentar.',
       you: 'Você',
       anonymous: 'Anônimo',
+      like: 'Curtir',
+      unlike: 'Descurtir',
       now: 'agora',
     },
     mobileSearch: {

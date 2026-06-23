@@ -13,6 +13,8 @@ type Comment = {
   body: string | null;
   createdAt: string;
   parentCommentId: string | null;
+  likeCount: number;
+  likedByMe: boolean;
 };
 
 type Props = {
@@ -90,6 +92,8 @@ export function Discussion({ topicId }: Props) {
       body,
       createdAt: new Date().toISOString(),
       parentCommentId: null,
+      likeCount: 0,
+      likedByMe: false,
     };
 
     // Optimistic update
@@ -109,6 +113,23 @@ export function Discussion({ topicId }: Props) {
       setSubmitError(dict.catalog.redesign.sectionError);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleLike = async (commentId: string) => {
+    // Optimistic toggle
+    const toggle = (c: Comment): Comment =>
+      c.id === commentId
+        ? { ...c, likedByMe: !c.likedByMe, likeCount: c.likedByMe ? c.likeCount - 1 : c.likeCount + 1 }
+        : c;
+
+    setComments((prev) => prev.map(toggle));
+
+    try {
+      await client.comments.toggleLike(commentId);
+    } catch {
+      // Rollback: toggling again restores the previous state
+      setComments((prev) => prev.map(toggle));
     }
   };
 
@@ -250,6 +271,30 @@ export function Discussion({ topicId }: Props) {
                   >
                     {c.body}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => void handleLike(c.id)}
+                    aria-pressed={c.likedByMe}
+                    aria-label={c.likedByMe ? dict.catalog.comments.unlike : dict.catalog.comments.like}
+                    className="mt-2 flex items-center gap-1.5 text-[12px] font-semibold transition-colors hover:opacity-80 cursor-pointer"
+                    style={{ color: c.likedByMe ? 'var(--aq-accent)' : 'var(--aq-text3)' }}
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill={c.likedByMe ? 'currentColor' : 'none'}
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M7 10v12" />
+                      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+                    </svg>
+                    {c.likeCount > 0 && <span>{c.likeCount}</span>}
+                  </button>
                 </div>
               </div>
             );
