@@ -454,10 +454,10 @@ function AccessPageContent() {
         {d.subtitle}
       </p>
 
-      <div className="flex gap-6">
+      <div className="flex flex-col gap-6 lg:flex-row">
         {/* Principal selector panel */}
         <aside
-          className="w-72 flex-shrink-0 rounded-xl border"
+          className="w-full flex-shrink-0 rounded-xl border lg:w-72"
           style={{ borderColor: 'var(--border)', background: 'var(--bg2)' }}
         >
           {/* Toggle */}
