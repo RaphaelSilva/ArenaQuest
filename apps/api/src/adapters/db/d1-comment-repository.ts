@@ -11,6 +11,7 @@ type CommentRow = {
   topic_node_id: string;
   parent_comment_id: string | null;
   user_id: string;
+  user_name: string | null; // LEFT JOIN: null if the author row is missing
   body: string;
   created_at: string;
   deleted_at: string | null;
@@ -27,6 +28,7 @@ function rowToComment(row: CommentRow): CommentRecord {
     topicNodeId: row.topic_node_id,
     parentCommentId: row.parent_comment_id,
     userId: row.user_id,
+    userName: row.user_name ?? '',
     body: row.deleted_at ? null : row.body,
     createdAt: row.created_at,
     deletedAt: row.deleted_at,
@@ -39,6 +41,7 @@ function rowToCommentWithMeta(row: CommentWithMetaRow, _viewerUserId: string): C
     topicNodeId: row.topic_node_id,
     parentCommentId: row.parent_comment_id,
     userId: row.user_id,
+    userName: row.user_name ?? '',
     body: row.deleted_at ? null : row.body,
     createdAt: row.created_at,
     deletedAt: row.deleted_at,
@@ -52,7 +55,12 @@ export class D1CommentRepository implements ICommentRepository {
 
   async findById(id: string): Promise<CommentRecord | null> {
     const row = await this.db
-      .prepare('SELECT * FROM topic_comments WHERE id = ?')
+      .prepare(
+        `SELECT tc.*, u.name AS user_name
+         FROM topic_comments tc
+         LEFT JOIN users u ON u.id = tc.user_id
+         WHERE tc.id = ?`,
+      )
       .bind(id)
       .first<CommentRow>();
     return row ? rowToComment(row) : null;
@@ -63,9 +71,11 @@ export class D1CommentRepository implements ICommentRepository {
       .prepare(
         `SELECT
            tc.*,
+           u.name AS user_name,
            COUNT(cl.comment_id) AS like_count,
            MAX(CASE WHEN cl.user_id = ? THEN 1 ELSE 0 END) AS liked_by_me
          FROM topic_comments tc
+         LEFT JOIN users u ON u.id = tc.user_id
          LEFT JOIN comment_likes cl ON cl.comment_id = tc.id
          WHERE tc.topic_node_id = ?
          GROUP BY tc.id
@@ -94,7 +104,12 @@ export class D1CommentRepository implements ICommentRepository {
       .run();
 
     const row = await this.db
-      .prepare('SELECT * FROM topic_comments WHERE id = ?')
+      .prepare(
+        `SELECT tc.*, u.name AS user_name
+         FROM topic_comments tc
+         LEFT JOIN users u ON u.id = tc.user_id
+         WHERE tc.id = ?`,
+      )
       .bind(id)
       .first<CommentRow>();
 
@@ -109,7 +124,12 @@ export class D1CommentRepository implements ICommentRepository {
       .run();
 
     const row = await this.db
-      .prepare('SELECT * FROM topic_comments WHERE id = ?')
+      .prepare(
+        `SELECT tc.*, u.name AS user_name
+         FROM topic_comments tc
+         LEFT JOIN users u ON u.id = tc.user_id
+         WHERE tc.id = ?`,
+      )
       .bind(commentId)
       .first<CommentRow>();
 

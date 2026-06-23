@@ -566,6 +566,7 @@ export const dictEn = {
       submit: 'Post',
       empty: 'Be the first to comment.',
       you: 'You',
+      anonymous: 'Anonymous',
       now: 'just now',
     },
     mobileSearch: {

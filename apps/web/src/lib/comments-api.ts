@@ -3,6 +3,7 @@ import type { HttpTransport } from './api-client';
 export type CommentItem = {
   id: string;
   userId: string;
+  userName: string;
   body: string | null;
   createdAt: string;
   likeCount: number;

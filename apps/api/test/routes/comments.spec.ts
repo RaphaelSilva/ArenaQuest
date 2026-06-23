@@ -133,6 +133,19 @@ describe('enrollment access', () => {
     const res = await req('GET', `/topics/${TOPIC_ID}/comments`, { token: tokenA });
     expect(res.status).toBe(200);
   });
+
+  it('GET /topics/:id/comments includes the author display name', async () => {
+    await req('POST', `/topics/${TOPIC_ID}/comments`, {
+      token: tokenA,
+      body: { body: 'Comment with author name' },
+    });
+
+    const res = await req('GET', `/topics/${TOPIC_ID}/comments`, { token: tokenA });
+    expect(res.status).toBe(200);
+    const { data } = await res.json<{ data: Array<{ userId: string; userName: string }> }>();
+    const fromA = data.find(c => c.userId === STUDENT_A);
+    expect(fromA?.userName).toBe('Student A');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -178,9 +191,11 @@ describe('POST /topics/:id/comments', () => {
       body: { body: 'First comment' },
     });
     expect(res.status).toBe(201);
-    const body = await res.json<{ id: string; body: string }>();
+    const body = await res.json<{ id: string; body: string; userName: string }>();
     expect(body.body).toBe('First comment');
     expect(body.id).toBeTruthy();
+    // Author display name is resolved from users.name, not the raw user id
+    expect(body.userName).toBe('Student A');
   });
 
   it('creates a reply to a top-level comment', async () => {

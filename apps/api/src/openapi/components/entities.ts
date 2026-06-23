@@ -140,6 +140,7 @@ export const CommentSchema = z.object({
   topicNodeId: z.string().openapi({ example: 'cmt-topic-1' }),
   parentCommentId: z.string().uuid().nullable().openapi({ example: null }),
   userId: z.string().openapi({ example: 'cmt-student-a' }),
+  userName: z.string().openapi({ example: 'Student A' }),
   body: z.string().nullable().openapi({ example: 'This topic was very helpful!' }),
   createdAt: z.string().datetime().openapi({ example: '2024-01-01T12:00:00Z' }),
   deletedAt: z.string().datetime().nullable().openapi({ example: null }),

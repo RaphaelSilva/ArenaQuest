@@ -564,6 +564,7 @@ export const dictPt = {
       submit: 'Publicar',
       empty: 'Seja o primeiro a comentar.',
       you: 'Você',
+      anonymous: 'Anônimo',
       now: 'agora',
     },
     mobileSearch: {

@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useDict } from '@web/context/dict-context';
-import { useApiClient } from '@web/context/auth-context';
+import { useApiClient, useAuthContext } from '@web/context/auth-context';
 import { SectionEmpty } from './SectionEmpty';
 import { SectionError } from './SectionError';
 
 type Comment = {
   id: string;
   userId: string;
+  userName: string;
   body: string | null;
   createdAt: string;
   parentCommentId: string | null;
@@ -17,6 +18,13 @@ type Comment = {
 type Props = {
   topicId: string;
 };
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 function formatCommentTime(iso: string, fallback: string): string {
   try {
@@ -33,6 +41,7 @@ function formatCommentTime(iso: string, fallback: string): string {
 export function Discussion({ topicId }: Props) {  
   const dict = useDict();
   const client = useApiClient();
+  const { user } = useAuthContext();
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState('');
@@ -77,6 +86,7 @@ export function Discussion({ topicId }: Props) {
     const optimistic: Comment = {
       id: optimisticId,
       userId: 'me',
+      userName: user?.name ?? '',
       body,
       createdAt: new Date().toISOString(),
       parentCommentId: null,
@@ -141,7 +151,7 @@ export function Discussion({ topicId }: Props) {
             }}
             aria-hidden
           >
-            ME
+            {user?.name ? getInitials(user.name) : 'ME'}
           </div>
           <div className="flex-1 min-w-0">
             <textarea
@@ -194,7 +204,10 @@ export function Discussion({ topicId }: Props) {
         ) : (
           comments.map((c) => {
             const isMe = c.userId === 'me';
-            const initials = isMe ? 'ME' : c.userId.slice(0, 2).toUpperCase();
+            const displayName = isMe
+              ? dict.catalog.comments.you
+              : c.userName || dict.catalog.comments.anonymous;
+            const initials = getInitials(isMe ? (user?.name ?? '') : c.userName);
 
             return (
               <div
@@ -225,7 +238,7 @@ export function Discussion({ topicId }: Props) {
                         color: isMe ? 'var(--aq-accent)' : 'var(--aq-text)',
                       }}
                     >
-                      {isMe ? 'You' : `User (${c.userId.slice(0, 5)})`}
+                      {displayName}
                     </span>
                     <span className="text-[11px]" style={{ color: 'var(--aq-text3)' }}>
                       {formatCommentTime(c.createdAt, 'now')}

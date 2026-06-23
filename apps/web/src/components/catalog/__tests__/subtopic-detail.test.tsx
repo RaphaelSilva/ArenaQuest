@@ -26,6 +26,7 @@ vi.mock('@web/context/auth-context', async () => {
         markVideoWatched: (...args: unknown[]) => mockMarkVideoWatched(...args),
       },
     }),
+    useAuthContext: () => ({ user: { id: 'me', name: 'Test User' } }),
   };
 });
 
@@ -102,6 +103,7 @@ describe('Comments', () => {
     {
       id: 'c1',
       userId: 'user123',
+      userName: 'Jane Doe',
       body: 'Great content!',
       createdAt: '2026-05-01T10:00:00Z',
       likeCount: 3,
@@ -122,12 +124,16 @@ describe('Comments', () => {
       />,
     );
     expect(screen.getByText('Great content!')).toBeInTheDocument();
+    // Author display name is shown, not a slice of the raw user id
+    expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+    expect(screen.queryByText('user123')).not.toBeInTheDocument();
   });
 
   it('optimistically prepends a comment on submit', async () => {
     mockCreateForTopic.mockResolvedValueOnce({
       id: 'c2',
       userId: 'me',
+      userName: 'Test User',
       body: 'New comment',
       createdAt: new Date().toISOString(),
       likeCount: 0,

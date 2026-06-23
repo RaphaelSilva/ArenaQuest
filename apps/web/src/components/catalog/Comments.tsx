@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { useDict } from '@web/context/dict-context';
-import { useApiClient } from '@web/context/auth-context';
+import { useApiClient, useAuthContext } from '@web/context/auth-context';
 
 type CommentWithMeta = {
   id: string;
   userId: string;
+  userName: string;
   body: string | null;
   createdAt: string;
   likeCount: number;
@@ -18,6 +19,13 @@ type Props = {
   topicId: string;
   initialComments: CommentWithMeta[];
 };
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 function formatTime(iso: string, now: string): string {
   try {
@@ -33,6 +41,7 @@ function formatTime(iso: string, now: string): string {
 export function Comments({ topicId, initialComments }: Props) {
   const dict = useDict();
   const client = useApiClient();
+  const { user } = useAuthContext();
   const [comments, setComments] = useState<CommentWithMeta[]>(
     initialComments.filter((c) => c.parentCommentId === null && c.body !== null),
   );
@@ -48,6 +57,7 @@ export function Comments({ topicId, initialComments }: Props) {
     const optimistic: CommentWithMeta = {
       id: optimisticId,
       userId: 'me',
+      userName: user?.name ?? '',
       body,
       createdAt: new Date().toISOString(),
       likeCount: 0,
@@ -161,12 +171,14 @@ export function Comments({ topicId, initialComments }: Props) {
               style={{ background: 'var(--aq-bg3)', color: 'var(--aq-accent)', border: '1px solid var(--aq-border2)' }}
               aria-hidden
             >
-              {c.userId.slice(0, 2)}
+              {initials(c.userId === 'me' ? (user?.name ?? '') : c.userName)}
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-[13px] font-semibold" style={{ color: 'var(--aq-text)' }}>
-                  {c.userId === 'me' ? dict.catalog.comments.you : c.userId.slice(0, 8)}
+                  {c.userId === 'me'
+                    ? dict.catalog.comments.you
+                    : c.userName || dict.catalog.comments.anonymous}
                 </span>
                 <span className="text-[11px]" style={{ color: 'var(--aq-text3)' }}>
                   {formatTime(c.createdAt, dict.catalog.comments.now)}

@@ -4815,6 +4815,8 @@ export interface components {
             topicNodeId: string;
             /** @example cmt-student-a */
             userId: string;
+            /** @example Student A */
+            userName: string;
         };
         CommentWithMeta: components["schemas"]["Comment"] & {
             /** @example 3 */
