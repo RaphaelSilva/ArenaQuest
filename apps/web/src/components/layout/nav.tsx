@@ -154,12 +154,7 @@ export function Nav() {
             className={(pathname === '/catalog' || pathname.startsWith('/catalog/')) ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
           >
             {dict.layout.nav.catalog}
-          </Link>
-          {canAccessAdmin && (
-            <Link href="/admin" className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
-              {dict.layout.nav.admin}
-            </Link>
-          )}
+          </Link>          
           <Link
             href="/tasks"
             className={pathname === '/tasks' ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
@@ -172,6 +167,11 @@ export function Nav() {
           >
             {dict.layout.nav.settings}
           </Link>
+          {canAccessAdmin && (
+            <Link href="/admin" className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50">
+              {dict.layout.nav.admin}
+            </Link>
+          )}
         </div>
 
         {/* Desktop sign out */}
