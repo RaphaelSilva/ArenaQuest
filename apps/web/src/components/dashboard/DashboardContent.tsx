@@ -47,7 +47,7 @@ export function DashboardContent() {
     : dict.dashboard.greeting.goodEvening;
 
   return (
-    <div className="flex flex-col gap-6" style={{ padding: '28px 32px 40px' }}>
+    <div className="flex flex-1 flex-col gap-6 overflow-y-auto" style={{ padding: '28px 32px 40px' }}>
       {/* Greeting row */}
       <div className="flex items-start justify-between gap-4">
         <div>
