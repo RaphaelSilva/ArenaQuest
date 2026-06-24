@@ -179,6 +179,23 @@ export class D1GamificationRepository implements IGamificationRepository {
     return results.map(rowToLevelDefinition);
   }
 
+  async replaceAllLevelDefinitions(rows: LevelDefinitionRecord[]): Promise<LevelDefinitionRecord[]> {
+    // Atomic whole-table replace: a single batch runs the delete + all inserts
+    // in one D1 transaction, so the table never lands in an invalid state.
+    const statements: D1PreparedStatement[] = [
+      this.db.prepare('DELETE FROM level_definitions'),
+      ...rows.map((row) =>
+        this.db
+          .prepare('INSERT INTO level_definitions (level, rank_title, min_xp, max_xp) VALUES (?, ?, ?, ?)')
+          .bind(row.level, row.rankTitle, row.minXp, row.maxXp),
+      ),
+    ];
+
+    await this.db.batch(statements);
+
+    return this.listLevelDefinitions();
+  }
+
   // ---------------------------------------------------------------------------
   // Badge evaluation helpers
   // ---------------------------------------------------------------------------

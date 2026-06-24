@@ -8,6 +8,7 @@ import { buildAdminTasksRouter } from './tasks';
 import { buildAdminBadgesRouter } from './badges';
 import { buildAdminMissionsRouter } from './missions';
 import { buildAdminQuestsRouter } from './quests';
+import { buildAdminLevelsRouter } from './levels';
 import { buildAdminEnrollmentsRouter } from './enrollments';
 import { buildAdminGroupsRouter } from './groups';
 import type { AppContainer } from '@api/container';
@@ -24,6 +25,7 @@ export function buildAdminRouter(container: AppContainer) {
   app.route('/badges', buildAdminBadgesRouter(container));
   app.route('/missions', buildAdminMissionsRouter(container));
   app.route('/quests', buildAdminQuestsRouter(container));
+  app.route('/levels', buildAdminLevelsRouter(container));
   app.route('/groups', buildAdminGroupsRouter(container));
   // Mounted at '/' to match legacy paths '/admin/users/:userId/enrollments' and '/admin/groups/:groupId/enrollments' exactly
   app.route('/', buildAdminEnrollmentsRouter(container));

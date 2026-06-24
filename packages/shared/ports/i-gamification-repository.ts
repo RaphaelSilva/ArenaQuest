@@ -78,6 +78,12 @@ export interface IGamificationRepository {
   getUserStreak(userId: string): Promise<UserStreakRecord | null>;
   upsertUserStreak(userId: string, params: UpsertUserStreakParams): Promise<UserStreakRecord>;
   listLevelDefinitions(): Promise<LevelDefinitionRecord[]>;
+  /**
+   * Atomically replace the entire level curve (delete-all + insert-all in one
+   * transaction). The caller validates the curve shape beforehand; this method
+   * only persists. Returns the persisted rows ordered by level.
+   */
+  replaceAllLevelDefinitions(rows: LevelDefinitionRecord[]): Promise<LevelDefinitionRecord[]>;
   countXpEventsBySource(userId: string, sourceKind: string, since?: string): Promise<number>;
   countAllCompletedTopics(userId: string): Promise<number>;
   getLeaderboard(params: GetLeaderboardParams): Promise<{ rows: LeaderboardRow[]; total: number }>;
