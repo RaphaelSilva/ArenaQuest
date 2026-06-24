@@ -163,4 +163,12 @@ export class D1BadgeRepository implements IBadgeRepository {
       .all<UserBadgeRow>();
     return results.map(rowToUserBadge);
   }
+
+  async revokeBadge(userId: string, badgeId: string): Promise<boolean> {
+    const result = await this.db
+      .prepare('DELETE FROM user_badges WHERE user_id = ? AND badge_id = ?')
+      .bind(userId, badgeId)
+      .run();
+    return result.meta.changes > 0;
+  }
 }

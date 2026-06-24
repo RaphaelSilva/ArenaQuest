@@ -38,4 +38,9 @@ export interface IBadgeRepository {
   update(id: string, params: UpdateBadgeParams): Promise<BadgeRecord | null>;
   awardBadge(userId: string, badgeId: string): Promise<UserBadgeRecord>;
   listUserBadges(userId: string): Promise<UserBadgeRecord[]>;
+  /**
+   * Remove a user's badge. Returns `true` when a row was deleted, `false` when
+   * the user did not hold the badge (so callers can map to 404).
+   */
+  revokeBadge(userId: string, badgeId: string): Promise<boolean>;
 }

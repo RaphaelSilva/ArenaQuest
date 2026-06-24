@@ -75,6 +75,14 @@ export interface IGamificationRepository {
   /** Idempotent — same (userId, sourceKind, idempotencyKey) returns the existing event. */
   appendXpEvent(params: AppendXpEventParams): Promise<XpEventRecord>;
   getUserXp(userId: string): Promise<UserXpRecord | null>;
+  /** Most recent XP events for a user, ordered by `earned_at` descending. */
+  listRecentXpEvents(userId: string, limit: number): Promise<XpEventRecord[]>;
+  /**
+   * Repair the `user_xp` read model from the append-only ledger: set
+   * `total_xp = MAX(0, SUM(xp_events.points))` (set, not increment). Appends no
+   * event. Returns the totals before and after the rewrite.
+   */
+  recomputeUserXp(userId: string): Promise<{ previousTotal: number; newTotal: number }>;
   getUserStreak(userId: string): Promise<UserStreakRecord | null>;
   upsertUserStreak(userId: string, params: UpsertUserStreakParams): Promise<UserStreakRecord>;
   listLevelDefinitions(): Promise<LevelDefinitionRecord[]>;

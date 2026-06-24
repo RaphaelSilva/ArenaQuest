@@ -137,6 +137,42 @@ export class D1GamificationRepository implements IGamificationRepository {
     return row ? rowToUserXp(row) : null;
   }
 
+  async listRecentXpEvents(userId: string, limit: number): Promise<XpEventRecord[]> {
+    const { results } = await this.db
+      .prepare('SELECT * FROM xp_events WHERE user_id = ? ORDER BY earned_at DESC LIMIT ?')
+      .bind(userId, limit)
+      .all<XpEventRow>();
+    return results.map(rowToXpEvent);
+  }
+
+  async recomputeUserXp(userId: string): Promise<{ previousTotal: number; newTotal: number }> {
+    const previousRow = await this.db
+      .prepare('SELECT total_xp FROM user_xp WHERE user_id = ?')
+      .bind(userId)
+      .first<{ total_xp: number }>();
+    const previousTotal = previousRow?.total_xp ?? 0;
+
+    const sumRow = await this.db
+      .prepare('SELECT COALESCE(SUM(points), 0) AS total FROM xp_events WHERE user_id = ?')
+      .bind(userId)
+      .first<{ total: number }>();
+    const newTotal = Math.max(0, sumRow?.total ?? 0);
+
+    // Set (not increment) the read model from the ledger; appends no event.
+    await this.db
+      .prepare(
+        `INSERT INTO user_xp (user_id, total_xp)
+         VALUES (?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET
+           total_xp   = excluded.total_xp,
+           updated_at = datetime('now')`,
+      )
+      .bind(userId, newTotal)
+      .run();
+
+    return { previousTotal, newTotal };
+  }
+
   // ---------------------------------------------------------------------------
   // Streak
   // ---------------------------------------------------------------------------
