@@ -15,7 +15,7 @@ This directory contains formal proposals and architectural decisions for ArenaQu
 | [0007](./0007-deployment-preflight-and-config-validation.md) | Deployment preflight & configuration validation | Draft | 2026-06-19 | raphaelsilva |
 | [0008](./0008-user-dashboard-with-topic-recommendations-and-badge-achievem.md) | User Dashboard with Topic Recommendations and Badge Achievements | Draft | 2026-06-20 | raphaelsilva |
 | [0009](./0009-gamification-catalog-administration.md) | Gamification Catalog Administration | Implemented | 2026-06-23 | raphaelsilva |
-| [0010](./0010-player-progression-administration.md) | Player Progression Administration | Draft | 2026-06-23 | raphaelsilva |
+| [0010](./0010-player-progression-administration.md) | Player Progression Administration | Implemented | 2026-06-23 | raphaelsilva |
 
 ## RFC Process
 

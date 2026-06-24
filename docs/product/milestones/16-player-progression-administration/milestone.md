@@ -1,6 +1,6 @@
 # Milestone 16 — Player Progression Administration
 
-**Status:** 📝 Draft
+**Status:** ✅ Implemented
 **Scope:** `apps/api` admin endpoints for per-user gamification records (`user_xp` via the `xp_events` ledger, `user_badges`), `apps/web` `/admin/players` progression screen and its typed client extension, plus EN/PT dictionaries. Derived from [RFC 0010](../../RFCs/0010-player-progression-administration.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may

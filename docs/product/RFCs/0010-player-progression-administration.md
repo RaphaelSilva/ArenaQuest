@@ -1,7 +1,7 @@
 # RFC 0010: Player Progression Administration
 
 **Date:** 2026-06-23
-**Status:** Draft
+**Status:** Implemented
 **Author:** raphaelsilva
 **Affected:**
 - `apps/web/src/app/(protected)/admin/players/page.tsx` (new — player progression UI)
