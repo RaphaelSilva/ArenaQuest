@@ -164,7 +164,7 @@ frontend task depends on its backend contract.
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
 | 01 | [Player progression admin API](./01-player-progression-admin-api.task.md) | 1 | Backend | ✅ Done |
-| 02 | [Player progression admin screen](./02-player-progression-admin-screen.task.md) | 2 | Frontend | ☐ Open |
+| 02 | [Player progression admin screen](./02-player-progression-admin-screen.task.md) | 2 | Frontend | ✅ Done |
 
 Dependency graph:
 

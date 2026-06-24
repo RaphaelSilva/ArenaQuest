@@ -1,6 +1,6 @@
 # Task 02 — Frontend: Player progression admin screen (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [16 — Player Progression Administration](./milestone.md)
 **RFC:** [RFC 0010](../../RFCs/0010-player-progression-administration.md)
 **Team:** Frontend Web
@@ -84,21 +84,21 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `/admin/players` performs user search → progression detail and renders XP
+- [x] `/admin/players` performs user search → progression detail and renders XP
       total, resolved level/rank, earned badges, and recent XP events.
-- [ ] Award, revoke, XP adjustment, and recompute each work end-to-end against
+- [x] Award, revoke, XP adjustment, and recompute each work end-to-end against
       the task 01 endpoints, each behind a confirmation; revoke and negative
       adjustments surface the reason in their confirmation; recompute shows the
       before/after total.
-- [ ] The screen and the "Player Progression" hub card are visible/reachable for
+- [x] The screen and the "Player Progression" hub card are visible/reachable for
       `ADMIN` and hidden/blocked for `CONTENT_CREATOR`.
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts`
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts`
       and `dict-pt.ts`; `check-i18n-coverage.js` passes.
-- [ ] The surface is responsive and keyboard-usable where interactive; root
+- [x] The surface is responsive and keyboard-usable where interactive; root
       `<main>` is `flex-1 overflow-y-auto`.
-- [ ] Changed files lint clean; `make test-web` green for the affected component
+- [x] Changed files lint clean; `make test-web` green for the affected component
       tests.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
