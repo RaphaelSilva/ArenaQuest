@@ -158,7 +158,7 @@ consumes).
 |---|-----------|-------|------|--------|
 | 01 | [Shared gamification catalog types](./01-shared-gamification-catalog-types.task.md) | 0 | Backend | ✅ Done |
 | 02 | [Admin quest-definition CRUD endpoints](./02-admin-quest-definition-crud-endpoints.task.md) | 1 | Backend | ✅ Done |
-| 03 | [Admin level-definition editor endpoints](./03-admin-level-definition-editor-endpoints.task.md) | 1 | Backend | ☐ Open |
+| 03 | [Admin level-definition editor endpoints](./03-admin-level-definition-editor-endpoints.task.md) | 1 | Backend | ✅ Done |
 | 04 | [Gamification web client and badges and missions screens](./04-gamification-web-client-and-badges-and-missions-sc.task.md) | 2 | Frontend | ☐ Open |
 | 05 | [Quests and levels screens and gamification hub cards](./05-quests-and-levels-screens-and-gamification-hub-car.task.md) | 3 | Frontend | ☐ Open |
 

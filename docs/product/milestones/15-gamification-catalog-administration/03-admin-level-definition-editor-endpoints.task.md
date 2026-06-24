@@ -1,6 +1,6 @@
 # Task 03 — Backend: Admin level-definition editor endpoints (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [15 — Gamification Catalog Administration](./milestone.md)
 **RFC:** [RFC 0009](../../RFCs/0009-gamification-catalog-administration.md)
 **Team:** Backend API
@@ -73,18 +73,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `GET /admin/levels` returns rows ordered by `level`; both operations appear
+- [x] `GET /admin/levels` returns rows ordered by `level`; both operations appear
       in the OpenAPI doc.
-- [ ] `PUT /admin/levels` persists a valid curve and returns `400` for (a) a
+- [x] `PUT /admin/levels` persists a valid curve and returns `400` for (a) a
       non-monotonic `min_xp`, (b) a gapped curve, and (c) a curve without exactly
       one `max_xp = NULL` row — each asserted by a Vitest case.
-- [ ] A rejected `PUT` commits nothing (the prior curve is intact), asserted by a
+- [x] A rejected `PUT` commits nothing (the prior curve is intact), asserted by a
       follow-up `GET`.
-- [ ] A `CONTENT_CREATOR` is rejected from `GET` and `PUT /admin/levels` with
+- [x] A `CONTENT_CREATOR` is rejected from `GET` and `PUT /admin/levels` with
       `403`, asserted by a guard test.
-- [ ] No provider-specific (D1) import leaks into the controller or router.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] No provider-specific (D1) import leaks into the controller or router.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
