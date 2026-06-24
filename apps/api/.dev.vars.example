@@ -10,6 +10,15 @@ ALLOWED_ORIGINS=http://localhost:3000
 # Wildcard form (for testing pattern matching locally — dev-only, never for production):
 # ALLOWED_ORIGINS=*
 
+# Refresh-token cookie SameSite policy (Strict | Lax | None). Defaults to "None"
+# when unset, which the API issues as "SameSite=None; Secure". Over plain
+# http://localhost browsers often refuse to store that cookie, breaking the
+# silent token refresh — you get a sticky 401 once the 15-min access token
+# expires (e.g. while filling a long admin form). web (:3000) -> api (:8787) is
+# same-site (SameSite ignores port), so "Lax" is stored and sent reliably in
+# local dev. Staging/prod set this explicitly per their cross-site needs.
+COOKIE_SAMESITE=Lax
+
 # R2 credentials for local dev — replace with real values from Cloudflare dashboard
 R2_ACCESS_KEY_ID=local-dev-r2-access-key-id
 R2_SECRET_ACCESS_KEY=local-dev-r2-secret-access-key
