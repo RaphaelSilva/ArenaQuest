@@ -13,6 +13,7 @@ import * as adminUsersApiModule from './admin-users-api';
 import * as adminMediaApiModule from './admin-media-api';
 import * as adminEnrollmentApiModule from './admin-enrollment-api';
 import * as adminGroupsApiModule from './admin-groups-api';
+import * as adminGamificationApiModule from './admin-gamification-api';
 import * as progressApiModule from './progress-api';
 import * as dashboardApiModule from './dashboard-api';
 import * as commentsApiModule from './comments-api';
@@ -97,6 +98,10 @@ export class ApiClient {
 
   get adminGroups() {
     return adminGroupsApiModule.createAdminGroupsApi(this.http);
+  }
+
+  get adminGamification() {
+    return adminGamificationApiModule.createAdminGamificationApi(this.http);
   }
 
   get progress() {
