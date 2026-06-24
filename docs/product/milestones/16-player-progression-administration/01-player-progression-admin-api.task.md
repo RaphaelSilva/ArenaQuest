@@ -1,6 +1,6 @@
 # Task 01 — Backend: Player progression admin API (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [16 — Player Progression Administration](./milestone.md)
 **RFC:** [RFC 0010](../../RFCs/0010-player-progression-administration.md)
 **Team:** Backend API
@@ -96,25 +96,25 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `GET /admin/players/{userId}/progression` returns the documented
+- [x] `GET /admin/players/{userId}/progression` returns the documented
       `PlayerProgression` shape with correct total XP, resolved level/rank,
       earned badges, and recent XP events for a seeded user.
-- [ ] `DELETE /admin/players/{userId}/badges/{badgeId}` removes the
+- [x] `DELETE /admin/players/{userId}/badges/{badgeId}` removes the
       `user_badges` row (subsequent read omits it) and returns `404` when the
       user never had that badge.
-- [ ] A positive and a negative XP adjustment each insert exactly one
+- [x] A positive and a negative XP adjustment each insert exactly one
       `xp_events` row with `source_kind = 'admin_adjustment'` and the admin id as
       `source_id`; `user_xp.total_xp` reflects the new total and never drops
       below 0.
-- [ ] A missing/empty `reason` is rejected `400 BadRequest` and writes no ledger
+- [x] A missing/empty `reason` is rejected `400 BadRequest` and writes no ledger
       row.
-- [ ] After drifting `user_xp.total_xp`, `xp-recompute` restores it to
+- [x] After drifting `user_xp.total_xp`, `xp-recompute` restores it to
       `MAX(0, SUM(xp_events.points))`, returns the before/after, and appends no
       new `xp_events` row.
-- [ ] All endpoints reject non-`ADMIN` callers (including `CONTENT_CREATOR`).
-- [ ] No provider-specific (D1) import leaks into a port or controller.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] All endpoints reject non-`ADMIN` callers (including `CONTENT_CREATOR`).
+- [x] No provider-specific (D1) import leaks into a port or controller.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
