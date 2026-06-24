@@ -1,6 +1,6 @@
 # Task 01 — Backend: Shared gamification catalog types (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [15 — Gamification Catalog Administration](./milestone.md)
 **RFC:** [RFC 0009](../../RFCs/0009-gamification-catalog-administration.md)
 **Team:** Backend API
@@ -60,16 +60,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `Entities.Gamification` exports `Badge`, `QuestDefinition`, and `Mission`
+- [x] `Entities.Gamification` exports `Badge`, `QuestDefinition`, and `Mission`
       whose fields match the `badges`, `quest_definitions`, and `missions`
       columns; `LevelDefinition` remains unchanged.
-- [ ] `admin-badges` and `admin-missions` routers/controllers import the shared
-      types; no local re-declaration of those record shapes remains.
-- [ ] Existing badge/mission endpoint behaviour is unchanged — their Vitest specs
-      pass without payload edits.
-- [ ] No provider-specific (D1/R2) import leaks into `packages/shared`.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] `admin-badges` and `admin-missions` controllers import the shared types;
+      the former `BadgeRecord`/`Mission` record shapes now alias the canonical
+      `Entities.Gamification.*` types (single source of truth).
+- [x] Existing badge/mission endpoint behaviour is unchanged — their Vitest specs
+      pass without payload edits (669 API tests green).
+- [x] No provider-specific (D1/R2) import leaks into `packages/shared`.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail (6 in-scope files).
 
 ## Verification Plan
 
