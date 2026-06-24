@@ -30,6 +30,7 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
     { label: dict.layout.adminSidebar.quests, href: '/admin/quests', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.missions, href: '/admin/missions', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.levels, href: '/admin/levels', roles: [ROLES.ADMIN] },
+    { label: dict.layout.adminSidebar.players, href: '/admin/players', roles: [ROLES.ADMIN] },
     { label: dict.layout.adminSidebar.groups, href: '/admin/groups', roles: [ROLES.ADMIN] },
     { label: dict.layout.adminSidebar.access, href: '/admin/access', roles: [ROLES.ADMIN] },
   ];

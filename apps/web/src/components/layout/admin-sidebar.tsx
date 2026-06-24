@@ -44,6 +44,7 @@ export function AdminSidebar() {
     { label: dict.layout.adminSidebar.quests, href: '/admin/quests', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.missions, href: '/admin/missions', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.levels, href: '/admin/levels', requiredRoles: [ROLES.ADMIN] },
+    { label: dict.layout.adminSidebar.players, href: '/admin/players', requiredRoles: [ROLES.ADMIN] },
     { label: dict.layout.adminSidebar.groups, href: '/admin/groups', requiredRoles: [ROLES.ADMIN] },
     { label: dict.layout.adminSidebar.access, href: '/admin/access', requiredRoles: [ROLES.ADMIN] },
   ];

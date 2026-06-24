@@ -40,6 +40,22 @@ export default function AdminDashboard() {
           </Link>
         )}
 
+        {isAdmin && (
+          <Link href="/admin/players">
+            <div className="cursor-pointer rounded-lg border border-zinc-200 bg-white p-6 hover:shadow-md transition-shadow dark:border-zinc-800 dark:bg-zinc-900 hover:dark:border-zinc-700">
+              <h2 className="mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                {d.playersTitle}
+              </h2>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                {d.playersDesc}
+              </p>
+              <Button variant="secondary" size="sm">
+                {d.playersButton}
+              </Button>
+            </div>
+          </Link>
+        )}
+
         {(isAdmin || isContentCreator) && (
           <Link href="/admin/topics">
             <div className="cursor-pointer rounded-lg border border-zinc-200 bg-white p-6 hover:shadow-md transition-shadow dark:border-zinc-800 dark:bg-zinc-900 hover:dark:border-zinc-700">

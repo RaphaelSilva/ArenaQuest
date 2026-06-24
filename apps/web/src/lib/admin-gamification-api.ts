@@ -122,6 +122,41 @@ export type LevelDefinition = {
   maxXp: number | null;
 };
 
+export type ProgressionBadge = {
+  badgeId: string;
+  slug: string;
+  name: string;
+  earnedAt: string;
+};
+
+export type RecentXpEvent = {
+  id: string;
+  sourceKind: string;
+  points: number;
+  earnedAt: string;
+};
+
+export type PlayerProgression = {
+  userId: string;
+  xp: {
+    totalXp: number;
+    level: number;
+    rankTitle: string;
+  };
+  badges: ProgressionBadge[];
+  recentXpEvents: RecentXpEvent[];
+};
+
+export type XpAdjustmentInput = {
+  points: number;
+  reason: string;
+};
+
+export type XpAdjustmentResult = {
+  previousTotal: number;
+  newTotal: number;
+};
+
 export class AdminGamificationApiError extends Error {
   constructor(
     public readonly code: string,
@@ -235,6 +270,39 @@ export function createAdminGamificationApi(http: HttpTransport) {
         const res = await http('PUT', '/admin/levels', { body: JSON.stringify(rows) });
         if (!res.ok) await rejectWith(res, 'LEVELS_REPLACE_FAILED');
         return (await res.json()) as LevelDefinition[];
+      },
+    },
+
+    progression: {
+      // All progression endpoints return bare bodies (no { data } envelope).
+      async get(userId: string): Promise<PlayerProgression> {
+        const res = await http('GET', `/admin/players/${userId}/progression`);
+        if (!res.ok) await rejectWith(res, 'PROGRESSION_GET_FAILED');
+        return (await res.json()) as PlayerProgression;
+      },
+
+      async awardBadge(userId: string, badgeId: string): Promise<void> {
+        const res = await http('POST', `/admin/players/${userId}/badges/${badgeId}`);
+        if (!res.ok) await rejectWith(res, 'BADGE_AWARD_FAILED');
+      },
+
+      async revokeBadge(userId: string, badgeId: string): Promise<void> {
+        const res = await http('DELETE', `/admin/players/${userId}/badges/${badgeId}`);
+        if (!res.ok) await rejectWith(res, 'BADGE_REVOKE_FAILED');
+      },
+
+      async adjustXp(userId: string, input: XpAdjustmentInput): Promise<XpAdjustmentResult> {
+        const res = await http('POST', `/admin/players/${userId}/xp-adjustments`, {
+          body: JSON.stringify(input),
+        });
+        if (!res.ok) await rejectWith(res, 'XP_ADJUST_FAILED');
+        return (await res.json()) as XpAdjustmentResult;
+      },
+
+      async recomputeXp(userId: string): Promise<XpAdjustmentResult> {
+        const res = await http('POST', `/admin/players/${userId}/xp-recompute`);
+        if (!res.ok) await rejectWith(res, 'XP_RECOMPUTE_FAILED');
+        return (await res.json()) as XpAdjustmentResult;
       },
     },
   };
