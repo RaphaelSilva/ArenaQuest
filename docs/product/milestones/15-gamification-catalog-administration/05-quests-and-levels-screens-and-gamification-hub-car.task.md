@@ -1,6 +1,6 @@
 # Task 05 — Frontend: Quests and levels screens and gamification hub cards (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [15 — Gamification Catalog Administration](./milestone.md)
 **RFC:** [RFC 0009](../../RFCs/0009-gamification-catalog-administration.md)
 **Team:** Frontend Web
@@ -76,22 +76,22 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `/admin/quests` renders for `ADMIN`/`CONTENT_CREATOR`, lists quests grouped
+- [x] `/admin/quests` renders for `ADMIN`/`CONTENT_CREATOR`, lists quests grouped
       by `kind`, and completes a create/edit/delete round-trip; `xpReward` is
       `ADMIN`-only and `predicateParams` is previewed parsed before save.
-- [ ] `/admin/levels` renders `ADMIN`-only, shows the full curve as an editable
+- [x] `/admin/levels` renders `ADMIN`-only, shows the full curve as an editable
       grid, blocks save on a non-monotonic/gapped/no-open-row curve client-side,
       and persists a valid curve via `PUT`.
-- [ ] The `/admin` hub renders the Gamification card group only for
+- [x] The `/admin` hub renders the Gamification card group only for
       `ADMIN || CONTENT_CREATOR`, linking to all four pages.
-- [ ] Both screens' root `<main>` scrolls (`flex-1 overflow-y-auto`); empty and
+- [x] Both screens' root `<main>` scrolls (`flex-1 overflow-y-auto`); empty and
       error states render.
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts`
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts`
       and `dict-pt.ts`; `check-i18n-coverage.js` passes.
-- [ ] The surfaces are responsive and keyboard-usable where interactive.
-- [ ] Changed files lint clean; `make test-web` green for the affected component
+- [x] The surfaces are responsive and keyboard-usable where interactive.
+- [x] Changed files lint clean; `make test-web` green for the affected component
       tests.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

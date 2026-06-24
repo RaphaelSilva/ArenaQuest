@@ -1,6 +1,6 @@
 # Milestone 15 — Gamification Catalog Administration
 
-**Status:** 📝 Draft
+**Status:** ✅ Implemented
 **Scope:** `apps/api` admin endpoints for `quest_definitions` + `level_definitions`, `apps/web` admin catalog screens (badges/quests/missions/levels) and their typed client, plus `packages/shared` gamification types and EN/PT dictionaries. Derived from [RFC 0009](../../RFCs/0009-gamification-catalog-administration.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may
@@ -160,7 +160,7 @@ consumes).
 | 02 | [Admin quest-definition CRUD endpoints](./02-admin-quest-definition-crud-endpoints.task.md) | 1 | Backend | ✅ Done |
 | 03 | [Admin level-definition editor endpoints](./03-admin-level-definition-editor-endpoints.task.md) | 1 | Backend | ✅ Done |
 | 04 | [Gamification web client and badges and missions screens](./04-gamification-web-client-and-badges-and-missions-sc.task.md) | 2 | Frontend | ✅ Done |
-| 05 | [Quests and levels screens and gamification hub cards](./05-quests-and-levels-screens-and-gamification-hub-car.task.md) | 3 | Frontend | ☐ Open |
+| 05 | [Quests and levels screens and gamification hub cards](./05-quests-and-levels-screens-and-gamification-hub-car.task.md) | 3 | Frontend | ✅ Done |
 
 Dependency graph:
 
