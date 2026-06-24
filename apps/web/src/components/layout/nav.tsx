@@ -26,6 +26,10 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
     { label: dict.layout.adminSidebar.users, href: '/admin/users', roles: [ROLES.ADMIN] },
     { label: dict.layout.adminSidebar.topics, href: '/admin/topics', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.tasks, href: '/admin/tasks', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
+    { label: dict.layout.adminSidebar.badges, href: '/admin/badges', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
+    { label: dict.layout.adminSidebar.quests, href: '/admin/quests', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
+    { label: dict.layout.adminSidebar.missions, href: '/admin/missions', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
+    { label: dict.layout.adminSidebar.levels, href: '/admin/levels', roles: [ROLES.ADMIN] },
     { label: dict.layout.adminSidebar.groups, href: '/admin/groups', roles: [ROLES.ADMIN] },
     { label: dict.layout.adminSidebar.access, href: '/admin/access', roles: [ROLES.ADMIN] },
   ];
@@ -81,7 +85,7 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
               </p>
               <ul className="space-y-1">
                 {adminLinks.map((link) => {
-                  const canSee = link.roles.includes(ROLES.ADMIN) ? isAdmin : canAccessAdmin;
+                  const canSee = link.roles.includes(ROLES.CONTENT_CREATOR) ? canAccessAdmin : isAdmin;
                   if (!canSee) return null;
                   const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
                   return (
