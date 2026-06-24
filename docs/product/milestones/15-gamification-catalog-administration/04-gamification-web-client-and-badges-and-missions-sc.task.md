@@ -1,6 +1,6 @@
 # Task 04 — Frontend: Gamification web client and badges and missions screens (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [15 — Gamification Catalog Administration](./milestone.md)
 **RFC:** [RFC 0009](../../RFCs/0009-gamification-catalog-administration.md)
 **Team:** Frontend Web
@@ -76,20 +76,20 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `admin-gamification-api.ts` exposes the four namespaces returning
+- [x] `admin-gamification-api.ts` exposes the four namespaces returning
       `Entities.Gamification.*` types over the centralized api-client.
-- [ ] `/admin/badges` renders for `ADMIN`/`CONTENT_CREATOR`, lists existing
+- [x] `/admin/badges` renders for `ADMIN`/`CONTENT_CREATOR`, lists existing
       badges, and completes a create/edit round-trip; `xpReward` is editable only
       for `ADMIN`.
-- [ ] `/admin/missions` renders, lists missions with their window and `badgeId`,
+- [x] `/admin/missions` renders, lists missions with their window and `badgeId`,
       and completes a create/edit/delete round-trip.
-- [ ] Both screens' root `<main>` scrolls (`flex-1 overflow-y-auto`).
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts`
+- [x] Both screens' root `<main>` scrolls (`flex-1 overflow-y-auto`).
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts`
       and `dict-pt.ts`; `check-i18n-coverage.js` passes.
-- [ ] The surfaces are responsive and keyboard-usable where interactive.
-- [ ] Changed files lint clean; `make test-web` green for the affected component
+- [x] The surfaces are responsive and keyboard-usable where interactive.
+- [x] Changed files lint clean; `make test-web` green for the affected component
       tests.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
