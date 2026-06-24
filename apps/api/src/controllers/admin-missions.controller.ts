@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { IMissionRepository } from '@arenaquest/shared/ports';
-import type { Mission } from '@arenaquest/shared/domain/mission';
+import type { Entities } from '@arenaquest/shared/types/entities';
 import type { ControllerResult } from '@api/core/result';
 
 const createSchema = z.object({
@@ -22,12 +22,12 @@ const updateSchema = createSchema.partial().extend({
 export class AdminMissionsController {
   constructor(private readonly repo: IMissionRepository) {}
 
-  async list(): Promise<ControllerResult<Mission[]>> {
+  async list(): Promise<ControllerResult<Entities.Gamification.Mission[]>> {
     const data = await this.repo.listAll();
     return { ok: true, data };
   }
 
-  async create(body: unknown): Promise<ControllerResult<Mission>> {
+  async create(body: unknown): Promise<ControllerResult<Entities.Gamification.Mission>> {
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
       return { ok: false, status: 400, error: 'ValidationError', meta: parsed.error.flatten() };
@@ -50,7 +50,7 @@ export class AdminMissionsController {
     return { ok: true, data };
   }
 
-  async update(id: string, body: unknown): Promise<ControllerResult<Mission>> {
+  async update(id: string, body: unknown): Promise<ControllerResult<Entities.Gamification.Mission>> {
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
       return { ok: false, status: 400, error: 'ValidationError', meta: parsed.error.flatten() };

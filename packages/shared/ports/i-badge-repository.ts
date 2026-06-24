@@ -1,16 +1,6 @@
-export interface BadgeRecord {
-  id: string;
-  slug: string;
-  name: string;
-  iconEmoji: string;
-  description: string;
-  xpReward: number;
-  ruleKind: string;
-  ruleParams: string;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { Entities } from '../types/entities';
+
+export type BadgeRecord = Entities.Gamification.Badge;
 
 export interface UserBadgeRecord {
   id: string;

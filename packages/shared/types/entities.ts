@@ -234,5 +234,47 @@ export namespace Entities {
             minXp: number;
             maxXp: number | null;
         }
+
+        export interface Badge {
+            id: string;
+            slug: string;
+            name: string;
+            iconEmoji: string;
+            description: string;
+            xpReward: number;
+            ruleKind: string;
+            ruleParams: string;
+            active: boolean;
+            createdAt: string;
+            updatedAt: string;
+        }
+
+        export interface QuestDefinition {
+            id: string;
+            kind: 'daily' | 'weekly';
+            title: string;
+            description: string;
+            predicateKind: string;
+            predicateParams: string; // Raw JSON from DB
+            xpReward: number;
+            active: boolean;
+            createdAt: Date;
+            updatedAt: Date;
+        }
+
+        export interface Mission {
+            id: string;
+            title: string;
+            description: string;
+            startAt: string;
+            endAt: string;
+            predicateKind: string;
+            predicateParams: string;
+            xpReward: number;
+            badgeId: string | null;
+            active: boolean;
+            createdAt: Date;
+            updatedAt: Date;
+        }
     }
 }
