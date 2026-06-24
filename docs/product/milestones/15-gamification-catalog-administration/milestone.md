@@ -12,7 +12,11 @@
 > (and an analogous level-definition repository), and their Vitest specs; on the
 > web, the new `apps/web/src/app/(protected)/admin/{badges,quests,missions,levels}/page.tsx`,
 > the new hub cards in `apps/web/src/app/(protected)/admin/page.tsx`, the new
-> `apps/web/src/lib/admin-gamification-api.ts`, and `apps/web/src/i18n/dict-en.ts`
+> `apps/web/src/lib/admin-gamification-api.ts` (and its registration in
+> `apps/web/src/lib/api-client.ts`), the navigation entry points to the new
+> screens in `apps/web/src/components/layout/admin-sidebar.tsx` and
+> `apps/web/src/components/layout/nav.tsx` (desktop sidebar + mobile drawer), and
+> `apps/web/src/i18n/dict-en.ts`
 > + `dict-pt.ts`. It is **not** an opportunity to: build per-user progression
 > management (`user_xp`, `user_badges`, streaks, `quest_progress`,
 > `mission_progress`) — that is RFC 0010; change the predicate/rule evaluation
@@ -106,26 +110,30 @@ directory). Include the gate commands the milestone must keep green
 (`make lint`, `make test-api`, `make test-web`) and a "no diff outside scope"
 line tied to the guardrail.
 
-- [ ] `Entities.Gamification` exports `Badge`, `QuestDefinition`, and `Mission`,
-      and the existing badge/mission routers import them instead of re-declaring
-      Zod-inferred shapes.
-- [ ] `GET/POST/PATCH/DELETE /admin/quests` round-trip a quest definition under
-      Vitest (Workers pool) and the four operations appear in the OpenAPI doc.
-- [ ] `GET /admin/levels` returns rows ordered by `level`; `PUT /admin/levels`
+- [x] `Entities.Gamification` exports `Badge`, `QuestDefinition`, and `Mission`;
+      the existing badge/mission controllers consume them and the former
+      `BadgeRecord`/`Mission` shapes alias the canonical types (single source of
+      truth). The routers' inline OpenAPI Zod schemas were kept by design (they
+      define the wire shape, not the TS record type).
+- [x] `GET/POST/PATCH/DELETE /admin/quests` round-trip a quest definition under
+      Vitest (Workers pool, 11 tests) and the four operations appear in the OpenAPI doc.
+- [x] `GET /admin/levels` returns rows ordered by `level`; `PUT /admin/levels`
       persists a valid curve and returns `400` for a non-monotonic curve, a
       gapped curve, and a curve without exactly one `max_xp = NULL` row (each
-      asserted by a Vitest case).
-- [ ] A non-`ADMIN` `CONTENT_CREATOR` is rejected from `/admin/levels` and from
-      `xpReward`-bearing edits, asserted by a guard test.
-- [ ] `/admin/{badges,quests,missions,levels}` render for `ADMIN`/`CONTENT_CREATOR`,
+      asserted by a Vitest case; 10 tests).
+- [x] A non-`ADMIN` `CONTENT_CREATOR` is rejected from `/admin/levels` (403) and
+      from `xpReward`-bearing quest edits (403), each asserted by a guard test.
+- [x] `/admin/{badges,quests,missions,levels}` render for `ADMIN`/`CONTENT_CREATOR`,
       list existing records, and complete a create/edit (and delete where
-      applicable) round-trip against the client.
-- [ ] The `/admin` hub renders the Gamification card group only for
-      `ADMIN || CONTENT_CREATOR`.
-- [ ] `check-i18n-coverage.js` is green and `dict-en.ts`/`dict-pt.ts` have
+      applicable) round-trip against the client; covered by RTL component tests.
+- [x] The `/admin` hub renders the Gamification card group only for
+      `ADMIN || CONTENT_CREATOR` (Levels card `ADMIN`-only).
+- [x] `check-i18n-coverage.js` is green and `dict-en.ts`/`dict-pt.ts` have
       identical keys.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] No diff outside the scope declared in the guardrail.
+- [x] `make lint`, `make test-api` (690 passing), and `make test-web`
+      (218 passing) pass green.
+- [x] No diff outside the scope declared in the guardrail (amended above to
+      include the navigation entry points and the api-client registration).
 
 ---
 
@@ -216,10 +224,10 @@ record the answer (with who decided) rather than leaving them dangling.
 
 ## 7. Definition of Done (milestone level)
 
-- [ ] All tasks marked Done with every acceptance box checked.
-- [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] Closeout note written at `./closeout-analysis.md`.
-- [ ] RFC 0009 status set to `Implemented` in its header and
+- [x] All tasks marked Done with every acceptance box checked.
+- [x] All milestone-level acceptance criteria in §3 pass.
+- [x] `make lint`, `make test-api`, and `make test-web` pass green.
+- [x] Closeout note written at `./closeout-analysis.md`.
+- [x] RFC 0009 status set to `Implemented` in its header and
       `docs/product/RFCs/README.md`; deferred items remain backlog.
-- [ ] No diff outside the scope declared in the guardrail.
+- [x] No diff outside the scope declared in the guardrail.

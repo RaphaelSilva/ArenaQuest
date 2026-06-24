@@ -1,7 +1,7 @@
 # RFC 0009: Gamification Catalog Administration
 
 **Date:** 2026-06-23
-**Status:** Draft
+**Status:** Implemented
 **Author:** raphaelsilva
 **Affected:**
 - `apps/web/src/app/(protected)/admin/page.tsx` (new hub cards for the catalog screens)
