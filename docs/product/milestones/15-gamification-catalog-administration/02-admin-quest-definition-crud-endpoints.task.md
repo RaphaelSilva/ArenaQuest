@@ -1,6 +1,6 @@
 # Task 02 — Backend: Admin quest-definition CRUD endpoints (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [15 — Gamification Catalog Administration](./milestone.md)
 **RFC:** [RFC 0009](../../RFCs/0009-gamification-catalog-administration.md)
 **Team:** Backend API
@@ -70,16 +70,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `GET/POST/PATCH/DELETE /admin/quests` round-trip a quest definition under
+- [x] `GET/POST/PATCH/DELETE /admin/quests` round-trip a quest definition under
       Vitest (Workers pool) and the four operations appear in the OpenAPI doc.
-- [ ] `POST`/`PATCH` reject a missing/invalid `kind`, an unparseable
+- [x] `POST`/`PATCH` reject a missing/invalid `kind`, an unparseable
       `predicateParams`, or a negative `xpReward` with `400`.
-- [ ] `PATCH`/`DELETE` of an unknown id return `404`.
-- [ ] A `CONTENT_CREATOR` setting or changing `xpReward` is rejected, while a
+- [x] `PATCH`/`DELETE` of an unknown id return `404`.
+- [x] A `CONTENT_CREATOR` setting or changing `xpReward` is rejected, while a
       non-economy field edit by the same role succeeds — both covered by a test.
-- [ ] No provider-specific (D1) import leaks into the controller or router.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] No provider-specific (D1) import leaks into the controller or router.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
