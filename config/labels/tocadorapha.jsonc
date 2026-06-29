@@ -1,0 +1,41 @@
+/**
+ * tocadorapha — label profile (RFC 0007). Edit the two anchors per environment
+ * (apiHost, webOrigin) and the brand block; everything else is derived by
+ * scripts/label.mjs. Paste resource ids after running the printed
+ * `wrangler … create` commands (make label-scaffold LABEL=tocadorapha).
+ */
+{
+  "label": "tocadorapha",
+  "displayName": "<fill: display name>",
+  "brand": {
+    "NEXT_PUBLIC_BRAND_SIGLA": "<fill>",
+    "NEXT_PUBLIC_BRAND_NAME_PREFIX": "<fill>",
+    "NEXT_PUBLIC_BRAND_NAME_ACCENT": "<fill or empty>",
+    "NEXT_PUBLIC_BRAND_POWERED_BY": "",
+    "NEXT_PUBLIC_BRAND_ACCENT": ""
+  },
+  "environments": {
+    "staging": {
+      "apiHost":      "<fill: api host, e.g. api-tocadorapha-staging.<acct>.workers.dev>",
+      "webOrigin":    "<fill: web origin, e.g. tocadorapha-web-staging.pages.dev>",
+      "worker":       "api-tocadorapha-staging",
+      "pagesProject": "tocadorapha-web-staging",
+      "d1":   { "name": "tocadorapha-db-staging", "id": "<fill after create>" },
+      "kv":   { "binding": "RATE_LIMIT_KV", "id": "<fill after create>" },
+      "r2":   { "bucket": "tocadorapha-media-staging", "s3Endpoint": "https://<acct>.r2.cloudflarestorage.com" },
+      "cookieSameSite": "None",
+      "mail": { "driver": "resend", "from": "<fill: Display Name <noreply@example.com>>" }
+    },
+    "production": {
+      "apiHost":      "<fill: production api host>",
+      "webOrigin":    "<fill: production web origin>",
+      "worker":       "api-tocadorapha",
+      "pagesProject": "tocadorapha-web",
+      "d1":   { "name": "tocadorapha-db", "id": "<fill after create>" },
+      "kv":   { "binding": "RATE_LIMIT_KV", "id": "<fill after create>" },
+      "r2":   { "bucket": "tocadorapha-media", "s3Endpoint": "https://<acct>.r2.cloudflarestorage.com" },
+      "cookieSameSite": "Strict",
+      "mail": { "driver": "resend", "from": "<fill: Display Name <noreply@example.com>>" }
+    }
+  }
+}
