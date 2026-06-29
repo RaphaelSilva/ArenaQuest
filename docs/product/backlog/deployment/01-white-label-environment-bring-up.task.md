@@ -1,7 +1,7 @@
 # Task 01: White-label environment bring-up — label profiles, scaffolding & preflight checklist (RFC 0007)
 
 ## Metadata
-- **Status:** ⏳ Planned
+- **Status:** ✅ Done
 - **Complexity:** High (~2–2.5 dev days, 3 phases)
 - **Team:** Tooling / DevOps
 - **Milestone:** — (standalone backlog item; RFC 0007 does not warrant a full milestone)
@@ -74,26 +74,26 @@ It is **tooling only** — Node scripts, two config files, `Makefile` targets, a
 ## Acceptance Criteria
 
 **Phase 1**
-- [ ] `config/deployment.schema.jsonc` declares every key with its class (secret/var/build), coherence anchor, and policy; `GOOGLE_CLIENT_ID` is classified as api-var and `GOOGLE_CLIENT_SECRET` as api-secret.
-- [ ] `config/labels/spaziord.jsonc` exists as a worked sample profile (brand + per-env anchors + resource names).
-- [ ] `node scripts/label.mjs check spaziord --env staging` prints a grouped checklist (config keys + secrets-by-name) with a fix-it line per gap and the exit codes `0`/`1`/`2`.
-- [ ] Unit tests cover presence, derivation, and exit-code mapping against fixtures; `node --test scripts/` is green.
+- [x] `config/deployment.schema.jsonc` declares every key with its class (secret/var/build), coherence anchor, and policy; `GOOGLE_CLIENT_ID` is classified as api-var and `GOOGLE_CLIENT_SECRET` as api-secret.
+- [x] `config/labels/spaziord.jsonc` exists as a worked sample profile (brand + per-env anchors + resource names).
+- [x] `node scripts/label.mjs check spaziord --env staging` prints a grouped checklist (config keys + secrets-by-name) with a fix-it line per gap and the exit codes `0`/`1`/`2`.
+- [x] Unit tests cover presence, derivation, and exit-code mapping against fixtures; `node --test scripts/` is green.
 
 **Phase 2**
-- [ ] Coherence is derive-and-diff: a `WEB_BASE_URL` not matching the profile's `webOrigin`, or a `NEXT_PUBLIC_API_URL` host ≠ `apiHost`, is reported as a named failure.
-- [ ] A `*` or multi-label wildcard in a staging/production `ALLOWED_ORIGINS` is rejected by the `no-wildcard-in-prod-staging` policy.
-- [ ] `cf-resources` checks report whether the profile's Worker / Pages / D1 / KV / R2 names exist (skipped-⚠️ when creds absent), and `external` items print the exact value to register (redirect URI, sender domain).
+- [x] Coherence is derive-and-diff: a `WEB_BASE_URL` not matching the profile's `webOrigin`, or a `NEXT_PUBLIC_API_URL` host ≠ `apiHost`, is reported as a named failure.
+- [x] A `*` or multi-label wildcard in a staging/production `ALLOWED_ORIGINS` is rejected by the `no-wildcard-in-prod-staging` policy.
+- [x] `cf-resources` checks report whether the profile's Worker / Pages / D1 / KV / R2 names exist (skipped-⚠️ when creds absent), and `external` items print the exact value to register (redirect URI, sender domain).
 
 **Phase 3**
-- [ ] `make label-new LABEL=<x>` writes a profile skeleton; `make label-scaffold LABEL=<x>` appends a coherent `env.<x>` block to `wrangler.jsonc` + a per-label deploy stanza, and prints the provisioning commands without running them.
-- [ ] Scaffolding is idempotent and leaves the existing ArenaQuest blocks unchanged (`git diff` shows only the new label's block).
-- [ ] `check --schema` fails when a required schema key is absent from the matching `*.example`.
-- [ ] A new-label runbook documents the SpazioRD path end-to-end.
+- [x] `make label-new LABEL=<x>` writes a profile skeleton; `make label-scaffold LABEL=<x>` appends a coherent `env.<x>` block to `wrangler.jsonc` + a per-label deploy stanza, and prints the provisioning commands without running them.
+- [x] Scaffolding is idempotent and leaves the existing ArenaQuest blocks unchanged (`git diff` shows only the new label's block).
+- [x] `check --schema` fails when a required schema key is absent from the matching `*.example`.
+- [x] A new-label runbook documents the SpazioRD path end-to-end.
 
 **Global**
-- [ ] Secret values never appear in any output — only present/absent by name.
-- [ ] The existing deploy pipeline is unchanged; `make lint` and `make build` pass; `node --test scripts/` is green.
-- [ ] No diff outside the scope guardrail (`git diff --stat`).
+- [x] Secret values never appear in any output — only present/absent by name.
+- [x] The existing deploy pipeline is unchanged; `make lint` and `make build` pass; `node --test scripts/` is green.
+- [x] No diff outside the scope guardrail (`git diff --stat`).
 
 ---
 
@@ -106,3 +106,12 @@ It is **tooling only** — Node scripts, two config files, `Makefile` targets, a
 5. **Idempotency:** re-run `label-scaffold` → no change to the existing ArenaQuest blocks; only the label's block is (re)written.
 6. **Secret hygiene:** grep the script and its output for any path that reads/prints a secret value → none.
 7. **Gates:** `make lint`, `make build`, `node --test scripts/` green; `git diff --stat` confirms only the guardrail files are touched.
+
+---
+
+## Closeout Notes
+
+- **Verified green:** `make lint` ✅, `make build` ✅, tests **22 pass / 0 fail** ✅, secret-hygiene grep clean (only `wrangler secret list`, never a value) ✅, `git diff --stat` limited to guardrail files (real `wrangler.jsonc` / `.github/workflows/*` / both `*.example` byte-for-byte unchanged) ✅.
+- **`node --test scripts/` caveat:** the literal directory-argument form regressed in Node 24.13.0 (a bare directory positional is resolved as a module: `Cannot find module …/scripts`; reproduces on an empty dir). Use a file/glob form instead — `node --test scripts/label.test.mjs` (or `node --test scripts/*.test.mjs`, or `cd scripts && node --test`). The tests themselves are green.
+- **Schema deviation (intentional):** the RFC listed `RESEND_API_KEY` as both `required:true` and `requiredWhen:"MAIL_DRIVER=resend"` (contradictory); resolved to `required:false` + `requiredWhen` so the gate is real, with an inline schema comment.
+- **`check --schema`** passes with no `*.example` edits — every required schema key was already present.
