@@ -1,0 +1,40 @@
+/**
+ * Test fixture: a complete, concrete-host label profile (no <acct>/<fill>
+ * placeholders) so derivation is exact and assertable. Pure data — never
+ * scaffolded into the real wrangler.jsonc.
+ */
+{
+  "label": "acme",
+  "displayName": "Acme",
+  "brand": {
+    "NEXT_PUBLIC_BRAND_SIGLA": "ACM",
+    "NEXT_PUBLIC_BRAND_NAME_PREFIX": "Acme",
+    "NEXT_PUBLIC_BRAND_NAME_ACCENT": "Co",
+    "NEXT_PUBLIC_BRAND_POWERED_BY": "true",
+    "NEXT_PUBLIC_BRAND_ACCENT": "#112233",
+  },
+  "environments": {
+    "staging": {
+      "apiHost": "api-acme-staging.acme.workers.dev",
+      "webOrigin": "acme-web-staging.pages.dev",
+      "worker": "api-acme-staging",
+      "pagesProject": "acme-web-staging",
+      "d1": { "name": "acme-db-staging", "id": "aaaa-staging" },
+      "kv": { "binding": "RATE_LIMIT_KV", "id": "kv-staging" },
+      "r2": { "bucket": "acme-media-staging", "s3Endpoint": "https://acct.r2.cloudflarestorage.com" },
+      "cookieSameSite": "None",
+      "mail": { "driver": "resend", "from": "Acme Staging <noreply@acme.app>" },
+    },
+    "production": {
+      "apiHost": "api.acme.app",
+      "webOrigin": "app.acme.app",
+      "worker": "api-acme",
+      "pagesProject": "acme-web",
+      "d1": { "name": "acme-db", "id": "aaaa-prod" },
+      "kv": { "binding": "RATE_LIMIT_KV", "id": "kv-prod" },
+      "r2": { "bucket": "acme-media", "s3Endpoint": "https://acct.r2.cloudflarestorage.com" },
+      "cookieSameSite": "Strict",
+      "mail": { "driver": "resend", "from": "Acme <noreply@acme.app>" },
+    },
+  },
+}

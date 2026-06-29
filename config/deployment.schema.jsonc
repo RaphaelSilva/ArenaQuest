@@ -1,0 +1,70 @@
+/**
+ * Deployment contract — shared by ALL labels; carries NO values.
+ *
+ * This is the single place the *shape* and the *rules* of a complete
+ * white-label tenant live: which keys exist, which class each key is
+ * (build / api-var / api-secret / cf-resource / external), which
+ * environment anchor it derives from, and any policy constraint. The
+ * per-label *values* live only in config/labels/<label>.jsonc; this file
+ * and the profile never duplicate each other.
+ *
+ * Key resolution of the long-standing ambiguity: GOOGLE_CLIENT_ID is an
+ * api-var (not sensitive) and GOOGLE_CLIENT_SECRET is an api-secret.
+ *
+ * Field meanings:
+ *   required      — must resolve non-empty for the label to be complete.
+ *   requiredWhen  — conditionally required, e.g. "MAIL_DRIVER=resend".
+ *   derivedFrom   — coherence anchor ("apiHost" | "webOrigin"); the value
+ *                   is re-derived from the profile and diffed on check.
+ *   from          — non-anchor source ("brand" | "r2").
+ *   enum          — allowed literal values.
+ *   policy        — named policy rule applied at check time.
+ *   manual        — a human action the value implies (e.g. OAuth redirect).
+ *   check         — how cf-resources presence is probed (by name).
+ *   confirm       — the external manual-confirmation statement.
+ */
+{
+  "build": {
+    "NEXT_PUBLIC_API_URL":           { "required": true,  "derivedFrom": "apiHost" },
+    "NEXT_PUBLIC_LANGUAGE":          { "required": false, "enum": ["pt", "en"] },
+    "NEXT_PUBLIC_BRAND_SIGLA":       { "required": true,  "from": "brand" },
+    "NEXT_PUBLIC_BRAND_NAME_PREFIX": { "required": true,  "from": "brand" },
+    "NEXT_PUBLIC_BRAND_NAME_ACCENT": { "required": false, "from": "brand" },
+    "NEXT_PUBLIC_BRAND_POWERED_BY":  { "required": false, "from": "brand", "enum": ["", "true", "false"] },
+    "NEXT_PUBLIC_BRAND_ACCENT":      { "required": false, "from": "brand" }
+  },
+  "api-vars": {
+    "ALLOWED_ORIGINS":     { "required": true,  "derivedFrom": "webOrigin", "policy": "no-wildcard-in-prod-staging" },
+    "WEB_BASE_URL":        { "required": true,  "derivedFrom": "webOrigin" },
+    "GOOGLE_REDIRECT_URI": { "required": true,  "derivedFrom": "apiHost", "manual": "register in the label's Google OAuth client" },
+    "GOOGLE_CLIENT_ID":    { "required": true },
+    "COOKIE_SAMESITE":     { "required": true,  "enum": ["Strict", "Lax", "None"] },
+    "R2_S3_ENDPOINT":      { "required": true,  "from": "r2" },
+    "R2_BUCKET_NAME":      { "required": true,  "from": "r2" },
+    "R2_PUBLIC_BASE":      { "required": false, "from": "r2" },
+    "MAIL_DRIVER":         { "required": true,  "enum": ["resend", "console", ""] },
+    "MAIL_FROM":           { "required": true }
+  },
+  "api-secrets": {
+    "JWT_SECRET":           { "required": true },
+    "R2_ACCESS_KEY_ID":     { "required": true },
+    "R2_SECRET_ACCESS_KEY": { "required": true },
+    "GOOGLE_CLIENT_SECRET": { "required": true },
+    // Gated by the mail driver: required only when MAIL_DRIVER=resend
+    // (resolves the RFC's `required:true` + `requiredWhen` ambiguity to the
+    // intended conditional gate).
+    "RESEND_API_KEY":       { "required": false, "requiredWhen": "MAIL_DRIVER=resend" }
+  },
+  "cf-resources": {
+    "worker":       { "check": "wrangler deployments / name" },
+    "pagesProject": { "check": "wrangler pages project list" },
+    "d1":           { "check": "wrangler d1 list" },
+    "kv":           { "check": "wrangler kv namespace list" },
+    "r2":           { "check": "wrangler r2 bucket list" }
+  },
+  "external": {
+    "google-oauth": { "confirm": "Web OAuth client created; <GOOGLE_REDIRECT_URI> is an Authorised redirect URI" },
+    "dns":          { "confirm": "Custom domains for <apiHost> and <webOrigin> resolve / are attached" },
+    "resend":       { "confirm": "Sender domain of <MAIL_FROM> verified in Resend", "requiredWhen": "MAIL_DRIVER=resend" }
+  }
+}
