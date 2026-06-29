@@ -9,6 +9,7 @@
         cf-typegen \
         db-migrations-dev db-migrations-staging db-migrations-prod db-seed-dev \
         deploy-api deploy-web bootstrap-admin \
+        label-new label-scaffold label-check \
         clean clean-cache clean-all
 
 # ── Colours ────────────────────────────────────────────────────────────────────
@@ -174,6 +175,16 @@ db-migrations-prod: ## Apply all D1 migrations to remote production DB (arenaque
 # WARNING: LOCAL DEVELOPMENT ONLY — never run against staging or production.
 db-seed-dev: ## Seed local D1 with test accounts (Admin, Student, Professor) — DEV ONLY
 	pnpm wrangler d1 execute arenaquest-db --local --file ./apps/api/migrations/seed/0001_test_users.sql
+
+# ==============================================================================
+# 🏷️  WHITE-LABEL BRING-UP (RFC 0007)
+# ==============================================================================
+label-new:       ## Create a label profile skeleton (LABEL=spaziord)
+	node scripts/label.mjs new $(LABEL)
+label-scaffold:  ## Generate wrangler/workflow/env boilerplate from the profile (LABEL=spaziord)
+	node scripts/label.mjs scaffold $(LABEL)
+label-check:     ## Checklist of what's missing for a label (LABEL=spaziord ENV=staging|production)
+	node scripts/label.mjs check $(LABEL) --env $(or $(ENV),staging)
 
 # ==============================================================================
 # 🧹 CLEAN
