@@ -804,6 +804,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/levels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Level Definitions
+         * @description Retrieve the level curve ordered by level.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successfully retrieved level definitions */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example 1 */
+                            level: number;
+                            /** @example 100 */
+                            maxXp: number | null;
+                            /** @example 0 */
+                            minXp: number;
+                            /** @example Aspirante */
+                            rankTitle: string;
+                        }[];
+                    };
+                };
+            };
+        };
+        /**
+         * Replace Level Definitions
+         * @description Replace the entire level curve in one transaction. The curve must be contiguous, with strictly increasing minXp and exactly one final open-ended (maxXp = null) level.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ReplaceLevelsBody"];
+                };
+            };
+            responses: {
+                /** @description Successfully replaced the level curve */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example 1 */
+                            level: number;
+                            /** @example 100 */
+                            maxXp: number | null;
+                            /** @example 0 */
+                            minXp: number;
+                            /** @example Aspirante */
+                            rankTitle: string;
+                        }[];
+                    };
+                };
+                /** @description Bad Request / Curve validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/missions": {
         parameters: {
             query?: never;
@@ -1118,6 +1209,530 @@ export interface paths {
                     content?: never;
                 };
                 /** @description Mission not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/admin/players/{userId}/badges/{badgeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Award Badge to Player
+         * @description Manually award a badge to a player.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                    badgeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Badge awarded */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            badgeId: string;
+                            earnedAt: string;
+                            id: string;
+                            userId: string;
+                        };
+                    };
+                };
+            };
+        };
+        /**
+         * Revoke Badge from Player
+         * @description Remove a badge a player holds. Returns 404 when the player does not hold it. Does not touch XP.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                    badgeId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Badge revoked */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Player does not hold this badge */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/players/{userId}/progression": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Player Progression
+         * @description Retrieve a player’s total XP, resolved level/rank, earned badges, and recent XP events.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Player progression */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlayerProgression"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/players/{userId}/xp-adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Adjust Player XP
+         * @description Append an admin_adjustment XP event (positive or negative). user_xp.total_xp is clamped at 0; the ledger keeps the true delta.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["XpAdjustmentBody"];
+                };
+            };
+            responses: {
+                /** @description Adjustment applied */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            newTotal: number;
+                            previousTotal: number;
+                        };
+                    };
+                };
+                /** @description Bad Request / Validation Failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/players/{userId}/xp-recompute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recompute Player XP
+         * @description Rewrite user_xp.total_xp to MAX(0, SUM(xp_events.points)). Appends no event.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description XP recomputed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            newTotal: number;
+                            previousTotal: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/quests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List All Quests
+         * @description Retrieve a list of all gamification quest definitions.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successfully retrieved quests */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** @example true */
+                                active: boolean;
+                                /** @example 2023-01-01T12:00:00Z */
+                                createdAt: string;
+                                /** @example Log in today. */
+                                description: string;
+                                /**
+                                 * Format: uuid
+                                 * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
+                                 */
+                                id: string;
+                                /**
+                                 * @example daily
+                                 * @enum {string}
+                                 */
+                                kind: "daily" | "weekly";
+                                /** @example login_count */
+                                predicateKind: string;
+                                /** @example {"count":1} */
+                                predicateParams: string;
+                                /** @example Daily Login */
+                                title: string;
+                                /** @example 2023-01-01T13:00:00Z */
+                                updatedAt: string;
+                                /** @example 50 */
+                                xpReward: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create Quest
+         * @description Create a new gamification quest definition.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        active?: boolean;
+                        /** @example Log in today. */
+                        description: string;
+                        /**
+                         * @example daily
+                         * @enum {string}
+                         */
+                        kind: "daily" | "weekly";
+                        /** @example login_count */
+                        predicateKind: string;
+                        /** @example {"count":1} */
+                        predicateParams: string;
+                        /** @example Daily Login */
+                        title: string;
+                        /** @example 50 */
+                        xpReward: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Successfully created quest */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** @example true */
+                                active: boolean;
+                                /** @example 2023-01-01T12:00:00Z */
+                                createdAt: string;
+                                /** @example Log in today. */
+                                description: string;
+                                /**
+                                 * Format: uuid
+                                 * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
+                                 */
+                                id: string;
+                                /**
+                                 * @example daily
+                                 * @enum {string}
+                                 */
+                                kind: "daily" | "weekly";
+                                /** @example login_count */
+                                predicateKind: string;
+                                /** @example {"count":1} */
+                                predicateParams: string;
+                                /** @example Daily Login */
+                                title: string;
+                                /** @example 2023-01-01T13:00:00Z */
+                                updatedAt: string;
+                                /** @example 50 */
+                                xpReward: number;
+                            };
+                        };
+                    };
+                };
+                /** @description Bad Request / Validation Failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — economy field edit requires admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/quests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Quest
+         * @description Hard delete a gamification quest definition.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successfully deleted quest */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** @example true */
+                                success: boolean;
+                            };
+                        };
+                    };
+                };
+                /** @description Quest not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Update Quest
+         * @description Update an existing gamification quest definition.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        active?: boolean;
+                        /** @example New description. */
+                        description?: string;
+                        /**
+                         * @example weekly
+                         * @enum {string}
+                         */
+                        kind?: "daily" | "weekly";
+                        /** @example login_count */
+                        predicateKind?: string;
+                        /** @example {"count":2} */
+                        predicateParams?: string;
+                        /** @example Updated Quest */
+                        title?: string;
+                        /** @example 75 */
+                        xpReward?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Successfully updated quest */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /** @example true */
+                                active: boolean;
+                                /** @example 2023-01-01T12:00:00Z */
+                                createdAt: string;
+                                /** @example Log in today. */
+                                description: string;
+                                /**
+                                 * Format: uuid
+                                 * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
+                                 */
+                                id: string;
+                                /**
+                                 * @example daily
+                                 * @enum {string}
+                                 */
+                                kind: "daily" | "weekly";
+                                /** @example login_count */
+                                predicateKind: string;
+                                /** @example {"count":1} */
+                                predicateParams: string;
+                                /** @example Daily Login */
+                                title: string;
+                                /** @example 2023-01-01T13:00:00Z */
+                                updatedAt: string;
+                                /** @example 50 */
+                                xpReward: number;
+                            };
+                        };
+                    };
+                };
+                /** @description Bad Request / Validation Failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — economy field edit requires admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Quest not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4932,6 +5547,26 @@ export interface components {
              */
             url: string;
         };
+        PlayerProgression: {
+            badges: {
+                badgeId: string;
+                earnedAt: string;
+                name: string;
+                slug: string;
+            }[];
+            recentXpEvents: {
+                earnedAt: string;
+                id: string;
+                points: number;
+                sourceKind: string;
+            }[];
+            userId: string;
+            xp: {
+                level: number;
+                rankTitle: string;
+                totalXp: number;
+            };
+        };
         RegisterRequest: {
             /**
              * Format: email
@@ -4943,6 +5578,16 @@ export interface components {
             /** @example password123 */
             password: string;
         };
+        ReplaceLevelsBody: {
+            /** @example 1 */
+            level: number;
+            /** @example 100 */
+            maxXp: number | null;
+            /** @example 0 */
+            minXp: number;
+            /** @example Aspirante */
+            rankTitle: string;
+        }[];
         ResetPasswordRequest: {
             /** @example newpassword123 */
             newPassword: string;
@@ -5097,6 +5742,12 @@ export interface components {
              *     ]
              */
             issues: unknown[];
+        };
+        XpAdjustmentBody: {
+            /** @example 50 */
+            points: number;
+            /** @example Manual correction */
+            reason: string;
         };
     };
     responses: never;
