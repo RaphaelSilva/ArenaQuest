@@ -57,6 +57,10 @@
           "userId": {
             "example": "cmt-student-a",
             "type": "string"
+          },
+          "userName": {
+            "example": "Student A",
+            "type": "string"
           }
         },
         "required": [
@@ -64,6 +68,7 @@
           "topicNodeId",
           "parentCommentId",
           "userId",
+          "userName",
           "body",
           "createdAt",
           "deletedAt"
@@ -331,6 +336,91 @@
         ],
         "type": "object"
       },
+      "PlayerProgression": {
+        "properties": {
+          "badges": {
+            "items": {
+              "properties": {
+                "badgeId": {
+                  "type": "string"
+                },
+                "earnedAt": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "badgeId",
+                "slug",
+                "name",
+                "earnedAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "recentXpEvents": {
+            "items": {
+              "properties": {
+                "earnedAt": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "points": {
+                  "type": "integer"
+                },
+                "sourceKind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "sourceKind",
+                "points",
+                "earnedAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "xp": {
+            "properties": {
+              "level": {
+                "type": "integer"
+              },
+              "rankTitle": {
+                "type": "string"
+              },
+              "totalXp": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "totalXp",
+              "level",
+              "rankTitle"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "userId",
+          "xp",
+          "badges",
+          "recentXpEvents"
+        ],
+        "type": "object"
+      },
       "RegisterRequest": {
         "properties": {
           "email": {
@@ -357,6 +447,40 @@
           "password"
         ],
         "type": "object"
+      },
+      "ReplaceLevelsBody": {
+        "items": {
+          "properties": {
+            "level": {
+              "example": 1,
+              "type": "integer"
+            },
+            "maxXp": {
+              "example": 100,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "minXp": {
+              "example": 0,
+              "type": "integer"
+            },
+            "rankTitle": {
+              "example": "Aspirante",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "level",
+            "rankTitle",
+            "minXp",
+            "maxXp"
+          ],
+          "type": "object"
+        },
+        "type": "array"
       },
       "ResetPasswordRequest": {
         "properties": {
@@ -669,6 +793,24 @@
         "required": [
           "error",
           "issues"
+        ],
+        "type": "object"
+      },
+      "XpAdjustmentBody": {
+        "properties": {
+          "points": {
+            "example": 50,
+            "type": "integer"
+          },
+          "reason": {
+            "example": "Manual correction",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "points",
+          "reason"
         ],
         "type": "object"
       }
@@ -1739,6 +1881,130 @@
         ]
       }
     },
+    "/v1/admin/levels": {
+      "get": {
+        "description": "Retrieve the level curve ordered by level.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "level": {
+                        "example": 1,
+                        "type": "integer"
+                      },
+                      "maxXp": {
+                        "example": 100,
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "minXp": {
+                        "example": 0,
+                        "type": "integer"
+                      },
+                      "rankTitle": {
+                        "example": "Aspirante",
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "level",
+                      "rankTitle",
+                      "minXp",
+                      "maxXp"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successfully retrieved level definitions"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List Level Definitions",
+        "tags": [
+          "admin:levels"
+        ]
+      },
+      "put": {
+        "description": "Replace the entire level curve in one transaction. The curve must be contiguous, with strictly increasing minXp and exactly one final open-ended (maxXp = null) level.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceLevelsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "level": {
+                        "example": 1,
+                        "type": "integer"
+                      },
+                      "maxXp": {
+                        "example": 100,
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "minXp": {
+                        "example": 0,
+                        "type": "integer"
+                      },
+                      "rankTitle": {
+                        "example": "Aspirante",
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "level",
+                      "rankTitle",
+                      "minXp",
+                      "maxXp"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successfully replaced the level curve"
+          },
+          "400": {
+            "description": "Bad Request / Curve validation failed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Replace Level Definitions",
+        "tags": [
+          "admin:levels"
+        ]
+      }
+    },
     "/v1/admin/missions": {
       "get": {
         "description": "Retrieve a list of all gamification missions.",
@@ -2248,6 +2514,726 @@
         "summary": "Update Mission",
         "tags": [
           "admin:missions"
+        ]
+      }
+    },
+    "/v1/admin/players/{userId}/badges/{badgeId}": {
+      "delete": {
+        "description": "Remove a badge a player holds. Returns 404 when the player does not hold it. Does not touch XP.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "badgeId",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Badge revoked"
+          },
+          "404": {
+            "description": "Player does not hold this badge"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Revoke Badge from Player",
+        "tags": [
+          "admin:players"
+        ]
+      },
+      "post": {
+        "description": "Manually award a badge to a player.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "badgeId",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "badgeId": {
+                      "type": "string"
+                    },
+                    "earnedAt": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "userId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "userId",
+                    "badgeId",
+                    "earnedAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Badge awarded"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Award Badge to Player",
+        "tags": [
+          "admin:players"
+        ]
+      }
+    },
+    "/v1/admin/players/{userId}/progression": {
+      "get": {
+        "description": "Retrieve a player’s total XP, resolved level/rank, earned badges, and recent XP events.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerProgression"
+                }
+              }
+            },
+            "description": "Player progression"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Player Progression",
+        "tags": [
+          "admin:players"
+        ]
+      }
+    },
+    "/v1/admin/players/{userId}/xp-adjustments": {
+      "post": {
+        "description": "Append an admin_adjustment XP event (positive or negative). user_xp.total_xp is clamped at 0; the ledger keeps the true delta.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/XpAdjustmentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "newTotal": {
+                      "type": "integer"
+                    },
+                    "previousTotal": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "previousTotal",
+                    "newTotal"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Adjustment applied"
+          },
+          "400": {
+            "description": "Bad Request / Validation Failed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Adjust Player XP",
+        "tags": [
+          "admin:players"
+        ]
+      }
+    },
+    "/v1/admin/players/{userId}/xp-recompute": {
+      "post": {
+        "description": "Rewrite user_xp.total_xp to MAX(0, SUM(xp_events.points)). Appends no event.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "newTotal": {
+                      "type": "integer"
+                    },
+                    "previousTotal": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "previousTotal",
+                    "newTotal"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "XP recomputed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Recompute Player XP",
+        "tags": [
+          "admin:players"
+        ]
+      }
+    },
+    "/v1/admin/quests": {
+      "get": {
+        "description": "Retrieve a list of all gamification quest definitions.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "active": {
+                            "example": true,
+                            "type": "boolean"
+                          },
+                          "createdAt": {
+                            "example": "2023-01-01T12:00:00Z",
+                            "type": "string"
+                          },
+                          "description": {
+                            "example": "Log in today.",
+                            "type": "string"
+                          },
+                          "id": {
+                            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "enum": [
+                              "daily",
+                              "weekly"
+                            ],
+                            "example": "daily",
+                            "type": "string"
+                          },
+                          "predicateKind": {
+                            "example": "login_count",
+                            "type": "string"
+                          },
+                          "predicateParams": {
+                            "example": "{\"count\":1}",
+                            "type": "string"
+                          },
+                          "title": {
+                            "example": "Daily Login",
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "example": "2023-01-01T13:00:00Z",
+                            "type": "string"
+                          },
+                          "xpReward": {
+                            "example": 50,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "title",
+                          "description",
+                          "predicateKind",
+                          "predicateParams",
+                          "xpReward",
+                          "active",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successfully retrieved quests"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List All Quests",
+        "tags": [
+          "admin:quests"
+        ]
+      },
+      "post": {
+        "description": "Create a new gamification quest definition.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "active": {
+                    "example": true,
+                    "type": "boolean"
+                  },
+                  "description": {
+                    "example": "Log in today.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "daily",
+                      "weekly"
+                    ],
+                    "example": "daily",
+                    "type": "string"
+                  },
+                  "predicateKind": {
+                    "example": "login_count",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "predicateParams": {
+                    "example": "{\"count\":1}",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "title": {
+                    "example": "Daily Login",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "xpReward": {
+                    "example": 50,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "title",
+                  "description",
+                  "predicateKind",
+                  "predicateParams",
+                  "xpReward"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "active": {
+                          "example": true,
+                          "type": "boolean"
+                        },
+                        "createdAt": {
+                          "example": "2023-01-01T12:00:00Z",
+                          "type": "string"
+                        },
+                        "description": {
+                          "example": "Log in today.",
+                          "type": "string"
+                        },
+                        "id": {
+                          "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "enum": [
+                            "daily",
+                            "weekly"
+                          ],
+                          "example": "daily",
+                          "type": "string"
+                        },
+                        "predicateKind": {
+                          "example": "login_count",
+                          "type": "string"
+                        },
+                        "predicateParams": {
+                          "example": "{\"count\":1}",
+                          "type": "string"
+                        },
+                        "title": {
+                          "example": "Daily Login",
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "example": "2023-01-01T13:00:00Z",
+                          "type": "string"
+                        },
+                        "xpReward": {
+                          "example": 50,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "title",
+                        "description",
+                        "predicateKind",
+                        "predicateParams",
+                        "xpReward",
+                        "active",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successfully created quest"
+          },
+          "400": {
+            "description": "Bad Request / Validation Failed"
+          },
+          "403": {
+            "description": "Forbidden — economy field edit requires admin"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create Quest",
+        "tags": [
+          "admin:quests"
+        ]
+      }
+    },
+    "/v1/admin/quests/{id}": {
+      "delete": {
+        "description": "Hard delete a gamification quest definition.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "success": {
+                          "example": true,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "success"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successfully deleted quest"
+          },
+          "404": {
+            "description": "Quest not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete Quest",
+        "tags": [
+          "admin:quests"
+        ]
+      },
+      "patch": {
+        "description": "Update an existing gamification quest definition.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "active": {
+                    "example": true,
+                    "type": "boolean"
+                  },
+                  "description": {
+                    "example": "New description.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "daily",
+                      "weekly"
+                    ],
+                    "example": "weekly",
+                    "type": "string"
+                  },
+                  "predicateKind": {
+                    "example": "login_count",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "predicateParams": {
+                    "example": "{\"count\":2}",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "title": {
+                    "example": "Updated Quest",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "xpReward": {
+                    "example": 75,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "active": {
+                          "example": true,
+                          "type": "boolean"
+                        },
+                        "createdAt": {
+                          "example": "2023-01-01T12:00:00Z",
+                          "type": "string"
+                        },
+                        "description": {
+                          "example": "Log in today.",
+                          "type": "string"
+                        },
+                        "id": {
+                          "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "enum": [
+                            "daily",
+                            "weekly"
+                          ],
+                          "example": "daily",
+                          "type": "string"
+                        },
+                        "predicateKind": {
+                          "example": "login_count",
+                          "type": "string"
+                        },
+                        "predicateParams": {
+                          "example": "{\"count\":1}",
+                          "type": "string"
+                        },
+                        "title": {
+                          "example": "Daily Login",
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "example": "2023-01-01T13:00:00Z",
+                          "type": "string"
+                        },
+                        "xpReward": {
+                          "example": 50,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "title",
+                        "description",
+                        "predicateKind",
+                        "predicateParams",
+                        "xpReward",
+                        "active",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successfully updated quest"
+          },
+          "400": {
+            "description": "Bad Request / Validation Failed"
+          },
+          "403": {
+            "description": "Forbidden — economy field edit requires admin"
+          },
+          "404": {
+            "description": "Quest not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update Quest",
+        "tags": [
+          "admin:quests"
         ]
       }
     },
