@@ -24,7 +24,7 @@ export class AppRouter {
    * @param app - The main Hono application instance.
    * @param container - The fully-built AppContainer with all bounded-context groups.
    */
-  static register(app: Hono, container: AppContainer): void {
+  static register(app: OpenAPIHono, container: AppContainer): void {
     const { identity, content, engagement, progress, gamification, infra, controllers } = container;
 
     // Build origin matcher from config — strict in prod, lenient in dev.
