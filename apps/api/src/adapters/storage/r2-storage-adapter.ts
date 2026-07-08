@@ -97,7 +97,7 @@ export class R2StorageAdapter implements IStorageAdapter {
         }),
       );
       return true;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- S3 SDK error shape is untyped
+      // S3 SDK error shape is untyped
     } catch (err: any) {
       if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) {
         return false;

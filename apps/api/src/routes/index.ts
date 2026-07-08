@@ -1,4 +1,3 @@
-import type { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { buildAuthRouter } from '@api/routes/auth';
