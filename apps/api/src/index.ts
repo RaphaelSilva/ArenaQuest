@@ -10,7 +10,7 @@
  */
 
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { apiReference } from '@scalar/hono-api-reference';
+import { Scalar } from '@scalar/hono-api-reference';
 
 import { buildContainer } from '@api/container';
 import { AppRouter } from '@api/routes';
@@ -29,7 +29,7 @@ export function buildApp(env: AppEnv): OpenAPIHono {
   configureOpenAPIDocument(app);
 
   // Serve Scalar UI at /docs for browsing the OpenAPI spec
-  app.get('/docs', apiReference({ url: '/openapi.json' }));
+  app.get('/docs', Scalar({ url: '/openapi.json' }));
 
   return app;
 }
