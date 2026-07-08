@@ -97,7 +97,7 @@ export function buildCatalogTasksRouter(slice: {
       isAdmin ? undefined : user.sub,
     );
     if (!result.ok) {
-      return respondWith(c, result);
+      return respondWith(c, result) as any;
     }
     c.header('Cache-Control', 'private, max-age=30');
     return c.json({ data: result.data });

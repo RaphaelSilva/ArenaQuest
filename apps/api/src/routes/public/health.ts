@@ -33,7 +33,7 @@ export function buildHealthRouter(): OpenAPIHono {
     respondWith(c, {
       ok: true,
       data: getHealth({ auth: 'jwt_pbkdf2', database: 'd1', storage: 'not_wired' }),
-    })
+    }) as any
   );
   return router;
 }

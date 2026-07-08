@@ -141,7 +141,7 @@ export function buildAdminGroupsRouter(container: AppContainer) {
 
   router.openapi(listGroupsRoute, async (c) => {
     const result = await controller.listAll();
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     return c.json({ data: result.data }, 200);
   });
 

@@ -172,14 +172,14 @@ export function buildAdminBadgesRouter(container: AppContainer) {
 
   router.openapi(listBadgesRoute, async (c) => {
     const result = await controller.list();
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     return c.json({ data: result.data }, 200);
   });
 
   router.openapi(createBadgeRoute, async (c) => {
     const body = c.req.valid('json');
     const result = await controller.create(body);
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     return c.json({ data: result.data }, 201);
   });
 

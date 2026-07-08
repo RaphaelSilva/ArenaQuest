@@ -99,7 +99,7 @@ export function buildCommentsRouter(slice: {
     const topicId = c.req.valid('param').id;
     const enrolledIds = await enrollmentRepo.getEffectiveAccessTopicIds(userId);
     const result = await controller.listComments(topicId, userId, enrolledIds, isPrivileged);
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     return c.json({ data: result.data }, 200);
   });
 
@@ -111,7 +111,7 @@ export function buildCommentsRouter(slice: {
     const body = c.req.valid('json');
     const enrolledIds = await enrollmentRepo.getEffectiveAccessTopicIds(userId);
     const result = await controller.createComment(topicId, userId, body, enrolledIds, isPrivileged);
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     if (xpEngine) {
       const todayKey = new Date().toISOString().slice(0, 10);
       try {

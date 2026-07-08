@@ -160,7 +160,7 @@ export function buildAdminProgressionRouter(container: AppContainer) {
   router.openapi(getProgressionRoute, async (c) => {
     const { userId } = c.req.valid('param');
     const result = await controller.getProgression(userId);
-    return respondWith(c, result);
+    return respondWith(c, result) as any;
   });
 
   router.openapi(awardBadgeRoute, async (c) => {
@@ -186,7 +186,7 @@ export function buildAdminProgressionRouter(container: AppContainer) {
   router.openapi(recomputeXpRoute, async (c) => {
     const { userId } = c.req.valid('param');
     const result = await controller.recomputeXp(userId);
-    return respondWith(c, result);
+    return respondWith(c, result) as any;
   });
 
   return router;

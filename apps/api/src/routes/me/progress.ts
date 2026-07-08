@@ -216,15 +216,15 @@ export function buildMeProgressRouter(slice: {
   router.openapi(summaryRoute, async (c) => {
     const userId = c.get('user').sub;
     const result = await service.getProgressSummary(userId);
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     c.header('Cache-Control', CACHE_CONTROL);
-    return respondWith(c, result);
+    return respondWith(c, result) as any;
   });
 
   router.openapi(topicsProgressRoute, async (c) => {
     const userId = c.get('user').sub;
     const result = await service.listAccessibleTopicProgress(userId);
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     c.header('Cache-Control', CACHE_CONTROL);
     return c.json({ data: result.data });
   });
@@ -232,7 +232,7 @@ export function buildMeProgressRouter(slice: {
   router.openapi(tasksProgressRoute, async (c) => {
     const userId = c.get('user').sub;
     const result = await service.listAccessibleTaskProgress(userId);
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     c.header('Cache-Control', CACHE_CONTROL);
     return c.json({ data: result.data });
   });

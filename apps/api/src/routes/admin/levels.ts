@@ -83,7 +83,7 @@ export function buildAdminLevelsRouter(container: AppContainer) {
 
   router.openapi(listLevelsRoute, async (c) => {
     const result = await controller.list();
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     return c.json(result.data, 200);
   });
 

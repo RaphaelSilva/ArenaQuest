@@ -73,7 +73,7 @@ export function buildCatalogTopicsRouter(slice: {
     const isAdmin = user.roles.includes(ROLES.ADMIN) || user.roles.includes(ROLES.CONTENT_CREATOR);
     const result = await controller.listPublished(isAdmin ? undefined : user.sub);
     if (!result.ok) {
-      return respondWith(c, result);
+      return respondWith(c, result) as any;
     }
     c.header('Cache-Control', 'private, max-age=30');
     return c.json({ data: result.data });
@@ -85,7 +85,7 @@ export function buildCatalogTopicsRouter(slice: {
     const isAdmin = user.roles.includes(ROLES.ADMIN) || user.roles.includes(ROLES.CONTENT_CREATOR);
     const result = await controller.getPublishedById(id, isAdmin ? undefined : user.sub);
     c.header('Cache-Control', 'private, max-age=30');
-    return respondWith(c, result);
+    return respondWith(c, result) as any;
   });
 
   return router;

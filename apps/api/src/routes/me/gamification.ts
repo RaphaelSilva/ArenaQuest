@@ -173,55 +173,55 @@ export function buildMeGamificationRouter(slice: {
     const result = await gamificationCtrl.getXp(userId);
     if (!result.ok) return respondWith(c, result);
     c.header('Cache-Control', CACHE_CONTROL);
-    return respondWith(c, result);
+    return respondWith(c, result) as any;
   });
 
   router.openapi(streakRoute, async (c) => {
     const userId = c.get('user').sub;
     const result = await gamificationCtrl.getStreak(userId);
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     c.header('Cache-Control', CACHE_CONTROL);
-    return respondWith(c, result);
+    return respondWith(c, result) as any;
   });
 
   router.openapi(badgesRoute, async (c) => {
     const userId = c.get('user').sub;
     const result = await gamificationCtrl.getBadges(userId);
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     c.header('Cache-Control', CACHE_CONTROL);
-    return respondWith(c, result);
+    return respondWith(c, result) as any;
   });
 
   router.openapi(dailyQuestsRoute, async (c) => {
     const userId = c.get('user').sub;
     const result = await questsCtrl.getDailyQuests(userId, new Date());
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     c.header('Cache-Control', CACHE_CONTROL);
-    return respondWith(c, result);
+    return respondWith(c, result) as any;
   });
 
   router.openapi(weeklyQuestsRoute, async (c) => {
     const userId = c.get('user').sub;
     const result = await questsCtrl.getWeeklyQuests(userId, new Date());
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     c.header('Cache-Control', CACHE_CONTROL);
-    return respondWith(c, result);
+    return respondWith(c, result) as any;
   });
 
   router.openapi(missionsRoute, async (c) => {
     const userId = c.get('user').sub;
     const result = await missionsCtrl.getMissions(userId, new Date());
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     c.header('Cache-Control', CACHE_CONTROL);
-    return respondWith(c, result);
+    return respondWith(c, result) as any;
   });
 
   router.openapi(dashboardRoute, async (c) => {
     const userId = c.get('user').sub;
     const result = await dashboardCtrl.getDashboard(userId, new Date());
-    if (!result.ok) return respondWith(c, result);
+    if (!result.ok) return respondWith(c, result) as any;
     c.header('Cache-Control', CACHE_CONTROL);
-    return respondWith(c, result);
+    return respondWith(c, result) as any;
   });
 
   return router;
