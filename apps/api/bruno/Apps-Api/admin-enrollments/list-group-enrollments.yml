@@ -1,0 +1,17 @@
+info:
+  name: List Group Enrollments
+  type: http
+  seq: 1
+http:
+  method: GET
+  url: "{{host}}/v1/admin/groups/:groupId/enrollments"
+  params:
+    - name: groupId
+      value: "group-id"
+      type: path
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

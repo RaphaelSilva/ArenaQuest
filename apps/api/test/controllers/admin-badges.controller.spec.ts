@@ -60,24 +60,6 @@ describe('AdminBadgesController', () => {
   });
 
   describe('create', () => {
-    it('returns 400 for unknown ruleKind', async () => {
-      const repo = makeRepo();
-      const controller = new AdminBadgesController(repo);
-
-      const result = await controller.create({
-        slug: 'test',
-        name: 'Test',
-        iconEmoji: '🎯',
-        ruleKind: 'invalid_rule_kind',
-      });
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.status).toBe(400);
-        expect(result.error).toBe('ValidationError');
-      }
-    });
-
     it('returns created badge for valid data', async () => {
       const badge = makeBadge({ slug: 'my-badge', name: 'My Badge' });
       const repo = makeRepo({ create: vi.fn(async () => badge) });

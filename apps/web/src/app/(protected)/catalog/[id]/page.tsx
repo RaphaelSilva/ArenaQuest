@@ -2,80 +2,80 @@
 
 export const runtime = 'edge';
 
-import { use, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useAuth } from '@web/hooks/use-auth';
+import { use, useMemo, useEffect, useState } from 'react';
 import { useApiClient } from '@web/context/auth-context';
-import type { TopicProgressStatus, TopicWithMedia } from '@web/lib/topics-api';
+import type { TopicProgressStatus, TopicWithMedia, TopicNode } from '@web/lib/topics-api';
+import type { BadgeItem } from '@web/lib/account-api';
+import { buildTrail, countDeep } from '@web/lib/topic-tree';
 import { TopicHeader } from '@web/components/catalog/TopicHeader';
 import { BadgesStrip } from '@web/components/catalog/BadgesStrip';
 import { SubtopicCard } from '@web/components/catalog/SubtopicCard';
 import { ContentSection } from '@web/components/catalog/ContentSection';
-import { MediaGallery } from '@web/components/catalog/MediaGallery';
+import { SectionEmpty } from '@web/components/catalog/SectionEmpty';
+import { MediaList } from '@web/components/catalog/MediaList/MediaList';
 import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
-import { Spinner } from '@web/components/spinner';
+import { useDict } from '@web/context/dict-context';
+import { MainPaneSkeleton } from '@web/components/catalog/MainPaneSkeleton';
+import { Discussion } from '@web/components/catalog/Discussion';
 
 type CatalogTopicPageProps = {
   params: Promise<{ id: string }>;
 };
 
-type BadgeItem = { id: string; emoji: string; name: string; earned: boolean };
-
 export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
+  const dict = useDict();
   const { id } = use(params);
-  const { user, accessToken } = useAuth();
   const client = useApiClient();
 
   const [topic, setTopic] = useState<TopicWithMedia | null>(null);
+  const [allTopics, setAllTopics] = useState<TopicNode[]>([]);
   const [progressMap, setProgressMap] = useState<Map<string, TopicProgressStatus>>(new Map());
   const [badges, setBadges] = useState<BadgeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const isInstructor = user?.roles.some((r) => r.name === 'instructor' || r.name === 'admin') ?? false;
+  const trail = useMemo(() => (topic ? buildTrail(allTopics, id) : []), [allTopics, id, topic]);
+  const totalInBranch = useMemo(() => (topic ? countDeep(allTopics, id) : 0), [allTopics, id, topic]);
 
-  // Read instructor preview mode from localStorage
-  const [previewRole] = useState<'participant' | 'instructor'>(() => {
-    if (typeof window === 'undefined') return 'participant';
-    return (localStorage.getItem('aq-catalog-role') as 'participant' | 'instructor') ?? 'participant';
-  });
-  const showInstructorUI = isInstructor && previewRole === 'instructor';
+  const breadcrumbItems = useMemo(() => {
+    const root = { label: dict.catalog.breadcrumb.catalogue, href: '/catalog' };
+    const trailItems = trail.map((t, i) => ({
+      label: t.title,
+      href: i === trail.length - 1 ? undefined : `/catalog/${t.id}`,
+    }));
+    
+    return [root, ...trailItems];
+  }, [trail, dict]);
+
 
   useEffect(() => {
     let active = true;
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
-    const headers = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' };
-
     Promise.all([
       client.topics.getById(id),
+      client.topics.list(),
       client.topics.listProgress(),
-      fetch(`${API_URL}/me/badges`, { headers, cache: 'no-store' })
-        .then(async (r) => {
-          if (!r.ok) return [];
-          const body = (await r.json()) as Array<{ badge: { id: string; iconEmoji: string; name: string }; earnedAt: string }>;
-          return body.map((e) => ({ id: e.badge.id, emoji: e.badge.iconEmoji, name: e.badge.name, earned: true }));
-        })
-        .catch(() => [] as BadgeItem[]),
-    ]).then(([t, progressEntries, b]) => {
+      client.account.getBadges().catch(() => [] as BadgeItem[]),
+    ]).then(([t, allTopicsData, progressEntries, b]) => {
       if (!active) return;
       setTopic(t);
+      setAllTopics(allTopicsData);
       setProgressMap(new Map(progressEntries.map((p) => [p.topicNodeId, p.status])));
       setBadges(b);
       setLoading(false);
     }).catch((err: unknown) => {
       if (!active) return;
-      setError(err instanceof Error ? err.message : 'Failed to load topic');
+      setError(err instanceof Error ? err.message : dict.catalog.topicPage.errorNotFound);
       setLoading(false);
     });
 
     return () => { active = false; };
-  }, [client, accessToken, id]);
+  }, [client, id, dict.catalog.topicPage.errorNotFound]);
 
   if (loading) {
     return (
-      <div className="flex h-full min-h-[50vh] items-center justify-center">
-        <Spinner className="h-8 w-8" />
+      <div className="mx-auto max-w-[900px] px-4 py-8 md:px-6 lg:px-10">
+        <MainPaneSkeleton />
       </div>
     );
   }
@@ -83,7 +83,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
   if (error || !topic) {
     return (
       <div className="flex h-full min-h-[50vh] flex-col items-center justify-center p-8 text-center">
-        <p className="text-sm" style={{ color: 'var(--aq-error)' }}>{error || 'Topic not found'}</p>
+        <p className="text-sm" style={{ color: 'var(--aq-error)' }}>{error || dict.catalog.topicPage.errorNotFound}</p>
       </div>
     );
   }
@@ -99,21 +99,18 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
     <div className="mx-auto max-w-[900px] px-4 py-8 md:px-6 lg:px-10">
       {/* Breadcrumb */}
       <CatalogBreadcrumb
-        items={[
-          { label: 'Catalogue', href: '/catalog' },
-          { label: topic.title },
-        ]}
+        items={breadcrumbItems}
         backHref="/catalog"
       />
 
       {/* Topic header */}
-      <TopicHeader topic={topic} pct={pct} />
+      <TopicHeader topic={topic} trail={trail} totalInBranch={totalInBranch} />
 
       {/* Progress bar */}
       <div className="mb-8">
         <div className="mb-2.5 flex items-center justify-between">
           <span className="text-[13px] font-semibold" style={{ color: 'var(--aq-text2)', fontFamily: "'Space Grotesk', sans-serif" }}>
-            Progresso
+            {dict.catalog.topicPage.progress}
           </span>
           <strong className="text-[13px]" style={{ color: 'var(--aq-accent)' }}>{pct}%</strong>
         </div>
@@ -135,10 +132,42 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
       {badges.length > 0 && <BadgesStrip badges={badges} />}
 
       {/* Content section */}
-      <ContentSection content={topic.content} />
+      {(!topic.content || !topic.content.trim()) ? (
+        <section className="mb-8">
+          <h2
+            className="mb-4 text-[13px] font-semibold uppercase tracking-widest"
+            style={{ color: 'var(--aq-text3)' }}
+          >
+            {dict.catalog.topicPage.contentTitle}
+          </h2>
+          <SectionEmpty title={dict.catalog.redesign.emptyDescription} />
+        </section>
+      ) : (
+        <ContentSection content={topic.content} />
+      )}
 
-      {/* Media gallery */}
-      <MediaGallery media={topic.media || []} />
+      {/* Media section */}
+      {(!topic.media || topic.media.length === 0) ? (
+        <section className="mb-8">
+          <h2
+            className="mb-4 text-[13px] font-semibold uppercase tracking-widest"
+            style={{ color: 'var(--aq-text3)' }}
+          >
+            {dict.catalog.topicPage.mediaGalleryTitle}
+          </h2>
+          <SectionEmpty title={dict.catalog.redesign.emptyMedia} />
+        </section>
+      ) : (
+        <MediaList
+          media={topic.media}
+          onVisitTopic={() => client.topics.visit(id)}
+        />
+      )}
+
+      {/* Discussion Section */}
+      {topic.parentId !== null && (
+        <Discussion topicId={id} />
+      )}
 
       {/* Subtopics */}
       <div>
@@ -147,21 +176,8 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
             className="text-[13px] font-semibold uppercase tracking-widest"
             style={{ color: 'var(--aq-text3)' }}
           >
-            Subtopics
+            {dict.catalog.topicPage.subtopics}
           </p>
-          {showInstructorUI && (
-            <Link
-              href="/admin/topics"
-              className="flex items-center gap-1.5 rounded-[8px] px-3.5 py-1.5 text-[12px] font-medium transition-all hover:opacity-80"
-              style={{
-                border: '1px solid var(--aq-accent)',
-                background: 'var(--aq-accent-glow)',
-                color: 'var(--aq-accent)',
-              }}
-            >
-              + Add subtopic
-            </Link>
-          )}
         </div>
 
         {topic.children.length === 0 ? (
@@ -170,10 +186,10 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
             style={{ color: 'var(--aq-text3)' }}
           >
             <p className="text-[40px] opacity-40" aria-hidden>📭</p>
-            <p className="mt-3 text-[15px]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>No subtopics yet</p>
+            <p className="mt-3 text-[15px]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{dict.catalog.topicPage.noSubtopics}</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {topic.children.map((child, i) => (
               <SubtopicCard
                 key={child.id}
@@ -181,7 +197,7 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
                 subtopic={child}
                 index={i}
                 status={progressMap.get(child.id) ?? 'not_started'}
-                showInstructorUI={showInstructorUI}
+                hasChildren={allTopics.some((t) => t.parentId === child.id)}
               />
             ))}
           </div>

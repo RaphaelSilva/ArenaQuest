@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import type { RoadmapNode } from '@web/lib/dashboard-api';
+import { useDict } from '@web/context/dict-context';
 
 type Props = { nodes: RoadmapNode[] };
 
@@ -10,15 +13,17 @@ const STATUS_COLORS: Record<RoadmapNode['status'], string> = {
 };
 
 export function Roadmap({ nodes }: Props) {
+  const dict = useDict();
+
   if (nodes.length === 0) {
     return (
       <section
         className="rounded-2xl border border-dashed p-8 text-center"
         style={{ borderColor: 'var(--aq-border2)', background: 'var(--aq-bg2)' }}
-        aria-label="Learning roadmap"
+        aria-label={dict.dashboard.roadmap.title}
       >
         <p className="text-sm" style={{ color: 'var(--aq-text3)' }}>
-          Your learning path will appear here.
+          {dict.dashboard.roadmap.empty}
         </p>
       </section>
     );
@@ -28,7 +33,7 @@ export function Roadmap({ nodes }: Props) {
     <section
       className="overflow-hidden rounded-2xl border"
       style={{ background: 'var(--aq-bg2)', borderColor: 'var(--aq-border2)' }}
-      aria-label="Learning roadmap"
+      aria-label={dict.dashboard.roadmap.title}
     >
       <div
         className="border-b px-5 py-4"
@@ -38,7 +43,7 @@ export function Roadmap({ nodes }: Props) {
           className="text-[13px] font-semibold"
           style={{ color: 'var(--aq-text)', fontFamily: "'Space Grotesk', sans-serif" }}
         >
-          Learning Roadmap
+          {dict.dashboard.roadmap.title}
         </h2>
       </div>
 

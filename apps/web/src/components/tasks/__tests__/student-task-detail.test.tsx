@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { dictPt } from '@web/i18n/dict-pt';
 import { StudentTaskDetail } from '../student-task-detail';
 import type { PublicTaskDetail } from '@web/lib/tasks-api';
 
@@ -32,8 +33,6 @@ function makeTask(overrides: Partial<PublicTaskDetail> = {}): PublicTaskDetail {
   };
 }
 
-const TOKEN = 'test-token';
-
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -41,14 +40,14 @@ beforeEach(() => {
 describe('StudentTaskDetail — stage state rendering', () => {
   it('marks the first stage as current and renders its check-in button', () => {
     render(<StudentTaskDetail task={makeTask()} />);
-    const btn = screen.getByRole('button', { name: /check-in na etapa aquecimento/i });
+    const btn = screen.getByRole('button', { name: dictPt.tasks.detail.checkInAriaLabel('Aquecimento') });
     expect(btn).toBeInTheDocument();
     expect(btn).not.toBeDisabled();
   });
 
   it('marks subsequent stages as locked', () => {
     render(<StudentTaskDetail task={makeTask()} />);
-    const locked = screen.getAllByText('Bloqueada');
+    const locked = screen.getAllByText(dictPt.tasks.detail.locked);
     expect(locked).toHaveLength(2);
   });
 
@@ -66,12 +65,12 @@ describe('StudentTaskDetail — stage state rendering', () => {
       { stageId: 's3', checkedInAt: '2026-05-01T12:00:00Z' },
     ];
     render(<StudentTaskDetail task={makeTask()} initialCheckins={checkins} />);
-    expect(screen.getByText(/Missão concluída/i)).toBeInTheDocument();
+    expect(screen.getByText(dictPt.tasks.detail.completedLabel)).toBeInTheDocument();
   });
 
   it('shows empty state when task has no stages', () => {
     render(<StudentTaskDetail task={makeTask({ stages: [] })} />);
-    expect(screen.getByText(/Nenhuma etapa definida ainda/i)).toBeInTheDocument();
+    expect(screen.getByText(dictPt.tasks.detail.noStages)).toBeInTheDocument();
   });
 
   it('renders topic chips as catalog links', () => {
@@ -85,10 +84,10 @@ describe('StudentTaskDetail — check-in flow', () => {
   it('disables button while request is in-flight', async () => {
     mockCheckIn.mockReturnValue(new Promise(() => {}));
     render(<StudentTaskDetail task={makeTask()} />);
-    const btn = screen.getByRole('button', { name: /check-in na etapa aquecimento/i });
+    const btn = screen.getByRole('button', { name: dictPt.tasks.detail.checkInAriaLabel('Aquecimento') });
     fireEvent.click(btn);
     await waitFor(() => expect(btn).toBeDisabled());
-    expect(screen.getByText('Registrando…')).toBeInTheDocument();
+    expect(screen.getByText(dictPt.tasks.detail.checkInLoading)).toBeInTheDocument();
   });
 
   it('advances stage state after successful check-in', async () => {
@@ -100,18 +99,18 @@ describe('StudentTaskDetail — check-in flow', () => {
       created: true,
     });
     render(<StudentTaskDetail task={makeTask()} />);
-    fireEvent.click(screen.getByRole('button', { name: /check-in na etapa aquecimento/i }));
+    fireEvent.click(screen.getByRole('button', { name: dictPt.tasks.detail.checkInAriaLabel('Aquecimento') }));
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /check-in na etapa prática/i })).toBeInTheDocument(),
+      expect(screen.getByRole('button', { name: dictPt.tasks.detail.checkInAriaLabel('Prática') })).toBeInTheDocument(),
     );
-    expect(screen.queryByRole('button', { name: /check-in na etapa aquecimento/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: dictPt.tasks.detail.checkInAriaLabel('Aquecimento') })).toBeNull();
   });
 
   it('ignores double-click while inflight (only one request)', async () => {
     let resolve!: (v: unknown) => void;
     mockCheckIn.mockReturnValue(new Promise((r) => { resolve = r; }));
     render(<StudentTaskDetail task={makeTask()} />);
-    const btn = screen.getByRole('button', { name: /check-in na etapa aquecimento/i });
+    const btn = screen.getByRole('button', { name: dictPt.tasks.detail.checkInAriaLabel('Aquecimento') });
     fireEvent.click(btn);
     fireEvent.click(btn);
     fireEvent.click(btn);
@@ -130,7 +129,7 @@ describe('StudentTaskDetail — error toasts', () => {
       error: { type: 'OUT_OF_ORDER', expectedStageId: 's1' },
     });
     render(<StudentTaskDetail task={makeTask()} initialCheckins={[]} />);
-    fireEvent.click(screen.getByRole('button', { name: /check-in na etapa aquecimento/i }));
+    fireEvent.click(screen.getByRole('button', { name: dictPt.tasks.detail.checkInAriaLabel('Aquecimento') }));
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(/Aquecimento/),
     );
@@ -141,9 +140,9 @@ describe('StudentTaskDetail — error toasts', () => {
       error: { type: 'UNKNOWN', message: 'server error' },
     });
     render(<StudentTaskDetail task={makeTask()} />);
-    fireEvent.click(screen.getByRole('button', { name: /check-in na etapa aquecimento/i }));
+    fireEvent.click(screen.getByRole('button', { name: dictPt.tasks.detail.checkInAriaLabel('Aquecimento') }));
     await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(/Não foi possível/i),
+      expect(screen.getByRole('alert')).toHaveTextContent(dictPt.tasks.detail.errorGeneral),
     );
   });
 });

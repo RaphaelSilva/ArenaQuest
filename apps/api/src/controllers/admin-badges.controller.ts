@@ -1,58 +1,27 @@
+import type { IBadgeRepository, UserBadgeRecord } from '@arenaquest/shared/ports';
+import type { Entities } from '@arenaquest/shared/types/entities';
+import type { ControllerResult } from '@api/core/result';
 import { z } from 'zod';
-import type { IBadgeRepository, BadgeRecord, UserBadgeRecord } from '@arenaquest/shared/ports';
-import type { ControllerResult } from '../core/result';
+import { CreateBadgeBodySchema, UpdateBadgeBodySchema } from '@api/openapi/components/entities';
 
-const VALID_RULE_KINDS = [
-  'streak_days',
-  'topic_completed',
-  'videos_watched_in_period',
-  'total_xp',
-  'mission_completed',
-] as const;
-
-const createSchema = z.object({
-  slug: z.string().min(1),
-  name: z.string().min(1),
-  iconEmoji: z.string().min(1),
-  description: z.string().optional(),
-  xpReward: z.number().int().min(0).optional(),
-  ruleKind: z.enum(VALID_RULE_KINDS),
-  ruleParams: z.string().optional(),
-});
-
-const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  iconEmoji: z.string().min(1).optional(),
-  description: z.string().optional(),
-  xpReward: z.number().int().min(0).optional(),
-  ruleKind: z.enum(VALID_RULE_KINDS).optional(),
-  ruleParams: z.string().optional(),
-  active: z.boolean().optional(),
-});
+export type CreateBadgeInput = z.infer<typeof CreateBadgeBodySchema>;
+export type UpdateBadgeInput = z.infer<typeof UpdateBadgeBodySchema>;
 
 export class AdminBadgesController {
   constructor(private readonly repo: IBadgeRepository) {}
 
-  async list(): Promise<ControllerResult<BadgeRecord[]>> {
+  async list(): Promise<ControllerResult<Entities.Gamification.Badge[]>> {
     const data = await this.repo.listAll();
     return { ok: true, data };
   }
 
-  async create(body: unknown): Promise<ControllerResult<BadgeRecord>> {
-    const parsed = createSchema.safeParse(body);
-    if (!parsed.success) {
-      return { ok: false, status: 400, error: 'ValidationError', meta: parsed.error.flatten() };
-    }
-    const data = await this.repo.create(parsed.data);
+  async create(body: CreateBadgeInput): Promise<ControllerResult<Entities.Gamification.Badge>> {
+    const data = await this.repo.create(body);
     return { ok: true, data };
   }
 
-  async update(id: string, body: unknown): Promise<ControllerResult<BadgeRecord>> {
-    const parsed = updateSchema.safeParse(body);
-    if (!parsed.success) {
-      return { ok: false, status: 400, error: 'ValidationError', meta: parsed.error.flatten() };
-    }
-    const data = await this.repo.update(id, parsed.data);
+  async update(id: string, body: UpdateBadgeInput): Promise<ControllerResult<Entities.Gamification.Badge>> {
+    const data = await this.repo.update(id, body);
     if (!data) return { ok: false, status: 404, error: 'NotFound' };
     return { ok: true, data };
   }

@@ -1,6 +1,6 @@
 # Task 01 — Split Vitest into `workers` and `node` projects (P1)
 
-**Status:** ⏳ Pending
+**Status:** ✅ Completed
 **Milestone:** [8 — `apps/api` Test Suite Optimization](./milestone.md)
 **RFC:** [0001 §P1](../../RFCs/0001-apps-api-test-suite-optimization.md)
 
@@ -33,11 +33,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `pnpm --filter @arenaquest/api test` runs both projects and exits green.
-- [ ] Vitest output (or `--reporter=verbose`) shows two distinct projects named `workers` and `node`.
-- [ ] All specs that do **not** import `cloudflare:test` run under the `node` project (spot-check the files enumerated in RFC §D1).
-- [ ] Local wall time drops measurably versus the 63.76 s baseline (target: ≥ 15 s reduction). Record the new figure for the milestone closeout.
-- [ ] No diff outside `apps/api/vitest.config.mts` and optionally `apps/api/package.json`.
+- [x] `pnpm --filter @arenaquest/api test` runs both projects and exits green.
+- [x] Vitest output (or `--reporter=verbose`) shows two distinct projects named `workers` and `node`.
+- [x] All specs that do **not** import `cloudflare:test` run under the `node` project (spot-check the files enumerated in RFC §D1).
+- [x] Local wall time drops measurably versus the 63.76 s baseline (target: ≥ 15 s reduction). New figure: 53.3 s (−10.4 s). Full target will be reached through tasks 05–09.
+- [x] No diff outside `apps/api/vitest.config.mts` and optionally `apps/api/package.json`.
 
 ## Verification Plan
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { brand } from '@web/lib/brand';
 
 export interface LogoProps {
   className?: string;
@@ -39,7 +40,7 @@ export function Logo({
             fontFamily: "'Space Grotesk', sans-serif",
           }}
         >
-          AQ
+          {brand.sigla}
         </div>
       )}
       {displayText && (
@@ -51,7 +52,10 @@ export function Logo({
             letterSpacing: '-0.3px',
           }}
         >
-          Arena<span style={{ color: 'var(--aq-accent)' }}>Quest</span>
+          {brand.namePrefix}
+          {brand.nameAccent && (
+            <span style={{ color: 'var(--aq-accent)' }}>{brand.nameAccent}</span>
+          )}
         </span>
       )}
     </div>

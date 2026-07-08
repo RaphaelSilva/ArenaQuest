@@ -1,0 +1,32 @@
+info:
+  name: Update Badge
+  type: http
+  seq: 4
+http:
+  method: PATCH
+  url: "{{host}}/v1/admin/badges/:id"
+  headers:
+    - name: "content-type"
+      value: application/json
+  params:
+    - name: id
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+  body:
+    type: json
+    data: |-
+        {
+          "active": true,
+          "description": "New description",
+          "iconEmoji": "🏆",
+          "name": "New Badge Name",
+          "ruleKind": "total_xp",
+          "ruleParams": "1000",
+          "xpReward": 200
+        }
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -10,6 +10,26 @@ export interface UpsertQuestProgressInput {
 
 export interface IQuestRepository {
   /**
+   * List all quest definitions (active and inactive) for admin management.
+   */
+  listAll(): Promise<QuestDefinition[]>;
+
+  /**
+   * Create a new quest definition. Generates id/createdAt/updatedAt internally.
+   */
+  create(input: Omit<QuestDefinition, 'id' | 'createdAt' | 'updatedAt'>): Promise<QuestDefinition>;
+
+  /**
+   * Update an existing quest definition. Returns the updated row, or null if not found.
+   */
+  update(id: string, partial: Partial<Omit<QuestDefinition, 'id' | 'createdAt' | 'updatedAt'>>): Promise<QuestDefinition | null>;
+
+  /**
+   * Hard-delete a quest definition by id. Returns whether a row was removed.
+   */
+  delete(id: string): Promise<boolean>;
+
+  /**
    * List all active quest definitions of a specific kind.
    */
   listActiveDefinitions(kind: QuestKind): Promise<QuestDefinition[]>;

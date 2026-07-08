@@ -1,0 +1,27 @@
+info:
+  name: Create User
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: "{{host}}/v1/admin/users"
+  headers:
+    - name: "content-type"
+      value: application/json
+  body:
+    type: json
+    data: |-
+        {
+          "email": "newuser@arenaquest.app",
+          "name": "New User",
+          "password": "password123",
+          "roles": [
+            "string"
+          ]
+        }
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

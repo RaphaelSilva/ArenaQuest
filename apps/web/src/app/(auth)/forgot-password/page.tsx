@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { authApi, AuthApiError } from '@web/lib/auth-api';
 import { Spinner } from '@web/components/spinner';
 import { Logo } from '@web/components/design-system';
+import { useDict } from '@web/context/dict-context';
 
 const MailIcon = () => (
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -32,17 +33,19 @@ function ForgotPasswordInner() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const dict = useDict();
+  const d = dict.auth.forgotPassword;
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!email.trim()) { setError('Informe seu e-mail.'); return; }
+    if (!email.trim()) { setError(d.errorEmailRequired); return; }
     setError('');
     setLoading(true);
     try {
       await authApi.forgotPassword(email.trim().toLowerCase());
     } catch (err) {
       if (err instanceof AuthApiError && err.code === 'RateLimited') {
-        setError('Muitas tentativas. Aguarde alguns minutos e tente novamente.');
+        setError(d.errorRateLimited);
         setLoading(false);
         return;
       }
@@ -56,22 +59,22 @@ function ForgotPasswordInner() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 16, padding: '20px 0' }} className="aq-anim">
         <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'oklch(0.65 0.16 240 / 0.15)', border: '2px solid var(--aq-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
-          ✉️
+          ✓
         </div>
         <h2 style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 22, fontWeight: 700 }}>
-          Verifique seu e-mail
+          {d.successTitle}
         </h2>
         <p style={{ fontSize: 13, color: 'var(--aq-text2)', lineHeight: 1.6, maxWidth: 320 }}>
-          Se esse endereço estiver cadastrado, você receberá em breve um link para redefinir sua senha.
+          {d.successMessage}
         </p>
         <p style={{ fontSize: 12, color: 'var(--aq-text3)', lineHeight: 1.6, maxWidth: 320 }}>
-          Não recebeu? Verifique a caixa de spam. O link expira em 1 hora.
+          {d.successSpamHint}
         </p>
         <Link
           href="/login"
           style={{ marginTop: 8, width: '100%', display: 'block', padding: 13, borderRadius: 10, border: 'none', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 15, fontWeight: 700, cursor: 'pointer', background: 'var(--aq-accent)', color: '#0B0E17', boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)', textDecoration: 'none', textAlign: 'center' }}
         >
-          Voltar ao login
+          {d.successBackButton}
         </Link>
       </div>
     );
@@ -81,10 +84,10 @@ function ForgotPasswordInner() {
     <div className="aq-anim">
       <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 22, fontWeight: 700, letterSpacing: '-0.3px', marginBottom: 6 }}>
-          Esqueceu a senha?
+          {d.title}
         </h2>
         <p style={{ fontSize: 13, color: 'var(--aq-text2)', lineHeight: 1.5 }}>
-          Informe seu e-mail e enviaremos um link para redefinir sua senha.
+          {d.subtitle}
         </p>
       </div>
 
@@ -96,13 +99,13 @@ function ForgotPasswordInner() {
 
       <form onSubmit={handleSubmit} noValidate>
         <div style={{ marginBottom: 20 }}>
-          <label htmlFor="forgot-email" style={s.fieldLabel}>E-mail</label>
+          <label htmlFor="forgot-email" style={s.fieldLabel}>{d.emailLabel}</label>
           <div style={s.inputWrap}>
             <span style={s.inputIcon}><MailIcon /></span>
             <input
               id="forgot-email"
               type="email"
-              placeholder="seu@email.com"
+              placeholder={d.emailPlaceholder}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
@@ -116,13 +119,13 @@ function ForgotPasswordInner() {
           disabled={loading}
           style={{ width: '100%', padding: 13, borderRadius: 10, border: 'none', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', background: 'var(--aq-accent)', color: '#0B0E17', boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)', opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s' }}
         >
-          {loading ? 'Enviando…' : 'Enviar link de redefinição'}
+          {loading ? d.sendingButton : d.submitButton}
         </button>
       </form>
 
       <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--aq-text3)', marginTop: 24 }}>
         <Link href="/login" style={{ color: 'var(--aq-accent)', textDecoration: 'none', fontWeight: 500 }}>
-          ← Voltar ao login
+          {d.backToLogin}
         </Link>
       </div>
     </div>

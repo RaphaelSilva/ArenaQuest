@@ -7,6 +7,7 @@ function makeComment(overrides: Partial<CommentRecord> = {}): CommentRecord {
     topicNodeId: 'topic-1',
     parentCommentId: null,
     userId: 'user-1',
+    userName: 'User One',
     body: 'Hello world',
     createdAt: '2026-01-01T00:00:00Z',
     deletedAt: null,

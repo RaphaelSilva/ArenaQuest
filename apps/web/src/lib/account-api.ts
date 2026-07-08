@@ -1,5 +1,12 @@
 import type { HttpTransport } from './api-client';
 
+export type BadgeItem = {
+  id: string;
+  emoji: string;
+  name: string;
+  earned: boolean;
+};
+
 export type AccountApiErrorCode =
   | 'InvalidCurrentPassword'
   | 'Unauthorized'
@@ -26,7 +33,7 @@ export function createAccountApi(http: HttpTransport) {
     async changePassword(currentPassword: string, newPassword: string): Promise<void> {
       let res: Response;
       try {
-        res = await http('POST', '/account/change-password', {
+        res = await http('POST', '/me/change-password', {
           body: JSON.stringify({ currentPassword, newPassword }),
         });
       } catch {
@@ -42,6 +49,19 @@ export function createAccountApi(http: HttpTransport) {
         }
         throw new AccountApiError('Unknown', res.status, errStr || `Failed (${res.status})`);
       }
+    },
+
+    async getBadges(): Promise<BadgeItem[]> {
+      let res: Response;
+      try {
+        res = await http('GET', '/me/badges');
+      } catch {
+        throw new AccountApiError('NetworkError', 0, 'Network failure.');
+      }
+      if (res.status === 401) throw new AccountApiError('Unauthorized', 401, 'Unauthorized.');
+      if (!res.ok) throw new AccountApiError('Unknown', res.status, `Failed (${res.status})`);
+      const data = (await res.json()) as Array<{ badge: { id: string; iconEmoji: string; name: string }; earnedAt: string }>;
+      return data.map((e) => ({ id: e.badge.id, emoji: e.badge.iconEmoji, name: e.badge.name, earned: true }));
     },
   };
 }

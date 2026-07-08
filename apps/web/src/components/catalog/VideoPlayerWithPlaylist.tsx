@@ -2,11 +2,12 @@
 
 import { useRef, useState } from 'react';
 import type { Media } from '@web/lib/admin-media-api';
+import { useDict } from '@web/context/dict-context';
+import { useApiClient } from '@web/context/auth-context';
 
 type Props = {
   videos: Media[];
   topicId: string;
-  accessToken: string;
   onWatched?: (mediaId: string) => void;
 };
 
@@ -26,11 +27,12 @@ function CheckIcon() {
   );
 }
 
-export function VideoPlayerWithPlaylist({ videos, topicId, accessToken, onWatched }: Props) {
+export function VideoPlayerWithPlaylist({ videos, topicId, onWatched }: Props) {
+  const dict = useDict();
+  const client = useApiClient();
   const [activeId, setActiveId] = useState(videos[0]?.id ?? '');
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
   const videoRef = useRef<HTMLVideoElement>(null);
-  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
   const activeVideo = videos.find((v) => v.id === activeId) ?? videos[0];
 
@@ -38,14 +40,7 @@ export function VideoPlayerWithPlaylist({ videos, topicId, accessToken, onWatche
     if (watchedIds.has(mediaId)) return;
     setWatchedIds((prev) => new Set(prev).add(mediaId));
     onWatched?.(mediaId);
-    try {
-      await fetch(`${API_URL}/topics/${topicId}/videos/${mediaId}/watched`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-    } catch {
-      // non-blocking — XP already logged or will retry next load
-    }
+    await client.topics.markVideoWatched(topicId, mediaId);
   }
 
   function handleTimeUpdate() {
@@ -62,14 +57,13 @@ export function VideoPlayerWithPlaylist({ videos, topicId, accessToken, onWatche
 
   function selectVideo(id: string) {
     setActiveId(id);
-    // Reset the video element to load new source
     setTimeout(() => videoRef.current?.load(), 0);
   }
 
   if (videos.length === 0) {
     return (
       <p className="py-8 text-center text-sm" style={{ color: 'var(--aq-text3)' }}>
-        No videos available.
+        {dict.catalog.videoPlaylist.noVideos}
       </p>
     );
   }
@@ -92,7 +86,7 @@ export function VideoPlayerWithPlaylist({ videos, topicId, accessToken, onWatche
           onEnded={handleEnded}
         >
           {activeVideo && <source src={activeVideo.url} type={activeVideo.type} />}
-          Your browser does not support the video tag.
+          {dict.catalog.videoPlaylist.noSupport}
         </video>
       </div>
 

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { AuthProvider } from "@web/context/auth-context";
+import { DictProvider } from "@web/context/dict-context";
+import { brand } from "@web/lib/brand";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,9 +15,19 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
-  title: "ArenaQuest",
-  description: "ArenaQuest learning platform",
+  title: brand.fullName,
+  description: `${brand.fullName} learning platform`,
 };
 
 export default function RootLayout({
@@ -26,10 +38,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider>{children}</AuthProvider>
+        <DictProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </DictProvider>
       </body>
     </html>
   );

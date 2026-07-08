@@ -1,328 +1,223 @@
-# RFC 0003 — Reorganização de rotas e adoção de OpenAPI/Swagger em `apps/api`
+# RFC 0003 — Route reorganization and OpenAPI/Swagger adoption in `apps/api`
 
-- **Status:** Draft
-- **Autor:** raphaelsilva
-- **Data:** 2026-05-24
-- **Escopo:** `apps/api/src/routes/**`, `apps/api/src/index.ts`, `apps/api/src/controllers/**` (assinaturas), documentação pública da API
+- **Status:** Implemented — Revised 2026-06-16 (originally Draft 2026-05-24; "Partially Implemented" revision 2026-06-11)
+- **Author:** raphaelsilva
+- **Scope:** `apps/api/src/routes/**`, `apps/api/src/index.ts`, `apps/api/src/controllers/**` (signatures), `apps/web/src/lib/*-api.ts`, `apps/api/test/**`, public API documentation
 
-## 1. Contexto
+> **Revision note.** Most of this RFC has already shipped on `develop`. The original document was written as a greenfield/incremental plan; it no longer matches reality and contained a few technical inaccuracies (auth on "public" routes, comments placement, the migration framing). This revision reframes the document as **current state + remaining gaps**, corrects those inaccuracies, brings the frontend and tests into scope, and resolves the Pending Decisions. The application is **not yet in production**, which removes the need for backward-compatibility machinery the original roadmap assumed.
 
-`apps/api` cresceu de um Worker com ~5 rotas (Milestone 01) para **~74 endpoints** distribuídos em **20 routers** sob `apps/api/src/routes/`. A organização atual reflete a sedimentação histórica das milestones (auth → topics → tasks → progress → gamification → comments) e não uma decisão deliberada de design.
+## 0. Implementation Status
 
-Estado atual do `routes/index.ts`:
+| Item | Status | Evidence |
+|---|---|---|
+| `/v1` prefix on all business routes | ✅ Done | `routes/index.ts:76` (`app.route('/v1', v1)`) |
+| Folder structure (`public/`, `auth/`, `me/`, `admin/`, `_shared/`, `openapi/`) | ✅ Done | `routes/public/catalog.topics.ts`, `routes/me/index.ts`, `routes/auth/*` |
+| `OpenAPIHono` + declarative routes with schema | ✅ Done | All mounted routers use `createRoute`/`router.openapi` (incl. `comments.router.ts`, `routes/auth/*`) |
+| Unified envelope (`respondWith`/`respondCreated`/`respondNoContent`) | ✅ Done | imported in `catalog.topics.ts:4` (`@api/routes/_shared/envelope`) |
+| `AppContainer` per bounded context | ✅ Done | `routes/index.ts:28`, `@api/container` |
+| Scalar `/docs` + `/openapi.json` | ✅ Done | `index.ts:13,32`, `openapi/document.ts:12` (`doc31`) |
+| `dump-openapi` script + committed `openapi.json` | ✅ Done | `apps/api/scripts/dump-openapi.ts`, `apps/api/openapi.json` |
+| Generated types in `apps/web` | ✅ Wired | `api-types.gen.ts` now consumed by the clients (e.g. `topics-api.ts`); coverage expands as clients are touched |
+| Comments router migrated to OpenAPI | ✅ Done | `comments.router.ts` is `OpenAPIHono`; `/topics/{id}/comments` present in `openapi.json` (Task 03 / R1) |
+| Controller input standardized | ✅ Done | Pattern B everywhere in scope: `routes/auth/*` + `admin/badges.ts` declarative + `c.req.valid('json')` (Task 04 / R2) |
+| Frontend aligned to `/v1` | ✅ Done | `/v1` centralized in `api-client.ts` (`API_VERSION`), `auth-api.ts`, OAuth link in `login/page.tsx` (Tasks 01/02/05 / R3) |
+| Tests aligned to the new paths | ✅ Done | `test/helpers/v1.ts` prepends `/v1`; legacy-rewrite shim removed from `src/index.ts` (Task 06 / R4) |
+| `oasdiff` contract gate in CI | ⏸️ Deferred | postponed until production (see §9, PD3) |
+| **Residual cleanup** — orphaned legacy routers | ✅ Done (2026-06-16) | `routes/{register,password,activate}.router.ts` (dead duplicates left by Task 04, superseded by `routes/auth/*.ts`) deleted; suite green (62 files / 621 tests), build passes. |
 
-```ts
-app.route('/', buildCommentsRouter(...));
-app.route('/auth', buildAuthRouter({...}));                    // login, refresh, logout, register, activate, password
-app.route('/admin/users', buildAdminUsersRouter(...));
-app.route('/admin/topics', buildAdminTopicsRouter(...));       // CRUD de nodes
-app.route('/admin/topics', buildAdminMediaRouter(...));        // ⚠️ mesmo prefixo, outro router
-app.route('/admin/tasks', buildAdminTasksRouter(...));
-app.route('/tasks', buildTasksRouter(...));
-app.route('/tasks', buildProgressTaskRouter(...));             // ⚠️ mesmo prefixo
-app.route('/topics', buildTopicsRouter(...));
-app.route('/topics', buildProgressTopicRouter(...));           // ⚠️ mesmo prefixo
-app.route('/me', buildMeProgressRouter(...));
-app.route('/me', buildMeGamificationRouter(...));              // ⚠️ mesmo prefixo
-app.route('/leaderboard', buildLeaderboardRouter(...));
-app.route('/admin', buildAdminEnrollmentRouter(...));          // ⚠️ admin no root, não sob /admin/enrollments
-app.route('/account', buildAccountRouter(...));
-app.route('/auth', buildOAuthRouter(...));                     // ⚠️ /auth registrado em dois lugares
-app.route('/admin/badges', buildAdminBadgesRouter(...));
-app.route('/admin/missions', buildAdminMissionsRouter(...));
-```
+## 1. Context
 
-Cada handler segue o mesmo molde manual:
+`apps/api` grew from a Worker with ~5 routes (Milestone 01) to **~74 endpoints** distributed across **20 routers** under `apps/api/src/routes/`. The original organization reflected the historical accumulation of milestones (auth → topics → tasks → progress → gamification → comments) rather than a deliberate design decision.
 
-```ts
-router.post('/', async (c) => {
-  const body = await c.req.json();
-  const result = await controller.create(body);
-  if (!result.ok) return c.json({ error: result.error, ...result.meta }, result.status as 400 | 404 | 422);
-  return c.json(result.data, 201);
-});
-```
+The reorganization described in §3–§4 has since been **largely executed**: routes now live under a single `/v1` sub-app composed from a small number of domain modules, validation is declarative via `@hono/zod-openapi`, a unified response envelope replaced the per-handler boilerplate, and OpenAPI is served at `/openapi.json` with a Scalar UI at `/docs`. What remains is the long tail captured in §0: migrating the comments router, standardizing controller signatures, wiring the frontend and tests to the new contract, and (post-launch) the CI contract gate.
 
-Não existe contrato OpenAPI/Swagger publicado — o frontend (`apps/web`) consome a API a partir de tipos copiados manualmente em `src/lib/*-api.ts`, e o time de QA não tem fonte única de verdade para as rotas disponíveis.
+## 2. Identified Problems
 
-## 2. Problemas identificados
+> These problems motivated the reorganization. Items marked **✅ resolved** are kept for historical context; items still open drive the remaining work in §5.
 
-### P1. Múltiplos routers compartilham o mesmo prefixo
+### P1. Multiple routers shared the same prefix — ✅ resolved
 
-`/admin/topics`, `/tasks`, `/topics`, `/me` e `/auth` são montados **mais de uma vez** com routers diferentes. Hono resolve isso por ordem de registro, mas o leitor humano precisa abrir os 2–3 arquivos para descobrir quem responde a `GET /tasks/:id`. Sintomas observáveis:
+`/admin/topics`, `/tasks`, `/topics`, `/me`, and `/auth` were each mounted more than once with different routers, making it hard to know what handled a given path and risking silent route collisions. Each top-level path now owns a single module (`routes/index.ts` mounts `public`, `auth`, `admin`, `me`, `topics`, `comments` under `/v1`).
 
-- `buildTopicsRouter` e `buildProgressTopicRouter` recebem ambos `topics`, `enrollmentRepo`, `xpEngine`, `streakEngine`, `questEvaluator`, `badgeEngine` — duplicação de DI porque a fronteira entre "conteúdo" e "progresso" foi diluída.
-- Colisões silenciosas: se dois routers definirem `GET /:id` no mesmo prefixo, o segundo vira código morto sem warning.
+### P2. Inconsistent administrative hierarchy — ✅ resolved
 
-### P2. Hierarquia administrativa inconsistente
+`buildAdminEnrollmentRouter` used to mount at `/admin` (root) and OAuth at `/auth` from a second file. Admin sub-resources are now composed inside `routes/admin/index.ts` with a single `requireRole` guard, and auth is composed inside `routes/auth/index.ts`.
 
-- `buildAdminEnrollmentRouter` é montado em `/admin` (raiz), não em `/admin/enrollments`. O prefixo do recurso é declarado **dentro** do router, divergindo do padrão dos outros admin routers.
-- `buildOAuthRouter` é montado em `/auth` mas adiciona rotas `/auth/google/*` — fica difícil saber, lendo apenas `routes/index.ts`, quais endpoints existem sob `/auth`.
+### P3. `AppRouter.register` was a bag of dependencies — ✅ resolved
 
-### P3. `AppRouter.register` é um saco de dependências
+The 30+ flat-field `deps` object was replaced by an `AppContainer` grouped by bounded context (`identity`, `content`, `engagement`, `progress`, `gamification`, `infra`, `controllers`) — see `@api/container` and `routes/index.ts:28`.
 
-A assinatura tem **30+ campos** em um único objeto plano (`auth`, `users`, `tokens`, `topics`, `tags`, `media`, `storage`, `taskRepo`, `taskStages`, `taskLinks`, `progressRepo`, `enrollmentRepo`, `questRepo`, `badgeRepo`, `gamificationRepo`, `missionRepo`, `commentRepo`, `xpEngine`, `streakEngine`, `questEvaluator`, `badgeEngine`, `authService`, `loginLimiter`, `registerController`, `registerLimiter`, `activateController`, `activateLimiter`, `passwordController`, `forgotPasswordLimiter`, `accountController`, `googleOAuthController`, `mailer`, `cookieSameSite`, `allowedOrigins`, `strictCors`).
+### P4. Boilerplate repeated in every handler — ✅ resolved (mostly)
 
-Adicionar um endpoint novo exige tocar **3 arquivos** (`index.ts` para instanciar adapter, `routes/index.ts` para repassar, e o router de destino), e o tipo do parâmetro `deps` continua crescendo.
+The manual `c.req.json()` + `if (!result.ok)` + status-cast pattern was centralized into `routes/_shared/envelope.ts` (`respondWith`/`respondCreated`/`respondNoContent`) and the automatic 400 from `c.req.valid('json')`. **Exception:** `comments.router.ts` still uses the old manual pattern (`c.req.json()` without try/catch, hand-rolled envelope, `result.status as 400 | 403 | 422`) — see P6 and §5.
 
-### P4. Boilerplate repetido em cada handler
+### P5. No OpenAPI/Swagger — ✅ resolved
 
-Cada uma das ~74 rotas repete:
+`/openapi.json` (OpenAPI 3.1 via `OpenAPIHono.doc31`) and `/docs` (Scalar) are live; `apps/api/openapi.json` is committed and `apps/web/src/lib/api-types.gen.ts` is generated from it. **Caveat:** any route still on raw `Hono` (comments) does **not** appear in the document — closing that gap is part of the remaining work.
 
-```ts
-const body = await c.req.json();                                 // sem try/catch ⇒ throw 500 em JSON malformado
-const result = await controller.xxx(body);
-if (!result.ok) return c.json({ error: ..., ...result.meta }, result.status as 400 | 404 | 422);
-return c.json(result.data);
-```
+### P6. Inconsistent naming and granularity — 🟡 partially open (comments)
 
-Pontos problemáticos:
-- `c.req.json()` sem tratamento de parse — payload inválido gera 500 em vez de 400.
-- Cast `result.status as 400 | 404 | 422` é divergente entre handlers (alguns usam `as never`, outros listam códigos diferentes).
-- Forma do envelope de resposta varia: `{ data }`, `{ data: ... }`, `result.data` solto, `c.body(null, 204)` — sem padrão único.
+Progress/gamification routers were split into the `me/` module. The remaining inconsistency is **comments**:
 
-### P5. Sem OpenAPI/Swagger
+- Create/list comments live at `/v1/topics/:id/comments` inside `comments.router.ts`, which is still raw `Hono` and mounted at the `/v1` root (`routes/index.ts:70`). Because it is not an `OpenAPIHono` route, it is **invisible in `/docs` and `openapi.json`**.
+- Like/delete live at `/v1/me/comments/:id` (`routes/me/comments.ts`), correctly under the `/me` module.
 
-Consequências práticas:
-- O frontend mantém tipos espelhados manualmente; quando o backend muda um campo, o erro só aparece em runtime.
-- A skill `qa-tester` precisa abrir o código-fonte para descobrir endpoints.
-- Não há `/docs` para stakeholders e onboarding.
-- Os schemas Zod usados via `@ValidateBody` (em `src/core/decorators.ts`) ficam isolados nos controllers e não viram contrato exportável.
+This split is defensible as a **resource model** (a comment belongs to a *topic*; `/me/comments` holds actions on the caller's own comments), but it must be documented explicitly and the topic-comments endpoints must be migrated to OpenAPI. The original RFC's label `me/comments.ts ← (write paths)` was misleading — the primary write (creating a comment) is **not** under `/me`.
 
-### P6. Nomenclatura e granularidade inconsistentes
+### P7. No versioning — ✅ resolved
 
-- `progress.router.ts` exporta **três** routers diferentes (`buildProgressTaskRouter`, `buildProgressTopicRouter`, `buildMeProgressRouter`) — um arquivo com três responsabilidades.
-- `me-gamification.router.ts` vs progresso de `/me` espalhado em `progress.router.ts`.
-- `tasks.router.ts` (público) vs `admin-tasks.router.ts` (backoffice) é um bom padrão, mas `comments.router.ts` é montado na raiz (`/`) sem prefixo e cuida de comentários de tópicos **e** de tarefas internamente.
+All business routes live under `/v1`; `/health`, `/openapi.json`, and `/docs` remain unversioned.
 
-### P7. Sem versionamento
+## 3. Design Principles
 
-Todas as rotas vivem em `/` sem `/v1`. Quando vier uma quebra de contrato (já há tickets no backlog para refactor de `TopicProgress`), não há caminho de migração além de quebrar o cliente.
+1. **One prefix, one sub-app.** Each top-level path (`/auth`, `/admin`, `/me`, catalog, `/leaderboard`) owns a single Hono module. Sub-resources mount **inside** that module.
+2. **Declarative routing with schema.** `@hono/zod-openapi`: each route declares method, path, request schema, response schema(s), and tags. OpenAPI 3.1 is a byproduct.
+3. **Thin handlers via envelope helper.** `ControllerResult → Response` is centralized in `routes/_shared/envelope.ts`.
+4. **DI by domain.** `AppContainer` grouped by bounded context instead of a flat dependency bag.
+5. **Explicit versioning.** `/v1` on all business routes (`/health`, `/openapi.json`, `/docs` unversioned).
+6. **OpenAPI = source of truth.** Generated at build time, committed to `apps/api/openapi.json`, served at `/openapi.json`, rendered at `/docs` via Scalar. The frontend derives types with `openapi-typescript`.
 
-## 3. Princípios da proposta
+### 3.1. Authentication taxonomy (correction)
 
-1. **Um prefixo, um sub-app.** Cada caminho de primeiro nível (`/auth`, `/admin`, `/me`, `/catalog`, `/leaderboard`) é dono de um único módulo Hono. Sub-recursos são montados **dentro** desse módulo, não como irmãos no `index.ts`.
-2. **Roteamento declarativo com schema.** Migrar para `@hono/zod-openapi`: cada rota declara método, path, request schema, response schema(s) e tags. O OpenAPI 3.1 sai como subproduto da definição da rota.
-3. **Handlers magros via helper de envelope.** Centralizar `ControllerResult → Response` em um único utilitário, eliminando o `if (!result.ok) ...` repetido.
-4. **DI por domínio.** Substituir o "saco de 30 campos" por um `AppContainer` agrupado por bounded context (`identity`, `content`, `engagement`, `progress`, `gamification`, `infra`).
-5. **Versionamento explícito.** Prefixo `/v1` em todas as rotas de negócio (mantendo `/health` e `/openapi.json` fora do versionamento).
-6. **OpenAPI = fonte da verdade.** O JSON é gerado em build-time, comitado em `apps/api/openapi.json`, servido em `/openapi.json` e renderizado em `/docs` via Scalar. O frontend deriva tipos com `openapi-typescript`.
+The original folder named `public/` and phase F4 described catalog routes as having **no auth**. **That is incorrect** — those routes are authenticated. "Public" here means *publicly browsable catalog content for any logged-in user*, **not** *unauthenticated*. The accurate taxonomy:
 
-## 4. Proposta detalhada
+| Tier | Routes | Guard |
+|---|---|---|
+| **Truly unauthenticated** | `/health`, `/openapi.json`, `/docs`, `/v1/auth/*` (login, register, forgot/reset-password, activate, oauth.google) | none |
+| **Authenticated (any logged-in user)** | catalog topics (`/v1/topics`), catalog tasks (`/v1/tasks`), `/v1/leaderboard`, `/v1/me/*`, comments | `authGuard` |
+| **Admin** | `/v1/admin/*` | `authGuard` + `requireRole(ADMIN, CONTENT_CREATOR)` |
 
-### 4.1. Nova estrutura de pastas
+Evidence the catalog is already guarded: `catalog.topics.ts:66-67` (`router.use('/topics', authGuard)` / `'/topics/*'`), `catalog.tasks.ts` (same), `leaderboard.ts` (same). The `public/` directory name is retained for now to mean "catalog/browse"; if it keeps causing confusion, a follow-up may rename it to `catalog/`.
+
+## 4. Detailed Design
+
+### 4.1. Folder structure (as implemented)
 
 ```
 apps/api/src/
 ├── routes/
-│   ├── index.ts                       ← composição mínima (3 montagens, não 20)
+│   ├── index.ts                       ← minimal composition under /v1
 │   ├── _shared/
-│   │   ├── envelope.ts                ← respondWith(result), respondCreated(result)
-│   │   ├── openapi.ts                 ← createRoute, registerCommonSchemas
-│   │   └── error-schemas.ts           ← ErrorBody, ValidationErrorBody (Zod)
-│   ├── public/
-│   │   ├── health.ts
-│   │   ├── catalog.topics.ts          ← GET /v1/catalog/topics/*
-│   │   ├── catalog.tasks.ts           ← GET /v1/catalog/tasks/*
-│   │   └── leaderboard.ts             ← GET /v1/leaderboard
-│   ├── auth/
+│   │   ├── envelope.ts                ← respondWith / respondCreated / respondNoContent
+│   │   └── ...
+│   ├── public/                        ← catalog/browse (AUTHENTICATED, not anonymous)
+│   │   ├── health.ts                  ← unversioned /health
+│   │   ├── catalog.topics.ts          ← GET /v1/topics/*        (authGuard)
+│   │   ├── catalog.tasks.ts           ← GET /v1/tasks/*         (authGuard)
+│   │   └── leaderboard.ts             ← GET /v1/leaderboard     (authGuard)
+│   ├── auth/                          ← unauthenticated
 │   │   ├── index.ts                   ← compose login + register + activate + password + oauth
-│   │   ├── login.ts
-│   │   ├── register.ts
-│   │   ├── activate.ts
-│   │   ├── password.ts
-│   │   └── oauth.google.ts
-│   ├── me/
-│   │   ├── index.ts                   ← compose progress + gamification + account
-│   │   ├── account.ts                 ← /v1/me, PATCH profile, delete
-│   │   ├── progress.ts                ← /v1/me/progress
-│   │   ├── enrollments.ts             ← /v1/me/enrollments
-│   │   ├── gamification.ts            ← /v1/me/xp, /v1/me/badges, /v1/me/quests
-│   │   └── comments.ts                ← /v1/me/comments (write paths)
-│   └── admin/
-│       ├── index.ts                   ← guard requireRole(ADMIN) aplicado uma vez
-│       ├── users.ts
-│       ├── topics.ts                  ← inclui media (sub-rota /:id/media)
-│       ├── tasks.ts                   ← inclui stages e linking (sub-rotas)
-│       ├── badges.ts
-│       ├── missions.ts
-│       └── enrollments.ts
+│   │   ├── login.ts / register.ts / activate.ts / password.ts / oauth.google.ts
+│   ├── me/                            ← authenticated (authGuard at sub-app level)
+│   │   ├── index.ts
+│   │   ├── account.ts / progress.ts / gamification.ts
+│   │   └── comments.ts                ← /v1/me/comments/:id  (like, delete — actions on own comments)
+│   ├── admin/                         ← authGuard + requireRole, composed once in index.ts
+│   │   └── users.ts / topics.ts / tasks.ts / badges.ts / missions.ts / enrollments.ts
+│   ├── comments.router.ts             ← ⚠️ raw Hono, mounted at /v1 root: /v1/topics/:id/comments (create/list)
+│   └── topics.router.ts               ← /v1/topics write/progress paths
 └── openapi/
-    ├── document.ts                    ← OpenAPIHono root, info, servers, security
-    └── components/
-        ├── entities.ts                ← Zod schemas reutilizáveis (User, Topic, Task...)
-        ├── pagination.ts
-        └── errors.ts
+    ├── document.ts                    ← OpenAPIHono root (doc31), info, servers, security
+    └── components/                    ← reusable Zod schemas (entities, pagination, errors)
 ```
 
-Os controllers permanecem onde estão; só a camada de roteamento muda.
+**Note on comments:** create/list still live in `comments.router.ts` (raw `Hono`) and therefore do not appear in `/docs`. Migrating it to `OpenAPIHono` is tracked in §5.
 
-### 4.2. Padrão de rota declarativa
-
-Exemplo do que substitui o handler manual de `admin-topics.router.ts`:
+### 4.2. Declarative route pattern (as implemented)
 
 ```ts
-// routes/admin/topics.ts
-import { createRoute, z } from '@hono/zod-openapi';
-import { TopicNodeSchema, CreateTopicSchema } from '@api/openapi/components/entities';
-import { respondWith, respondCreated } from '@api/routes/_shared/envelope';
-
-export const createTopicRoute = createRoute({
-  method: 'post',
-  path: '/',
-  tags: ['admin:topics'],
-  summary: 'Create a topic node',
-  security: [{ bearerAuth: [] }],
-  request: {
-    body: { content: { 'application/json': { schema: CreateTopicSchema } } },
-  },
-  responses: {
-    201: { description: 'Created', content: { 'application/json': { schema: TopicNodeSchema } } },
-    400: { description: 'Validation error', content: { 'application/json': { schema: ValidationErrorBody } } },
-    404: { description: 'Parent not found', content: { 'application/json': { schema: ErrorBody } } },
-    422: { description: 'Domain rule violated', content: { 'application/json': { schema: ErrorBody } } },
-  },
+// routes/admin/tasks.ts
+router.openapi(createTaskRoute, async (c) => {
+  const body = c.req.valid('json');        // inferred Zod type, no cast
+  const result = await controller.create(body, c.get('user').sub);
+  return respondCreated(c, result);        // single-line envelope
 });
-
-export function registerAdminTopics(app: OpenAPIHono, ctx: AdminCtx) {
-  app.openapi(createTopicRoute, async (c) => {
-    const body = c.req.valid('json');
-    return respondCreated(c, await ctx.controllers.adminTopics.create(body));
-  });
-  // ... outras rotas
-}
 ```
 
-Ganhos diretos:
-- Tipagem end-to-end: `c.req.valid('json')` é o tipo Zod inferido, sem cast.
-- Validação automática 400 com corpo padronizado (`{ error: 'ValidationError', issues: [...] }`).
-- `respondWith`/`respondCreated` centralizam o mapeamento `ControllerResult → Response`.
-- A própria rota é a documentação OpenAPI.
+`c.req.valid('json')` performs the 400 validation at the **route** boundary; the controller receives an already-typed, already-validated value. The route definition is also the OpenAPI documentation.
 
-### 4.3. Envelope unificado
+### 4.3. Controller contract (standardization — open work)
 
-`routes/_shared/envelope.ts`:
+Controllers currently use **three inconsistent input patterns**:
 
-```ts
-export function respondWith<T>(c: Context, r: ControllerResult<T>) {
-  if (r.ok) return c.json(r.data, 200);
-  return c.json({ error: r.error, ...(r.meta ?? {}) }, r.status);
-}
-export function respondCreated<T>(c: Context, r: ControllerResult<T>) {
-  if (r.ok) return c.json(r.data, 201);
-  return c.json({ error: r.error, ...(r.meta ?? {}) }, r.status);
-}
-export function respondNoContent<T>(c: Context, r: ControllerResult<T>) {
-  if (r.ok) return c.body(null, 204);
-  return c.json({ error: r.error, ...(r.meta ?? {}) }, r.status);
-}
-```
+- **Pattern A — `input: unknown` + internal `safeParse`** (validation inside the controller): `register.controller.ts`, `password.controller.ts`, `activate.controller.ts`, `admin-badges.controller.ts`. Error envelopes also diverge (`ValidationFailed` vs `ValidationError` vs `BadRequest`).
+- **Pattern B — pre-validated typed input** (`z.infer<...>`), validation already done at the route via `c.req.valid('json')`: `admin-tasks.controller.ts`, `admin-topics.controller.ts`, `admin-task-stages.controller.ts`, `comments.controller.ts`.
+- **Pattern D — individual primitive arguments** (context-extracted, no body): `topics.controller.ts`, `me-missions.controller.ts`, etc.
 
-Elimina ~3 linhas de boilerplate × 74 handlers ≈ **220 linhas a menos**.
+**Decision: converge on Pattern B.** Controllers should receive already-validated, typed input; HTTP-shape validation is the route's job. Pattern A controllers (register/password/activate/admin-badges) get their `safeParse` removed and their corresponding routes migrated to declarative `request.body` schemas, yielding a single standardized 400 body. Pattern D stays as-is (no body to validate).
 
-### 4.4. Container de dependências por domínio
+**The controller's role after this change:**
+- Transport-agnostic application/domain logic: orchestrate repositories and engines, enforce **domain invariants** (e.g. last-admin lockout guard, enrollment-based topic access), and return a `ControllerResult<T>` (`{ ok: true, data } | { ok: false, status, error, meta? }`, `core/result.ts`).
+- It does **not** parse HTTP and does **not** re-validate request shape.
 
-Substitui o objeto-saco do `AppRouter.register`:
+This directly answers **PD4** (§9): `@ValidateBody`/`@Body` decorators do **not** exist on `develop` (they were a feature-branch artifact). The standing decision is to keep schema validation at the route and **not reintroduce** them.
 
-```ts
-// src/container.ts
-export interface AppContainer {
-  identity: {
-    authService: AuthService;
-    users: IUserRepository;
-    tokens: IRefreshTokenRepository;
-    activationTokens: IActivationTokenRepository;
-    passwordResetTokens: IPasswordResetTokenRepository;
-    oauthAccounts: IOAuthAccountRepository;
-  };
-  content: { topics: ITopicNodeRepository; tags: ITagRepository; media: IMediaRepository; storage: IStorageAdapter };
-  engagement: { taskRepo: ITaskRepository; taskStages: ITaskStageRepository; taskLinks: ITaskLinkingRepository; commentRepo: ICommentRepository };
-  progress: { progressRepo: IProgressRepository; enrollmentRepo: IEnrollmentRepository };
-  gamification: { questRepo: IQuestRepository; badgeRepo: IBadgeRepository; gamificationRepo: IGamificationRepository; missionRepo: IMissionRepository; xpEngine: XpEngine; streakEngine: StreakEngine; questEvaluator: QuestEvaluator; badgeEngine: BadgeEngine };
-  infra: { auth: IAuthAdapter; mailer: IMailer; rateLimiters: { login: IRateLimiter; register: IRateLimiter; activate: IRateLimiter; forgotPassword: IRateLimiter }; cors: { allowedOrigins?: string; strict: boolean }; cookies: { sameSite: CookieSameSite } };
-  controllers: { /* já agregados por feature */ };
-}
+### 4.4. Unified envelope — implemented
 
-export function buildContainer(env: AppEnv): AppContainer { /* ... */ }
-```
+`routes/_shared/envelope.ts` provides `respondWith` (200), `respondCreated` (201), `respondNoContent` (204), each mapping `ControllerResult → Response` and serializing errors as `{ error, ...meta }` with the result's status.
 
-`buildApp(env)` reduz a:
+### 4.5. Dependency container by domain — implemented
 
-```ts
-const ctx = buildContainer(env);
-const app = new OpenAPIHono();
-registerMiddleware(app, ctx.infra);
-registerPublic(app, ctx);
-registerAuth(app.basePath('/v1/auth'), ctx);
-registerMe(app.basePath('/v1/me'), ctx);
-registerAdmin(app.basePath('/v1/admin'), ctx);
-registerDocs(app);
-return app;
-```
+`AppContainer` groups dependencies by bounded context (`identity`, `content`, `engagement`, `progress`, `gamification`, `infra`, `controllers`); `buildContainer(env)` constructs it per request, and `AppRouter.register` consumes the grouped slices (`routes/index.ts`).
 
-### 4.5. Geração e exposição do OpenAPI
+### 4.6. OpenAPI generation & exposure — implemented
 
-- `/openapi.json` — JSON 3.1 gerado em runtime pelo `OpenAPIHono`.
-- `/docs` — UI Scalar (`@scalar/hono-api-reference`), mais leve que Swagger UI e roda dentro do limite de bundle do Worker.
-- Build script `apps/api/scripts/dump-openapi.ts` exporta `apps/api/openapi.json` comitado, usado por:
-  - `apps/web` via `openapi-typescript apps/api/openapi.json -o apps/web/src/lib/api-types.gen.ts`;
-  - validador de contrato em CI (`oasdiff` entre PR e `main`, falha em breaking changes não anotadas).
+- `/openapi.json` — OpenAPI 3.1 generated by `OpenAPIHono.doc31` (`openapi/document.ts`).
+- `/docs` — Scalar UI via `@scalar/hono-api-reference` (`index.ts:32`).
+- `apps/api/scripts/dump-openapi.ts` exports the committed `apps/api/openapi.json`; `apps/web/src/lib/api-types.gen.ts` is generated from it (consumption still pending — see §6).
 
-### 4.6. Versionamento
+## 5. Remaining Work (single cutover) — ✅ completed 2026-06
 
-- Todas as rotas de negócio movem para `/v1/...`.
-- `/health`, `/openapi.json`, `/docs` ficam fora do versionamento.
-- `v0` (estado atual) pode ser mantido por um período de deprecação via rewrites no Worker se necessário — fora do escopo deste RFC.
+> **The application is not in production.** There are no live clients to keep compatible, so the original incremental, backward-compatible roadmap (legacy rewrites, deprecation windows, "frontend will not break") no longer applies and has been removed. The remaining work was a single coordinated cutover validated by the test suite — **now complete**. Each deliverable shipped as a `docs/product/backlog/refactoring/` task; see the mapping below.
 
-## 5. Roadmap de migração
+| # | Deliverable | Backlog task | Status |
+|---|---|---|---|
+| R1 | **Migrate `comments.router.ts` to `OpenAPIHono`** — `/v1/topics/:id/comments` declarative, in `/docs`/`openapi.json`; `respondWith`/`respondCreated`; try/catch on body parse. | `03-api-comments-openapi-migration` | ✅ Done |
+| R2 | **Standardize controllers on Pattern B** — removed `unknown`+`safeParse` from register/password/activate/admin-badges; schemas moved to route `request.body`; unified 400 body. | `04-api-controller-input-standardization` | ✅ Done |
+| R3 | **Frontend alignment** (see §6) — `/v1` centralized in `api-client.ts`; clients begin consuming `api-types.gen.ts`. | `01`/`02`/`05-frontend-v1-prefix-alignment` | ✅ Done |
+| R4 | **Test alignment + remove legacy shim** (see §7) — `/v1` prepended via `test/helpers/v1.ts`; legacy-rewrite shim deleted from `src/index.ts`. | `06-api-test-v1-paths-and-remove-legacy-shim` | ✅ Done |
+| R5 | **Defer `oasdiff` contract gate** | — | ⏸️ Deferred until production (see §9, PD3) |
 
-A migração é **incremental** — não há big-bang. `@hono/zod-openapi` é um superset do `Hono`; as duas APIs coexistem no mesmo `app`.
+**Residual (resolved 2026-06-16):** R2's implementation introduced `routes/auth/{register,activate,password}.ts` (declarative, mounted via `routes/auth/index.ts`) but left the superseded top-level `routes/{register,password,activate}.router.ts` files in the tree. They were **orphaned** (imported by nothing; the live routes and tests use `routes/auth/*`) and have now been deleted — suite green (62 files / 621 tests), build passes. Note: `routes/comments.router.ts` and `routes/topics.router.ts` are **not** orphans — those are still imported by `routes/index.ts`.
 
-| Fase | Entregável | Esforço estimado |
-|---|---|---:|
-| F1 | Adicionar `@hono/zod-openapi` + `@scalar/hono-api-reference`; criar `OpenAPIHono` raiz; expor `/openapi.json` e `/docs` vazios | 0.5 dia |
-| F2 | Helpers `respondWith`/`respondCreated`/`respondNoContent` + schemas comuns (`ErrorBody`, `ValidationErrorBody`, `Pagination`) | 0.5 dia |
-| F3 | `AppContainer` e `buildContainer`; refatorar `index.ts` e `routes/index.ts` para o novo formato **sem mover rotas ainda** | 1 dia |
-| F4 | Migrar domínio **público** (`/health`, `/catalog/topics`, `/catalog/tasks`, `/leaderboard`) — domínio menor, sem auth | 1 dia |
-| F5 | Migrar `/auth` (login, register, activate, password, oauth) — consolidar os 5 routers em um módulo | 1.5 dia |
-| F6 | Migrar `/me` (progress + gamification + account + enrollments) — elimina as 3 montagens duplicadas | 1.5 dia |
-| F7 | Migrar `/admin` (users, topics+media, tasks+stages+linking, badges, missions, enrollments) — maior módulo | 2 dias |
-| F8 | Introduzir prefixo `/v1` global; configurar rewrites legados em `wrangler.toml` para `/auth/*` → `/v1/auth/*` (apenas para clientes antigos durante o cutover) | 0.5 dia |
-| F9 | Gerar `apps/api/openapi.json` em CI; gerar tipos no `apps/web`; adicionar `oasdiff` contract check no PR pipeline | 1 dia |
-| F10 | Remover decorators `@ValidateBody` redundantes nos controllers (validação agora no router via Zod-OpenAPI) | 1 dia |
+## 6. Frontend alignment (new — in scope)
 
-**Total:** ~10.5 dias-pessoa, incrementais, cada fase entregável independente e com testes passando.
+**Problem.** The API now serves everything under `/v1`, but the hand-written web clients still call **un-prefixed** paths, and `NEXT_PUBLIC_API_URL` has no `/v1`:
 
-Cada fase mantém compatibilidade de path com a versão anterior — frontend não quebra durante a migração.
+- `apps/web/src/lib/api-client.ts:30` concatenates `${apiUrl}${path}` with no version injection.
+- `apps/web/src/lib/topics-api.ts:20` → `http('GET', '/topics')`; `auth-api.ts:48` → `fetch(\`${API_URL}/auth/login\`)`.
+- `apps/web/.env.example:4` → `NEXT_PUBLIC_API_URL=http://localhost:8787` (no `/v1`).
+- `apps/web/src/lib/api-types.gen.ts` already contains `/v1/...` paths but is **not wired** into the clients.
 
-## 6. Alternativas consideradas
+Today this does **not** 404 only because a transparent **legacy-rewrite shim** in `apps/api/src/index.ts:42-55` rewrites un-prefixed `/auth|/me|/admin|/topics|/tasks|/leaderboard|/catalog` to `/v1/...`. That shim is exactly the backward-compat machinery this RFC wants to drop (no production ⇒ not needed). The goal is to migrate clients to call `/v1` directly and then **remove the shim**. **Scope:**
 
-- **`hono-openapi`** (lib comunitária) em vez de `@hono/zod-openapi` — descartada: menos manutenção ativa, sem suporte first-class a Zod 3.
-- **tRPC** sobre Hono — descartado: quebra o contrato REST que mobile e integrações externas (Resend webhooks no futuro) precisam consumir; também adiciona um adapter no `apps/web` para algo que OpenAPI resolve.
-- **Manter Hono "cru" e só gerar OpenAPI manualmente** (`zod-to-openapi` standalone) — descartada: schema e rota ficam em arquivos diferentes, drift é inevitável.
-- **Nenhuma mudança, só adicionar Swagger** — descartada: P1–P4 continuam custando tempo em cada feature nova; só documentar a confusão não resolve a confusão.
+1. **Centralize the `/v1` prefix in `api-client.ts`** (single source of truth) rather than editing every path string — preferred. The standalone `auth-api.ts` (pre-auth, bypasses the transport) and the hardcoded OAuth link in `login/page.tsx:265` (`${NEXT_PUBLIC_API_URL}/auth/google`) need their own update.
+2. **Adopt `api-types.gen.ts`** so request/response types are derived from `openapi.json` and drift surfaces at compile time.
 
-## 7. Riscos
+Representative files: `topics-api.ts`, `tasks-api.ts`, `auth-api.ts`, `comments-api.ts`, `progress-api.ts`, `dashboard-api.ts`, `admin-{topics,tasks,users,media,enrollment}-api.ts`, `app/(auth)/login/page.tsx`.
 
-| Risco | Mitigação |
-|---|---|
-| Regressão em rotas críticas (`/auth/login`, `/admin/users`) durante a migração | Cada fase tem PR isolado com a suíte de testes existente (61 arquivos, 737 testes) precisando passar |
-| Aumento do bundle do Worker (limite 1 MB comprimido) | `@hono/zod-openapi` + `@scalar/hono-api-reference` somam ~120 KB; medir após F1 e mover Scalar para `/docs` lazy-load se necessário |
-| Drift entre `openapi.json` comitado e código | Job de CI roda `pnpm dump-openapi` e falha se o diff for não-vazio |
-| Breaking changes implícitas durante refactor | `oasdiff` no pipeline a partir de F9; fases F4–F7 mantêm path 1:1 |
-| Quebra de clientes legados ao introduzir `/v1` (F8) | Rewrites no Worker mantêm `/auth/*` respondendo durante uma janela de deprecação documentada |
+## 7. Test impact (new — in scope)
 
-## 8. Métricas de sucesso
+- ~**64** spec files under `apps/api/test/**`, ~**803** tests; they are **integration-style**, hitting literal paths through a `req()`/`worker.fetch` helper (e.g. `apps/api/test/routes/topics.router.spec.ts`).
+- Roughly **117** hardcoded path literals reference the affected prefixes (`/auth/login` ×20, `/admin/users` ×23, `/admin/topics` ×15, `/topics`, `/me/*`, …) across ~13 route spec files.
+- **Strategy:** introduce a shared path-constants helper (or prepend `/v1` inside the `req()` helper) so the cutover is a small, centralized change instead of ~117 scattered edits. Because there is no production safety net, **the test suite is the cutover's validation** — every phase must keep it green.
+- The suite currently passes **only** because of the legacy-rewrite shim (`src/index.ts:42-55`). Once tests target `/v1` directly and the frontend is migrated (§6), the shim is removed — its deletion is what proves the cutover is complete.
 
-- `routes/index.ts` cai de **20 montagens** para **5** (`public`, `auth`, `me`, `admin`, `docs`).
-- Handlers caem de **~5 linhas médias de boilerplate** para **1 linha** (`return respondWith(c, await ctrl.x(input))`).
-- **0** prefixos compartilhados por mais de um router.
-- `apps/web` consome tipos gerados em `apps/api/openapi.json` — drift de tipos detectado em CI, não em runtime.
-- `/docs` acessível em staging e produção com 100% das rotas listadas e exemplos navegáveis.
+## 8. Alternatives Considered
 
-## 9. Decisões pendentes (a fechar antes do F1)
+- **`hono-openapi`** instead of `@hono/zod-openapi` — discarded (less active, weaker Zod support). Decision validated in practice.
+- **tRPC over Hono** — discarded: breaks the REST contract needed by mobile/external integrations.
+- **Raw Hono + manual `zod-to-openapi`** — discarded: schema/route drift.
+- **No changes, just add Swagger** — discarded: documenting the mess does not fix P1–P4.
 
-1. Versionamento: `/v1` no path ou no header `Accept: application/vnd.arenaquest.v1+json`? Recomendação: path (mais legível no Cloudflare Analytics e curl).
-2. Renderer de docs: Scalar (recomendado) vs Swagger UI vs Redoc.
-3. Política de contrato: `oasdiff` falha em qualquer breaking change ou exige label `breaking-change` no PR? Recomendação: falha hard; label desbloqueia.
-4. Manter os decorators `@ValidateBody` em controllers para uso fora de HTTP (jobs, testes), ou removê-los completamente? Recomendação: remover — a fronteira de validação é o router.
+## 9. Pending Decisions
+
+1. **Versioning — path vs header.** ✅ **Resolved: path (`/v1`)**, already implemented (`routes/index.ts:76`). More readable in Cloudflare Analytics and curl.
+2. **Docs renderer.** ✅ **Resolved: Scalar**, already live at `/docs` (`index.ts:32`).
+3. **Contract policy (`oasdiff`).** ⏸️ **Deferred until production.** With no live clients, breaking changes are cheap, so the hard gate is premature; for now only the committed-`openapi.json` drift check applies. When enabled (at launch), recommendation is **hard failure with a `breaking-change` label override**. Concrete changes the gate would catch and their blast radius:
+   - Rename a response field (`topicId` → `topic_id`) or change its type → regenerated `api-types.gen.ts` breaks the web build.
+   - Remove an endpoint or a response field.
+   - Flip a request field `required` ↔ `optional`, or tighten a Zod schema (e.g. add `.max(100)`).
+   - Change a status code or the response envelope shape.
+   - Operational side effects: each schema tweak requires `pnpm dump-openapi`, the drift check fails if `openapi.json` isn't regenerated, and the team must agree on hard-fail-vs-label policy. Deferring avoids this friction during pre-launch churn.
+4. **`@ValidateBody` decorators.** ✅ **Resolved: do not reintroduce.** They do not exist on `develop` (feature-branch artifact). The validation boundary is the route (`c.req.valid('json')`); the controller is transport-agnostic domain logic (see §4.3).

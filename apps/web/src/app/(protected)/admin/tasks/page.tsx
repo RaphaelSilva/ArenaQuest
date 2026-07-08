@@ -12,13 +12,15 @@ import { StageEditor } from '@web/components/tasks/stage-editor';
 import { AdminTasksApiError, type Task, type TaskDetail, type TaskStatus } from '@web/lib/admin-tasks-api';
 import type { TopicNode } from '@web/lib/admin-topics-api';
 import { Button, Badge } from '@web/components/design-system';
-
-const PUBLISH_REASONS: Record<string, string> = {
-  NO_STAGES: 'Add at least one stage before publishing.',
-  LINKED_TOPIC_NOT_PUBLISHED: 'Every linked topic must itself be published.',
-};
+import { useDict } from '@web/context/dict-context';
 
 export default function AdminTasksPage() {
+  const dict = useDict();
+
+  const PUBLISH_REASONS: Record<string, string> = {
+    NO_STAGES: dict.admin.tasks.cannotPublish.noStages,
+    LINKED_TOPIC_NOT_PUBLISHED: dict.admin.tasks.cannotPublish.linkedTopicNotPublished,
+  };
   const router = useRouter();
   const { isLoading: authLoading } = useAuth();
   const client = useApiClient();
@@ -55,11 +57,11 @@ export default function AdminTasksPage() {
       setTasks(list);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load tasks');
+      setError(e instanceof Error ? e.message : dict.admin.tasks.errorLoading);
     } finally {
       setLoading(false);
     }
-  }, [client]);
+  }, [client, dict.admin.tasks.errorLoading]);
 
   const reloadDetail = useCallback(async (id: string) => {
     try {
@@ -71,9 +73,9 @@ export default function AdminTasksPage() {
       setTopics(topicList);
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, title: detail.title, status: detail.status } : t)));
     } catch (e) {
-      setDetailError(e instanceof Error ? e.message : 'Failed to load task detail');
+      setDetailError(e instanceof Error ? e.message : dict.admin.tasks.errors.failedLoadDetail);
     }
-  }, [client]);
+  }, [client, dict.admin.tasks.errors.failedLoadDetail]);
 
   useEffect(() => {
     if (!authLoading && !canAuthor) {
@@ -115,7 +117,7 @@ export default function AdminTasksPage() {
       setTasks((prev) => [task, ...prev]);
       setSelectedId(task.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create task');
+      setError(e instanceof Error ? e.message : dict.admin.tasks.errors.failedCreate);
     }
   };
 
@@ -128,7 +130,7 @@ export default function AdminTasksPage() {
       const updated = await client.adminTasks.update(id, { title: title.trim() });
       setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to rename task');
+      setError(e instanceof Error ? e.message : dict.admin.tasks.errors.failedRename);
     } finally {
       setInlineEditId(null);
     }
@@ -168,7 +170,7 @@ export default function AdminTasksPage() {
       });
       await reloadDetail(selectedId);
     } catch (e) {
-      setDetailError(e instanceof Error ? e.message : 'Failed to save changes');
+      setDetailError(e instanceof Error ? e.message : dict.admin.tasks.errors.failedSave);
     } finally {
       setDetailSaving(false);
     }
@@ -186,9 +188,9 @@ export default function AdminTasksPage() {
         const reasons = (e.details.reasons as string[] | undefined) ?? [];
         setPublishErrors(reasons);
       } else if (e instanceof AdminTasksApiError && e.code === 'INVALID_TRANSITION') {
-        setDetailError('That status transition is not allowed.');
+        setDetailError(dict.admin.tasks.errors.invalidTransition);
       } else {
-        setDetailError(e instanceof Error ? e.message : 'Failed to update status');
+        setDetailError(e instanceof Error ? e.message : dict.admin.tasks.errors.failedStatus);
       }
     }
   };
@@ -200,9 +202,9 @@ export default function AdminTasksPage() {
       await reloadDetail(selectedId);
     } catch (e) {
       if (e instanceof AdminTasksApiError && e.code === 'LINKED_TOPIC_NOT_PUBLISHED') {
-        setDetailError('All linked topics must be published while the task is published.');
+        setDetailError(dict.admin.tasks.errors.linkedTopicNotPublished);
       } else {
-        setDetailError(e instanceof Error ? e.message : 'Failed to update topic links');
+        setDetailError(e instanceof Error ? e.message : dict.admin.tasks.errors.failedTopicLinks);
       }
     }
   };
@@ -215,7 +217,7 @@ export default function AdminTasksPage() {
       if (selectedId === archiveTarget.id) setSelectedId(null);
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to archive task');
+      setError(e instanceof Error ? e.message : dict.admin.tasks.errors.failedArchive);
     }
   };
 
@@ -234,22 +236,22 @@ export default function AdminTasksPage() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900 flex-shrink-0">
         <div>
-          <h1 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>Tasks</h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">Create and manage learning tasks</p>
+          <h1 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>{dict.admin.tasks.title}</h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{dict.admin.tasks.subtitle}</p>
         </div>
         <Button
           onClick={handleCreate}
           variant="primary"
           size="md"
         >
-          New Task
+          {dict.admin.tasks.newButton}
         </Button>
       </div>
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--aq-bg)' }}>
         {/* Left: task list — full width on mobile, responsive on desktop */}
-        <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:max-w-[50%] lg:max-w-[620px] min-w-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
+        <div className={`${selectedId ? 'hidden detail:flex' : 'flex'} w-full detail:max-w-[50%] min-w-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
           {error && (
             <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{error}</p>
           )}
@@ -260,7 +262,7 @@ export default function AdminTasksPage() {
             </div>
           ) : tasks.length === 0 ? (
             <p className="py-8 text-center text-sm text-zinc-500">
-              No tasks yet. Create your first task.
+              {dict.admin.tasks.empty}
             </p>
           ) : (
             <div className="space-y-1">
@@ -313,11 +315,11 @@ export default function AdminTasksPage() {
                       {task.status !== 'archived' && (
                         <button
                           type="button"
-                          aria-label={`Archive ${task.title}`}
+                          aria-label={`${dict.admin.tasks.detail.archiveButton} ${task.title}`}
                           onClick={(e) => { e.stopPropagation(); setArchiveTarget(task); }}
                           className="flex-shrink-0 text-xs text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
                         >
-                          Archive
+                          {dict.admin.tasks.detail.archiveButton}
                         </button>
                       )}
                     </div>
@@ -329,17 +331,17 @@ export default function AdminTasksPage() {
         </div>
 
         {/* Right: detail pane */}
-        <div className={`${selectedId ? 'flex' : 'hidden md:flex'} flex-1 flex-col overflow-y-auto p-6 md:p-8`}>
+        <div className={`${selectedId ? 'flex' : 'hidden detail:flex'} flex-1 flex-col overflow-y-auto p-6 detail:p-8`}>
           {/* Mobile back button */}
           {selectedTask && (
             <button
               onClick={() => setSelectedId(null)}
-              className="mb-4 flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 md:hidden"
+              className="mb-4 flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 detail:hidden"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Back to tasks
+              {dict.admin.tasks.backToTasks}
             </button>
           )}
           {!selectedTask ? (
@@ -349,7 +351,7 @@ export default function AdminTasksPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
-              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Select a task to edit its details</p>
+              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{dict.admin.tasks.selectToEdit}</p>
             </div>
           ) : !taskDetail ? (
             <div className="flex items-center justify-center py-24">
@@ -361,9 +363,9 @@ export default function AdminTasksPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>
-                    {detailTitle || 'Untitled Task'}
+                    {detailTitle || dict.admin.tasks.untitledTask}
                   </h2>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Task ID: <code className="font-mono text-xs">{selectedId}</code></p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">{dict.admin.tasks.taskIdLabel} <code className="font-mono text-xs">{selectedId}</code></p>
                 </div>
                 <Badge status={detailStatus}>
                   {detailStatus}
@@ -378,7 +380,7 @@ export default function AdminTasksPage() {
 
               {publishErrors.length > 0 && (
                 <div role="alert" className="rounded-md bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-                  <p className="font-medium">Cannot publish this task yet:</p>
+                  <p className="font-medium">{dict.admin.tasks.cannotPublish.title}</p>
                   <ul className="mt-1 list-inside list-disc">
                     {publishErrors.map((r) => (
                       <li key={r}>{PUBLISH_REASONS[r] ?? r}</li>
@@ -390,7 +392,7 @@ export default function AdminTasksPage() {
               {/* Meta: title + description */}
               <section className="space-y-4 rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
                 <label className="block">
-                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">Title</span>
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{dict.admin.tasks.detail.titleLabel}</span>
                   <input
                     type="text"
                     value={detailTitle}
@@ -400,7 +402,7 @@ export default function AdminTasksPage() {
                 </label>
 
                 <label className="block">
-                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">Description (Markdown)</span>
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{dict.admin.tasks.detail.descriptionLabel}</span>
                   <textarea
                     value={detailDescription}
                     onChange={(e) => setDetailDescription(e.target.value)}
@@ -411,7 +413,7 @@ export default function AdminTasksPage() {
 
                 {detailDescription && (
                   <div>
-                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Preview</p>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">{dict.admin.tasks.detail.preview}</p>
                     <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-950">
                       <MarkdownViewer content={detailDescription} />
                     </div>
@@ -426,14 +428,14 @@ export default function AdminTasksPage() {
                     size="md"
                     isLoading={detailSaving}
                   >
-                    Save
+                    {detailSaving ? dict.admin.tasks.detail.savingButton : dict.admin.tasks.detail.saveButton}
                   </Button>
                 </div>
               </section>
 
               {/* Linked Topics */}
               <section className="rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                <h3 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">Linked Topics</h3>
+                <h3 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">{dict.admin.tasks.detail.linkedTopicsTitle}</h3>
                 <TaskTopicPicker
                   topics={topics}
                   allowDrafts={detailStatus === 'draft'}
@@ -444,7 +446,7 @@ export default function AdminTasksPage() {
 
               {/* Stages */}
               <section className="rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                <h3 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">Stages</h3>
+                <h3 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">{dict.admin.tasks.detail.stagesTitle}</h3>
                 <StageEditor
                   task={taskDetail}
                   topics={topics}
@@ -454,14 +456,14 @@ export default function AdminTasksPage() {
 
               {/* Status transitions */}
               <section className="rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                <h3 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">Status</h3>
+                <h3 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">{dict.admin.tasks.detail.statusTitle}</h3>
                 <div className="flex gap-2">
                   {detailStatus !== 'draft' && (
                     <button
                       onClick={() => handleSetStatus('draft')}
                       className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
                     >
-                      Move to Draft
+                      {dict.admin.tasks.detail.moveToDraftButton}
                     </button>
                   )}
                   {detailStatus === 'draft' && (
@@ -469,7 +471,7 @@ export default function AdminTasksPage() {
                       onClick={() => handleSetStatus('published')}
                       className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
                     >
-                      Publish
+                      {dict.admin.tasks.detail.publishButton}
                     </button>
                   )}
                   {detailStatus !== 'archived' && (
@@ -477,7 +479,7 @@ export default function AdminTasksPage() {
                       onClick={() => handleSetStatus('archived')}
                       className="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
                     >
-                      Archive
+                      {dict.admin.tasks.detail.archiveButton}
                     </button>
                   )}
                 </div>
@@ -492,12 +494,12 @@ export default function AdminTasksPage() {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Confirm archive"
+          aria-label={dict.admin.tasks.detail.archiveButton}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
         >
           <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
             <p className="mb-4 text-sm text-zinc-700 dark:text-zinc-300">
-              Archive &ldquo;{archiveTarget.title}&rdquo;? This action cannot be undone.
+              {dict.admin.tasks.confirm.archiveMessage(archiveTarget.title)}
             </p>
             <div className="flex justify-end gap-3">
               <Button
@@ -505,14 +507,14 @@ export default function AdminTasksPage() {
                 variant="secondary"
                 size="md"
               >
-                Cancel
+                {dict.admin.tasks.confirm.cancelButton}
               </Button>
               <Button
                 onClick={handleArchive}
                 variant="danger"
                 size="md"
               >
-                Confirm
+                {dict.admin.tasks.confirm.confirmButton}
               </Button>
             </div>
           </div>

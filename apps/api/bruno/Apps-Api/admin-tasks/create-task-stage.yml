@@ -1,0 +1,26 @@
+info:
+  name: Create Task Stage
+  type: http
+  seq: 6
+http:
+  method: POST
+  url: "{{host}}/v1/admin/tasks/:id/stages"
+  headers:
+    - name: "content-type"
+      value: application/json
+  params:
+    - name: id
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+  body:
+    type: json
+    data: |-
+        {
+          "label": "string"
+        }
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

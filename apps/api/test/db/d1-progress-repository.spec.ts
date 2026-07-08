@@ -2,62 +2,7 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { D1ProgressRepository } from '@api/adapters/db/d1-progress-repository';
 import { Entities } from '@arenaquest/shared/types/entities';
-
-// Minimal schema required by progress tables
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id    TEXT NOT NULL PRIMARY KEY,
-    email TEXT NOT NULL UNIQUE
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_nodes (
-    id        TEXT    NOT NULL PRIMARY KEY,
-    parent_id TEXT    REFERENCES topic_nodes(id),
-    title     TEXT    NOT NULL,
-    status    TEXT    NOT NULL DEFAULT 'draft',
-    archived  INTEGER NOT NULL DEFAULT 0
-  )`,
-  `CREATE TABLE IF NOT EXISTS tasks (
-    id         TEXT NOT NULL PRIMARY KEY,
-    title      TEXT NOT NULL,
-    status     TEXT NOT NULL DEFAULT 'draft',
-    created_by TEXT NOT NULL REFERENCES users(id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS task_stages (
-    id         TEXT    NOT NULL PRIMARY KEY,
-    task_id    TEXT    NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    label      TEXT    NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_progress (
-    id            TEXT NOT NULL PRIMARY KEY,
-    user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    topic_node_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    status        TEXT NOT NULL DEFAULT 'not_started',
-    completed_at  TEXT,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (user_id, topic_node_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS task_progress (
-    id               TEXT NOT NULL PRIMARY KEY,
-    user_id          TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    task_id          TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    status           TEXT NOT NULL DEFAULT 'not_started',
-    current_stage_id TEXT REFERENCES task_stages(id) ON DELETE SET NULL,
-    completed_at     TEXT,
-    created_at       TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (user_id, task_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS task_stage_progress (
-    id            TEXT NOT NULL PRIMARY KEY,
-    user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    task_id       TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    stage_id      TEXT NOT NULL REFERENCES task_stages(id) ON DELETE CASCADE,
-    checked_in_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (user_id, stage_id)
-  )`,
-];
+import { applyMigrations } from '../helpers/apply-migrations';
 
 describe('D1ProgressRepository', () => {
   let repo: D1ProgressRepository;
@@ -67,7 +12,7 @@ describe('D1ProgressRepository', () => {
   let stageId: string;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map((sql) => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
     repo = new D1ProgressRepository(env.DB);
   });
 
@@ -78,7 +23,7 @@ describe('D1ProgressRepository', () => {
     stageId = crypto.randomUUID();
 
     await env.DB.batch([
-      env.DB.prepare('INSERT INTO users (id, email) VALUES (?, ?)').bind(userId, `${userId}@t.com`),
+      env.DB.prepare('INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)').bind(userId, 'test', `${userId}@t.com`, 'hash'),
       env.DB.prepare("INSERT INTO topic_nodes (id, title, status) VALUES (?, 'T', 'published')").bind(topicId),
       env.DB.prepare("INSERT INTO tasks (id, title, created_by) VALUES (?, 'T', ?)").bind(taskId, userId),
       env.DB.prepare('INSERT INTO task_stages (id, task_id, label) VALUES (?, ?, ?)').bind(stageId, taskId, 'S1'),
@@ -225,7 +170,7 @@ describe('D1ProgressRepository', () => {
 
     it('getLastActivityAt returns null with no activity', async () => {
       const newUser = crypto.randomUUID();
-      await env.DB.prepare('INSERT INTO users (id, email) VALUES (?, ?)').bind(newUser, `${newUser}@t.com`).run();
+      await env.DB.prepare('INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)').bind(newUser, 'test', `${newUser}@t.com`, 'hash').run();
       expect(await repo.getLastActivityAt(newUser)).toBeNull();
     });
   });

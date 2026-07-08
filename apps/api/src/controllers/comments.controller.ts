@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ValidateBody, Body } from '@api/core/decorators';
+
 import type { ICommentRepository, CommentRecord, CommentWithMeta } from '@arenaquest/shared/ports';
 import type { ControllerResult } from '@api/core/result';
 
@@ -21,8 +21,11 @@ export class CommentsController {
     topicNodeId: string,
     userId: string,
     enrolledTopicIds: string[],
+    isPrivileged = false,
   ): Promise<ControllerResult<CommentWithMeta[]>> {
-    if (!enrolledTopicIds.includes(topicNodeId)) {
+    // Admins/content creators bypass the enrollment gate, mirroring topic reads
+    // (catalog.topics router) so they can moderate comments on any topic they can view.
+    if (!isPrivileged && !enrolledTopicIds.includes(topicNodeId)) {
       return { ok: false, status: 403, error: 'Forbidden' };
     }
 
@@ -40,14 +43,14 @@ export class CommentsController {
     return { ok: true, data: [...topLevel, ...replies] };
   }
 
-  @ValidateBody(CreateCommentSchema)
   async createComment(
     topicNodeId: string,
     userId: string,
-    @Body() input: CreateCommentInput,
+    input: CreateCommentInput,
     enrolledTopicIds: string[],
+    isPrivileged = false,
   ): Promise<ControllerResult<CommentRecord>> {
-    if (!enrolledTopicIds.includes(topicNodeId)) {
+    if (!isPrivileged && !enrolledTopicIds.includes(topicNodeId)) {
       return { ok: false, status: 403, error: 'Forbidden' };
     }
 

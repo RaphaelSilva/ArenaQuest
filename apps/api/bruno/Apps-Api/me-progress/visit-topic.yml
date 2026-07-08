@@ -1,0 +1,17 @@
+info:
+  name: Visit Topic
+  type: http
+  seq: 6
+http:
+  method: POST
+  url: "{{host}}/v1/me/topics/:id/visit"
+  params:
+    - name: id
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

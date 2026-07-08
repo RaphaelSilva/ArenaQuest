@@ -8,12 +8,19 @@ export type TopicNode = {
   title: string;
   content: string;
   status: 'draft' | 'published' | 'archived';
+  visibility?: 'public' | 'restricted' | 'private';
   archived: boolean;
   order: number;
   estimatedMinutes: number;
   tags: { id: string; name: string; slug: string }[];
   prerequisiteIds: string[];
   media?: Media[];
+  mediaCount?: {
+    video: number;
+    audio: number;
+    pdf: number;
+    total: number;
+  };
 };
 
 export type CreateTopicInput = {
@@ -21,6 +28,7 @@ export type CreateTopicInput = {
   parentId?: string | null;
   content?: string;
   status?: 'draft' | 'published' | 'archived';
+  visibility?: 'public' | 'restricted' | 'private';
   estimatedMinutes?: number;
   tagIds?: string[];
   prerequisiteIds?: string[];
@@ -30,6 +38,7 @@ export type UpdateTopicInput = {
   title?: string;
   content?: string;
   status?: 'draft' | 'published' | 'archived';
+  visibility?: 'public' | 'restricted' | 'private';
   estimatedMinutes?: number;
   tagIds?: string[];
   prerequisiteIds?: string[];

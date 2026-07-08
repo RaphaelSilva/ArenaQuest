@@ -1,10 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { useDict } from '@web/context/dict-context';
+import { useApiClient, useAuthContext } from '@web/context/auth-context';
 
 type CommentWithMeta = {
   id: string;
   userId: string;
+  userName: string;
   body: string | null;
   createdAt: string;
   likeCount: number;
@@ -15,22 +18,30 @@ type CommentWithMeta = {
 type Props = {
   topicId: string;
   initialComments: CommentWithMeta[];
-  accessToken: string;
 };
 
-function formatTime(iso: string): string {
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function formatTime(iso: string, now: string): string {
   try {
     return new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' }).format(
       Math.round((new Date(iso).getTime() - Date.now()) / 60000),
       'minute',
     );
   } catch {
-    return 'agora';
+    return now;
   }
 }
 
-export function Comments({ topicId, initialComments, accessToken }: Props) {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+export function Comments({ topicId, initialComments }: Props) {
+  const dict = useDict();
+  const client = useApiClient();
+  const { user } = useAuthContext();
   const [comments, setComments] = useState<CommentWithMeta[]>(
     initialComments.filter((c) => c.parentCommentId === null && c.body !== null),
   );
@@ -46,6 +57,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
     const optimistic: CommentWithMeta = {
       id: optimisticId,
       userId: 'me',
+      userName: user?.name ?? '',
       body,
       createdAt: new Date().toISOString(),
       likeCount: 0,
@@ -59,16 +71,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
     setSubmitError('');
 
     try {
-      const res = await fetch(`${API_URL}/topics/${topicId}/comments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ body }),
-      });
-      if (!res.ok) throw new Error(`Failed to post comment (${res.status})`);
-      const real = (await res.json()) as CommentWithMeta;
+      const real = await client.comments.createForTopic(topicId, body);
       setComments((prev) => prev.map((c) => (c.id === optimisticId ? real : c)));
     } catch (err) {
       setComments((prev) => prev.filter((c) => c.id !== optimisticId));
@@ -88,10 +91,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
       ),
     );
     try {
-      await fetch(`${API_URL}/comments/${commentId}/like`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      await client.comments.toggleLike(commentId);
     } catch {
       // rollback
       setComments((prev) =>
@@ -110,7 +110,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
         className="mb-4 text-[13px] font-semibold uppercase tracking-widest"
         style={{ color: 'var(--aq-text3)' }}
       >
-        Discussão · {comments.length} {comments.length === 1 ? 'comentário' : 'comentários'}
+        {dict.catalog.comments.header(comments.length)}
       </p>
 
       {/* Comment input */}
@@ -127,7 +127,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void handleSubmit(); }}
-            placeholder="Compartilhe uma dúvida ou observação…"
+            placeholder={dict.catalog.comments.placeholder}
             rows={2}
             className="w-full rounded-[10px] px-3 py-2 text-[13px] outline-none transition-all"
             style={{
@@ -150,7 +150,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
                 className="ml-auto rounded-[8px] px-4 py-1.5 text-[12px] font-medium transition-opacity disabled:opacity-60"
                 style={{ background: 'var(--aq-accent)', color: '#0B0E17' }}
               >
-                {submitting ? 'Publicando…' : 'Publicar'}
+                {submitting ? dict.catalog.comments.submitting : dict.catalog.comments.submit}
               </button>
             </div>
           )}
@@ -161,7 +161,7 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
       <div className="flex flex-col gap-4">
         {comments.length === 0 && (
           <p className="py-6 text-center text-[13px]" style={{ color: 'var(--aq-text3)' }}>
-            Seja o primeiro a comentar.
+            {dict.catalog.comments.empty}
           </p>
         )}
         {comments.map((c) => (
@@ -171,15 +171,17 @@ export function Comments({ topicId, initialComments, accessToken }: Props) {
               style={{ background: 'var(--aq-bg3)', color: 'var(--aq-accent)', border: '1px solid var(--aq-border2)' }}
               aria-hidden
             >
-              {c.userId.slice(0, 2)}
+              {initials(c.userId === 'me' ? (user?.name ?? '') : c.userName)}
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-[13px] font-semibold" style={{ color: 'var(--aq-text)' }}>
-                  {c.userId === 'me' ? 'Você' : c.userId.slice(0, 8)}
+                  {c.userId === 'me'
+                    ? dict.catalog.comments.you
+                    : c.userName || dict.catalog.comments.anonymous}
                 </span>
                 <span className="text-[11px]" style={{ color: 'var(--aq-text3)' }}>
-                  {formatTime(c.createdAt)}
+                  {formatTime(c.createdAt, dict.catalog.comments.now)}
                 </span>
               </div>
               <p className="mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--aq-text2)' }}>

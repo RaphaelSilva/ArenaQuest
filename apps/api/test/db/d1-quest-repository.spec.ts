@@ -2,50 +2,15 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { D1QuestRepository } from '@api/adapters/db/d1-quest-repository';
 import { QuestKind } from '@arenaquest/shared/domain/quest';
+import { applyMigrations } from '../helpers/apply-migrations';
 
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id            TEXT NOT NULL PRIMARY KEY,
-    name          TEXT NOT NULL,
-    email         TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    timezone      TEXT NOT NULL DEFAULT 'UTC'
-  )`,
-  `CREATE TABLE IF NOT EXISTS quest_definitions (
-    id               TEXT    NOT NULL PRIMARY KEY,
-    kind             TEXT    NOT NULL,
-    title            TEXT    NOT NULL,
-    description      TEXT    NOT NULL,
-    predicate_kind   TEXT    NOT NULL,
-    predicate_params TEXT    NOT NULL,
-    xp_reward        INTEGER NOT NULL,
-    active           INTEGER NOT NULL DEFAULT 1,
-    created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at       TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS quest_progress (
-    user_id       TEXT    NOT NULL,
-    quest_id      TEXT    NOT NULL,
-    period_key    TEXT    NOT NULL,
-    current_value INTEGER NOT NULL DEFAULT 0,
-    target_value  INTEGER NOT NULL,
-    completed     INTEGER NOT NULL DEFAULT 0,
-    completed_at  TEXT,
-    updated_at    TEXT    NOT NULL DEFAULT (datetime('now')),
-    PRIMARY KEY (user_id, quest_id, period_key),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (quest_id) REFERENCES quest_definitions(id) ON DELETE CASCADE
-  )`
-];
 
 describe('D1QuestRepository', () => {
   let repo: D1QuestRepository;
   const userId = 'user-123';
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map(sql => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
     repo = new D1QuestRepository(env.DB);
 
     // Seed definitions
@@ -66,12 +31,16 @@ describe('D1QuestRepository', () => {
 
   it('listActiveDefinitions filters by kind and active status', async () => {
     const dailies = await repo.listActiveDefinitions(QuestKind.DAILY);
-    expect(dailies).toHaveLength(1);
-    expect(dailies[0].id).toBe('d1');
+    const d1 = dailies.find(q => q.id === 'd1');
+    expect(d1).toBeDefined();
+    expect(d1?.id).toBe('d1');
+    expect(dailies.every(q => q.kind === QuestKind.DAILY && q.active)).toBe(true);
 
     const weeklies = await repo.listActiveDefinitions(QuestKind.WEEKLY);
-    expect(weeklies).toHaveLength(1);
-    expect(weeklies[0].id).toBe('w1');
+    const w1 = weeklies.find(q => q.id === 'w1');
+    expect(w1).toBeDefined();
+    expect(w1?.id).toBe('w1');
+    expect(weeklies.every(q => q.kind === QuestKind.WEEKLY && q.active)).toBe(true);
   });
 
   it('upsertProgress is idempotent and handles completion', async () => {
@@ -114,12 +83,12 @@ describe('D1QuestRepository', () => {
 
   it('listActiveQuestsForUser returns definitions with progress', async () => {
     const period = '2026-05-15';
-    
+
     // No progress yet
     const quests1 = await repo.listActiveQuestsForUser(userId, QuestKind.DAILY, period);
-    expect(quests1).toHaveLength(1);
-    expect(quests1[0].id).toBe('d1');
-    expect(quests1[0].progress).toBeNull();
+    const d1Quest1 = quests1.find(q => q.id === 'd1');
+    expect(d1Quest1).toBeDefined();
+    expect(d1Quest1!.progress).toBeNull();
 
     // Add some progress
     await repo.upsertProgress({
@@ -131,8 +100,9 @@ describe('D1QuestRepository', () => {
     });
 
     const quests2 = await repo.listActiveQuestsForUser(userId, QuestKind.DAILY, period);
-    expect(quests2[0].progress).not.toBeNull();
-    expect(quests2[0].progress!.currentValue).toBe(5);
+    const d1Quest2 = quests2.find(q => q.id === 'd1');
+    expect(d1Quest2!.progress).not.toBeNull();
+    expect(d1Quest2!.progress!.currentValue).toBe(5);
   });
 
   it('markCompleted sets completed status manually', async () => {

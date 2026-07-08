@@ -1,0 +1,13 @@
+info:
+  name: Rotate Session Token
+  type: http
+  seq: 7
+http:
+  method: POST
+  url: "{{host}}/v1/auth/refresh"
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

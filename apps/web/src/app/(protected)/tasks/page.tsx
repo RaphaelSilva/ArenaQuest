@@ -2,11 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useApiClient } from '@web/context/auth-context';
+import { useDict } from '@web/context/dict-context';
 import { Spinner } from '@web/components/spinner';
 import { StudentTaskCard } from '@web/components/tasks/student-task-card';
 import type { TaskSummary } from '@web/lib/tasks-api';
 
 export default function StudentTasksPage() {
+  const dict = useDict();
   const client = useApiClient();
   const [tasks, setTasks] = useState<TaskSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -15,10 +17,10 @@ export default function StudentTasksPage() {
     try {
       const list = await client.tasks.list();
       setTasks(list);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load tasks');
+    } catch {
+      setError(dict.tasks.errorLoading);
     }
-  }, [client]);
+  }, [client, dict]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch is the canonical use case
@@ -27,7 +29,7 @@ export default function StudentTasksPage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-8">
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Tasks</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{dict.tasks.title}</h1>
 
       {error && (
         <div role="alert" className="mb-4 rounded-md bg-red-100 px-4 py-3 text-sm text-red-800">
@@ -41,7 +43,7 @@ export default function StudentTasksPage() {
         </div>
       ) : tasks.length === 0 ? (
         <p className="py-12 text-center text-sm text-zinc-500">
-          No tasks are available right now. Check back soon!
+          {dict.tasks.empty}
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

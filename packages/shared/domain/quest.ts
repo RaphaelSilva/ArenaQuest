@@ -1,20 +1,11 @@
+import type { Entities } from '../types/entities';
+
 export enum QuestKind {
   DAILY = 'daily',
   WEEKLY = 'weekly',
 }
 
-export interface QuestDefinition {
-  id: string;
-  kind: QuestKind;
-  title: string;
-  description: string;
-  predicateKind: string;
-  predicateParams: string; // Raw JSON from DB
-  xpReward: number;
-  active: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export type QuestDefinition = Entities.Gamification.QuestDefinition;
 
 export interface QuestProgress {
   userId: string;

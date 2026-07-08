@@ -1,6 +1,6 @@
 # Milestone 8 — `apps/api` Test Suite Optimization
 
-**Status:** Planning
+**Status:** ✅ Completed
 **Scope:** Test infrastructure and test code in `apps/api/test/**` and `apps/api/vitest.config.mts` only. Derived from [RFC 0001](../../RFCs/0001-apps-api-test-suite-optimization.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone touches **only** test-related artefacts: Vitest configuration, files under `apps/api/test/**`, and new test helpers under `apps/api/test/helpers/**`. Production code (`apps/api/src/**`), shared packages (`packages/shared/**`), the web app (`apps/web/**`), migrations (`apps/api/migrations/**`), and CI workflows are **out of scope**. If a finding here suggests a fix to production code, file a separate issue/task — do not bundle it.
@@ -39,15 +39,15 @@ The deliverables are observable in the test suite, not in product features.
 
 ## 3. Acceptance Criteria
 
-- [ ] `pnpm --filter @arenaquest/api test` wall time is **≤ 40 s** locally on the developer baseline (compare against the 63.76 s baseline recorded in RFC §Contexto).
-- [ ] Vitest reports two projects (`workers`, `node`); files not importing `cloudflare:test` run under `node` and do not boot Miniflare.
-- [ ] `apps/api/test/README.md` exists and documents the router-vs-controller convention, the auth-guard consolidation rule, and the migrations helper.
-- [ ] No spec file contains an inline `CREATE TABLE IF NOT EXISTS …` block; all schema setup goes through the shared helper.
-- [ ] `middleware/auth-guard.spec.ts` is the single source for the "401 without token" and "403 with wrong role" matrix; per-router specs hold at most one auth smoke.
-- [ ] For every controller/router pair listed in RFC §D2, the router spec contains only HTTP-shaped assertions; business-rule branches live in the controller spec.
-- [ ] All RFC §D5 removals/reductions are applied (`shared-roles.spec.ts`, `health.controller.spec.ts`, `/health` duplicates, `parse-cookie-samesite` reduced to 4 tests, CORS router reduced to HTTP smoke).
-- [ ] `make lint` and `make test-api` pass green; total test count is within the band declared in RFC §"Impacto esperado" (~680–700).
-- [ ] No diff outside `apps/api/test/**`, `apps/api/vitest.config.mts`, and (if needed) `apps/api/package.json` test scripts.
+- [x] `pnpm --filter @arenaquest/api test` wall time is **≤ 40 s** locally on the developer baseline (compare against the 63.76 s baseline recorded in RFC §Contexto).
+- [x] Vitest reports two projects (`workers`, `node`); files not importing `cloudflare:test` run under `node` and do not boot Miniflare.
+- [x] `apps/api/test/README.md` exists and documents the router-vs-controller convention, the auth-guard consolidation rule, and the migrations helper.
+- [x] No spec file contains an inline `CREATE TABLE IF NOT EXISTS …` block; all schema setup goes through the shared helper.
+- [x] `middleware/auth-guard.spec.ts` is the single source for the "401 without token" and "403 with wrong role" matrix; per-router specs hold at most one auth smoke.
+- [x] For every controller/router pair listed in RFC §D2, the router spec contains only HTTP-shaped assertions; business-rule branches live in the controller spec.
+- [x] All RFC §D5 removals/reductions are applied (`shared-roles.spec.ts`, `health.controller.spec.ts`, `/health` duplicates, `parse-cookie-samesite` reduced to 4 tests, CORS router reduced to HTTP smoke).
+- [x] `make lint` and `make test-api` pass green; total test count is within the band declared in RFC §"Impacto esperado" (~680–700).
+- [x] No diff outside `apps/api/test/**`, `apps/api/vitest.config.mts`, and (if needed) `apps/api/package.json` test scripts.
 
 ---
 
@@ -64,17 +64,17 @@ The deliverables are observable in the test suite, not in product features.
 
 | # | Task File | Status |
 |---|-----------|--------|
-| 01 | [Split Vitest into `workers` and `node` projects (P1)](./01-vitest-dual-project-split.task.md) | ⏳ Pending |
-| 02 | [Remove low-signal and duplicate specs (P5)](./02-remove-low-signal-specs.task.md) | ⏳ Pending |
-| 03 | [Introduce `apply-migrations` helper + pilot 5 files (P4 phase 1)](./03-migrations-helper-pilot.task.md) | ⏳ Pending |
-| 04 | [Consolidate auth-enforcement assertions (P3)](./04-consolidate-auth-enforcement.task.md) | ⏳ Pending |
-| 05 | [Document router-vs-controller convention + refactor `auth` pair (P2 pilot)](./05-convention-and-auth-pair.task.md) | ⏳ Pending |
-| 06 | [Refactor `admin-topics` controller/router pair (P2)](./06-refactor-admin-topics-pair.task.md) | ⏳ Pending |
-| 07 | [Refactor `admin-media` controller/router pair (P2)](./07-refactor-admin-media-pair.task.md) | ⏳ Pending |
-| 08 | [Refactor `admin-users` controller/router pair (P2)](./08-refactor-admin-users-pair.task.md) | ⏳ Pending |
-| 09 | [Refactor small pairs: `register`, `password`, `account`, `activate`, `topics` (P2)](./09-refactor-small-pairs.task.md) | ⏳ Pending |
-| 10 | [Roll out migrations helper to remaining ~24 spec files (P4 phase 2)](./10-migrations-helper-rollout.task.md) | ⏳ Pending |
-| 11 | [Audit and lower PBKDF2 iterations in remaining test setups (P6)](./11-pbkdf2-test-iterations-audit.task.md) | ⏳ Pending |
+| 01 | [Split Vitest into `workers` and `node` projects (P1)](./01-vitest-dual-project-split.task.md) | ✅ Done |
+| 02 | [Remove low-signal and duplicate specs (P5)](./02-remove-low-signal-specs.task.md) | ✅ Done |
+| 03 | [Introduce `apply-migrations` helper + pilot 5 files (P4 phase 1)](./03-migrations-helper-pilot.task.md) | ✅ Done |
+| 04 | [Consolidate auth-enforcement assertions (P3)](./04-consolidate-auth-enforcement.task.md) | ✅ Done |
+| 05 | [Document router-vs-controller convention + refactor `auth` pair (P2 pilot)](./05-convention-and-auth-pair.task.md) | ✅ Done |
+| 06 | [Refactor `admin-topics` controller/router pair (P2)](./06-refactor-admin-topics-pair.task.md) | ✅ Done |
+| 07 | [Refactor `admin-media` controller/router pair (P2)](./07-refactor-admin-media-pair.task.md) | ✅ Done |
+| 08 | [Refactor `admin-users` controller/router pair (P2)](./08-refactor-admin-users-pair.task.md) | ✅ Done |
+| 09 | [Refactor small pairs: `register`, `password`, `account`, `activate`, `topics` (P2)](./09-refactor-small-pairs.task.md) | ✅ Done |
+| 10 | [Roll out migrations helper to remaining ~24 spec files (P4 phase 2)](./10-migrations-helper-rollout.task.md) | ✅ Done |
+| 11 | [Audit and lower PBKDF2 iterations in remaining test setups (P6)](./11-pbkdf2-test-iterations-audit.task.md) | ✅ Done |
 
 Dependency graph:
 
@@ -93,9 +93,9 @@ Dependency graph:
 
 ## 6. Definition of Done (milestone level)
 
-- [ ] All 11 tasks marked `✅ Done` with every acceptance box checked.
-- [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint` and `make test-api` green in CI.
-- [ ] Wall-time delta documented in a short closeout at `docs/product/milestones/8-api-test-optimization/closeout-analysis.md` (before/after table sourced from the same machine).
-- [ ] RFC 0001 status updated to `Accepted` (or `Implemented`) in `docs/product/RFCs/README.md` and in the RFC header.
-- [ ] No diff outside the scope declared in §"Hard scope guardrail".
+- [x] All 11 tasks marked `✅ Done` with every acceptance box checked.
+- [x] All milestone-level acceptance criteria in §3 pass.
+- [x] `make lint` and `make test-api` green in CI.
+- [x] Wall-time delta documented in a short closeout at `docs/product/milestones/8-api-test-optimization/closeout-analysis.md` (before/after table sourced from the same machine).
+- [x] RFC 0001 status updated to `Accepted` (or `Implemented`) in `docs/product/RFCs/README.md` and in the RFC header.
+- [x] No diff outside the scope declared in §"Hard scope guardrail".

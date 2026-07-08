@@ -18,6 +18,7 @@ const ROOT: TopicNodeRecord = {
   estimatedMinutes: 0,
   prerequisiteIds: [],
   archived: false,
+  visibility: Entities.Config.TopicVisibility.RESTRICTED,
 };
 
 const CHILD: TopicNodeRecord = { ...ROOT, id: 'child-1', parentId: 'root-1', title: 'Child' };
@@ -81,20 +82,6 @@ describe('AdminTopicsController', () => {
       expect(topicsRepo.create).toHaveBeenCalledOnce();
     });
 
-    it('returns 400 for missing title', async () => {
-      const result = await controller.create({ content: 'no title' });
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.status).toBe(400);
-      expect(result.error).toBe('BadRequest');
-    });
-
-    it('returns 400 for empty title', async () => {
-      const result = await controller.create({ title: '' });
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.status).toBe(400);
-    });
 
     it('returns 404 when parentId does not exist', async () => {
       const result = await controller.create({ title: 'Child', parentId: 'nonexistent' });
@@ -120,6 +107,12 @@ describe('AdminTopicsController', () => {
       await controller.create({ title: 'Topic', content: '<script>alert(1)</script>' });
       const callArg = (topicsRepo.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(callArg.content).not.toContain('<script>');
+    });
+
+    it('forwards visibility to the topics repo', async () => {
+      await controller.create({ title: 'Private Topic', visibility: 'private' });
+      const callArg = (topicsRepo.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(callArg.visibility).toBe('private');
     });
   });
 
@@ -152,12 +145,6 @@ describe('AdminTopicsController', () => {
       expect(topicsRepo.update).toHaveBeenCalledOnce();
     });
 
-    it('returns 400 for invalid body (empty title)', async () => {
-      const result = await controller.update('root-1', { title: '' });
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.status).toBe(400);
-    });
 
     it('returns 404 when node does not exist', async () => {
       const result = await controller.update('nonexistent', { title: 'X' });
@@ -173,6 +160,18 @@ describe('AdminTopicsController', () => {
       expect(result.status).toBe(422);
       expect(result.error).toBe('UNKNOWN_PREREQ');
     });
+
+    it('sanitizes markdown content on update', async () => {
+      await controller.update('root-1', { content: '<iframe src="evil.com"></iframe>' });
+      const callArg = (topicsRepo.update as ReturnType<typeof vi.fn>).mock.calls[0][1];
+      expect(callArg.content).not.toContain('<iframe');
+    });
+
+    it('forwards visibility to the topics repo', async () => {
+      await controller.update('root-1', { visibility: 'public' });
+      const callArg = (topicsRepo.update as ReturnType<typeof vi.fn>).mock.calls[0][1];
+      expect(callArg.visibility).toBe('public');
+    });
   });
 
   // ── move ──────────────────────────────────────────────────────────────────
@@ -184,12 +183,6 @@ describe('AdminTopicsController', () => {
       expect(topicsRepo.move).toHaveBeenCalledWith('child-1', null, undefined);
     });
 
-    it('returns 400 for invalid body', async () => {
-      const result = await controller.move('root-1', {});
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.status).toBe(400);
-    });
 
     it('returns 404 when node does not exist', async () => {
       const result = await controller.move('nonexistent', { newParentId: null });

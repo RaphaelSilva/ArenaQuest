@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ContentSection } from '@web/components/catalog/ContentSection';
 
+import { dictPt } from '@web/i18n/dict-pt';
+
 describe('ContentSection', () => {
   it('renders nothing when content is null', () => {
     const { container } = render(<ContentSection content={null} />);
@@ -25,7 +27,7 @@ describe('ContentSection', () => {
 
   it('renders content section with heading when content is provided', () => {
     const { container } = render(<ContentSection content="# Hello World" />);
-    expect(screen.getByText('About This Topic')).toBeInTheDocument();
+    expect(screen.getByText(dictPt.catalog.topicPage.contentTitle)).toBeInTheDocument();
     expect(container.querySelector('section')).toBeInTheDocument();
   });
 

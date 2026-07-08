@@ -15,6 +15,7 @@ type TopicNodeRow = {
   sort_order: number;
   estimated_minutes: number;
   archived: number;
+  visibility: string;
   created_at: string;
   updated_at: string;
 };
@@ -42,6 +43,36 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
     return results.map(r => ({ id: r.id, name: r.name, slug: r.slug }));
   }
 
+  private async fetchMediaCount(nodeId: string): Promise<{ video: number; audio: number; pdf: number; total: number }> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT type, COUNT(*) as count
+         FROM media
+         WHERE topic_node_id = ? AND status != 'deleted' AND status != 'pending'
+         GROUP BY type`
+      )
+      .bind(nodeId)
+      .all<{ type: string; count: number }>();
+
+    let video = 0;
+    let audio = 0;
+    let pdf = 0;
+
+    for (const r of results) {
+      const t = r.type.toLowerCase();
+      if (t === 'video') video = r.count;
+      else if (t === 'audio') audio = r.count;
+      else if (t === 'pdf') pdf = r.count;
+    }
+
+    return {
+      video,
+      audio,
+      pdf,
+      total: video + audio + pdf,
+    };
+  }
+
   private async fetchPrerequisiteIds(nodeId: string): Promise<string[]> {
     const { results } = await this.db
       .prepare('SELECT prerequisite_id FROM topic_node_prerequisites WHERE topic_node_id = ?')
@@ -52,9 +83,10 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
   }
 
   private async rowToRecord(row: TopicNodeRow): Promise<TopicNodeRecord> {
-    const [tags, prerequisiteIds] = await Promise.all([
+    const [tags, prerequisiteIds, mediaCount] = await Promise.all([
       this.fetchTags(row.id),
       this.fetchPrerequisiteIds(row.id),
+      this.fetchMediaCount(row.id),
     ]);
 
     return {
@@ -68,6 +100,8 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
       estimatedMinutes: row.estimated_minutes,
       prerequisiteIds,
       archived: row.archived === 1,
+      visibility: row.visibility as Entities.Config.TopicVisibility,
+      mediaCount,
     };
   }
 
@@ -173,6 +207,7 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
       estimatedMinutes: row.estimated_minutes,
       prerequisiteIds: prereqsMap.get(row.id) ?? [],
       archived: row.archived === 1,
+      visibility: row.visibility as Entities.Config.TopicVisibility,
     }));
   }
 
@@ -198,12 +233,14 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
       sortOrder = (maxRow?.mx ?? -1) + 1;
     }
 
+    const visibility = data.visibility ?? 'restricted';
+
     const stmts = [
       this.db
         .prepare(
-          'INSERT INTO topic_nodes (id, parent_id, title, content, status, sort_order, estimated_minutes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO topic_nodes (id, parent_id, title, content, status, sort_order, estimated_minutes, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         )
-        .bind(id, parentId, data.title, content, status, sortOrder, estimatedMinutes),
+        .bind(id, parentId, data.title, content, status, sortOrder, estimatedMinutes, visibility),
       ...(data.tagIds ?? []).map(tagId =>
         this.db
           .prepare('INSERT OR IGNORE INTO topic_node_tags (topic_node_id, tag_id) VALUES (?, ?)')
@@ -237,6 +274,7 @@ export class D1TopicNodeRepository implements ITopicNodeRepository {
       }
     }
     if (data.estimatedMinutes !== undefined) { setClauses.push('estimated_minutes = ?'); values.push(data.estimatedMinutes); }
+    if (data.visibility !== undefined) { setClauses.push('visibility = ?'); values.push(data.visibility); }
 
     values.push(id);
     await this.db

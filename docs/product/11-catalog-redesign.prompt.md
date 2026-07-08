@@ -1,0 +1,1 @@
+Act as executor, chained mode. Run task under @docs/product/milestones/11-catalog-redesign in dependency order.

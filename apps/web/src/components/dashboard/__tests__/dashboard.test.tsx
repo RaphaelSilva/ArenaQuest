@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
+import { dictPt } from '@web/i18n/dict-pt';
 import { StatCardLevel } from '../StatCardLevel';
 import { DailyTasks } from '../DailyTasks';
 import type { DashboardXp, DailyQuest } from '@web/lib/dashboard-api';
@@ -25,12 +26,12 @@ describe('StatCardLevel', () => {
 
   it('renders total XP', () => {
     render(<StatCardLevel xp={XP_FULL} />);
-    expect(screen.getByText(/1,240 XP total/i)).toBeInTheDocument();
+    expect(screen.getByText(dictPt.dashboard.levelCard.xpTotal(1240))).toBeInTheDocument();
   });
 
   it('renders the XP progress bar with correct aria attributes', () => {
     render(<StatCardLevel xp={XP_FULL} />);
-    const bar = screen.getByRole('progressbar', { name: /XP progress/i });
+    const bar = screen.getByRole('progressbar', { name: dictPt.dashboard.levelCard.xpProgressLabel });
     // 240 / 760 ≈ 31.58 → rounds to 32%
     expect(bar).toHaveAttribute('aria-valuenow', '32');
     expect(bar).toHaveAttribute('aria-valuemin', '0');
@@ -40,7 +41,7 @@ describe('StatCardLevel', () => {
   it('does not show NaN when xpToNextLevel is 0', () => {
     const xp: DashboardXp = { ...XP_FULL, xpToNextLevel: 0, xpInLevel: 0 };
     render(<StatCardLevel xp={xp} />);
-    const bar = screen.getByRole('progressbar', { name: /XP progress/i });
+    const bar = screen.getByRole('progressbar', { name: dictPt.dashboard.levelCard.xpProgressLabel });
     expect(bar.getAttribute('aria-valuenow')).not.toBe('NaN');
     expect(bar).toHaveAttribute('aria-valuenow', '100');
   });
@@ -77,7 +78,7 @@ describe('DailyTasks', () => {
 
   it('renders the progress bar with the correct percentage', () => {
     render(<DailyTasks tasks={TASKS} />);
-    const bar = screen.getByRole('progressbar', { name: /Daily task progress/i });
+    const bar = screen.getByRole('progressbar', { name: dictPt.dashboard.dailyTasks.progressLabel });
     expect(bar).toHaveAttribute('aria-valuenow', '33');
   });
 
@@ -89,13 +90,13 @@ describe('DailyTasks', () => {
 
   it('shows empty state when there are no tasks', () => {
     render(<DailyTasks tasks={[]} />);
-    expect(screen.getByText(/No daily tasks today/i)).toBeInTheDocument();
+    expect(screen.getByText(dictPt.dashboard.dailyTasks.empty)).toBeInTheDocument();
   });
 
   it('shows all tasks as completed when all are done', () => {
     const allDone: DailyQuest[] = TASKS.map((t) => ({ ...t, completed: true }));
     render(<DailyTasks tasks={allDone} />);
-    const bar = screen.getByRole('progressbar', { name: /Daily task progress/i });
+    const bar = screen.getByRole('progressbar', { name: dictPt.dashboard.dailyTasks.progressLabel });
     expect(bar).toHaveAttribute('aria-valuenow', '100');
   });
 });

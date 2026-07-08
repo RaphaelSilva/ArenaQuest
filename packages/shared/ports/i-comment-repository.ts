@@ -3,6 +3,7 @@ export interface CommentRecord {
   topicNodeId: string;
   parentCommentId: string | null;
   userId: string;
+  userName: string; // display name of the comment author, joined from users.name
   body: string | null; // null when soft-deleted
   createdAt: string;
   deletedAt: string | null;

@@ -1,0 +1,8 @@
+// Test fixture: an env.<label> `vars` block with an injected coherence break —
+// WEB_BASE_URL points at the wrong host (not the profile's webOrigin).
+{
+  "ALLOWED_ORIGINS": "https://acme-web-staging.pages.dev,https://*.acme-web-staging.pages.dev,http://localhost:3000",
+  "WEB_BASE_URL": "https://WRONG-host.example.com",
+  "GOOGLE_REDIRECT_URI": "https://api-acme-staging.acme.workers.dev/auth/google/callback",
+  "GOOGLE_CLIENT_ID": "set-in-block.apps.googleusercontent.com",
+}

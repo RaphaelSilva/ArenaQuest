@@ -2,42 +2,8 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { D1MediaRepository } from '@api/adapters/db/d1-media-repository';
 import { Entities } from '@arenaquest/shared/types/entities';
+import { applyMigrations } from '../helpers/apply-migrations';
 
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id            TEXT NOT NULL PRIMARY KEY,
-    name          TEXT NOT NULL,
-    email         TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    timezone      TEXT NOT NULL DEFAULT 'UTC'
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_nodes (
-    id                TEXT    NOT NULL PRIMARY KEY,
-    parent_id         TEXT    REFERENCES topic_nodes(id) ON DELETE RESTRICT,
-    title             TEXT    NOT NULL,
-    content           TEXT    NOT NULL DEFAULT '',
-    status            TEXT    NOT NULL DEFAULT 'draft',
-    sort_order        INTEGER NOT NULL DEFAULT 0,
-    estimated_minutes INTEGER NOT NULL DEFAULT 0,
-    archived          INTEGER NOT NULL DEFAULT 0,
-    created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at        TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS media (
-    id            TEXT    NOT NULL PRIMARY KEY,
-    topic_node_id TEXT    NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    uploaded_by   TEXT    NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    storage_key   TEXT    NOT NULL,
-    original_name TEXT    NOT NULL,
-    type          TEXT    NOT NULL,
-    size_bytes    INTEGER NOT NULL DEFAULT 0,
-    status        TEXT    NOT NULL DEFAULT 'pending',
-    created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-];
 
 describe('D1MediaRepository', () => {
   let repo: D1MediaRepository;
@@ -45,7 +11,7 @@ describe('D1MediaRepository', () => {
   let uploadedById: string;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map(sql => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
     repo = new D1MediaRepository(env.DB);
 
     // Seed a user and topic node to satisfy FK constraints

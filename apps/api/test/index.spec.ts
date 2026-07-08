@@ -10,16 +10,6 @@ import worker, { AppEnv } from "../src/index";
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
 describe("Worker", () => {
-	it("/health returns ok (unit style)", async () => {
-		const request = new IncomingRequest("http://example.com/health");
-		const ctx = createExecutionContext();
-		const response = await worker.fetch(request, env as AppEnv, ctx);
-		await waitOnExecutionContext(ctx);
-		expect(response.status).toBe(200);
-		const body = await response.json<{ status: string }>();
-		expect(body.status).toBe("ok");
-	});
-
 	it("/health returns ok (integration style)", async () => {
 		const response = await SELF.fetch("https://example.com/health");
 		expect(response.status).toBe(200);

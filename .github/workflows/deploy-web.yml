@@ -80,6 +80,13 @@ jobs:
         run: pnpm --filter web pages:build
         env:
           NEXT_PUBLIC_API_URL: https://api-staging.raphael-1d2.workers.dev
+          # White-label branding — sourced from the staging GitHub Environment
+          # vars; unset → empty → ArenaQuest defaults in brand.ts/next.config.ts.
+          NEXT_PUBLIC_BRAND_SIGLA: ${{ vars.NEXT_PUBLIC_BRAND_SIGLA }}
+          NEXT_PUBLIC_BRAND_NAME_PREFIX: ${{ vars.NEXT_PUBLIC_BRAND_NAME_PREFIX }}
+          NEXT_PUBLIC_BRAND_NAME_ACCENT: ${{ vars.NEXT_PUBLIC_BRAND_NAME_ACCENT }}
+          NEXT_PUBLIC_BRAND_POWERED_BY: ${{ vars.NEXT_PUBLIC_BRAND_POWERED_BY }}
+          NEXT_PUBLIC_BRAND_ACCENT: ${{ vars.NEXT_PUBLIC_BRAND_ACCENT }}
 
       - name: Deploy to Cloudflare Pages (Staging)
         uses: cloudflare/wrangler-action@v3
@@ -122,6 +129,7 @@ jobs:
         run: pnpm --filter web pages:build
         env:
           NEXT_PUBLIC_API_URL: https://api.raphael-1d2.workers.dev
+          NEXT_PUBLIC_LANGUAGE: en
 
       - name: Deploy to Cloudflare Pages (Production)
         uses: cloudflare/wrangler-action@v3
@@ -130,3 +138,95 @@ jobs:
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           workingDirectory: apps/web
           command: pages deploy .vercel/output/static --project-name=arenaquest-web
+
+  deploy-prod-spaziord:
+    name: Deploy to Production
+    needs: deploy-staging
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment:
+      name: prod-spaziord
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared
+        run: pnpm turbo build --filter @arenaquest/shared
+
+      - name: Build for Cloudflare Pages (Production)
+        run: pnpm --filter web pages:build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          # White-label branding — sourced from the production GitHub Environment
+          # vars; unset → empty → ArenaQuest defaults in brand.ts/next.config.ts.
+          NEXT_PUBLIC_BRAND_SIGLA: SRD
+          NEXT_PUBLIC_BRAND_NAME_PREFIX: Spazio
+          NEXT_PUBLIC_BRAND_NAME_ACCENT: RD
+          NEXT_PUBLIC_BRAND_POWERED_BY: true
+          NEXT_PUBLIC_BRAND_ACCENT: #8423c5
+
+      - name: Deploy to Cloudflare Pages (Production)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          command: pages deploy .vercel/output/static --project-name=spaziord-web
+
+  deploy-prod-budo:
+    name: Deploy to Production
+    needs: deploy-staging
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment:
+      name: prod-budo
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared
+        run: pnpm turbo build --filter @arenaquest/shared
+
+      - name: Build for Cloudflare Pages (Production)
+        run: pnpm --filter web pages:build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          # White-label branding — sourced from the production GitHub Environment
+          # vars; unset → empty → ArenaQuest defaults in brand.ts/next.config.ts.
+          NEXT_PUBLIC_BRAND_SIGLA: NJS
+          NEXT_PUBLIC_BRAND_NAME_PREFIX: Budo
+          NEXT_PUBLIC_BRAND_NAME_ACCENT: Taijutsu
+          NEXT_PUBLIC_BRAND_POWERED_BY: true
+          NEXT_PUBLIC_BRAND_ACCENT: #8423c5
+
+      - name: Deploy to Cloudflare Pages (Production)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          command: pages deploy .vercel/output/static --project-name=budo-web

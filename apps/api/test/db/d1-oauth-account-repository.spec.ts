@@ -1,39 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { D1OAuthAccountRepository } from '@api/adapters/db/d1-oauth-account-repository';
-
-const MIGRATION_SQL = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id            TEXT NOT NULL PRIMARY KEY,
-    name          TEXT NOT NULL,
-    email         TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    timezone      TEXT NOT NULL DEFAULT 'UTC'
-  )`,
-  `CREATE TABLE IF NOT EXISTS roles (
-    id          TEXT NOT NULL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '',
-    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_roles (
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    PRIMARY KEY (user_id, role_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS oauth_accounts (
-    provider         TEXT NOT NULL,
-    provider_user_id TEXT NOT NULL,
-    user_id          TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    email            TEXT NOT NULL,
-    created_at       TEXT NOT NULL DEFAULT (datetime('now')),
-    PRIMARY KEY (provider, provider_user_id)
-  )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_accounts_provider_user
-     ON oauth_accounts (provider, user_id)`,
-];
+import { applyMigrations } from '../helpers/apply-migrations';
 
 const USER_ID_1 = 'oauth-test-user-1';
 const USER_ID_2 = 'oauth-test-user-2';
@@ -44,12 +12,9 @@ describe('D1OAuthAccountRepository', () => {
   let repo: D1OAuthAccountRepository;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_SQL.map(sql => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
 
     await env.DB.batch([
-      env.DB
-        .prepare("INSERT OR IGNORE INTO roles (id, name, description) VALUES ('role-student', 'student', 'Student')")
-        .bind(),
       env.DB
         .prepare('INSERT OR IGNORE INTO users (id, name, email, password_hash, status) VALUES (?, ?, ?, ?, ?)')
         .bind(USER_ID_1, 'Alice', 'alice@oauth.test', 'pbkdf2:1:aa:bb', 'active'),
@@ -58,7 +23,7 @@ describe('D1OAuthAccountRepository', () => {
         .bind(USER_ID_2, 'Bob', 'bob@oauth.test', 'pbkdf2:1:cc:dd', 'active'),
       env.DB
         .prepare('INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)')
-        .bind(USER_ID_1, 'role-student'),
+        .bind(USER_ID_1, 'bf3d0f1d-7d77-5151-922e-b87dff0fa7ad'),
     ]);
 
     repo = new D1OAuthAccountRepository(env.DB);

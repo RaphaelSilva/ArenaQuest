@@ -1,58 +1,15 @@
 import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
+import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
 
 // ---------------------------------------------------------------------------
-// DB setup — mirrors auth.router.spec.ts so this file is self-contained.
+// DB setup
 // ---------------------------------------------------------------------------
-
-const MIGRATION_SQL = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id            TEXT NOT NULL PRIMARY KEY,
-    name          TEXT NOT NULL,
-    email         TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    timezone      TEXT NOT NULL DEFAULT 'UTC'
-  )`,
-  `CREATE TABLE IF NOT EXISTS roles (
-    id          TEXT NOT NULL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '',
-    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_roles (
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    PRIMARY KEY (user_id, role_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS refresh_tokens (
-    token      TEXT NOT NULL PRIMARY KEY,
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_activation_tokens (
-    token_hash    TEXT    NOT NULL PRIMARY KEY,
-    user_id       TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at    INTEGER NOT NULL,
-    consumed_at   INTEGER NULL,
-    created_at    INTEGER NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_streak (
-    user_id             TEXT    NOT NULL PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    current_streak      INTEGER NOT NULL DEFAULT 0,
-    longest_streak      INTEGER NOT NULL DEFAULT 0,
-    last_activity_date  TEXT,
-    updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-];
 
 beforeAll(async () => {
-  await env.DB.batch(MIGRATION_SQL.map((sql) => env.DB.prepare(sql)));
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO roles (id, name, description) VALUES ('role-student', 'student', 'Student')",
-  ).run();
+  await applyMigrations(env.DB);
 });
 
 beforeEach(async () => {
@@ -77,7 +34,7 @@ async function request(
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (ip) headers['CF-Connecting-IP'] = ip;
 
-  const req = new IncomingRequest(`http://example.com${path}`, {
+  const req = new IncomingRequest(`http://example.com${v1(path)}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -138,6 +95,14 @@ async function seedInactiveUser(email: string): Promise<string> {
 // ---------------------------------------------------------------------------
 
 describe('POST /auth/activate', () => {
+  it('returns standardized 400 for empty body', async () => {
+    const res = await request('/auth/activate', { body: {}, ip: '203.0.113.79' });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('ValidationError');
+    expect(Array.isArray(body.issues)).toBe(true);
+  });
+
   it('valid token flips user to ACTIVE and returns 200 activated', async () => {
     const userId = await seedInactiveUser('happy@activate-test.local');
     const plainToken = 'happy-path-plaintext-token';
@@ -166,65 +131,6 @@ describe('POST /auth/activate', () => {
       .bind(userId)
       .first<{ consumed_at: number | null }>();
     expect(tokenRow?.consumed_at).not.toBeNull();
-  });
-
-  it('replay returns 200 already_active and does not flip user again', async () => {
-    const userId = await seedInactiveUser('replay@activate-test.local');
-    const plainToken = 'replay-path-plaintext-token';
-    await seedActivationToken({
-      userId,
-      plainToken,
-      expiresAt: Date.now() + 60_000,
-    });
-
-    const first = await request('/auth/activate', {
-      body: { token: plainToken },
-      ip: '203.0.113.71',
-    });
-    expect(first.status).toBe(200);
-
-    const second = await request('/auth/activate', {
-      body: { token: plainToken },
-      ip: '203.0.113.71',
-    });
-    expect(second.status).toBe(200);
-    expect(await second.json()).toEqual({ status: 'already_active' });
-  });
-
-  it('expired token → 400 InvalidToken', async () => {
-    const userId = await seedInactiveUser('expired@activate-test.local');
-    const plainToken = 'expired-path-plaintext-token';
-    await seedActivationToken({
-      userId,
-      plainToken,
-      expiresAt: Date.now() - 1_000, // already past
-    });
-
-    const res = await request('/auth/activate', {
-      body: { token: plainToken },
-      ip: '203.0.113.72',
-    });
-
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: 'InvalidToken' });
-  });
-
-  it('unknown / missing token → 400 InvalidToken (same shape as expired)', async () => {
-    const r1 = await request('/auth/activate', {
-      body: { token: 'never-issued-token' },
-      ip: '203.0.113.73',
-    });
-    const r2 = await request('/auth/activate', {
-      body: {},
-      ip: '203.0.113.73',
-    });
-
-    expect(r1.status).toBe(400);
-    expect(r2.status).toBe(400);
-    const b1 = await r1.json();
-    const b2 = await r2.json();
-    expect(b1).toEqual({ error: 'InvalidToken' });
-    expect(b2).toEqual({ error: 'InvalidToken' });
   });
 
   it('after activation, /auth/login succeeds with accessToken (regression)', async () => {

@@ -7,8 +7,15 @@ This directory contains formal proposals and architectural decisions for ArenaQu
 | RFC | Title | Status | Date | Author |
 |-----|-------|--------|------|--------|
 | [0001](./0001-apps-api-test-suite-optimization.md) | Otimização da suíte de testes de `apps/api` | Draft | 2026-05-24 | raphaelsilva |
-| [0002](./0002-frontend-internationalization-i18n.md) | Frontend Internationalization (i18n) Strategy | Proposed | 2026-05-24 | Claude Code |
+| [0002](./0002-frontend-internationalization-i18n.md) | Frontend Internationalization (i18n) Strategy | Implemented | 2026-05-24 | Claude Code |
 | [0003](./0003-apps-api-route-organization-and-openapi.md) | Reorganização de rotas e adoção de OpenAPI/Swagger em `apps/api` | Draft | 2026-05-24 | raphaelsilva |
+| [0004](./0004-catalog-redesign.md) | Catalog page redesign — wireframe-aligned UX | Implemented | 2026-05-27 | raphaelsilva |
+| [0005](./0005-enrollment-exclusions-and-visibility.md) | Enrollment strategy review — topic exclusions and node visibility | Implemented | 2026-05-28 | raphaelsilva |
+| [0006](./0006-white-label-branding-and-build-tooling.md) | White-label branding | Draft | 2026-06-19 | raphaelsilva |
+| [0007](./0007-deployment-preflight-and-config-validation.md) | White-label environment bring-up — label profiles, scaffolding & preflight checklist | Draft | 2026-06-19 | raphaelsilva |
+| [0008](./0008-user-dashboard-with-topic-recommendations-and-badge-achievem.md) | User Dashboard with Topic Recommendations and Badge Achievements | Draft | 2026-06-20 | raphaelsilva |
+| [0009](./0009-gamification-catalog-administration.md) | Gamification Catalog Administration | Implemented | 2026-06-23 | raphaelsilva |
+| [0010](./0010-player-progression-administration.md) | Player Progression Administration | Implemented | 2026-06-23 | raphaelsilva |
 
 ## RFC Process
 

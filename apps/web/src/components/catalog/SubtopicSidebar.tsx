@@ -1,6 +1,9 @@
+'use client';
+
 import Link from 'next/link';
 import type { TopicNode } from '@web/lib/topics-api';
 import type { TopicProgressStatus } from '@web/lib/topics-api';
+import { useDict } from '@web/context/dict-context';
 
 type Props = {
   topicId: string;
@@ -11,6 +14,7 @@ type Props = {
 };
 
 export function SubtopicSidebar({ topicId, topicTitle, subtopicId, siblings, progressMap }: Props) {
+  const dict = useDict();
   const completedCount = siblings.filter(
     (s) => (progressMap.get(s.id) ?? 'not_started') === 'completed',
   ).length;
@@ -35,7 +39,7 @@ export function SubtopicSidebar({ topicId, topicTitle, subtopicId, siblings, pro
           className="mb-3 text-[11px] font-semibold uppercase tracking-widest"
           style={{ color: 'var(--aq-text3)' }}
         >
-          Subtópicos
+          {dict.catalog.subtopicSidebar.header}
         </p>
         <div className="flex items-center gap-2.5">
           <span
@@ -50,7 +54,7 @@ export function SubtopicSidebar({ topicId, topicTitle, subtopicId, siblings, pro
               {topicTitle}
             </p>
             <p className="text-[11px]" style={{ color: 'var(--aq-text3)' }}>
-              {topicPct}% concluído
+              {dict.catalog.subtopicSidebar.completedPct(topicPct)}
             </p>
           </div>
         </div>
@@ -73,7 +77,7 @@ export function SubtopicSidebar({ topicId, topicTitle, subtopicId, siblings, pro
           return (
             <Link
               key={s.id}
-              href={`/catalog/${topicId}/${s.id}`}
+              href={`/catalog/${s.id}`}
               className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[var(--aq-bg3)]"
               style={{
                 background: isCurrent ? 'var(--aq-accent-glow)' : undefined,
@@ -131,22 +135,22 @@ export function SubtopicSidebar({ topicId, topicTitle, subtopicId, siblings, pro
       >
         {prev ? (
           <Link
-            href={`/catalog/${topicId}/${prev.id}`}
+            href={`/catalog/${prev.id}`}
             className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-2 text-[12px] font-medium transition-colors hover:bg-[var(--aq-bg3)]"
             style={{ border: '1px solid var(--aq-border2)', color: 'var(--aq-text2)' }}
           >
-            ← Anterior
+            {dict.catalog.subtopicSidebar.previous}
           </Link>
         ) : (
           <div className="flex-1" />
         )}
         {next ? (
           <Link
-            href={`/catalog/${topicId}/${next.id}`}
+            href={`/catalog/${next.id}`}
             className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-2 text-[12px] font-medium transition-colors hover:bg-[var(--aq-bg3)]"
             style={{ border: '1px solid var(--aq-border2)', color: 'var(--aq-text2)' }}
           >
-            Próximo →
+            {dict.catalog.subtopicSidebar.next}
           </Link>
         ) : (
           <Link
@@ -154,7 +158,7 @@ export function SubtopicSidebar({ topicId, topicTitle, subtopicId, siblings, pro
             className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-2 text-[12px] font-medium transition-colors"
             style={{ background: 'var(--aq-accent-glow)', border: '1px solid var(--aq-accent)', color: 'var(--aq-accent)' }}
           >
-            Concluído ✓
+            {dict.catalog.subtopicSidebar.completedNav}
           </Link>
         )}
       </div>

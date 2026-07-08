@@ -1,0 +1,24 @@
+info:
+  name: Create Task
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: "{{host}}/v1/admin/tasks"
+  headers:
+    - name: "content-type"
+      value: application/json
+  body:
+    type: json
+    data: |-
+        {
+          "description": "",
+          "status": "draft",
+          "title": "string"
+        }
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

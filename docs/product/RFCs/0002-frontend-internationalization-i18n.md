@@ -1,7 +1,7 @@
 # RFC 0002: Frontend Internationalization (i18n) Strategy
 
 **Date:** 2026-05-24  
-**Status:** Proposed  
+**Status:** Implemented  
 **Author:** Claude Code  
 **Affected:** `apps/web` (Next.js 15 frontend)
 

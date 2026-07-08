@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { MediaGallery } from '@web/components/catalog/MediaGallery';
 import type { Media } from '@web/lib/topics-api';
 
+import { dictPt } from '@web/i18n/dict-pt';
+
 describe('MediaGallery', () => {
   it('renders nothing when media array is empty', () => {
     const { container } = render(<MediaGallery media={[]} />);
@@ -34,7 +36,7 @@ describe('MediaGallery', () => {
     ];
 
     render(<MediaGallery media={media} />);
-    expect(screen.getByText('Media Gallery')).toBeInTheDocument();
+    expect(screen.getByText(dictPt.catalog.topicPage.mediaGalleryTitle)).toBeInTheDocument();
   });
 
   it('renders multiple media items', () => {

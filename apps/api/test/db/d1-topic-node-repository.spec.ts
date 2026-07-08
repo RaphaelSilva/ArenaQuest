@@ -2,44 +2,13 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { D1TopicNodeRepository } from '@api/adapters/db/d1-topic-node-repository';
 import { Entities } from '@arenaquest/shared/types/entities';
-
-// D1's exec() processes one statement at a time in the local simulator
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS topic_nodes (
-    id                TEXT    NOT NULL PRIMARY KEY,
-    parent_id         TEXT    REFERENCES topic_nodes(id) ON DELETE RESTRICT,
-    title             TEXT    NOT NULL,
-    content           TEXT    NOT NULL DEFAULT '',
-    status            TEXT    NOT NULL DEFAULT 'draft',
-    sort_order        INTEGER NOT NULL DEFAULT 0,
-    estimated_minutes INTEGER NOT NULL DEFAULT 0,
-    archived          INTEGER NOT NULL DEFAULT 0,
-    created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at        TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS tags (
-    id         TEXT NOT NULL PRIMARY KEY,
-    name       TEXT NOT NULL,
-    slug       TEXT NOT NULL UNIQUE,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_node_tags (
-    topic_node_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    tag_id        TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-    PRIMARY KEY (topic_node_id, tag_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_node_prerequisites (
-    topic_node_id   TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    prerequisite_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    PRIMARY KEY (topic_node_id, prerequisite_id)
-  )`,
-];
+import { applyMigrations } from '../helpers/apply-migrations';
 
 describe('D1TopicNodeRepository', () => {
   let repo: D1TopicNodeRepository;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map(sql => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
     repo = new D1TopicNodeRepository(env.DB);
   });
 
@@ -217,6 +186,104 @@ describe('D1TopicNodeRepository', () => {
 
       const s = await repo.findById(sibling.id);
       expect(s!.archived).toBe(false);
+    });
+  });
+
+  describe('visibility', () => {
+    it('create with explicit visibility round-trips', async () => {
+      const node = await repo.create({ title: 'Public Node', visibility: Entities.Config.TopicVisibility.PUBLIC });
+      expect(node.visibility).toBe(Entities.Config.TopicVisibility.PUBLIC);
+
+      const fetched = await repo.findById(node.id);
+      expect(fetched!.visibility).toBe(Entities.Config.TopicVisibility.PUBLIC);
+    });
+
+    it('create without visibility defaults to restricted', async () => {
+      const node = await repo.create({ title: 'Default Visibility Node' });
+      expect(node.visibility).toBe(Entities.Config.TopicVisibility.RESTRICTED);
+    });
+
+    it('update changes visibility to private', async () => {
+      const node = await repo.create({ title: 'Visibility Change Node' });
+      const updated = await repo.update(node.id, { visibility: Entities.Config.TopicVisibility.PRIVATE });
+      expect(updated.visibility).toBe(Entities.Config.TopicVisibility.PRIVATE);
+    });
+
+    it('update omitting visibility preserves the stored value', async () => {
+      const node = await repo.create({ title: 'Preserved Visibility Node', visibility: Entities.Config.TopicVisibility.PUBLIC });
+      const updated = await repo.update(node.id, { title: 'Updated Title Only' });
+      expect(updated.visibility).toBe(Entities.Config.TopicVisibility.PUBLIC);
+    });
+  });
+
+  describe('mediaCount projection', () => {
+    it('returns zero media counts for a newly created topic', async () => {
+      const node = await repo.create({ title: 'Topic without Media' });
+      expect(node.mediaCount).toEqual({
+        video: 0,
+        audio: 0,
+        pdf: 0,
+        total: 0,
+      });
+
+      const fetched = await repo.findById(node.id);
+      expect(fetched!.mediaCount).toEqual({
+        video: 0,
+        audio: 0,
+        pdf: 0,
+        total: 0,
+      });
+    });
+
+    it('returns correct counts for mixed media kinds and updates on deletion', async () => {
+      const node = await repo.create({ title: 'Topic with Media' });
+
+      const userId = crypto.randomUUID();
+      await env.DB.prepare(
+        "INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)"
+      ).bind(userId, 'Uploader', 'uploader@test.com', 'hash').run();
+
+      const m1 = crypto.randomUUID();
+      const m2 = crypto.randomUUID();
+      const m3 = crypto.randomUUID();
+      const m4 = crypto.randomUUID();
+      const m5 = crypto.randomUUID();
+      const m6 = crypto.randomUUID();
+
+      await env.DB.prepare(
+        `INSERT INTO media (id, topic_node_id, uploaded_by, storage_key, original_name, type, status) VALUES 
+         (?, ?, ?, 'key1', 'video1.mp4', 'video', 'active'),
+         (?, ?, ?, 'key2', 'video2.mp4', 'video', 'active'),
+         (?, ?, ?, 'key3', 'audio.mp3', 'audio', 'active'),
+         (?, ?, ?, 'key4', 'doc.pdf', 'pdf', 'active'),
+         (?, ?, ?, 'key5', 'deleted.mp4', 'video', 'deleted'),
+         (?, ?, ?, 'key6', 'pending.mp3', 'audio', 'pending')`
+      ).bind(
+        m1, node.id, userId,
+        m2, node.id, userId,
+        m3, node.id, userId,
+        m4, node.id, userId,
+        m5, node.id, userId,
+        m6, node.id, userId
+      ).run();
+
+      const fetched = await repo.findById(node.id);
+      expect(fetched!.mediaCount).toEqual({
+        video: 2,
+        audio: 1,
+        pdf: 1,
+        total: 4,
+      });
+
+      await env.DB.prepare("UPDATE media SET status = 'deleted' WHERE id = ?").bind(m1).run();
+
+      const afterDelete = await repo.findById(node.id);
+      expect(afterDelete!.mediaCount).toEqual({
+        video: 1,
+        audio: 1,
+        pdf: 1,
+        total: 3,
+      });
     });
   });
 });

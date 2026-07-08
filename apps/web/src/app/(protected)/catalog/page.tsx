@@ -6,8 +6,10 @@ import { useApiClient } from '@web/context/auth-context';
 import type { TopicNode, TopicProgressStatus } from '@web/lib/topics-api';
 import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
 import { Spinner } from '@web/components/spinner';
+import { useDict } from '@web/context/dict-context';
 
 export default function CatalogIndexPage() {
+  const dict = useDict();
   const client = useApiClient();
   const [topics, setTopics] = useState<TopicNode[]>([]);
   const [progressMap, setProgressMap] = useState<Map<string, TopicProgressStatus>>(new Map());
@@ -39,10 +41,10 @@ export default function CatalogIndexPage() {
   return (
     <div className="mx-auto max-w-[900px] px-4 py-8 md:px-6 lg:px-10">
       {/* Breadcrumb */}
-      <CatalogBreadcrumb items={[{ label: 'Catalogue' }]} />
+      <CatalogBreadcrumb items={[{ label: dict.catalog.breadcrumb.catalogue }]} />
 
       <h1 className="mb-8 text-2xl font-bold md:text-3xl" style={{ color: 'var(--aq-text)' }}>
-        Catalogue
+        {dict.catalog.title}
       </h1>
 
       {loading ? (
@@ -51,7 +53,7 @@ export default function CatalogIndexPage() {
         </div>
       ) : topics.length === 0 ? (
         <div className="flex h-[200px] flex-col items-center justify-center text-center">
-          <p style={{ color: 'var(--aq-text3)' }}>No topics available yet.</p>
+          <p style={{ color: 'var(--aq-text3)' }}>{dict.catalog.empty}</p>
         </div>
       ) : (
         <div className="space-y-3">

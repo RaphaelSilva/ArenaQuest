@@ -38,10 +38,13 @@
  * (But this is not recommended - e2e tests are more appropriate)
  */
 
-import { render, screen, waitFor, fireEvent, within, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { TopicNode } from '@web/lib/admin-topics-api';
+import { dictPt } from '@web/i18n';
+
+const d = dictPt.admin.topics;
 
 // ---------------------------------------------------------------------------
 // Mock next/navigation
@@ -186,13 +189,13 @@ describe.skip('AdminTopicsPage (unit tests disabled - see file header)', () => {
     it('renders the page for admin', async () => {
       setupAdminAuth();
       render(<AdminTopicsPage />);
-      await waitFor(() => expect(screen.getByRole('heading', { name: /topic tree/i })).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByRole('heading', { name: new RegExp(d.title, 'i') })).toBeInTheDocument());
     });
 
     it('renders the page for content_creator', async () => {
       setupContentCreatorAuth();
       render(<AdminTopicsPage />);
-      await waitFor(() => expect(screen.getByRole('heading', { name: /topic tree/i })).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByRole('heading', { name: new RegExp(d.title, 'i') })).toBeInTheDocument());
     });
   });
 
@@ -212,7 +215,7 @@ describe.skip('AdminTopicsPage (unit tests disabled - see file header)', () => {
       setupAdminAuth();
       mockAdminTopics.list.mockResolvedValue([]);
       render(<AdminTopicsPage />);
-      await waitFor(() => expect(screen.getByText(/no topics yet/i)).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(new RegExp(d.empty, 'i'))).toBeInTheDocument());
     });
   });
 
@@ -224,12 +227,12 @@ describe.skip('AdminTopicsPage (unit tests disabled - see file header)', () => {
       await waitFor(() => screen.getByText('Root Topic A'));
 
       // Test: opens the create modal
-      await user.click(screen.getByRole('button', { name: /new root topic/i }));
-      expect(screen.getByRole('dialog', { name: /new root topic/i })).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: new RegExp(d.newRootButton, 'i') }));
+      expect(screen.getByRole('dialog', { name: new RegExp(d.form.newRootTitle, 'i') })).toBeInTheDocument();
 
       // Test: shows validation error when title is empty
-      await user.click(screen.getByRole('button', { name: /create/i }));
-      expect(screen.getByRole('alert')).toHaveTextContent(/title is required/i);
+      await user.click(screen.getByRole('button', { name: new RegExp(d.form.createButton, 'i') }));
+      expect(screen.getByRole('alert')).toHaveTextContent(new RegExp(d.form.titleRequired, 'i'));
       expect(mockAdminTopics.create).not.toHaveBeenCalled();
     });
   });

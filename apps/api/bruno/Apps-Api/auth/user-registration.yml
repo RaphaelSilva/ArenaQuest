@@ -1,0 +1,24 @@
+info:
+  name: User Registration
+  type: http
+  seq: 8
+http:
+  method: POST
+  url: "{{host}}/v1/auth/register"
+  headers:
+    - name: "content-type"
+      value: application/json
+  body:
+    type: json
+    data: |-
+        {
+          "email": "student@arenaquest.app",
+          "name": "John Doe",
+          "password": "password123"
+        }
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

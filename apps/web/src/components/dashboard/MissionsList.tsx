@@ -1,35 +1,41 @@
+'use client';
+
 import type { DashboardMission } from '@web/lib/dashboard-api';
+import { useDict } from '@web/context/dict-context';
 
 type Props = { missions: DashboardMission[] | null };
 
-function formatDeadline(iso: string): string {
+function formatDeadline(iso: string | null): string {
+  if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export function MissionsList({ missions }: Props) {
+  const dict = useDict();
+
   if (!missions || missions.length === 0) {
     return (
       <section
         className="rounded-2xl border border-dashed p-8 text-center"
         style={{ borderColor: 'var(--aq-border2)', background: 'var(--aq-bg2)' }}
-        aria-label="Special missions"
+        aria-label={dict.dashboard.missions.title}
       >
         <p className="text-sm" style={{ color: 'var(--aq-text3)' }}>
-          No active missions right now.
+          {dict.dashboard.missions.empty}
         </p>
       </section>
     );
   }
 
   return (
-    <section aria-label="Special missions">
+    <section aria-label={dict.dashboard.missions.title}>
       <h2
         className="mb-3 text-[13px] font-semibold"
         style={{ color: 'var(--aq-text)', fontFamily: "'Space Grotesk', sans-serif" }}
       >
-        Special Missions
+        {dict.dashboard.missions.title}
       </h2>
       <ul className="flex flex-col gap-3">
         {missions.map((m) => (
@@ -65,7 +71,7 @@ export function MissionsList({ missions }: Props) {
                     className="flex-1 h-1.5 overflow-hidden rounded-full"
                     style={{ background: 'var(--aq-bg4)' }}
                     role="progressbar"
-                    aria-label={`${m.name}: ${m.progressPct}% complete`}
+                    aria-label={`${m.name}: ${m.progressPct}%`}
                     aria-valuenow={m.progressPct}
                     aria-valuemin={0}
                     aria-valuemax={100}
@@ -81,9 +87,9 @@ export function MissionsList({ missions }: Props) {
                 </div>
 
                 <p className="mt-1 text-[11px]" style={{ color: 'var(--aq-text3)' }}>
-                  Ends {formatDeadline(m.deadlineAt)}
+                  {dict.dashboard.missions.ends} {formatDeadline(m.deadlineAt)}
                   {m.rewardBadge && (
-                    <span className="ml-2">· Badge: {m.rewardBadge}</span>
+                    <span className="ml-2">· {dict.dashboard.missions.badge} {m.rewardBadge}</span>
                   )}
                 </p>
               </div>

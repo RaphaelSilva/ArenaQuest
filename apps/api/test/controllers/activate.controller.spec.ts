@@ -68,29 +68,6 @@ describe('ActivateController', () => {
     expect(r1).toEqual(r2);
   });
 
-  it('missing token → 400 InvalidToken', async () => {
-    const repo = makeFakeTokenRepo({ outcome: 'invalid' });
-    const ctrl = new ActivateController(repo);
-
-    const result = await ctrl.activate({});
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.status).toBe(400);
-    expect(result.error).toBe('InvalidToken');
-  });
-
-  it('non-object body → 400 InvalidToken', async () => {
-    const repo = makeFakeTokenRepo({ outcome: 'invalid' });
-    const ctrl = new ActivateController(repo);
-
-    const result = await ctrl.activate(null);
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.status).toBe(400);
-  });
-
   let _: number;
   beforeEach(() => { _ = 0; });
 });

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useApiClient } from '@web/context/auth-context';
 import type { Media } from '@web/lib/admin-media-api';
 import { Spinner } from '@web/components/spinner';
+import { useDict } from '@web/context/dict-context';
 
 type MediaListProps = {
   topicId: string;
@@ -14,16 +15,18 @@ type MediaListProps = {
 export function MediaList({ topicId, media, onMediaDeleted }: MediaListProps) {
   const client = useApiClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const dict = useDict();
+  const d = dict.admin.topics.media;
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this media?')) return;
+    if (!confirm(d.list.deleteConfirm)) return;
 
     setDeletingId(id);
     try {
       await client.adminMedia.delete(topicId, id);
       onMediaDeleted();
     } catch {
-      alert('Failed to delete media');
+      alert(d.list.deleteFailed);
     } finally {
       setDeletingId(null);
     }
@@ -35,7 +38,7 @@ export function MediaList({ topicId, media, onMediaDeleted }: MediaListProps) {
         <svg className="h-8 w-8 text-zinc-300 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">No media attached to this topic.</p>
+        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">{d.list.empty}</p>
       </div>
     );
   }
@@ -94,7 +97,7 @@ export function MediaList({ topicId, media, onMediaDeleted }: MediaListProps) {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-full p-2 text-zinc-400 hover:bg-zinc-100 hover:text-indigo-600 dark:hover:bg-zinc-800 dark:hover:text-indigo-400"
-                  title="Download / View"
+                  title={d.list.downloadView}
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -105,7 +108,7 @@ export function MediaList({ topicId, media, onMediaDeleted }: MediaListProps) {
                 onClick={() => handleDelete(item.id)}
                 disabled={deletingId === item.id}
                 className="rounded-full p-2 text-zinc-400 hover:bg-zinc-100 hover:text-red-600 disabled:opacity-50 dark:hover:bg-zinc-800 dark:hover:text-red-400"
-                title="Delete"
+                title={d.list.delete}
               >
                 {deletingId === item.id ? (
                    <Spinner className="h-4 w-4" />

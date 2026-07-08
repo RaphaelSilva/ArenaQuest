@@ -14,6 +14,7 @@ import { MediaUploader } from '@web/components/admin/MediaUploader';
 import { MediaList } from '@web/components/admin/MediaList';
 import { Spinner } from '@web/components/spinner';
 import { Button, Badge } from '@web/components/design-system';
+import { useDict } from '@web/context/dict-context';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -81,19 +82,22 @@ type CreateModalProps = {
 };
 
 function CreateModal({ parentId, onSubmit, onClose }: CreateModalProps) {
+  const dict = useDict();
+  const d = dict.admin.topics.form;
+
   const [title, setTitle] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!title.trim()) { setError('Title is required.'); return; }
+    if (!title.trim()) { setError(d.titleRequired); return; }
     setSubmitting(true);
     try {
       await onSubmit({ title: title.trim(), parentId });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setError(err instanceof Error ? err.message : d.errorGeneral);
     } finally {
       setSubmitting(false);
     }
@@ -103,18 +107,18 @@ function CreateModal({ parentId, onSubmit, onClose }: CreateModalProps) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={parentId ? 'Add child topic' : 'New root topic'}
+      aria-label={parentId ? d.addChildTitle : d.newRootTitle}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
       <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-zinc-900">
         <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          {parentId ? 'Add child topic' : 'New root topic'}
+          {parentId ? d.addChildTitle : d.newRootTitle}
         </h2>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
             <label htmlFor="cm-title" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Title
+              {d.titleLabel}
             </label>
             <input
               id="cm-title"
@@ -135,7 +139,7 @@ function CreateModal({ parentId, onSubmit, onClose }: CreateModalProps) {
               variant="secondary"
               size="md"
             >
-              Cancel
+              {d.cancelButton}
             </Button>
             <Button
               type="submit"
@@ -144,7 +148,7 @@ function CreateModal({ parentId, onSubmit, onClose }: CreateModalProps) {
               size="md"
               isLoading={submitting}
             >
-              Create
+              {d.createButton}
             </Button>
           </div>
         </form>
@@ -166,6 +170,9 @@ function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const dict = useDict();
+  const d = dict.admin.topics.confirm;
+
   return (
     <div
       role="dialog"
@@ -181,14 +188,14 @@ function ConfirmDialog({
             variant="secondary"
             size="md"
           >
-            Cancel
+            {d.cancelButton}
           </Button>
           <Button
             onClick={onConfirm}
             variant="danger"
             size="md"
           >
-            Confirm
+            {d.confirmButton}
           </Button>
         </div>
       </div>
@@ -205,6 +212,8 @@ export default function AdminTopicsPage() {
   const { isLoading: authLoading } = useAuth();
   const client = useApiClient();
   const canAccess = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
+  const dict = useDict();
+  const d = dict.admin.topics;
 
   // ---------------------------------------------------------------------------
   // Core state
@@ -245,6 +254,7 @@ export default function AdminTopicsPage() {
   const [detailTitle, setDetailTitle] = useState('');
   const [detailContent, setDetailContent] = useState('');
   const [detailStatus, setDetailStatus] = useState<'draft' | 'published' | 'archived'>('draft');
+  const [detailVisibility, setDetailVisibility] = useState<'public' | 'restricted' | 'private'>('restricted');
   const [detailMinutes, setDetailMinutes] = useState(0);
   const [detailTagIds, setDetailTagIds] = useState('');
   const [detailPrereqIds, setDetailPrereqIds] = useState('');
@@ -273,11 +283,11 @@ export default function AdminTopicsPage() {
       const data = await client.adminTopics.list();
       setNodes(data);
     } catch {
-      setFetchError('Failed to load topics.');
+      setFetchError(d.errorLoading);
     } finally {
       setLoading(false);
     }
-  }, [client]);
+  }, [client, d]);
 
   useEffect(() => {
     if (canAccess) refresh();
@@ -300,6 +310,7 @@ export default function AdminTopicsPage() {
       setDetailTitle('');
       setDetailContent('');
       setDetailStatus('draft');
+      setDetailVisibility('restricted');
       setDetailMinutes(0);
       setDetailTagIds('');
       setDetailPrereqIds('');
@@ -309,6 +320,7 @@ export default function AdminTopicsPage() {
     setDetailTitle(selectedNode.title);
     setDetailContent(selectedNode.content);
     setDetailStatus(selectedNode.status);
+    setDetailVisibility(selectedNode.visibility ?? 'restricted');
     setDetailMinutes(selectedNode.estimatedMinutes);
     setDetailTagIds(selectedNode.tags.map((t) => t.id).join(', '));
     setDetailPrereqIds(selectedNode.prerequisiteIds.join(', '));
@@ -317,10 +329,10 @@ export default function AdminTopicsPage() {
     setLoadingMedia(true);
     client.adminMedia.list(selectedNode.id)
       .then(setDetailMedia)
-      .catch(() => showToast('Failed to load media', 'error'))
+      .catch(() => showToast(d.toast.failedLoadMedia, 'error'))
       .finally(() => setLoadingMedia(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, client]);
+  }, [selectedId, client, d]);
 
   // ---------------------------------------------------------------------------
   // Toast helpers
@@ -375,9 +387,9 @@ export default function AdminTopicsPage() {
         newSortOrder: node.order,
       });
       await refresh();
-      showToast('Ordem salva', 'success');
+      showToast(d.toast.orderSaved, 'success');
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Falha ao mover', 'error');
+      showToast(err instanceof Error ? err.message : d.toast.moveFailed, 'error');
     }
   }
 
@@ -429,7 +441,7 @@ export default function AdminTopicsPage() {
       await client.adminTopics.update(id, { title: title.trim() });
       await refresh();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to rename topic', 'error');
+      showToast(err instanceof Error ? err.message : d.toast.failedRename, 'error');
     } finally {
       setInlineEditId(null);
     }
@@ -438,7 +450,7 @@ export default function AdminTopicsPage() {
   async function handleCreate(data: CreateTopicInput) {
     await client.adminTopics.create(data);
     await refresh();
-    showToast('Topic created', 'success');
+    showToast(d.toast.topicCreated, 'success');
   }
 
   async function handleArchive() {
@@ -448,9 +460,9 @@ export default function AdminTopicsPage() {
       setArchiveTarget(null);
       if (selectedId === archiveTarget.id) setSelectedId(null);
       await refresh();
-      showToast('Topic archived', 'success');
+      showToast(d.toast.topicArchived, 'success');
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to archive topic', 'error');
+      showToast(err instanceof Error ? err.message : d.toast.failedArchive, 'error');
       setArchiveTarget(null);
     }
   }
@@ -473,14 +485,15 @@ export default function AdminTopicsPage() {
         title: detailTitle,
         content: detailContent,
         status: detailStatus,
+        visibility: detailVisibility,
         estimatedMinutes: detailMinutes,
         tagIds,
         prerequisiteIds: prereqIds,
       });
       await refresh();
-      showToast('Changes saved', 'success');
+      showToast(d.toast.changesSaved, 'success');
     } catch (err) {
-      setDetailError(err instanceof Error ? err.message : 'Failed to save changes');
+      setDetailError(err instanceof Error ? err.message : d.toast.failedSave);
     } finally {
       setDetailSaving(false);
     }
@@ -493,7 +506,7 @@ export default function AdminTopicsPage() {
       const media = await client.adminMedia.list(selectedId);
       setDetailMedia(media);
     } catch {
-      showToast('Failed to reload media', 'error');
+      showToast(d.toast.failedReloadMedia, 'error');
     } finally {
       setLoadingMedia(false);
     }
@@ -550,9 +563,9 @@ export default function AdminTopicsPage() {
         await client.adminTopics.move(sourceId, moveArgs);
         await refresh();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Move failed';
+        const msg = err instanceof Error ? err.message : d.toast.moveFailed;
         showToast(
-          msg === 'WOULD_CYCLE' ? 'Cannot move: operation would create a circular dependency' : msg,
+          msg === 'WOULD_CYCLE' ? d.toast.moveCycle : msg,
           'error',
         );
       }
@@ -587,7 +600,7 @@ export default function AdminTopicsPage() {
                   ? 'bg-indigo-50 text-indigo-900 shadow-sm dark:bg-indigo-500/10 dark:text-indigo-300'
                   : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/50'
             } ${node.archived ? 'opacity-40 grayscale-[0.5]' : ''} ${
-              movingNodeId && movingNodeId !== node.id ? 'cursor-pointer md:cursor-default' : ''
+              movingNodeId && movingNodeId !== node.id ? 'cursor-pointer detail:cursor-default' : ''
             } ${
               targetParentId === node.id ? 'ring-2 ring-green-500 dark:ring-green-400' : ''
             } ${dropIndicatorClass}`}
@@ -607,7 +620,7 @@ export default function AdminTopicsPage() {
             {/* Expand / collapse toggle */}
             <button
               type="button"
-              aria-label={isExpanded ? 'Collapse' : 'Expand'}
+              aria-label={isExpanded ? d.collapseButton : d.expandButton}
               onClick={(e) => { e.stopPropagation(); toggleExpand(node.id); }}
               className="w-4 flex-shrink-0 text-center text-xs text-zinc-400 disabled:invisible"
               disabled={node.children.length === 0}
@@ -623,7 +636,7 @@ export default function AdminTopicsPage() {
               onClick={(e) => e.stopPropagation()}
               className="flex-shrink-0 cursor-grab text-zinc-300 transition-colors group-hover:text-zinc-500 dark:text-zinc-600 dark:group-hover:text-zinc-400 select-none active:cursor-grabbing"
               data-testid={`drag-handle-${node.id}`}
-              aria-label="Drag to reorder"
+              aria-label={d.dragToReorder}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
@@ -669,7 +682,7 @@ export default function AdminTopicsPage() {
             {/* Add child */}
             <button
               type="button"
-              aria-label={`Add child to ${node.title}`}
+              aria-label={`${d.addChildButton} to ${node.title}`}
               onClick={(e) => {
                 e.stopPropagation();
                 setCreateParentId(node.id);
@@ -677,7 +690,7 @@ export default function AdminTopicsPage() {
               }}
               className="flex-shrink-0 text-xs text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400"
             >
-              + Child
+              {d.addChildButton}
             </button>
 
             {/* Archive */}
@@ -687,18 +700,18 @@ export default function AdminTopicsPage() {
               onClick={(e) => { e.stopPropagation(); setArchiveTarget(node); }}
               className="flex-shrink-0 text-xs text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
             >
-              Archive
+              {d.archiveButton}
             </button>
 
             {/* Mobile reordering buttons */}
             {movingNodeId === node.id ? (
-              <div className="flex items-center gap-1 md:hidden flex-wrap">
+              <div className="flex items-center gap-1 detail:hidden flex-wrap">
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); moveNodeLocally(node.id, 'up'); }}
                   className="text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400"
                   aria-label="Move up"
-                  title="Move up among siblings"
+                  title={d.moveUp}
                 >
                   ▲
                 </button>
@@ -707,7 +720,7 @@ export default function AdminTopicsPage() {
                   onClick={(e) => { e.stopPropagation(); moveNodeLocally(node.id, 'down'); }}
                   className="text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400"
                   aria-label="Move down"
-                  title="Move down among siblings"
+                  title={d.moveDown}
                 >
                   ▼
                 </button>
@@ -721,7 +734,7 @@ export default function AdminTopicsPage() {
                   onClick={(e) => { e.stopPropagation(); confirmMove(); }}
                   className="text-xs text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
                   aria-label="Confirm move"
-                  title="Save the move (with or without new parent)"
+                  title="Save the move"
                 >
                   ✓
                 </button>
@@ -730,7 +743,7 @@ export default function AdminTopicsPage() {
                   onClick={(e) => { e.stopPropagation(); cancelMove(); }}
                   className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                   aria-label="Cancel move"
-                  title="Cancel and discard changes"
+                  title="Cancel move"
                 >
                   ✕
                 </button>
@@ -742,9 +755,9 @@ export default function AdminTopicsPage() {
                   e.stopPropagation();
                   setMovingNodeId(node.id);
                 }}
-                className="flex-shrink-0 text-xs text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 md:hidden"
-                aria-label="Reorder - use ▲▼ to move, click another topic to set as parent"
-                title="Click to reorder. Use ▲▼ to move between siblings. Click another topic to move inside it."
+                className="flex-shrink-0 text-xs text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 detail:hidden"
+                aria-label={d.reorderTitle}
+                title={d.reorderTitle}
               >
                 ⇅
               </button>
@@ -783,22 +796,22 @@ export default function AdminTopicsPage() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900 flex-shrink-0">
         <div>
-          <h1 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>Topic Tree</h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">Build and organize your educational hierarchy</p>
+          <h1 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>{d.title}</h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{d.subtitle}</p>
         </div>
         <Button
           onClick={() => { setCreateParentId(null); setShowCreate(true); }}
           variant="primary"
           size="md"
         >
-          New Root Topic
+          {d.newRootButton}
         </Button>
       </div>
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--aq-bg)' }}>
         {/* Left: tree panel — full width on mobile, responsive on desktop */}
-        <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:max-w-[50%] lg:max-w-[620px] min-w-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
+        <div className={`${selectedId ? 'hidden detail:flex' : 'flex'} w-full detail:max-w-[50%] min-w-0 flex-col overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900`}>
           {fetchError && (
             <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{fetchError}</p>
           )}
@@ -809,7 +822,7 @@ export default function AdminTopicsPage() {
             </div>
           ) : tree.length === 0 ? (
             <p className="py-8 text-center text-sm text-zinc-400">
-              No topics yet. Create your first root topic.
+              {d.empty}
             </p>
           ) : (
             <div>{renderNodes(tree)}</div>
@@ -817,17 +830,17 @@ export default function AdminTopicsPage() {
         </div>
 
         {/* Right: detail pane */}
-        <div className={`${selectedId ? 'flex' : 'hidden md:flex'} flex-1 flex-col overflow-y-auto p-6 md:p-8`}>
+        <div className={`${selectedId ? 'flex' : 'hidden detail:flex'} flex-1 flex-col overflow-y-auto p-6 detail:p-8`}>
           {/* Mobile back button */}
           {selectedNode && (
             <button
               onClick={() => setSelectedId(null)}
-              className="mb-4 flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 md:hidden"
+              className="mb-4 flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 detail:hidden"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Back to topics
+              {d.backToTopics}
             </button>
           )}
           {!selectedNode ? (
@@ -837,16 +850,16 @@ export default function AdminTopicsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Select a topic to edit its details</p>
+              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{d.selectToEdit}</p>
             </div>
           ) : (
             <div className="space-y-8">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>
-                    {detailTitle || 'Untitled Topic'}
+                    {detailTitle || d.untitledTopic}
                   </h2>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Topic ID: <code className="font-mono text-xs">{selectedId}</code></p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">{d.topicIdLabel} <code className="font-mono text-xs">{selectedId}</code></p>
                 </div>
                 <Badge status={STATUS_BADGE_MAP[detailStatus] || 'draft'}>
                   {detailStatus}
@@ -857,7 +870,7 @@ export default function AdminTopicsPage() {
 
               <div>
                 <label htmlFor="dp-title" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Title
+                  {d.detail.titleLabel}
                 </label>
                 <input
                   id="dp-title"
@@ -870,7 +883,7 @@ export default function AdminTopicsPage() {
 
               <div>
                 <label htmlFor="dp-status" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Status
+                  {d.detail.statusLabel}
                 </label>
                 <select
                   id="dp-status"
@@ -878,15 +891,32 @@ export default function AdminTopicsPage() {
                   onChange={(e) => setDetailStatus(e.target.value as typeof detailStatus)}
                   className="w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
                 >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
+                  <option value="draft">{d.detail.statusDraft}</option>
+                  <option value="published">{d.detail.statusPublished}</option>
+                  <option value="archived">{d.detail.statusArchived}</option>
                 </select>
               </div>
 
               <div>
+                <label htmlFor="dp-visibility" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {d.detail.visibilityLabel}
+                </label>
+                <select
+                  id="dp-visibility"
+                  value={detailVisibility}
+                  onChange={(e) => setDetailVisibility(e.target.value as typeof detailVisibility)}
+                  className="w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+                >
+                  <option value="public">{d.detail.visibilityPublic}</option>
+                  <option value="restricted">{d.detail.visibilityRestricted}</option>
+                  <option value="private">{d.detail.visibilityPrivate}</option>
+                </select>
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{d.detail.visibilityHelp}</p>
+              </div>
+
+              <div>
                 <label htmlFor="dp-content" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Content (Markdown)
+                  {d.detail.contentLabel}
                 </label>
                 <textarea
                   id="dp-content"
@@ -899,7 +929,7 @@ export default function AdminTopicsPage() {
 
               <div>
                 <label htmlFor="dp-minutes" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Estimated Minutes
+                  {d.detail.minutesLabel}
                 </label>
                 <input
                   id="dp-minutes"
@@ -913,28 +943,28 @@ export default function AdminTopicsPage() {
 
               <div>
                 <label htmlFor="dp-tags" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Tag IDs <span className="font-normal text-zinc-400">(comma-separated)</span>
+                  {d.detail.tagIdsLabel} <span className="font-normal text-zinc-400">{d.detail.tagIdsHint}</span>
                 </label>
                 <input
                   id="dp-tags"
                   type="text"
                   value={detailTagIds}
                   onChange={(e) => setDetailTagIds(e.target.value)}
-                  placeholder="tag-id-1, tag-id-2"
+                  placeholder={d.detail.tagIdsPlaceholder}
                   className="w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
                 />
               </div>
 
               <div>
                 <label htmlFor="dp-prereqs" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Prerequisite IDs <span className="font-normal text-zinc-400">(comma-separated)</span>
+                  {d.detail.prereqIdsLabel} <span className="font-normal text-zinc-400">{d.detail.tagIdsHint}</span>
                 </label>
                 <input
                   id="dp-prereqs"
                   type="text"
                   value={detailPrereqIds}
                   onChange={(e) => setDetailPrereqIds(e.target.value)}
-                  placeholder="node-id-1, node-id-2"
+                  placeholder={d.detail.prereqIdsPlaceholder}
                   className="w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
                 />
               </div>
@@ -951,15 +981,15 @@ export default function AdminTopicsPage() {
                   size="md"
                   isLoading={detailSaving}
                 >
-                  Save changes
+                  {d.detail.saveButton}
                 </Button>
               </div>
             </form>
 
             <div className="mt-12 space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Media Attachments</h3>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">Upload and manage files associated with this topic.</p>
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{d.media.sectionTitle}</h3>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">{d.media.sectionSubtitle}</p>
               </div>
 
               {selectedId && (
@@ -999,7 +1029,7 @@ export default function AdminTopicsPage() {
 
       {archiveTarget && (
         <ConfirmDialog
-          message={`Archive "${archiveTarget.title}"? This will also archive all its descendants.`}
+          message={d.confirm.archiveMessage(archiveTarget.title)}
           onConfirm={handleArchive}
           onCancel={() => setArchiveTarget(null)}
         />

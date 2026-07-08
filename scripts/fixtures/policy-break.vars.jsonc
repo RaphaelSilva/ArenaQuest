@@ -1,0 +1,6 @@
+// Test fixture: a staging `vars` block with a forbidden full-wildcard origin
+// in ALLOWED_ORIGINS (the no-wildcard-in-prod-staging policy must reject it).
+{
+  "ALLOWED_ORIGINS": "https://acme-web-staging.pages.dev,*",
+  "WEB_BASE_URL": "https://acme-web-staging.pages.dev",
+}

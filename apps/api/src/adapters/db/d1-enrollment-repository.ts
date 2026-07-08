@@ -44,15 +44,16 @@ export class D1EnrollmentRepository implements IEnrollmentRepository {
   constructor(private readonly db: D1Database) {}
 
   /**
-   * Recursive CTE that expands every granted topic subtree to all descendants.
-   * Two separate bind parameters for userId (user grants + group membership).
-   * Benchmarked < 50ms on a 1,000-topic fixture with 20 grants.
+   * Returns (allow_tree ∪ public_set) − private_set using a single recursive CTE.
+   * allow_tree: granted topics (user + group) expanded to all descendants.
+   * public_set: non-archived public topics (no grant required).
+   * private_set: always excluded, even if granted or public.
    */
   async getEffectiveAccessTopicIds(userId: string): Promise<string[]> {
     const { results } = await this.db
       .prepare(
         `WITH RECURSIVE
-           direct_grants(topic_node_id) AS (
+           allow_seed(id) AS (
              SELECT topic_node_id FROM enrollments_user WHERE user_id = ?1
              UNION
              SELECT eg.topic_node_id
@@ -60,14 +61,20 @@ export class D1EnrollmentRepository implements IEnrollmentRepository {
                JOIN user_group_members ugm ON ugm.group_id = eg.group_id
               WHERE ugm.user_id = ?1
            ),
-           tree(id) AS (
-             SELECT topic_node_id AS id FROM direct_grants
+           allow_tree(id) AS (
+             SELECT id FROM allow_seed
              UNION ALL
-             SELECT tn.id
-               FROM topic_nodes tn
-               JOIN tree ON tn.parent_id = tree.id
+             SELECT tn.id FROM topic_nodes tn JOIN allow_tree ON tn.parent_id = allow_tree.id
+           ),
+           public_set(id) AS (
+             SELECT id FROM topic_nodes WHERE visibility = 'public' AND archived = 0
            )
-         SELECT DISTINCT id FROM tree`,
+         SELECT DISTINCT id FROM (
+           SELECT id FROM allow_tree
+           UNION
+           SELECT id FROM public_set
+         )
+         WHERE id NOT IN (SELECT id FROM topic_nodes WHERE visibility = 'private')`,
       )
       .bind(userId)
       .all<{ id: string }>();

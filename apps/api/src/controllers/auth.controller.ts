@@ -1,7 +1,7 @@
 import type { AuthService } from '@api/core/auth/auth-service';
 import { AuthError } from '@api/core/auth/auth-error';
 import type { Entities } from '@arenaquest/shared/types/entities';
-import type { ControllerResult } from '../core/result';
+import type { ControllerResult } from '@api/core/result';
 
 export type { ControllerResult };
 

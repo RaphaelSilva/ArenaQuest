@@ -1,35 +1,117 @@
-import { Hono } from 'hono';
+import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import { ROLES } from '@arenaquest/shared/constants/roles';
 import { authGuard } from '@api/middleware/auth-guard';
-import type { ICommentRepository, IEnrollmentRepository } from '@arenaquest/shared/ports';
-import type { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
-import { CommentsController } from '@api/controllers/comments.controller';
+import { CommentsController, CreateCommentSchema } from '@api/controllers/comments.controller';
+import { CommentSchema, CommentWithMetaSchema } from '@api/openapi/components/entities';
+import { ErrorBody } from '@api/openapi/components/errors';
+import { respondWith } from '@api/routes/_shared/envelope';
+import type { EngagementContext, ProgressContext, GamificationContext } from '@api/container';
 
-export function buildCommentsRouter(
-  commentRepo: ICommentRepository,
-  enrollmentRepo: IEnrollmentRepository,
-  xpEngine?: XpEngine,
-): Hono {
-  const router = new Hono();
+const topicParamSchema = z.object({
+  id: z.string().openapi({ example: 'cmt-topic-1', description: 'Topic node ID' }),
+});
+
+export const listCommentsRoute = createRoute({
+  method: 'get',
+  path: '/topics/{id}/comments',
+  summary: 'List comments on a topic',
+  description: 'Returns all comments on a topic node ordered top-level DESC then replies ASC. Requires enrollment.',
+  tags: ['topics:comments'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: topicParamSchema,
+  },
+  responses: {
+    200: {
+      description: 'Comments retrieved successfully',
+      content: {
+        'application/json': {
+          schema: z.object({ data: z.array(CommentWithMetaSchema) }),
+        },
+      },
+    },
+    403: {
+      description: 'Forbidden — user is not enrolled in this topic',
+      content: { 'application/json': { schema: ErrorBody } },
+    },
+  },
+});
+
+export const createCommentRoute = createRoute({
+  method: 'post',
+  path: '/topics/{id}/comments',
+  summary: 'Create a comment on a topic',
+  description: 'Creates a top-level comment or a reply. Awards XP on success. Requires enrollment.',
+  tags: ['topics:comments'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: topicParamSchema,
+    body: {
+      content: {
+        'application/json': {
+          schema: CreateCommentSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    201: {
+      description: 'Comment created',
+      content: {
+        'application/json': {
+          schema: CommentSchema,
+        },
+      },
+    },
+    400: {
+      description: 'Bad request — malformed body, validation error, or nested reply forbidden',
+      content: { 'application/json': { schema: ErrorBody } },
+    },
+    403: {
+      description: 'Forbidden — user is not enrolled in this topic',
+      content: { 'application/json': { schema: ErrorBody } },
+    },
+    422: {
+      description: 'Unprocessable — parent comment not found',
+      content: { 'application/json': { schema: ErrorBody } },
+    },
+  },
+});
+
+export function buildCommentsRouter(slice: {
+  engagement: EngagementContext;
+  progress: ProgressContext;
+  gamification: GamificationContext;
+}): OpenAPIHono {
+  const { commentRepo } = slice.engagement;
+  const { enrollmentRepo } = slice.progress;
+  const { xpEngine } = slice.gamification;
+
+  const router = new OpenAPIHono();
   const controller = new CommentsController(commentRepo);
 
-  router.get('/topics/:id/comments', authGuard, async (c) => {
-    const userId = c.get('user').sub;
-    const topicId = c.req.param('id');
+  router.use('/topics/*', authGuard);
+
+  router.openapi(listCommentsRoute, async (c) => {
+    const user = c.get('user');
+    const userId = user.sub;
+    const isPrivileged = user.roles.includes(ROLES.ADMIN) || user.roles.includes(ROLES.CONTENT_CREATOR);
+    const topicId = c.req.valid('param').id;
     const enrolledIds = await enrollmentRepo.getEffectiveAccessTopicIds(userId);
-    const result = await controller.listComments(topicId, userId, enrolledIds);
-    if (!result.ok) return c.json({ error: result.error, ...result.meta }, result.status as 403);
-    return c.json({ data: result.data });
+    const result = await controller.listComments(topicId, userId, enrolledIds, isPrivileged);
+    if (!result.ok) return respondWith(c, result) as any;
+    return c.json({ data: result.data }, 200);
   });
 
-  router.post('/topics/:id/comments', authGuard, async (c) => {
-    const userId = c.get('user').sub;
-    const topicId = c.req.param('id');
-    const body = await c.req.json();
+  router.openapi(createCommentRoute, async (c) => {
+    const user = c.get('user');
+    const userId = user.sub;
+    const isPrivileged = user.roles.includes(ROLES.ADMIN) || user.roles.includes(ROLES.CONTENT_CREATOR);
+    const topicId = c.req.valid('param').id;
+    const body = c.req.valid('json');
     const enrolledIds = await enrollmentRepo.getEffectiveAccessTopicIds(userId);
-    const result = await controller.createComment(topicId, userId, body, enrolledIds);
-    if (!result.ok) {
-      return c.json({ error: result.error, ...result.meta }, result.status as 400 | 403 | 422);
-    }
+    const result = await controller.createComment(topicId, userId, body, enrolledIds, isPrivileged);
+    if (!result.ok) return respondWith(c, result) as any;
     if (xpEngine) {
       const todayKey = new Date().toISOString().slice(0, 10);
       try {
@@ -39,23 +121,6 @@ export function buildCommentsRouter(
       }
     }
     return c.json(result.data, 201);
-  });
-
-  router.post('/comments/:id/like', authGuard, async (c) => {
-    const userId = c.get('user').sub;
-    const commentId = c.req.param('id');
-    const result = await controller.likeComment(commentId, userId);
-    if (!result.ok) return c.json({ error: result.error }, result.status as 404);
-    return c.json(result.data);
-  });
-
-  router.delete('/comments/:id', authGuard, async (c) => {
-    const userId = c.get('user').sub;
-    const commentId = c.req.param('id');
-    const userRoles = c.get('user').roles;
-    const result = await controller.deleteComment(commentId, userId, userRoles);
-    if (!result.ok) return c.json({ error: result.error }, result.status as 403 | 404);
-    return c.body(null, 204);
   });
 
   return router;

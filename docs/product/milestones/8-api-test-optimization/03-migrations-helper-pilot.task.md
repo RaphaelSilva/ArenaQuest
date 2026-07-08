@@ -1,6 +1,6 @@
 # Task 03 — Introduce `apply-migrations` helper + pilot 5 files (P4 phase 1)
 
-**Status:** ⏳ Pending
+**Status:** ✅ Completed
 **Milestone:** [8 — `apps/api` Test Suite Optimization](./milestone.md)
 **RFC:** [0001 §P4](../../RFCs/0001-apps-api-test-suite-optimization.md)
 
@@ -32,11 +32,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Helper file exists and is unit-tested at least implicitly by the pilot specs running green.
-- [ ] All 5 pilot specs use the helper and no longer contain inline `CREATE TABLE` text.
-- [ ] Helper reads migrations from `apps/api/migrations/**` by default; adding a new migration there is reflected automatically in the pilot specs without code changes in tests.
-- [ ] `make test-api` and `make lint` pass.
-- [ ] No diff outside `apps/api/test/helpers/**` and the 5 pilot spec files.
+- [x] Helper file exists and is unit-tested at least implicitly by the pilot specs running green.
+- [x] All 5 pilot specs use the helper and no longer contain inline `CREATE TABLE` text.
+- [x] Helper reads migrations from `apps/api/migrations/**` by default; adding a new migration there is reflected automatically in the pilot specs without code changes in tests.
+- [x] `make test-api` and `make lint` pass.
+- [x] No diff outside `apps/api/test/helpers/**` and the 5 pilot spec files.
 
 ## Verification Plan
 

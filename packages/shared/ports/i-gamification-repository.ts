@@ -75,9 +75,23 @@ export interface IGamificationRepository {
   /** Idempotent — same (userId, sourceKind, idempotencyKey) returns the existing event. */
   appendXpEvent(params: AppendXpEventParams): Promise<XpEventRecord>;
   getUserXp(userId: string): Promise<UserXpRecord | null>;
+  /** Most recent XP events for a user, ordered by `earned_at` descending. */
+  listRecentXpEvents(userId: string, limit: number): Promise<XpEventRecord[]>;
+  /**
+   * Repair the `user_xp` read model from the append-only ledger: set
+   * `total_xp = MAX(0, SUM(xp_events.points))` (set, not increment). Appends no
+   * event. Returns the totals before and after the rewrite.
+   */
+  recomputeUserXp(userId: string): Promise<{ previousTotal: number; newTotal: number }>;
   getUserStreak(userId: string): Promise<UserStreakRecord | null>;
   upsertUserStreak(userId: string, params: UpsertUserStreakParams): Promise<UserStreakRecord>;
   listLevelDefinitions(): Promise<LevelDefinitionRecord[]>;
+  /**
+   * Atomically replace the entire level curve (delete-all + insert-all in one
+   * transaction). The caller validates the curve shape beforehand; this method
+   * only persists. Returns the persisted rows ordered by level.
+   */
+  replaceAllLevelDefinitions(rows: LevelDefinitionRecord[]): Promise<LevelDefinitionRecord[]>;
   countXpEventsBySource(userId: string, sourceKind: string, since?: string): Promise<number>;
   countAllCompletedTopics(userId: string): Promise<number>;
   getLeaderboard(params: GetLeaderboardParams): Promise<{ rows: LeaderboardRow[]; total: number }>;

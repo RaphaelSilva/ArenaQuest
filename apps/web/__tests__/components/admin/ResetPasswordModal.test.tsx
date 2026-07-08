@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Entities } from '@arenaquest/shared/types/entities';
 import { ResetPasswordModal } from '@web/components/admin/ResetPasswordModal';
+import { dictPt } from '@web/i18n';
 
 // ---------------------------------------------------------------------------
 // Mock useApiClient hook
@@ -55,6 +56,8 @@ const MOCK_RESET_RESPONSE = {
   resetAt: new Date().toISOString(),
 };
 
+const d = dictPt.admin.users.resetPasswordModal;
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -79,9 +82,9 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      expect(screen.getByText(/Reset Password for Bob Student/i)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(d.confirmTitle(MOCK_USER.name), 'i'))).toBeInTheDocument();
       expect(
-        screen.getByText(/This will invalidate all active sessions/i)
+        screen.getByText(new RegExp(d.confirmMessage, 'i'))
       ).toBeInTheDocument();
     });
 
@@ -94,11 +97,11 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const emailCheckbox = screen.getByLabelText(/Send notification email/i);
+      const emailCheckbox = screen.getByLabelText(new RegExp(d.sendEmailLabel, 'i'));
       expect(emailCheckbox).toBeInTheDocument();
       expect(emailCheckbox).not.toBeChecked();
 
-      const noteField = screen.getByLabelText(/Optional note to include/i);
+      const noteField = screen.getByLabelText(new RegExp(d.noteLabel, 'i'));
       expect(noteField).toBeInTheDocument();
     });
 
@@ -112,7 +115,7 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const cancelButton = screen.getByRole('button', { name: /Cancel/ });
+      const cancelButton = screen.getByRole('button', { name: new RegExp(d.cancelButton, 'i') });
       await user.click(cancelButton);
 
       expect(mockOnClose).toHaveBeenCalled();
@@ -142,7 +145,7 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const emailCheckbox = screen.getByLabelText(/Send notification email/i);
+      const emailCheckbox = screen.getByLabelText(new RegExp(d.sendEmailLabel, 'i'));
       expect(emailCheckbox).not.toBeChecked();
 
       await user.click(emailCheckbox);
@@ -162,13 +165,15 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const noteField = screen.getByLabelText(/Optional note to include/i) as HTMLTextAreaElement;
+      const noteField = screen.getByLabelText(new RegExp(d.noteLabel, 'i')) as HTMLTextAreaElement;
       const longText = 'a'.repeat(600);
       await user.type(noteField, longText);
 
       expect(noteField.value).toHaveLength(500);
-      expect(screen.getByText(/500\/500 characters/i)).toBeInTheDocument();
-    });
+      expect(screen.getByText(new RegExp(d.noteCharCount(500), 'i'))).toBeInTheDocument();
+      // Typing 600 chars re-renders the controlled textarea 600× (~1.5s on its own); give
+      // generous headroom so parallel-suite CPU contention can't push it past the timeout.
+    }, 15000);
 
     it('calls API with correct payload on confirm', async () => {
       const user = userEvent.setup();
@@ -182,9 +187,9 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const emailCheckbox = screen.getByLabelText(/Send notification email/i);
-      const noteField = screen.getByLabelText(/Optional note to include/i);
-      const confirmButton = screen.getByRole('button', { name: /Confirm/ });
+      const emailCheckbox = screen.getByLabelText(new RegExp(d.sendEmailLabel, 'i'));
+      const noteField = screen.getByLabelText(new RegExp(d.noteLabel, 'i'));
+      const confirmButton = screen.getByRole('button', { name: new RegExp(d.confirmButton, 'i') });
 
       await user.click(emailCheckbox);
       await user.type(noteField, 'Test note');
@@ -210,7 +215,7 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const confirmButton = screen.getByRole('button', { name: /Confirm/ });
+      const confirmButton = screen.getByRole('button', { name: new RegExp(d.confirmButton, 'i') });
       await user.click(confirmButton);
 
       await waitFor(() => {
@@ -237,10 +242,10 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const confirmButton = screen.getByRole('button', { name: /Confirm/ });
+      const confirmButton = screen.getByRole('button', { name: new RegExp(d.confirmButton, 'i') });
       await user.click(confirmButton);
 
-      expect(screen.getByText(/Resetting password/i)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(d.loadingMessage, 'i'))).toBeInTheDocument();
     });
   });
 
@@ -257,11 +262,11 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const confirmButton = screen.getByRole('button', { name: /Confirm/ });
+      const confirmButton = screen.getByRole('button', { name: new RegExp(d.confirmButton, 'i') });
       await user.click(confirmButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/Password Reset Successful/i)).toBeInTheDocument();
+        expect(screen.getByText(new RegExp(d.successTitle, 'i'))).toBeInTheDocument();
         expect(screen.getByText(MOCK_RESET_RESPONSE.temporaryPassword)).toBeInTheDocument();
       });
     });
@@ -278,31 +283,11 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const confirmButton = screen.getByRole('button', { name: /Confirm/ });
+      const confirmButton = screen.getByRole('button', { name: new RegExp(d.confirmButton, 'i') });
       await user.click(confirmButton);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Copy password/i })).toBeInTheDocument();
-      });
-    });
-
-    it('shows copy button in success modal', async () => {
-      const user = userEvent.setup();
-      mockAdminUsers.resetPassword.mockResolvedValueOnce(MOCK_RESET_RESPONSE);
-
-      render(
-        <ResetPasswordModal
-          user={MOCK_USER}
-          onClose={mockOnClose}
-          onSuccess={mockOnSuccess}
-        />
-      );
-
-      const confirmButton = screen.getByRole('button', { name: /Confirm/ });
-      await user.click(confirmButton);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Copy password/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: new RegExp(d.copyButton, 'i') })).toBeInTheDocument();
       });
     });
 
@@ -318,14 +303,14 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const confirmButton = screen.getByRole('button', { name: /Confirm/ });
+      const confirmButton = screen.getByRole('button', { name: new RegExp(d.confirmButton, 'i') });
       await user.click(confirmButton);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Close/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: new RegExp(d.closeButton, 'i') })).toBeInTheDocument();
       });
 
-      const closeButton = screen.getByRole('button', { name: /Close/ });
+      const closeButton = screen.getByRole('button', { name: new RegExp(d.closeButton, 'i') });
       await user.click(closeButton);
 
       expect(mockOnSuccess).toHaveBeenCalled();
@@ -348,17 +333,17 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const confirmButton = screen.getByRole('button', { name: /^Confirm$/ });
+      const confirmButton = screen.getByRole('button', { name: new RegExp(`^${d.confirmButton}$`, 'i') });
       await user.click(confirmButton);
 
       // Wait for error state to appear
       await waitFor(() => {
-        expect(screen.getByText(/Password Reset Failed/i)).toBeInTheDocument();
+        expect(screen.getByText(new RegExp(d.failedTitle, 'i'))).toBeInTheDocument();
       });
 
       // Error modal should have Cancel and Retry buttons
-      expect(screen.getByRole('button', { name: /^Cancel$/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^Retry$/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: new RegExp(`^${d.cancelButton}$`, 'i') })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: new RegExp(`^${d.retryButton}$`, 'i') })).toBeInTheDocument();
     });
 
     it('displays specific error message for 403 Forbidden', async () => {
@@ -375,15 +360,15 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const confirmButton = screen.getByRole('button', { name: /^Confirm$/ });
+      const confirmButton = screen.getByRole('button', { name: new RegExp(`^${d.confirmButton}$`, 'i') });
       await user.click(confirmButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/Password Reset Failed/i)).toBeInTheDocument();
+        expect(screen.getByText(new RegExp(d.failedTitle, 'i'))).toBeInTheDocument();
       });
 
       // The error message should be shown in the modal
-      expect(screen.getByText(/do not have permission/i)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(d.errorPermission, 'i'))).toBeInTheDocument();
     });
 
     it('displays specific error message for 404 Not Found', async () => {
@@ -400,11 +385,11 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const confirmButton = screen.getByRole('button', { name: /^Confirm$/ });
+      const confirmButton = screen.getByRole('button', { name: new RegExp(`^${d.confirmButton}$`, 'i') });
       await user.click(confirmButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/User not found/i)).toBeInTheDocument();
+        expect(screen.getByText(new RegExp(d.errorNotFound, 'i'))).toBeInTheDocument();
       });
     });
 
@@ -422,11 +407,11 @@ describe('ResetPasswordModal', () => {
         />
       );
 
-      const confirmButton = screen.getByRole('button', { name: /^Confirm$/ });
+      const confirmButton = screen.getByRole('button', { name: new RegExp(`^${d.confirmButton}$`, 'i') });
       await user.click(confirmButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/cannot reset your own password/i)).toBeInTheDocument();
+        expect(screen.getByText(new RegExp(d.errorSelfReset, 'i'))).toBeInTheDocument();
       });
     });
   });

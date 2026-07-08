@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@web/hooks/use-auth';
 import { useApiClient } from '@web/context/auth-context';
+import { useDict } from '@web/context/dict-context';
 import type { DashboardPayload } from '@web/lib/dashboard-api';
 import { StatCardLevel } from './StatCardLevel';
 import { StatCardStreak } from './StatCardStreak';
@@ -15,14 +16,8 @@ import { Roadmap } from './Roadmap';
 import { DashboardSkeleton } from './DashboardSkeleton';
 import { ThemeToggle } from './ThemeToggle';
 
-function getGreeting(now: Date): string {
-  const h = now.getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
-
 export function DashboardContent() {
+  const dict = useDict();
   const { user, isLoading: authLoading } = useAuth();
   const client = useApiClient();
   const [data, setData] = useState<DashboardPayload | null>(null);
@@ -35,18 +30,24 @@ export function DashboardContent() {
     if (authLoading) return;
     client.dashboard.get()
       .then(setData)
-      .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : 'Failed to load dashboard.');
+      .catch(() => {
+        setError(dict.dashboard.errorLoading);
       })
       .finally(() => setLoading(false));
-  }, [authLoading, client]);
+  }, [authLoading, client, dict]);
 
   if (loading) return <DashboardSkeleton />;
 
   const now = new Date();
+  const h = now.getHours();
+  const greeting = h < 12
+    ? dict.dashboard.greeting.goodMorning
+    : h < 18
+    ? dict.dashboard.greeting.goodAfternoon
+    : dict.dashboard.greeting.goodEvening;
 
   return (
-    <div className="flex flex-col gap-6" style={{ padding: '28px 32px 40px' }}>
+    <div className="flex flex-1 flex-col gap-6 overflow-y-auto" style={{ padding: '28px 32px 40px' }}>
       {/* Greeting row */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -54,10 +55,10 @@ export function DashboardContent() {
             className="text-[22px] font-bold tracking-tight"
             style={{ color: 'var(--aq-text)', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.3px' }}
           >
-            {getGreeting(now)}{firstName ? `, ${firstName}` : ''} 👋
+            {greeting}{firstName ? `, ${firstName}` : ''} 👋
           </h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--aq-text2)' }}>
-            Track your progress and keep the momentum going.
+            {dict.dashboard.trackSubtitle}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">

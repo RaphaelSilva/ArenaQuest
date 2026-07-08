@@ -1,0 +1,20 @@
+info:
+  name: Revoke Group Enrollment
+  type: http
+  seq: 3
+http:
+  method: DELETE
+  url: "{{host}}/v1/admin/groups/:groupId/enrollments/:topicId"
+  params:
+    - name: groupId
+      value: "group-id"
+      type: path
+    - name: topicId
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

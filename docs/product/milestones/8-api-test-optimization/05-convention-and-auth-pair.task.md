@@ -1,6 +1,6 @@
 # Task 05 — Document router-vs-controller convention + refactor `auth` pair (P2 pilot)
 
-**Status:** ⏳ Pending
+**Status:** ✅ Completed
 **Milestone:** [8 — `apps/api` Test Suite Optimization](./milestone.md)
 **RFC:** [0001 §P2](../../RFCs/0001-apps-api-test-suite-optimization.md)
 
@@ -30,11 +30,11 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `apps/api/test/README.md` exists and documents the convention, auth-guard rule, and migrations helper.
-- [ ] `auth.router.spec.ts` contains only HTTP-shaped assertions (≥ 1 smoke per endpoint).
-- [ ] Every business-rule branch removed from the router spec is present in `auth.controller.spec.ts` (cross-list in the PR description).
-- [ ] `make test-api` and `make lint` pass.
-- [ ] No diff outside `apps/api/test/**`.
+- [x] `apps/api/test/README.md` exists and documents the convention, auth-guard rule, and migrations helper.
+- [x] `auth.router.spec.ts` contains only HTTP-shaped assertions (≥ 1 smoke per endpoint).
+- [x] Every business-rule branch removed from the router spec is present in `auth.controller.spec.ts` (cross-list in plan file).
+- [x] `make test-api` and `make lint` pass.
+- [x] No diff outside `apps/api/test/**`.
 
 ## Verification Plan
 

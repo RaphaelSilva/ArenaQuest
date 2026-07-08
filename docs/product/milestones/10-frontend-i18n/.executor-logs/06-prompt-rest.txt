@@ -1,0 +1,51 @@
+I am the ArenaQuest Orchestrator. You are acting as the ArenaQuest Senior Frontend Developer.
+
+You are running HEADLESS (no interactive TTY). You cannot ask the user anything. If you hit a blocker that would require human input, STOP and write a clear "BLOCKED:" line at the end of your output explaining what is needed — the orchestrator will surface it to the user.
+
+SYSTEM STANDARDS & GUIDELINES (Cached):
+We are migrating all participant-facing routes and components to the typed dictionary i18n system.
+- Scope: `apps/web/src/app/(protected)/{catalog,dashboard,tasks,settings}/**` and `apps/web/src/components/{catalog,dashboard,tasks,enrollment}/**`.
+- Non-negotiable rules:
+  1. DO NOT hardcode user-facing strings in apps/web.
+  2. Client Components (with 'use client') must read via `useDict()` from `@web/context/dict-context`.
+  3. Server Components (without 'use client') must read from `dict` imported from `@web/i18n`.
+  4. DO NOT mix both in the same file.
+  5. When adding keys to the dictionaries, you MUST add them to BOTH `apps/web/src/i18n/dict-en.ts` and `apps/web/src/i18n/dict-pt.ts` with the exact same type and structure.
+  6. Empty strings are forbidden.
+  7. Do not touch admin routes or layout chrome (which are other tasks).
+  8. Markdown-rendered content is out of scope. Only the surrounding UI chrome is migrated.
+  9. Update affected tests to assert on dictionary values rather than literal strings.
+
+TASK DESCRIPTION (Dynamic):
+Task File: docs/product/milestones/10-frontend-i18n/06-migrate-participant-routes.task.md
+Plan File: docs/product/milestones/10-frontend-i18n/planing/06-migrate-participant-routes.plan.md
+
+INSTRUCTIONS:
+Please execute the plan for migrating Dashboard, Tasks, Settings, and Enrollment routes & components to use i18n dictionaries.
+Specifically:
+1. Dashboard Components & Pages:
+   - `apps/web/src/components/dashboard/BadgesGrid.tsx`
+   - `apps/web/src/components/dashboard/DailyTasks.tsx`
+   - `apps/web/src/components/dashboard/DashboardContent.tsx`
+   - `apps/web/src/components/dashboard/MissionsList.tsx`
+   - `apps/web/src/components/dashboard/Roadmap.tsx`
+   - `apps/web/src/components/dashboard/StatCardLevel.tsx`
+   - `apps/web/src/components/dashboard/StatCardRanking.tsx`
+   - `apps/web/src/components/dashboard/StatCardStreak.tsx`
+   - `apps/web/src/components/dashboard/WeeklyChallenges.tsx`
+   - Update tests in `apps/web/src/components/dashboard/__tests__/dashboard.test.tsx` to read assertions from the i18n dictionary.
+2. Tasks Components & Pages:
+   - `apps/web/src/app/(protected)/tasks/page.tsx`
+   - `apps/web/src/app/(protected)/tasks/[id]/page.tsx`
+   - `apps/web/src/components/tasks/student-task-card.tsx`
+   - `apps/web/src/components/tasks/student-task-detail.tsx`
+   - Update tests in `apps/web/src/components/tasks/__tests__/student-task-card.test.tsx` and `apps/web/src/components/tasks/__tests__/student-task-detail.test.tsx` to read assertions from the i18n dictionary.
+3. Settings:
+   - `apps/web/src/app/(protected)/settings/page.tsx`
+4. Enrollment:
+   - `apps/web/src/components/enrollment/enrollments-tab.tsx`
+5. Ensure both `dict-en.ts` and `dict-pt.ts` have identical keys for any new/modified entries. Make sure they use either `useDict` (for client components) or `dict` (for server components) correctly.
+
+Do not attempt to run verification, test, or linter commands directly. The orchestrator will run them.
+Keep all changes clean and precise.
+When done, list files touched and changes made.

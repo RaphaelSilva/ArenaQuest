@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import type { TaskSummary } from '@web/lib/tasks-api';
+import { useDict } from '@web/context/dict-context';
 
 export function StudentTaskCard({ task }: { task: TaskSummary }) {
+  const dict = useDict();
   return (
     <Link
       href={`/tasks/${task.id}`}
@@ -12,11 +14,10 @@ export function StudentTaskCard({ task }: { task: TaskSummary }) {
     >
       <h3 className="text-base font-semibold text-[color:var(--text)]">{task.title}</h3>
       <p className="text-xs text-[color:var(--text2)]">
-        {task.stageCount} {task.stageCount === 1 ? 'stage' : 'stages'} · {task.topicCount}{' '}
-        {task.topicCount === 1 ? 'topic' : 'topics'}
+        {dict.tasks.card.stageCount(task.stageCount)} · {dict.tasks.card.topicCount(task.topicCount)}
       </p>
       <span className="mt-2 self-start text-sm font-medium text-[color:var(--accent)] hover:opacity-80 transition-opacity">
-        Explore →
+        {dict.tasks.card.explore}
       </span>
     </Link>
   );

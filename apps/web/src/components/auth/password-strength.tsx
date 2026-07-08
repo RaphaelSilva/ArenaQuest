@@ -1,3 +1,7 @@
+'use client';
+
+import { useDict } from '@web/context/dict-context';
+
 function getStrength(pw: string): number {
   if (!pw) return 0;
   let s = 0;
@@ -14,11 +18,17 @@ const STRENGTH_COLORS = [
   'oklch(0.65 0.16 240)',
   'var(--aq-accent3)',
 ];
-const STRENGTH_LABELS = ['Fraca', 'Razoável', 'Boa', 'Forte'];
 
 export function PasswordStrength({ password }: { password: string }) {
+  const dict = useDict();
   if (!password) return null;
   const strength = getStrength(password);
+  const strengthLabels = [
+    dict.auth.passwordStrength.weak,
+    dict.auth.passwordStrength.fair,
+    dict.auth.passwordStrength.good,
+    dict.auth.passwordStrength.strong,
+  ];
   return (
     <>
       <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
@@ -27,7 +37,7 @@ export function PasswordStrength({ password }: { password: string }) {
         ))}
       </div>
       <div style={{ fontSize: 11, marginTop: 4, color: STRENGTH_COLORS[strength - 1] ?? 'var(--aq-text3)' }}>
-        Força: {STRENGTH_LABELS[strength - 1] ?? '—'}
+        <span>{dict.auth.passwordStrength.label}</span> {strengthLabels[strength - 1] ?? '—'}
       </div>
     </>
   );

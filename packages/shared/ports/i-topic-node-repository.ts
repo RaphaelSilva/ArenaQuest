@@ -11,6 +11,13 @@ export interface TopicNodeRecord {
   estimatedMinutes: number;
   prerequisiteIds: string[];
   archived: boolean;
+  visibility: Entities.Config.TopicVisibility;
+  mediaCount?: {
+    video: number;
+    audio: number;
+    pdf: number;
+    total: number;
+  };
 }
 
 export interface CreateTopicNodeInput {
@@ -22,6 +29,7 @@ export interface CreateTopicNodeInput {
   tagIds?: string[];
   prerequisiteIds?: string[];
   order?: number;
+  visibility?: Entities.Config.TopicVisibility;
 }
 
 export interface UpdateTopicNodeInput {
@@ -31,6 +39,7 @@ export interface UpdateTopicNodeInput {
   estimatedMinutes?: number;
   tagIds?: string[];
   prerequisiteIds?: string[];
+  visibility?: Entities.Config.TopicVisibility;
 }
 
 export interface ITopicNodeRepository {

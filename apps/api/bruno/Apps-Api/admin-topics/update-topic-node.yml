@@ -1,0 +1,35 @@
+info:
+  name: Update Topic Node
+  type: http
+  seq: 5
+http:
+  method: PATCH
+  url: "{{host}}/v1/admin/topics/:id"
+  headers:
+    - name: "content-type"
+      value: application/json
+  params:
+    - name: id
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+  body:
+    type: json
+    data: |-
+        {
+          "content": "string",
+          "estimatedMinutes": 1,
+          "prerequisiteIds": [
+            "string"
+          ],
+          "status": "string",
+          "tagIds": [
+            "string"
+          ],
+          "title": "string"
+        }
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

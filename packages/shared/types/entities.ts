@@ -20,6 +20,16 @@ export namespace Entities {
             ARCHIVED = 'archived',
         }
 
+        /** Controls which authenticated users can see a topic node. */
+        export enum TopicVisibility {
+            /** Any authenticated user can see this node. */
+            PUBLIC = 'public',
+            /** A grant (enrollment) is required; this is the production default. */
+            RESTRICTED = 'restricted',
+            /** Visible to admins and the node creator only. */
+            PRIVATE = 'private',
+        }
+
         export enum MediaStatus {
             PENDING = 'pending',
             READY = 'ready',
@@ -124,6 +134,12 @@ export namespace Entities {
             order: number;
             estimatedMinutes: number;
             prerequisiteIds: string[];
+            mediaCount?: {
+                video: number;
+                audio: number;
+                pdf: number;
+                total: number;
+            };
         }
 
     }
@@ -217,6 +233,48 @@ export namespace Entities {
             rankTitle: string;
             minXp: number;
             maxXp: number | null;
+        }
+
+        export interface Badge {
+            id: string;
+            slug: string;
+            name: string;
+            iconEmoji: string;
+            description: string;
+            xpReward: number;
+            ruleKind: string;
+            ruleParams: string;
+            active: boolean;
+            createdAt: string;
+            updatedAt: string;
+        }
+
+        export interface QuestDefinition {
+            id: string;
+            kind: 'daily' | 'weekly';
+            title: string;
+            description: string;
+            predicateKind: string;
+            predicateParams: string; // Raw JSON from DB
+            xpReward: number;
+            active: boolean;
+            createdAt: Date;
+            updatedAt: Date;
+        }
+
+        export interface Mission {
+            id: string;
+            title: string;
+            description: string;
+            startAt: string;
+            endAt: string;
+            predicateKind: string;
+            predicateParams: string;
+            xpReward: number;
+            badgeId: string | null;
+            active: boolean;
+            createdAt: Date;
+            updatedAt: Date;
         }
     }
 }

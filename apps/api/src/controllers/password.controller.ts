@@ -10,19 +10,13 @@ import { Entities } from '@arenaquest/shared/types/entities';
 import { toMilliseconds } from '@arenaquest/shared/domain/time';
 import type { ControllerResult } from '@api/core/result';
 import { renderPasswordResetEmail } from '@api/mail/templates/password-reset-email';
+import { ForgotPasswordRequestSchema, ResetPasswordRequestSchema } from '@api/openapi/components/entities';
+
+export type ForgotPasswordInput = z.infer<typeof ForgotPasswordRequestSchema>;
+export type ResetPasswordInput = z.infer<typeof ResetPasswordRequestSchema>;
 
 const TOKEN_TTL_MS = toMilliseconds(1, 'hours');
 const TOKEN_BYTES = 32;
-const PASSWORD_MIN = 8;
-
-const ForgotPasswordSchema = z.object({
-  email: z.string().trim().toLowerCase().email('Invalid'),
-});
-
-const ResetPasswordSchema = z.object({
-  token: z.string().min(1),
-  newPassword: z.string().min(PASSWORD_MIN, 'TooShort').regex(/\d/, 'NoDigit'),
-});
 
 function generateResetToken(): string {
   const bytes = new Uint8Array(TOKEN_BYTES);
@@ -42,13 +36,8 @@ export class PasswordController {
     private readonly webBaseUrl: string,
   ) {}
 
-  async resetPassword(input: unknown): Promise<ControllerResult<null>> {
-    const parsed = ResetPasswordSchema.safeParse(input);
-    if (!parsed.success) {
-      return { ok: false, status: 400, error: 'BadRequest' };
-    }
-
-    const { token, newPassword } = parsed.data;
+  async resetPassword(input: ResetPasswordInput): Promise<ControllerResult<null>> {
+    const { token, newPassword } = input;
 
     const result = await this.resetTokens.consumeByPlainToken(token);
 
@@ -63,13 +52,8 @@ export class PasswordController {
     return { ok: true, data: null };
   }
 
-  async forgotPassword(input: unknown): Promise<ControllerResult<null>> {
-    const parsed = ForgotPasswordSchema.safeParse(input);
-    if (!parsed.success) {
-      return { ok: false, status: 400, error: 'BadRequest' };
-    }
-
-    const { email } = parsed.data;
+  async forgotPassword(input: ForgotPasswordInput): Promise<ControllerResult<null>> {
+    const { email } = input;
 
     try {
       const user = await this.users.findByEmail(email);

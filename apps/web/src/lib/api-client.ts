@@ -2,6 +2,8 @@
 
 import type { FetchWithAuthOptions } from './fetch-with-auth';
 import { fetchWithAuth } from './fetch-with-auth';
+
+const API_VERSION = '/v1';
 import * as topicsApiModule from './topics-api';
 import * as tasksApiModule from './tasks-api';
 import * as accountApiModule from './account-api';
@@ -10,8 +12,11 @@ import * as adminTasksApiModule from './admin-tasks-api';
 import * as adminUsersApiModule from './admin-users-api';
 import * as adminMediaApiModule from './admin-media-api';
 import * as adminEnrollmentApiModule from './admin-enrollment-api';
+import * as adminGroupsApiModule from './admin-groups-api';
+import * as adminGamificationApiModule from './admin-gamification-api';
 import * as progressApiModule from './progress-api';
 import * as dashboardApiModule from './dashboard-api';
+import * as commentsApiModule from './comments-api';
 
 // HTTP transport interface — injectable for testing
 export interface HttpTransport {
@@ -28,7 +33,7 @@ export function createFetchTransport(
   return async (method: string, path: string, options?: FetchWithAuthOptions): Promise<Response> => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
     return fetchWithAuth(
-      `${apiUrl}${path}`,
+      `${apiUrl}${API_VERSION}${path}`,
       {
         ...options,
         method,
@@ -91,11 +96,23 @@ export class ApiClient {
     return adminEnrollmentApiModule.createAdminEnrollmentApi(this.http);
   }
 
+  get adminGroups() {
+    return adminGroupsApiModule.createAdminGroupsApi(this.http);
+  }
+
+  get adminGamification() {
+    return adminGamificationApiModule.createAdminGamificationApi(this.http);
+  }
+
   get progress() {
     return progressApiModule.createProgressApi(this.http);
   }
 
   get dashboard() {
     return dashboardApiModule.createDashboardApi(this.http);
+  }
+
+  get comments() {
+    return commentsApiModule.createCommentsApi(this.http);
   }
 }

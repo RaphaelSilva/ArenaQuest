@@ -1,139 +1,14 @@
 import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, it, expect, beforeAll } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
+import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 
 // ---------------------------------------------------------------------------
 // DB bootstrap
 // ---------------------------------------------------------------------------
 
-const MIGRATION_SQL = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active',
-    created_at TEXT NOT NULL DEFAULT (datetime('now')), timezone TEXT NOT NULL DEFAULT 'UTC'
-  )`,
-  `CREATE TABLE IF NOT EXISTS roles (
-    id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_roles (
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    PRIMARY KEY (user_id, role_id)
-  )`,
-  `INSERT OR IGNORE INTO roles (id, name) VALUES ('r-admin', 'admin'), ('r-student', 'student')`,
-  `CREATE TABLE IF NOT EXISTS refresh_tokens (
-    token TEXT NOT NULL PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_groups (
-    id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_group_members (
-    group_id TEXT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    PRIMARY KEY (group_id, user_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_nodes (
-    id TEXT NOT NULL PRIMARY KEY, parent_id TEXT, title TEXT NOT NULL,
-    content TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'draft',
-    sort_order INTEGER NOT NULL DEFAULT 0, estimated_minutes INTEGER NOT NULL DEFAULT 0,
-    archived INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS enrollments_user (
-    id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL,
-    topic_node_id TEXT NOT NULL, granted_by TEXT NOT NULL,
-    granted_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(user_id, topic_node_id)
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_enrollments_user_user ON enrollments_user(user_id)`,
-  `CREATE TABLE IF NOT EXISTS enrollments_user_group (
-    id TEXT NOT NULL PRIMARY KEY, group_id TEXT NOT NULL,
-    topic_node_id TEXT NOT NULL, granted_by TEXT NOT NULL,
-    granted_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(group_id, topic_node_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_comments (
-    id TEXT PRIMARY KEY, topic_node_id TEXT NOT NULL, parent_comment_id TEXT,
-    user_id TEXT NOT NULL, body TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')), deleted_at TEXT,
-    FOREIGN KEY (topic_node_id) REFERENCES topic_nodes(id),
-    FOREIGN KEY (parent_comment_id) REFERENCES topic_comments(id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS comment_likes (
-    comment_id TEXT NOT NULL, user_id TEXT NOT NULL,
-    liked_at TEXT NOT NULL DEFAULT (datetime('now')),
-    PRIMARY KEY (comment_id, user_id),
-    FOREIGN KEY (comment_id) REFERENCES topic_comments(id)
-  )`,
-  // Gamification stubs required by buildApp
-  `CREATE TABLE IF NOT EXISTS xp_events (
-    id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, source_kind TEXT NOT NULL,
-    source_id TEXT, points INTEGER NOT NULL, idempotency_key TEXT NOT NULL,
-    earned_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS uniq_xp_events_idempotency ON xp_events(user_id, source_kind, idempotency_key)`,
-  `CREATE TABLE IF NOT EXISTS user_xp (
-    user_id TEXT NOT NULL PRIMARY KEY, total_xp INTEGER NOT NULL DEFAULT 0,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_streak (
-    user_id TEXT NOT NULL PRIMARY KEY, current_streak INTEGER NOT NULL DEFAULT 0,
-    longest_streak INTEGER NOT NULL DEFAULT 0, last_activity_date TEXT,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS level_definitions (
-    level INTEGER NOT NULL PRIMARY KEY, rank_title TEXT NOT NULL,
-    min_xp INTEGER NOT NULL, max_xp INTEGER
-  )`,
-  `CREATE TABLE IF NOT EXISTS badges (
-    id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
-    icon_emoji TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', xp_reward INTEGER NOT NULL DEFAULT 0,
-    rule_kind TEXT NOT NULL, rule_params TEXT NOT NULL DEFAULT '{}', active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_badges (
-    id TEXT NOT NULL, user_id TEXT NOT NULL, badge_id TEXT NOT NULL,
-    earned_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id, badge_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS quest_definitions (
-    id TEXT NOT NULL PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL,
-    description TEXT NOT NULL, predicate_kind TEXT NOT NULL, predicate_params TEXT NOT NULL,
-    xp_reward INTEGER NOT NULL, active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS quest_progress (
-    user_id TEXT NOT NULL, quest_id TEXT NOT NULL, period_key TEXT NOT NULL,
-    current_value INTEGER NOT NULL DEFAULT 0, target_value INTEGER NOT NULL,
-    completed INTEGER NOT NULL DEFAULT 0, completed_at TEXT,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (user_id, quest_id, period_key)
-  )`,
-  `CREATE TABLE IF NOT EXISTS missions (
-    id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
-    start_at TEXT NOT NULL, end_at TEXT NOT NULL, predicate_kind TEXT NOT NULL,
-    predicate_params TEXT NOT NULL DEFAULT '{}', xp_reward INTEGER NOT NULL DEFAULT 0,
-    badge_id TEXT, active INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS mission_progress (
-    user_id TEXT NOT NULL, mission_id TEXT NOT NULL,
-    current_value INTEGER NOT NULL DEFAULT 0, target_value INTEGER NOT NULL DEFAULT 1,
-    completed INTEGER NOT NULL DEFAULT 0, completed_at TEXT,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (user_id, mission_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_progress (
-    user_id TEXT NOT NULL, topic_node_id TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'not_started', visited_at TEXT, completed_at TEXT,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (user_id, topic_node_id)
-  )`,
-];
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
@@ -141,15 +16,19 @@ const STUDENT_A = 'cmt-student-a';
 const STUDENT_B = 'cmt-student-b';
 const STUDENT_C = 'cmt-student-c'; // never enrolled
 const ADMIN_ID = 'cmt-admin-1';
+const CREATOR_ID = 'cmt-creator-1';
 const TOPIC_ID = 'cmt-topic-1';
+const PUBLIC_TOPIC_ID = 'cmt-public-topic-1';
+const RESTRICTED_TOPIC_ID = 'cmt-restricted-topic-1'; // restricted, nobody enrolled
 
 let tokenA: string;
 let tokenB: string;
 let tokenC: string;
 let adminToken: string;
+let creatorToken: string;
 
 beforeAll(async () => {
-  await env.DB.batch(MIGRATION_SQL.map(sql => env.DB.prepare(sql)));
+  await applyMigrations(env.DB);
 
   await env.DB.batch([
     env.DB.prepare(`INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)`)
@@ -160,8 +39,14 @@ beforeAll(async () => {
       .bind(STUDENT_C, 'Student C', 'c@cmt.test', 'hash'),
     env.DB.prepare(`INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)`)
       .bind(ADMIN_ID, 'Admin', 'admin@cmt.test', 'hash'),
+    env.DB.prepare(`INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)`)
+      .bind(CREATOR_ID, 'Creator', 'creator@cmt.test', 'hash'),
     env.DB.prepare(`INSERT OR IGNORE INTO topic_nodes (id, title) VALUES (?, ?)`)
       .bind(TOPIC_ID, 'Test Topic'),
+    env.DB.prepare(`INSERT OR IGNORE INTO topic_nodes (id, title, status, visibility) VALUES (?, ?, ?, ?)`)
+      .bind(PUBLIC_TOPIC_ID, 'Public Topic', 'published', 'public'),
+    env.DB.prepare(`INSERT OR IGNORE INTO topic_nodes (id, title, status, visibility) VALUES (?, ?, ?, ?)`)
+      .bind(RESTRICTED_TOPIC_ID, 'Restricted Topic', 'published', 'restricted'),
     // Enroll student A in the topic
     env.DB.prepare(`INSERT OR IGNORE INTO enrollments_user (id, user_id, topic_node_id, granted_by) VALUES (?, ?, ?, ?)`)
       .bind('enroll-a', STUDENT_A, TOPIC_ID, ADMIN_ID),
@@ -174,11 +59,12 @@ beforeAll(async () => {
   ]);
 
   const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
-  [tokenA, tokenB, tokenC, adminToken] = await Promise.all([
+  [tokenA, tokenB, tokenC, adminToken, creatorToken] = await Promise.all([
     adapter.signAccessToken({ sub: STUDENT_A, email: 'a@cmt.test', roles: ['student'] }),
     adapter.signAccessToken({ sub: STUDENT_B, email: 'b@cmt.test', roles: ['student'] }),
     adapter.signAccessToken({ sub: STUDENT_C, email: 'c@cmt.test', roles: ['student'] }),
     adapter.signAccessToken({ sub: ADMIN_ID, email: 'admin@cmt.test', roles: ['admin'] }),
+    adapter.signAccessToken({ sub: CREATOR_ID, email: 'creator@cmt.test', roles: ['content_creator'] }),
   ]);
 });
 
@@ -187,7 +73,7 @@ async function req(method: string, path: string, options: { body?: unknown; toke
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.token) headers['Authorization'] = `Bearer ${options.token}`;
 
-  const request = new IncomingRequest(`http://example.com${path}`, {
+  const request = new IncomingRequest(`http://example.com${v1(path)}`, {
     method,
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -214,13 +100,13 @@ describe('auth guard', () => {
     expect(res.status).toBe(401);
   });
 
-  it('POST /comments/:id/like returns 401 without token', async () => {
-    const res = await req('POST', '/comments/any-id/like');
+  it('POST /me/comments/:id/like returns 401 without token', async () => {
+    const res = await req('POST', '/me/comments/any-id/like');
     expect(res.status).toBe(401);
   });
 
-  it('DELETE /comments/:id returns 401 without token', async () => {
-    const res = await req('DELETE', '/comments/any-id');
+  it('DELETE /me/comments/:id returns 401 without token', async () => {
+    const res = await req('DELETE', '/me/comments/any-id');
     expect(res.status).toBe(401);
   });
 });
@@ -247,6 +133,51 @@ describe('enrollment access', () => {
     const res = await req('GET', `/topics/${TOPIC_ID}/comments`, { token: tokenA });
     expect(res.status).toBe(200);
   });
+
+  it('GET /topics/:id/comments includes the author display name', async () => {
+    await req('POST', `/topics/${TOPIC_ID}/comments`, {
+      token: tokenA,
+      body: { body: 'Comment with author name' },
+    });
+
+    const res = await req('GET', `/topics/${TOPIC_ID}/comments`, { token: tokenA });
+    expect(res.status).toBe(200);
+    const { data } = await res.json<{ data: Array<{ userId: string; userName: string }> }>();
+    const fromA = data.find(c => c.userId === STUDENT_A);
+    expect(fromA?.userName).toBe('Student A');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Privileged bypass — admins/content creators read & write on restricted
+// topics they are NOT enrolled in (mirrors topic-read bypass in catalog router).
+// ---------------------------------------------------------------------------
+
+describe('privileged bypass on restricted topic (unenrolled)', () => {
+  it('plain student gets 403 on a restricted topic they are not enrolled in', async () => {
+    const res = await req('GET', `/topics/${RESTRICTED_TOPIC_ID}/comments`, { token: tokenC });
+    expect(res.status).toBe(403);
+  });
+
+  it('admin can GET comments without enrollment', async () => {
+    const res = await req('GET', `/topics/${RESTRICTED_TOPIC_ID}/comments`, { token: adminToken });
+    expect(res.status).toBe(200);
+  });
+
+  it('content creator can GET comments without enrollment', async () => {
+    const res = await req('GET', `/topics/${RESTRICTED_TOPIC_ID}/comments`, { token: creatorToken });
+    expect(res.status).toBe(200);
+  });
+
+  it('content creator can POST a comment without enrollment', async () => {
+    const res = await req('POST', `/topics/${RESTRICTED_TOPIC_ID}/comments`, {
+      token: creatorToken,
+      body: { body: 'Creator comment on restricted topic' },
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json<{ body: string }>();
+    expect(body.body).toBe('Creator comment on restricted topic');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -260,9 +191,11 @@ describe('POST /topics/:id/comments', () => {
       body: { body: 'First comment' },
     });
     expect(res.status).toBe(201);
-    const body = await res.json<{ id: string; body: string }>();
+    const body = await res.json<{ id: string; body: string; userName: string }>();
     expect(body.body).toBe('First comment');
     expect(body.id).toBeTruthy();
+    // Author display name is resolved from users.name, not the raw user id
+    expect(body.userName).toBe('Student A');
   });
 
   it('creates a reply to a top-level comment', async () => {
@@ -313,13 +246,25 @@ describe('POST /topics/:id/comments', () => {
     expect(body.body).toBe('Bold text');
     expect(body.body).not.toContain('<b>');
   });
+
+  it('returns 400 for malformed JSON body', async () => {
+    const request = new IncomingRequest(`http://example.com${v1(`/topics/${TOPIC_ID}/comments`)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+      body: 'not-valid-json{{{',
+    });
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(request, env as AppEnv, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(res.status).toBe(400);
+  });
 });
 
 // ---------------------------------------------------------------------------
 // Soft delete
 // ---------------------------------------------------------------------------
 
-describe('DELETE /comments/:id', () => {
+describe('DELETE /me/comments/:id', () => {
   it('author can delete own comment', async () => {
     const createRes = await req('POST', `/topics/${TOPIC_ID}/comments`, {
       token: tokenA,
@@ -327,7 +272,7 @@ describe('DELETE /comments/:id', () => {
     });
     const comment = await createRes.json<{ id: string }>();
 
-    const deleteRes = await req('DELETE', `/comments/${comment.id}`, { token: tokenA });
+    const deleteRes = await req('DELETE', `/me/comments/${comment.id}`, { token: tokenA });
     expect(deleteRes.status).toBe(204);
   });
 
@@ -338,7 +283,7 @@ describe('DELETE /comments/:id', () => {
     });
     const comment = await createRes.json<{ id: string }>();
 
-    await req('DELETE', `/comments/${comment.id}`, { token: tokenA });
+    await req('DELETE', `/me/comments/${comment.id}`, { token: tokenA });
 
     const listRes = await req('GET', `/topics/${TOPIC_ID}/comments`, { token: tokenA });
     const { data } = await listRes.json<{ data: Array<{ id: string; body: string | null }> }>();
@@ -355,7 +300,7 @@ describe('DELETE /comments/:id', () => {
     const comment = await createRes.json<{ id: string }>();
 
     // B tries to delete A's comment
-    const deleteRes = await req('DELETE', `/comments/${comment.id}`, { token: tokenB });
+    const deleteRes = await req('DELETE', `/me/comments/${comment.id}`, { token: tokenB });
     expect(deleteRes.status).toBe(403);
   });
 
@@ -366,8 +311,28 @@ describe('DELETE /comments/:id', () => {
     });
     const comment = await createRes.json<{ id: string }>();
 
-    const deleteRes = await req('DELETE', `/comments/${comment.id}`, { token: adminToken });
+    const deleteRes = await req('DELETE', `/me/comments/${comment.id}`, { token: adminToken });
     expect(deleteRes.status).toBe(204);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OpenAPI contract
+// ---------------------------------------------------------------------------
+
+describe('OpenAPI contract', () => {
+  it('comment endpoints appear in /openapi.json', async () => {
+    // /openapi.json is unversioned — call worker.fetch directly to avoid the v1() prefix in req()
+    const r = new IncomingRequest('http://example.com/openapi.json', { method: 'GET' });
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(r, env as AppEnv, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(res.status).toBe(200);
+    const doc = await res.json<{ paths: Record<string, unknown> }>();
+    const commentPath = doc.paths['/v1/topics/{id}/comments'] as Record<string, unknown> | undefined;
+    expect(commentPath).toBeDefined();
+    expect(commentPath).toHaveProperty('get');
+    expect(commentPath).toHaveProperty('post');
   });
 });
 
@@ -375,7 +340,7 @@ describe('DELETE /comments/:id', () => {
 // Like toggle
 // ---------------------------------------------------------------------------
 
-describe('POST /comments/:id/like', () => {
+describe('POST /me/comments/:id/like', () => {
   it('liked_by_me reflects toggle state', async () => {
     const createRes = await req('POST', `/topics/${TOPIC_ID}/comments`, {
       token: tokenA,
@@ -384,19 +349,40 @@ describe('POST /comments/:id/like', () => {
     const comment = await createRes.json<{ id: string }>();
 
     // Like
-    const likeRes = await req('POST', `/comments/${comment.id}/like`, { token: tokenA });
+    const likeRes = await req('POST', `/me/comments/${comment.id}/like`, { token: tokenA });
     expect(likeRes.status).toBe(200);
     const likeBody = await likeRes.json<{ liked: boolean }>();
     expect(likeBody.liked).toBe(true);
 
     // Unlike
-    const unlikeRes = await req('POST', `/comments/${comment.id}/like`, { token: tokenA });
+    const unlikeRes = await req('POST', `/me/comments/${comment.id}/like`, { token: tokenA });
     const unlikeBody = await unlikeRes.json<{ liked: boolean }>();
     expect(unlikeBody.liked).toBe(false);
   });
 
   it('returns 404 for unknown comment', async () => {
-    const res = await req('POST', '/comments/does-not-exist/like', { token: tokenA });
+    const res = await req('POST', '/me/comments/00000000-0000-0000-0000-000000000000/like', { token: tokenA });
     expect(res.status).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Public topic visibility — unenrolled access
+// ---------------------------------------------------------------------------
+
+describe('public topic visibility — unenrolled access', () => {
+  it('unenrolled tokenC can GET comments on a public topic', async () => {
+    const res = await req('GET', `/topics/${PUBLIC_TOPIC_ID}/comments`, { token: tokenC });
+    expect(res.status).toBe(200);
+  });
+
+  it('unenrolled tokenC can POST a comment on a public topic', async () => {
+    const res = await req('POST', `/topics/${PUBLIC_TOPIC_ID}/comments`, {
+      token: tokenC,
+      body: { body: 'Public topic comment from unenrolled user' },
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json<{ id: string; body: string }>();
+    expect(body.body).toBe('Public topic comment from unenrolled user');
   });
 });

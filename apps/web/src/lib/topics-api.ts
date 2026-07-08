@@ -1,6 +1,14 @@
-import type { TopicNode, Media } from './admin-topics-api';
+import type { components } from './api-types.gen';
+import type { Media } from './admin-media-api';
 import type { HttpTransport } from './api-client';
-export type { TopicNode, Media };
+
+// TopicNode sourced from generated OpenAPI contract — backend field renames surface at compile time.
+// TODO(api-types): remove the extension fields once `archived` and `mediaCount` appear in api-types.gen.ts.
+export type TopicNode = components['schemas']['TopicNode'] & {
+  archived?: boolean;
+  mediaCount?: { video: number; audio: number; pdf: number; total: number };
+};
+export type { Media };
 
 export type TopicProgressStatus = 'not_started' | 'in_progress' | 'completed';
 
@@ -34,7 +42,7 @@ export function createTopicsApi(http: HttpTransport) {
 
     async visit(id: string): Promise<void> {
       try {
-        await http('POST', `/topics/${id}/visit`);
+        await http('POST', `/me/topics/${id}/visit`);
       } catch {
         // intentionally silent — beacon must not block rendering
       }
@@ -52,10 +60,18 @@ export function createTopicsApi(http: HttpTransport) {
     },
 
     async complete(id: string): Promise<TopicProgressStatus> {
-      const res = await http('POST', `/topics/${id}/complete`);
+      const res = await http('POST', `/me/topics/${id}/complete`);
       if (!res.ok) throw new Error(`Failed to mark topic as read (${res.status})`);
       const body = (await res.json()) as { topicProgress: { status: string } };
       return body.topicProgress.status as TopicProgressStatus;
+    },
+
+    async markVideoWatched(topicId: string, mediaId: string): Promise<void> {
+      try {
+        await http('POST', `/topics/${topicId}/videos/${mediaId}/watched`);
+      } catch {
+        // non-blocking beacon — swallow all errors
+      }
     },
   };
 }

@@ -2,36 +2,14 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { D1UserRepository } from '@api/adapters/db/d1-user-repository';
 import { Entities } from '@arenaquest/shared/types/entities';
+import { applyMigrations } from '../helpers/apply-migrations';
 
-// D1's exec() processes one statement at a time in the local simulator
-const MIGRATION_STATEMENTS = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id            TEXT NOT NULL PRIMARY KEY,
-    name          TEXT NOT NULL,
-    email         TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    timezone      TEXT NOT NULL DEFAULT 'UTC'
-  )`,
-  `CREATE TABLE IF NOT EXISTS roles (
-    id          TEXT NOT NULL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '',
-    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_roles (
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    PRIMARY KEY (user_id, role_id)
-  )`,
-];
 
 describe('D1UserRepository', () => {
   let repo: D1UserRepository;
 
   beforeAll(async () => {
-    await env.DB.batch(MIGRATION_STATEMENTS.map(sql => env.DB.prepare(sql)));
+    await applyMigrations(env.DB);
     repo = new D1UserRepository(env.DB);
   });
 

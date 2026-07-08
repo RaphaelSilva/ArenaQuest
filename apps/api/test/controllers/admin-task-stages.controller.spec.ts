@@ -89,13 +89,6 @@ describe('AdminTaskStagesController', () => {
     expect(r.status).toBe(404);
   });
 
-  it('create - rejects label with newlines', async () => {
-    h.taskStore.set('t', makeTask({ id: 't' }));
-    const r = await controller.create('t', { label: 'a\nb' });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.status).toBe(400);
-  });
 
   it('update - 404 when stage does not belong to task', async () => {
     h.taskStore.set('t1', makeTask({ id: 't1' }));

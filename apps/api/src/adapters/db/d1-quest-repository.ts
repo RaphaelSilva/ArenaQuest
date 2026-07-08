@@ -57,6 +57,104 @@ export class D1QuestRepository implements IQuestRepository {
     };
   }
 
+  private async findById(id: string): Promise<QuestDefinition | null> {
+    const row = await this.db
+      .prepare('SELECT * FROM quest_definitions WHERE id = ?')
+      .bind(id)
+      .first<QuestDefinitionRow>();
+    return row ? this.rowToDefinition(row) : null;
+  }
+
+  async listAll(): Promise<QuestDefinition[]> {
+    const { results } = await this.db
+      .prepare('SELECT * FROM quest_definitions ORDER BY created_at DESC')
+      .all<QuestDefinitionRow>();
+    return results.map(row => this.rowToDefinition(row));
+  }
+
+  async create(input: Omit<QuestDefinition, 'id' | 'createdAt' | 'updatedAt'>): Promise<QuestDefinition> {
+    const id = crypto.randomUUID();
+    await this.db
+      .prepare(
+        `INSERT INTO quest_definitions (id, kind, title, description, predicate_kind, predicate_params, xp_reward, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        id,
+        input.kind,
+        input.title,
+        input.description,
+        input.predicateKind,
+        input.predicateParams,
+        input.xpReward,
+        input.active ? 1 : 0,
+      )
+      .run();
+
+    const created = await this.findById(id);
+    if (!created) throw new Error('D1QuestRepository: failed to fetch quest after create');
+    return created;
+  }
+
+  async update(id: string, partial: Partial<Omit<QuestDefinition, 'id' | 'createdAt' | 'updatedAt'>>): Promise<QuestDefinition | null> {
+    const existing = await this.findById(id);
+    if (!existing) return null;
+
+    const updates: string[] = [];
+    const values: (string | number | null)[] = [];
+
+    if (partial.kind !== undefined) {
+      updates.push('kind = ?');
+      values.push(partial.kind);
+    }
+    if (partial.title !== undefined) {
+      updates.push('title = ?');
+      values.push(partial.title);
+    }
+    if (partial.description !== undefined) {
+      updates.push('description = ?');
+      values.push(partial.description);
+    }
+    if (partial.predicateKind !== undefined) {
+      updates.push('predicate_kind = ?');
+      values.push(partial.predicateKind);
+    }
+    if (partial.predicateParams !== undefined) {
+      updates.push('predicate_params = ?');
+      values.push(partial.predicateParams);
+    }
+    if (partial.xpReward !== undefined) {
+      updates.push('xp_reward = ?');
+      values.push(partial.xpReward);
+    }
+    if (partial.active !== undefined) {
+      updates.push('active = ?');
+      values.push(partial.active ? 1 : 0);
+    }
+
+    if (updates.length === 0) {
+      return existing;
+    }
+
+    updates.push("updated_at = datetime('now')");
+    values.push(id);
+
+    await this.db
+      .prepare(`UPDATE quest_definitions SET ${updates.join(', ')} WHERE id = ?`)
+      .bind(...values)
+      .run();
+
+    return this.findById(id);
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const result = await this.db
+      .prepare('DELETE FROM quest_definitions WHERE id = ?')
+      .bind(id)
+      .run();
+    return (result.meta.changes ?? 0) > 0;
+  }
+
   async listActiveDefinitions(kind: QuestKind): Promise<QuestDefinition[]> {
     const { results } = await this.db
       .prepare('SELECT * FROM quest_definitions WHERE kind = ? AND active = 1')

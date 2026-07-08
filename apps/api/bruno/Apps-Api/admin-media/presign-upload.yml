@@ -1,0 +1,28 @@
+info:
+  name: Presign Upload
+  type: http
+  seq: 2
+http:
+  method: POST
+  url: "{{host}}/v1/admin/topics/:topicId/media/presign"
+  headers:
+    - name: "content-type"
+      value: application/json
+  params:
+    - name: topicId
+      value: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+      type: path
+  body:
+    type: json
+    data: |-
+        {
+          "contentType": "string",
+          "fileName": "string",
+          "sizeBytes": 1
+        }
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

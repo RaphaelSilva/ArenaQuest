@@ -1,0 +1,47 @@
+/**
+ * SpazioRD — sample worked label profile (RFC 0007 §1).
+ *
+ * The ONLY place this label's per-tenant values are written. Two anchors
+ * per environment — `apiHost` and `webOrigin` — drive every cross-
+ * referencing key (NEXT_PUBLIC_API_URL, GOOGLE_REDIRECT_URI, WEB_BASE_URL,
+ * ALLOWED_ORIGINS, R2_*); see scripts/label.mjs `deriveExpected`. Resource
+ * `id` fields are `<fill …>` until `wrangler … create` returns them — run
+ * `make label-scaffold LABEL=spaziord` then the printed provisioning
+ * commands, and paste the ids back here. `<acct>` placeholders stand for
+ * the Cloudflare account / workers.dev subdomain.
+ */
+{
+  "label": "spaziord",
+  "displayName": "SpazioRD",
+  "brand": {
+    "NEXT_PUBLIC_BRAND_SIGLA": "SRD",
+    "NEXT_PUBLIC_BRAND_NAME_PREFIX": "Spazio",
+    "NEXT_PUBLIC_BRAND_NAME_ACCENT": "RD",
+    "NEXT_PUBLIC_BRAND_POWERED_BY": "true",
+    "NEXT_PUBLIC_BRAND_ACCENT": "#1e6fff"
+  },
+  "environments": {
+    "staging": {
+      "apiHost":      "api-spaziord-staging.<acct>.workers.dev",
+      "webOrigin":    "spaziord-web-staging.pages.dev",
+      "worker":       "api-spaziord-staging",
+      "pagesProject": "spaziord-web-staging",
+      "d1":   { "name": "spaziord-db-staging", "id": "<fill after `wrangler d1 create spaziord-db-staging`>" },
+      "kv":   { "binding": "RATE_LIMIT_KV", "id": "<fill after `wrangler kv namespace create RATE_LIMIT_KV`>" },
+      "r2":   { "bucket": "spaziord-media-staging", "s3Endpoint": "https://<acct>.r2.cloudflarestorage.com" },
+      "cookieSameSite": "None",
+      "mail": { "driver": "resend", "from": "SpazioRD Staging <noreply@spaziord.app>" }
+    },
+    "production": {
+      "apiHost":      "api.spaziord.app",
+      "webOrigin":    "app.spaziord.app",
+      "worker":       "api-spaziord",
+      "pagesProject": "spaziord-web",
+      "d1":   { "name": "spaziord-db", "id": "<fill after `wrangler d1 create spaziord-db`>" },
+      "kv":   { "binding": "RATE_LIMIT_KV", "id": "<fill after `wrangler kv namespace create RATE_LIMIT_KV`>" },
+      "r2":   { "bucket": "spaziord-media", "s3Endpoint": "https://<acct>.r2.cloudflarestorage.com" },
+      "cookieSameSite": "Strict",
+      "mail": { "driver": "resend", "from": "SpazioRD <noreply@spaziord.app>" }
+    }
+  }
+}

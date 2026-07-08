@@ -1,0 +1,17 @@
+info:
+  name: List User Enrollments
+  type: http
+  seq: 4
+http:
+  method: GET
+  url: "{{host}}/v1/admin/users/:userId/enrollments"
+  params:
+    - name: userId
+      value: "student-id"
+      type: path
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

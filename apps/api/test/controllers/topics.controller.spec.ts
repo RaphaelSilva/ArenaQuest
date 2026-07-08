@@ -18,6 +18,7 @@ const PUBLISHED: TopicNodeRecord = {
   estimatedMinutes: 0,
   prerequisiteIds: [],
   archived: false,
+  visibility: Entities.Config.TopicVisibility.RESTRICTED,
 };
 
 const DRAFT: TopicNodeRecord = {

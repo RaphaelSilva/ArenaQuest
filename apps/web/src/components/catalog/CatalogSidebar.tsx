@@ -1,16 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link';
 import type { TopicNode } from '@web/lib/topics-api';
 import type { TopicProgressStatus } from '@web/lib/topics-api';
+import { useDict } from '@web/context/dict-context';
+import { TopicTreeNode, type TopicTreeData } from './TopicTreeNode';
 
-type TreeNode = TopicNode & { children: TreeNode[] };
-
-function buildTree(nodes: TopicNode[]): TreeNode[] {
-  const byId = new Map<string, TreeNode>(nodes.map((n) => [n.id, { ...n, children: [] }]));
-  const roots: TreeNode[] = [];
+function buildTree(nodes: TopicNode[]): TopicTreeData[] {
+  const byId = new Map<string, TopicTreeData>(nodes.map((n) => [n.id, { ...n, children: [] }]));
+  const roots: TopicTreeData[] = [];
   for (const node of byId.values()) {
     if (node.parentId === null) roots.push(node);
     else {
@@ -19,44 +18,12 @@ function buildTree(nodes: TopicNode[]): TreeNode[] {
       else roots.push(node);
     }
   }
-  function sort(list: TreeNode[]) {
+  function sort(list: TopicTreeData[]) {
     list.sort((a, b) => a.order - b.order);
     list.forEach((n) => sort(n.children));
   }
   sort(roots);
   return roots;
-}
-
-const STATUS_DOT: Record<TopicProgressStatus, string> = {
-  completed: 'var(--aq-accent3)',
-  in_progress: 'var(--aq-accent)',
-  not_started: 'var(--aq-bg4)',
-};
-
-const STATUS_LABEL: Record<TopicProgressStatus, string> = {
-  completed: '✓',
-  in_progress: '…',
-  not_started: '○',
-};
-
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      width="10"
-      height="10"
-      viewBox="0 0 10 10"
-      fill="none"
-      style={{ transition: 'transform 0.2s', transform: open ? 'rotate(90deg)' : 'none' }}
-    >
-      <path
-        d="M3.5 2L6.5 5L3.5 8"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
 }
 
 function SearchIcon() {
@@ -75,36 +42,69 @@ type Props = {
   isInstructor: boolean;
 };
 
-export function CatalogSidebar({ topics, progressMap, globalProgress, isInstructor }: Props) {
+export function CatalogSidebar({ topics, progressMap, globalProgress }: Props) {
+  const dict = useDict();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Note: This component is hidden on mobile/tablet via 'hidden lg:flex' in layout.tsx
-  const tree = buildTree(topics);
+  const tree = useMemo(() => buildTree(topics), [topics]);
+  const topicById = useMemo(() => new Map(topics.map((t) => [t.id, t])), [topics]);
 
-  // URL state: expanded IDs
   const openParam = searchParams.get('open') ?? '';
-  const expandedIds = new Set(openParam ? openParam.split(',').filter(Boolean) : tree.map((n) => n.id));
+  const userExpandedIds = useMemo(
+    () => new Set(openParam ? openParam.split(',').filter(Boolean) : tree.map((n) => n.id)),
+    [openParam, tree],
+  );
 
-  // URL state: search query
   const qParam = searchParams.get('q') ?? '';
   const [searchValue, setSearchValue] = useState(qParam);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Role preview (local state, persisted in localStorage)
-  const [previewRole, setPreviewRole] = useState<'participant' | 'instructor'>(() => {
-    if (typeof window === 'undefined') return 'participant';
-    return (localStorage.getItem('aq-catalog-role') as 'participant' | 'instructor') ?? 'participant';
-  });
+  // Active topic id derived from the URL — used for highlighting and ancestor auto-expansion.
+  const activeId = useMemo(() => {
+    const match = pathname.match(/^\/catalog\/([^/]+)/);
+    return match ? match[1] : null;
+  }, [pathname]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('aq-catalog-role', previewRole);
+  // Ancestors of the active route are always expanded so deep topics are visible.
+  const ancestorIds: ReadonlySet<string> = (() => {
+    const ids: string[] = [];
+    let cur = activeId ? topicById.get(activeId) : undefined;
+    while (cur?.parentId) {
+      ids.push(cur.parentId);
+      cur = topicById.get(cur.parentId);
     }
-  }, [previewRole]);
+    return new Set(ids);
+  })();
 
-  const showInstructorUI = isInstructor && previewRole === 'instructor';
+  const q = qParam.toLowerCase();
+
+  function nodeOrDescendantMatches(node: TopicTreeData): boolean {
+    if (!q) return true;
+    if (node.title.toLowerCase().includes(q)) return true;
+    return node.children.some(nodeOrDescendantMatches);
+  }
+
+  function collectMatchAncestors(node: TopicTreeData, parents: readonly string[]): string[] {
+    const here: string[] = node.title.toLowerCase().includes(q) ? [...parents] : [];
+    const nextParents = [...parents, node.id];
+    for (const child of node.children) {
+      here.push(...collectMatchAncestors(child, nextParents));
+    }
+    return here;
+  }
+
+  // Ancestors of any node whose title matches the query — kept open so matches surface.
+  const matchAncestorIds: ReadonlySet<string> = q
+    ? new Set(tree.flatMap((root) => collectMatchAncestors(root, [])))
+    : new Set();
+
+  const effectiveExpanded: ReadonlySet<string> = new Set<string>([
+    ...userExpandedIds,
+    ...ancestorIds,
+    ...matchAncestorIds,
+  ]);
 
   const updateUrl = useCallback(
     (newExpandedIds: Set<string>, newQ: string) => {
@@ -119,157 +119,46 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
     [router, pathname, searchParams],
   );
 
-  function toggleExpand(id: string) {
-    const next = new Set(expandedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    updateUrl(next, qParam);
-  }
+  const handleToggle = useCallback(
+    (id: string) => {
+      const next = new Set(userExpandedIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      updateUrl(next, qParam);
+    },
+    [userExpandedIds, qParam, updateUrl],
+  );
 
   function handleSearch(value: string) {
     setSearchValue(value);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
-      updateUrl(expandedIds, value);
+      updateUrl(userExpandedIds, value);
     }, 200);
   }
 
-  const q = qParam.toLowerCase();
-
-  function topicMatchesSearch(node: TreeNode): boolean {
-    if (!q) return true;
-    if (node.title.toLowerCase().includes(q)) return true;
-    return node.children.some((c) => c.title.toLowerCase().includes(q));
-  }
-
   function renderTree() {
-    const visible = tree.filter(topicMatchesSearch);
+    const visible = tree.filter(nodeOrDescendantMatches);
     if (visible.length === 0) {
       return (
         <p className="px-4 py-6 text-center text-xs" style={{ color: 'var(--aq-text3)' }}>
-          No results
+          {dict.catalog.sidebar.noResults}
         </p>
       );
     }
-    return visible.map((node) => {
-      const isOpen = expandedIds.has(node.id);
-      const topicStatus = progressMap.get(node.id) ?? 'not_started';
-      const subtopicTotal = node.children.length;
-      const subtopicDone = node.children.filter(
-        (c) => (progressMap.get(c.id) ?? 'not_started') === 'completed',
-      ).length;
-      const pct = subtopicTotal > 0 ? Math.round((subtopicDone / subtopicTotal) * 100) : 0;
-
-      // Active: any route under this topic
-      const isActive = pathname.startsWith(`/catalog/${node.id}`);
-
-      const visibleChildren = q
-        ? node.children.filter((c) => c.title.toLowerCase().includes(q))
-        : node.children;
-
-      return (
-        <div key={node.id}>
-          {/* Topic row */}
-          <div
-            className="relative flex cursor-pointer items-center gap-0 pr-3"
-            style={{
-              background: isActive ? 'var(--aq-accent-glow)' : undefined,
-              padding: '0 12px 0 0',
-            }}
-            onClick={() => toggleExpand(node.id)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && toggleExpand(node.id)}
-            aria-expanded={isOpen}
-          >
-            {isActive && (
-              <div
-                className="absolute left-0 top-0 bottom-0"
-                style={{ width: 3, background: 'var(--aq-accent)', borderRadius: '0 2px 2px 0' }}
-              />
-            )}
-            {/* Chevron */}
-            <span
-              className="flex h-9 w-5 flex-shrink-0 items-center justify-center"
-              style={{ color: 'var(--aq-text3)' }}
-            >
-              {node.children.length > 0 && <ChevronIcon open={isOpen} />}
-            </span>
-            {/* Icon */}
-            <span
-              className="mr-2.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-[7px] text-sm"
-              style={{ background: 'var(--aq-accent-glow)' }}
-              aria-hidden
-            >
-              📚
-            </span>
-            {/* Info */}
-            <div className="min-w-0 flex-1 py-2">
-              <p
-                className="truncate text-[13px] font-medium"
-                style={{ color: isActive ? 'var(--aq-accent)' : 'var(--aq-text)' }}
-              >
-                {node.title}
-              </p>
-              <div className="mt-0.5 flex items-center gap-1.5">
-                <div
-                  className="h-[3px] flex-1 overflow-hidden rounded-full"
-                  style={{ background: 'var(--aq-bg4)' }}
-                >
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${pct}%`,
-                      background: topicStatus === 'completed' ? 'var(--aq-accent3)' : 'var(--aq-accent)',
-                    }}
-                  />
-                </div>
-                <span className="flex-shrink-0 text-[10px] font-semibold" style={{ color: 'var(--aq-text3)' }}>
-                  {pct}%
-                </span>
-              </div>
-            </div>
-            {/* Link to topic page */}
-            <Link
-              href={`/catalog/${node.id}`}
-              className="absolute inset-0"
-              aria-label={node.title}
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-
-          {/* Subtopics */}
-          {isOpen && visibleChildren.length > 0 && (
-            <div>
-              {visibleChildren.map((child) => {
-                const childStatus = progressMap.get(child.id) ?? 'not_started';
-                const isChildActive = pathname === `/catalog/${node.id}/${child.id}`;
-                return (
-                  <Link
-                    key={child.id}
-                    href={`/catalog/${node.id}/${child.id}`}
-                    className="flex items-center gap-2 py-[7px] text-xs transition-colors hover:bg-[var(--aq-bg3)]"
-                    style={{
-                      paddingLeft: 54,
-                      paddingRight: 12,
-                      background: isChildActive ? 'var(--aq-accent-glow)' : undefined,
-                      color: 'var(--aq-text2)',
-                    }}
-                  >
-                    <span
-                      className="h-[6px] w-[6px] flex-shrink-0 rounded-full"
-                      style={{ background: STATUS_DOT[childStatus] }}
-                    />
-                    <span className="flex-1 truncate">{child.title}</span>
-                    <span style={{ color: STATUS_DOT[childStatus] }}>{STATUS_LABEL[childStatus]}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      );
-    });
+    return visible.map((node) => (
+      <TopicTreeNode
+        key={node.id}
+        node={node}
+        depth={0}
+        expandedIds={effectiveExpanded}
+        progressMap={progressMap}
+        activeId={activeId}
+        onToggle={handleToggle}
+        expandLabel={dict.catalog.sidebar.expandTopic}
+        collapseLabel={dict.catalog.sidebar.collapseTopic}
+      />
+    ));
   }
 
   return (
@@ -279,42 +168,10 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
         className="px-5 pb-3 pt-5"
         style={{ borderBottom: '1px solid var(--aq-border)' }}
       >
-        <p
-          className="mb-3 text-[11px] font-semibold uppercase tracking-widest"
-          style={{ color: 'var(--aq-text3)' }}
-        >
-          Catalogue
-        </p>
-
-        {/* Role pill — instructor only */}
-        {isInstructor && (
-          <div
-            className="mb-3 flex rounded-[20px] p-[3px]"
-            style={{ background: 'var(--aq-bg3)', border: '1px solid var(--aq-border)' }}
-          >
-            {(['participant', 'instructor'] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setPreviewRole(r)}
-                className="flex-1 rounded-[16px] px-3 py-[5px] text-[12px] font-medium capitalize transition-all"
-                style={{
-                  background: previewRole === r ? 'var(--aq-accent)' : 'transparent',
-                  color: previewRole === r ? '#0B0E17' : 'var(--aq-text2)',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                {r === 'participant' ? 'Participante' : 'Instrutor'}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Global progress */}
         <div>
           <div className="mb-1.5 flex justify-between text-[12px]" style={{ color: 'var(--aq-text2)' }}>
-            <span>Progress</span>
+            <span>{dict.catalog.sidebar.progressLabel}</span>
             <strong style={{ color: 'var(--aq-accent)' }}>{globalProgress}%</strong>
           </div>
           <div
@@ -332,10 +189,16 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
         </div>
       </div>
 
-      {/* Search */}
-      <div className="mx-4 mt-3">
+      {/* Search & Eyebrow */}
+      <div className="mx-4 mt-4">
+        <p
+          className="mb-2 text-[11px] font-semibold uppercase tracking-[1.2px]"
+          style={{ color: 'var(--aq-text3)' }}
+        >
+          {dict.catalog.breadcrumb.catalogue}
+        </p>
         <div
-          className="flex items-center gap-2 rounded-[8px] px-3 py-[7px]"
+          className="flex items-center gap-2 rounded-[9px] px-3 py-[7px]"
           style={{ background: 'var(--aq-bg3)', border: '1px solid var(--aq-border2)' }}
         >
           <span style={{ color: 'var(--aq-text3)' }}>
@@ -343,12 +206,12 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
           </span>
           <input
             type="search"
-            placeholder="Search topics…"
+            placeholder={dict.catalog.sidebar.searchPlaceholder}
             value={searchValue}
             onChange={(e) => handleSearch(e.target.value)}
             className="w-full bg-transparent text-[13px] outline-none"
             style={{ color: 'var(--aq-text)', caretColor: 'var(--aq-accent)' }}
-            aria-label="Search topics"
+            aria-label={dict.catalog.sidebar.searchAriaLabel}
           />
         </div>
       </div>
@@ -356,34 +219,17 @@ export function CatalogSidebar({ topics, progressMap, globalProgress, isInstruct
       {/* Tree */}
       <nav
         className="flex-1 overflow-y-auto py-3"
-        aria-label="Catalogue tree"
+        aria-label={dict.catalog.sidebar.navAriaLabel}
         style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--aq-bg4) transparent' }}
       >
         {topics.length === 0 ? (
           <p className="px-4 py-6 text-center text-xs" style={{ color: 'var(--aq-text3)' }}>
-            No published content yet.
+            {dict.catalog.sidebar.noContent}
           </p>
         ) : (
           renderTree()
         )}
       </nav>
-
-      {/* Instructor: add topic shortcut */}
-      {showInstructorUI && (
-        <div className="p-4" style={{ borderTop: '1px solid var(--aq-border)' }}>
-          <Link
-            href="/admin/topics"
-            className="flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-[12px] transition-all hover:border-[var(--aq-accent)] hover:text-[var(--aq-accent)]"
-            style={{
-              border: '1px dashed var(--aq-border2)',
-              color: 'var(--aq-text3)',
-            }}
-          >
-            <span>+</span>
-            <span>Manage topics</span>
-          </Link>
-        </div>
-      )}
     </div>
   );
 }

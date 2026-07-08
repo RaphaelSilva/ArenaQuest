@@ -1,6 +1,6 @@
 # RFC 0001 — Otimização da suíte de testes de `apps/api`
 
-- **Status:** Draft
+- **Status:** Done
 - **Autor:** raphaelsilva
 - **Data:** 2026-05-24
 - **Escopo:** `apps/api/test/**`

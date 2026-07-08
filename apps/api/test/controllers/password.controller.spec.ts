@@ -99,20 +99,6 @@ function makeMailer(): IMailer & { sent: Array<{ to: string; subject: string }> 
 // ---------------------------------------------------------------------------
 
 describe('PasswordController.forgotPassword', () => {
-  it('returns 400 for an invalid email', async () => {
-    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeResetTokenRepo(), makeMailer(), 'http://localhost:3000');
-    const result = await controller.forgotPassword({ email: 'not-an-email' });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.status).toBe(400);
-  });
-
-  it('returns 400 for a missing body', async () => {
-    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeResetTokenRepo(), makeMailer(), 'http://localhost:3000');
-    const result = await controller.forgotPassword(null);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.status).toBe(400);
-  });
-
   it('returns 200 and sends email for a known active user', async () => {
     const tokenRepo = makeResetTokenRepo();
     const mailer = makeMailer();
@@ -200,27 +186,6 @@ function makeConsumeableResetTokenRepo(outcome: 'consumed' | 'expired' | 'alread
 }
 
 describe('PasswordController.resetPassword', () => {
-  it('returns 400 for missing newPassword', async () => {
-    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeConsumeableResetTokenRepo(), makeMailer(), 'http://localhost:3000');
-    const result = await controller.resetPassword({ token: 'abc' });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.status).toBe(400);
-  });
-
-  it('returns 400 for a newPassword shorter than 8 chars', async () => {
-    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeConsumeableResetTokenRepo(), makeMailer(), 'http://localhost:3000');
-    const result = await controller.resetPassword({ token: 'abc', newPassword: 'short1' });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.status).toBe(400);
-  });
-
-  it('returns 400 for newPassword with no digit', async () => {
-    const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeConsumeableResetTokenRepo(), makeMailer(), 'http://localhost:3000');
-    const result = await controller.resetPassword({ token: 'abc', newPassword: 'NoDigitHere' });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.status).toBe(400);
-  });
-
   it('returns 400 InvalidOrExpiredToken for an expired token', async () => {
     const controller = new PasswordController(makeAuthAdapter(), makeUserRepo(), makeRefreshTokenRepo(), makeConsumeableResetTokenRepo('expired'), makeMailer(), 'http://localhost:3000');
     const result = await controller.resetPassword({ token: 'expired-token', newPassword: 'ValidPass1' });

@@ -5,6 +5,7 @@ import { useApiClient } from '@web/context/auth-context';
 import type { Entities } from '@arenaquest/shared/types/entities';
 import type { ResetPasswordInput } from '@web/lib/admin-users-api';
 import { Spinner } from '@web/components/spinner';
+import { useDict } from '@web/context/dict-context';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -28,6 +29,8 @@ export function ResetPasswordModal({
   onSuccess,
 }: ResetPasswordModalProps) {
   const client = useApiClient();
+  const dict = useDict();
+  const d = dict.admin.users.resetPasswordModal;
 
   // State management
   const [phase, setPhase] = useState<Phase>('confirmation');
@@ -84,24 +87,22 @@ export function ResetPasswordModal({
       setPhase('success');
     } catch (err) {
       const error = err as Error & { status?: number };
-      let message = 'An error occurred while resetting the password.';
+      let message = d.errorGeneral;
 
       if (error.status === 403) {
-        message = 'You do not have permission to reset passwords.';
+        message = d.errorPermission;
       } else if (error.status === 404) {
-        message = 'User not found.';
+        message = d.errorNotFound;
       } else if (error.status === 422) {
-        message =
-          'You cannot reset your own password. Use Settings → Change Password instead.';
+        message = d.errorSelfReset;
       } else if (error.status === 500) {
-        message =
-          'An error occurred. The password may have been updated but the email failed to send.';
+        message = d.errorEmailFailed;
       }
 
       setErrorMessage(message);
       setPhase('error');
     }
-  }, [client, user.id, sendEmail, adminNote]);
+  }, [client, user.id, sendEmail, adminNote, d]);
 
   // Handle close success modal
   const handleCloseSuccess = useCallback(() => {
@@ -118,7 +119,7 @@ export function ResetPasswordModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Reset password"
+        aria-label={dict.admin.users.detail.resetPasswordButton}
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       >
         <div
@@ -126,11 +127,11 @@ export function ResetPasswordModal({
           style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
         >
           <h2 className="mb-2 text-lg font-semibold" style={{ color: 'var(--text)' }}>
-            Reset Password for {user.name}?
+            {d.confirmTitle(user.name)}
           </h2>
 
           <p className="mb-4 text-sm" style={{ color: 'var(--text2)' }}>
-            This will invalidate all active sessions for this user.
+            {d.confirmMessage}
           </p>
 
           <label className="mb-4 flex items-center gap-2" style={{ color: 'var(--text)' }}>
@@ -138,9 +139,9 @@ export function ResetPasswordModal({
               type="checkbox"
               checked={sendEmail}
               onChange={(e) => setSendEmail(e.target.checked)}
-              aria-label="Send notification email to user"
+              aria-label={d.sendEmailLabel}
             />
-            <span className="text-sm">Send notification email to user</span>
+            <span className="text-sm">{d.sendEmailLabel}</span>
           </label>
 
           <div className="mb-6">
@@ -149,13 +150,13 @@ export function ResetPasswordModal({
               className="mb-2 block text-sm font-medium"
               style={{ color: 'var(--text3)' }}
             >
-              Optional note to include in email
+              {d.noteLabel}
             </label>
             <textarea
               id="admin-note"
               value={adminNote}
               onChange={(e) => setAdminNote(e.target.value.slice(0, 500))}
-              placeholder="Leave a message for the user..."
+              placeholder={d.notePlaceholder}
               maxLength={500}
               className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none"
               style={{
@@ -166,7 +167,7 @@ export function ResetPasswordModal({
               rows={3}
             />
             <p className="mt-1 text-xs" style={{ color: 'var(--text3)' }}>
-              {adminNote.length}/500 characters
+              {d.noteCharCount(adminNote.length)}
             </p>
           </div>
 
@@ -177,7 +178,7 @@ export function ResetPasswordModal({
               className="rounded-lg px-4 py-2 text-sm transition-colors"
               style={{ color: 'var(--text2)' }}
             >
-              Cancel
+              {d.cancelButton}
             </button>
             <button
               type="button"
@@ -185,7 +186,7 @@ export function ResetPasswordModal({
               className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
               style={{ background: 'var(--accent)' }}
             >
-              Confirm
+              {d.confirmButton}
             </button>
           </div>
         </div>
@@ -202,7 +203,7 @@ export function ResetPasswordModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Resetting password"
+        aria-label={d.loadingMessage}
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       >
         <div
@@ -210,7 +211,7 @@ export function ResetPasswordModal({
           style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
         >
           <Spinner className="mb-4 h-6 w-6 text-zinc-400" />
-          <p style={{ color: 'var(--text2)' }}>Resetting password...</p>
+          <p style={{ color: 'var(--text2)' }}>{d.loadingMessage}</p>
         </div>
       </div>
     );
@@ -225,7 +226,7 @@ export function ResetPasswordModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Password reset successful"
+        aria-label={d.successTitle}
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       >
         <div
@@ -233,12 +234,11 @@ export function ResetPasswordModal({
           style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
         >
           <h2 className="mb-4 text-lg font-semibold" style={{ color: 'var(--text)' }}>
-            Password Reset Successful
+            {d.successTitle}
           </h2>
 
           <p className="mb-4 text-sm" style={{ color: 'var(--text2)' }}>
-            Share this temporary password with the user. They can change it in Settings after
-            logging in.
+            {d.successMessage}
           </p>
 
           <div
@@ -261,7 +261,7 @@ export function ResetPasswordModal({
               color: '#0B0E17',
             }}
           >
-            {copied ? 'Copied to clipboard!' : 'Copy password'}
+            {copied ? d.copiedButton : d.copyButton}
           </button>
 
           <button
@@ -270,7 +270,7 @@ export function ResetPasswordModal({
             className="w-full rounded-lg px-4 py-2 text-sm transition-colors"
             style={{ background: 'var(--bg2)', color: 'var(--text2)' }}
           >
-            Close
+            {d.closeButton}
           </button>
         </div>
       </div>
@@ -286,7 +286,7 @@ export function ResetPasswordModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Password reset error"
+        aria-label={d.failedTitle}
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       >
         <div
@@ -294,7 +294,7 @@ export function ResetPasswordModal({
           style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
         >
           <h2 className="mb-4 text-lg font-semibold" style={{ color: 'var(--error)' }}>
-            Password Reset Failed
+            {d.failedTitle}
           </h2>
 
           <p className="mb-4 text-sm" style={{ color: 'var(--text)' }}>
@@ -311,7 +311,7 @@ export function ResetPasswordModal({
               className="rounded-lg px-4 py-2 text-sm transition-colors"
               style={{ color: 'var(--text2)' }}
             >
-              Cancel
+              {d.cancelButton}
             </button>
             <button
               type="button"
@@ -319,7 +319,7 @@ export function ResetPasswordModal({
               className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
               style={{ background: 'var(--accent)' }}
             >
-              Retry
+              {d.retryButton}
             </button>
           </div>
         </div>

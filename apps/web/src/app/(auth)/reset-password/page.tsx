@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { authApi, AuthApiError } from '@web/lib/auth-api';
 import { Spinner } from '@web/components/spinner';
 import { Logo } from '@web/components/design-system';
+import { useDict } from '@web/context/dict-context';
 
 const LockIcon = () => (
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -46,25 +47,28 @@ function ResetPasswordInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams?.get('token') ?? '';
+  const dict = useDict();
+  const d = dict.auth.resetPassword;
 
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [expiredLink, setExpiredLink] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ newPw?: string; confirmPw?: string }>({});
 
   if (!token) {
     return (
       <div className="aq-anim">
         <div role="alert" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '12px 14px', borderRadius: 9, background: 'var(--aq-error-bg)', border: '1px solid oklch(0.65 0.22 15 / 0.3)', marginBottom: 24, fontSize: 13, color: 'var(--aq-error)' }}>
-          <AlertIcon /> Link inválido. Solicite um novo link de redefinição.
+          <AlertIcon /> {d.invalidLinkMessage}
         </div>
         <Link
           href="/forgot-password"
           style={{ display: 'block', width: '100%', padding: 13, borderRadius: 10, border: 'none', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 15, fontWeight: 700, cursor: 'pointer', background: 'var(--aq-accent)', color: '#0B0E17', boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)', textDecoration: 'none', textAlign: 'center' }}
         >
-          Solicitar novo link
+          {d.requestNewLink}
         </Link>
       </div>
     );
@@ -72,11 +76,11 @@ function ResetPasswordInner() {
 
   function validate(): boolean {
     const errs: { newPw?: string; confirmPw?: string } = {};
-    if (!newPw) errs.newPw = 'Campo obrigatório';
-    else if (newPw.length < 8) errs.newPw = 'Mínimo 8 caracteres';
-    else if (!/\d/.test(newPw)) errs.newPw = 'Inclua pelo menos um número';
-    if (!confirmPw) errs.confirmPw = 'Campo obrigatório';
-    else if (newPw !== confirmPw) errs.confirmPw = 'As senhas não coincidem';
+    if (!newPw) errs.newPw = d.errorRequired;
+    else if (newPw.length < 8) errs.newPw = d.errorMinLength;
+    else if (!/\d/.test(newPw)) errs.newPw = d.errorNoDigit;
+    if (!confirmPw) errs.confirmPw = d.errorRequired;
+    else if (newPw !== confirmPw) errs.confirmPw = d.errorMismatch;
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -85,17 +89,19 @@ function ResetPasswordInner() {
     e.preventDefault();
     if (!validate()) return;
     setError('');
+    setExpiredLink(false);
     setLoading(true);
     try {
       await authApi.resetPassword(token, newPw);
       router.replace('/login?passwordReset=1');
     } catch (err) {
       if (err instanceof AuthApiError && err.code === 'InvalidToken') {
-        setError('Este link expirou ou já foi usado. Solicite um novo.');
+        setError(d.errorExpiredLink);
+        setExpiredLink(true);
       } else if (err instanceof AuthApiError && err.code === 'RateLimited') {
-        setError('Muitas tentativas. Aguarde alguns minutos.');
+        setError(d.errorRateLimited);
       } else {
-        setError('Não foi possível redefinir a senha. Tente novamente.');
+        setError(d.errorGeneral);
       }
     } finally {
       setLoading(false);
@@ -106,18 +112,18 @@ function ResetPasswordInner() {
     <div className="aq-anim">
       <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 22, fontWeight: 700, letterSpacing: '-0.3px', marginBottom: 6 }}>
-          Nova senha
+          {d.title}
         </h2>
         <p style={{ fontSize: 13, color: 'var(--aq-text2)', lineHeight: 1.5 }}>
-          Escolha uma senha com pelo menos 8 caracteres e um número.
+          {d.subtitle}
         </p>
       </div>
 
       {error && (
         <div role="alert" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', borderRadius: 9, background: 'var(--aq-error-bg)', border: '1px solid oklch(0.65 0.22 15 / 0.3)', marginBottom: 18, fontSize: 13, color: 'var(--aq-error)' }}>
           <AlertIcon /> {error}
-          {(error.includes('expirou') || error.includes('usado')) && (
-            <Link href="/forgot-password" style={{ marginLeft: 4, color: 'var(--aq-accent)', textDecoration: 'none', fontWeight: 500, whiteSpace: 'nowrap' }}>Solicitar novo</Link>
+          {expiredLink && (
+            <Link href="/forgot-password" style={{ marginLeft: 4, color: 'var(--aq-accent)', textDecoration: 'none', fontWeight: 500, whiteSpace: 'nowrap' }}>{d.requestNew}</Link>
           )}
         </div>
       )}
@@ -125,13 +131,13 @@ function ResetPasswordInner() {
       <form onSubmit={handleSubmit} noValidate>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
           <div>
-            <label htmlFor="new-password" style={s.fieldLabel}>Nova senha</label>
+            <label htmlFor="new-password" style={s.fieldLabel}>{d.newPasswordLabel}</label>
             <div style={s.inputWrap}>
               <span style={s.inputIcon}><LockIcon /></span>
               <input
                 id="new-password"
                 type={showPw ? 'text' : 'password'}
-                placeholder="Mínimo 8 caracteres"
+                placeholder={d.newPasswordPlaceholder}
                 value={newPw}
                 onChange={(e) => setNewPw(e.target.value)}
                 autoComplete="new-password"
@@ -141,7 +147,7 @@ function ResetPasswordInner() {
                 type="button"
                 onClick={() => setShowPw(!showPw)}
                 style={{ position: 'absolute', right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--aq-text3)', display: 'flex', alignItems: 'center' }}
-                aria-label={showPw ? 'Ocultar senha' : 'Mostrar senha'}
+                aria-label={showPw ? d.hidePassword : d.showPassword}
               >
                 <EyeIcon off={showPw} />
               </button>
@@ -150,13 +156,13 @@ function ResetPasswordInner() {
           </div>
 
           <div>
-            <label htmlFor="confirm-password" style={s.fieldLabel}>Confirmar senha</label>
+            <label htmlFor="confirm-password" style={s.fieldLabel}>{d.confirmPasswordLabel}</label>
             <div style={s.inputWrap}>
               <span style={s.inputIcon}><LockIcon /></span>
               <input
                 id="confirm-password"
                 type={showPw ? 'text' : 'password'}
-                placeholder="Repita a nova senha"
+                placeholder={d.confirmPasswordPlaceholder}
                 value={confirmPw}
                 onChange={(e) => setConfirmPw(e.target.value)}
                 autoComplete="new-password"
@@ -172,13 +178,13 @@ function ResetPasswordInner() {
           disabled={loading}
           style={{ width: '100%', padding: 13, borderRadius: 10, border: 'none', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', background: 'var(--aq-accent)', color: '#0B0E17', boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)', opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s' }}
         >
-          {loading ? 'Redefinindo…' : 'Redefinir senha'}
+          {loading ? d.loadingButton : d.submitButton}
         </button>
       </form>
 
       <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--aq-text3)', marginTop: 24 }}>
         <Link href="/login" style={{ color: 'var(--aq-accent)', textDecoration: 'none', fontWeight: 500 }}>
-          ← Voltar ao login
+          {d.backToLogin}
         </Link>
       </div>
     </div>

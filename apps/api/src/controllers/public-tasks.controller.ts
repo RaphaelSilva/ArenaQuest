@@ -6,7 +6,7 @@ import type {
   IEnrollmentRepository,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
-import type { ControllerResult } from '../core/result';
+import type { ControllerResult } from '@api/core/result';
 
 export type TaskSummary = {
   id: string;

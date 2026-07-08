@@ -1,8 +1,12 @@
+'use client';
+
 import type { DailyQuest } from '@web/lib/dashboard-api';
+import { useDict } from '@web/context/dict-context';
 
 type Props = { tasks: DailyQuest[] };
 
 export function DailyTasks({ tasks }: Props) {
+  const dict = useDict();
   const completed = tasks.filter((t) => t.completed).length;
   const total = tasks.length;
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -12,10 +16,10 @@ export function DailyTasks({ tasks }: Props) {
       <section
         className="rounded-2xl border border-dashed p-8 text-center"
         style={{ borderColor: 'var(--aq-border2)', background: 'var(--aq-bg2)' }}
-        aria-label="Daily tasks"
+        aria-label={dict.dashboard.dailyTasks.title}
       >
         <p className="text-sm" style={{ color: 'var(--aq-text3)' }}>
-          No daily tasks today.
+          {dict.dashboard.dailyTasks.empty}
         </p>
       </section>
     );
@@ -25,7 +29,7 @@ export function DailyTasks({ tasks }: Props) {
     <section
       className="overflow-hidden rounded-2xl border"
       style={{ background: 'var(--aq-bg2)', borderColor: 'var(--aq-border2)' }}
-      aria-label="Daily tasks"
+      aria-label={dict.dashboard.dailyTasks.title}
     >
       <div
         className="flex items-center justify-between border-b px-5 py-4"
@@ -35,7 +39,7 @@ export function DailyTasks({ tasks }: Props) {
           className="flex items-center gap-2 text-[13px] font-semibold"
           style={{ color: 'var(--aq-text)', fontFamily: "'Space Grotesk', sans-serif" }}
         >
-          Today&apos;s Tasks
+          {dict.dashboard.dailyTasks.title}
           <span
             className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
             style={{ background: 'var(--aq-accent-glow)', color: 'var(--aq-accent)' }}
@@ -53,7 +57,7 @@ export function DailyTasks({ tasks }: Props) {
           className="h-1.5 overflow-hidden rounded-full"
           style={{ background: 'var(--aq-bg4)' }}
           role="progressbar"
-          aria-label="Daily task progress"
+          aria-label={dict.dashboard.dailyTasks.progressLabel}
           aria-valuenow={pct}
           aria-valuemin={0}
           aria-valuemax={100}

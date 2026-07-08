@@ -16,18 +16,21 @@ import {
   type TaskDetail,
   type TaskStatus,
 } from '@web/lib/admin-tasks-api';
+import { useDict } from '@web/context/dict-context';
 
 /**
  * @see https://nextjs.org/docs/app/api-reference/edge
  */
 export const runtime = 'edge';
 
-const PUBLISH_REASONS: Record<string, string> = {
-  NO_STAGES: 'Add at least one stage before publishing.',
-  LINKED_TOPIC_NOT_PUBLISHED: 'Every linked topic must itself be published.',
-};
-
 export default function AdminTaskEditorPage() {
+  const dict = useDict();
+
+  const PUBLISH_REASONS: Record<string, string> = {
+    NO_STAGES: dict.admin.tasks.cannotPublish.noStages,
+    LINKED_TOPIC_NOT_PUBLISHED: dict.admin.tasks.cannotPublish.linkedTopicNotPublished,
+  };
+
   const params = useParams<{ id: string }>();
   const taskId = params.id;
   const router = useRouter();
@@ -54,9 +57,9 @@ export default function AdminTaskEditorPage() {
       setDescription(detail.description);
       setTopics(topicList);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load task');
+      setError(e instanceof Error ? e.message : dict.admin.tasks.errors.failedLoadDetail);
     }
-  }, [client, taskId]);
+  }, [client, taskId, dict.admin.tasks.errors.failedLoadDetail]);
 
   useEffect(() => {
     if (!canAuthor) {
@@ -74,7 +77,7 @@ export default function AdminTaskEditorPage() {
       await client.adminTasks.update(task.id, { title, description });
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed');
+      setError(e instanceof Error ? e.message : dict.admin.tasks.errors.failedSave);
     } finally {
       setSaving(false);
     }
@@ -92,9 +95,9 @@ export default function AdminTaskEditorPage() {
         const reasons = (e.details.reasons as string[] | undefined) ?? [];
         setPublishErrors(reasons);
       } else if (e instanceof AdminTasksApiError && e.code === 'INVALID_TRANSITION') {
-        setError('That status transition is not allowed.');
+        setError(dict.admin.tasks.errors.invalidTransition);
       } else {
-        setError(e instanceof Error ? e.message : 'Failed to update status');
+        setError(e instanceof Error ? e.message : dict.admin.tasks.errors.failedStatus);
       }
     }
   };
@@ -106,9 +109,9 @@ export default function AdminTaskEditorPage() {
       await reload();
     } catch (e) {
       if (e instanceof AdminTasksApiError && e.code === 'LINKED_TOPIC_NOT_PUBLISHED') {
-        setError('All linked topics must be published while the task is published.');
+        setError(dict.admin.tasks.errors.linkedTopicNotPublished);
       } else {
-        setError(e instanceof Error ? e.message : 'Failed to update topic links');
+        setError(e instanceof Error ? e.message : dict.admin.tasks.errors.failedTopicLinks);
       }
     }
   };
@@ -128,11 +131,11 @@ export default function AdminTaskEditorPage() {
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-8">
       <Link href="/admin/tasks" className="text-sm text-zinc-500 hover:text-zinc-900">
-        ← Back to tasks
+        {dict.admin.tasks.editPage.backToTasks}
       </Link>
 
       <header className="mt-3 mb-6 flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Edit Task</h1>
+        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{dict.admin.tasks.editPage.pageTitle}</h1>
         <span
           data-testid="status-chip"
           className="rounded-full bg-zinc-200 px-3 py-1 text-xs uppercase tracking-wide text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200"
@@ -149,7 +152,7 @@ export default function AdminTaskEditorPage() {
 
       {publishErrors.length > 0 && (
         <div role="alert" data-testid="publish-errors" className="mb-4 rounded-md bg-amber-100 px-4 py-3 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-          <p className="font-medium">Cannot publish this task yet:</p>
+          <p className="font-medium">{dict.admin.tasks.cannotPublish.title}</p>
           <ul className="mt-1 list-inside list-disc">
             {publishErrors.map((r) => (
               <li key={r}>{PUBLISH_REASONS[r] ?? r}</li>
@@ -160,7 +163,7 @@ export default function AdminTaskEditorPage() {
 
       <section className="space-y-4 rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <label className="block">
-          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">Title</span>
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{dict.admin.tasks.detail.titleLabel}</span>
           <input
             type="text"
             value={title}
@@ -170,7 +173,7 @@ export default function AdminTaskEditorPage() {
         </label>
 
         <label className="block">
-          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">Description (Markdown)</span>
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{dict.admin.tasks.detail.descriptionLabel}</span>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -181,7 +184,7 @@ export default function AdminTaskEditorPage() {
 
         {description && (
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Preview</p>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-zinc-500">{dict.admin.tasks.detail.preview}</p>
             <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-950">
               <MarkdownViewer content={description} />
             </div>
@@ -194,13 +197,13 @@ export default function AdminTaskEditorPage() {
             disabled={saving}
             className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
           >
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? dict.admin.tasks.detail.savingButton : dict.admin.tasks.detail.saveButton}
           </button>
         </div>
       </section>
 
       <section className="mt-6 rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">Linked Topics</h2>
+        <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">{dict.admin.tasks.detail.linkedTopicsTitle}</h2>
         <TaskTopicPicker
           topics={topics}
           allowDrafts={isDraft}
@@ -210,19 +213,19 @@ export default function AdminTaskEditorPage() {
       </section>
 
       <section className="mt-6 rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">Stages</h2>
+        <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">{dict.admin.tasks.detail.stagesTitle}</h2>
         <StageEditor task={task} topics={topics} onChange={reload} />
       </section>
 
       <section className="mt-6 rounded-md border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">Status</h2>
+        <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">{dict.admin.tasks.detail.statusTitle}</h2>
         <div className="flex gap-2">
           {task.status !== 'draft' && (
             <button
               onClick={() => handleSetStatus('draft')}
               className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
             >
-              Move to Draft
+              {dict.admin.tasks.detail.moveToDraftButton}
             </button>
           )}
           {task.status === 'draft' && (
@@ -230,7 +233,7 @@ export default function AdminTaskEditorPage() {
               onClick={() => handleSetStatus('published')}
               className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
             >
-              Publish
+              {dict.admin.tasks.detail.publishButton}
             </button>
           )}
           {task.status !== 'archived' && (
@@ -238,7 +241,7 @@ export default function AdminTaskEditorPage() {
               onClick={() => handleSetStatus('archived')}
               className="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
             >
-              Archive
+              {dict.admin.tasks.detail.archiveButton}
             </button>
           )}
         </div>

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { ITopicNodeRepository, IMediaRepository, IStorageAdapter } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
-import type { ControllerResult } from '../core/result';
-import { ValidateBody, Body } from '../core/decorators';
+import type { ControllerResult } from '@api/core/result';
+
 
 // ---------------------------------------------------------------------------
 // Validation constants
@@ -74,10 +74,9 @@ export class AdminMediaController {
     return { ok: true, data: mediaWithUrls };
   }
 
-  @ValidateBody(PresignSchema)
   async presignUpload(
     topicId: string,
-    @Body() body: z.infer<typeof PresignSchema>,
+    body: z.infer<typeof PresignSchema>,
     userId: string,
   ): Promise<ControllerResult<PresignResult>> {
     const topic = await this.topics.findById(topicId);

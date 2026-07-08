@@ -2,20 +2,22 @@ import { z } from 'zod';
 import type { ITopicNodeRepository, ITagRepository, TopicNodeRecord } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
 import { sanitizeMarkdown } from '@arenaquest/shared/utils/sanitize-markdown';
-import type { ControllerResult } from '../core/result';
-import { ValidateBody, Body } from '../core/decorators';
+import type { ControllerResult } from '@api/core/result';
+
 
 // ---------------------------------------------------------------------------
 // Schemas
 // ---------------------------------------------------------------------------
 
 const TOPIC_STATUS_VALUES = ['draft', 'published', 'archived'] as const;
+const TOPIC_VISIBILITY_VALUES = ['public', 'restricted', 'private'] as const;
 
 export const CreateTopicSchema = z.object({
   parentId: z.string().nullable().optional(),
   title: z.string().min(1),
   content: z.string().optional(),
   status: z.enum(TOPIC_STATUS_VALUES).optional(),
+  visibility: z.enum(TOPIC_VISIBILITY_VALUES).optional(),
   estimatedMinutes: z.number().int().min(0).optional(),
   tagIds: z.array(z.string()).optional(),
   prerequisiteIds: z.array(z.string()).optional(),
@@ -25,6 +27,7 @@ export const UpdateTopicSchema = z.object({
   title: z.string().min(1).optional(),
   content: z.string().optional(),
   status: z.enum(TOPIC_STATUS_VALUES).optional(),
+  visibility: z.enum(TOPIC_VISIBILITY_VALUES).optional(),
   estimatedMinutes: z.number().int().min(0).optional(),
   tagIds: z.array(z.string()).optional(),
   prerequisiteIds: z.array(z.string()).optional(),
@@ -56,9 +59,8 @@ export class AdminTopicsController {
     return { ok: true, data: nodes };
   }
 
-  @ValidateBody(CreateTopicSchema)
-  async create(@Body() body: z.infer<typeof CreateTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
-    const { parentId, title, content, status, estimatedMinutes, tagIds, prerequisiteIds } = body;
+  async create(body: z.infer<typeof CreateTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
+    const { parentId, title, content, status, visibility, estimatedMinutes, tagIds, prerequisiteIds } = body;
 
     if (parentId) {
       const parent = await this.topics.findById(parentId);
@@ -79,6 +81,7 @@ export class AdminTopicsController {
       title,
       content: content !== undefined ? sanitizeMarkdown(content) : undefined,
       status: status as Entities.Config.TopicNodeStatus,
+      visibility: visibility as Entities.Config.TopicVisibility,
       estimatedMinutes,
       tagIds,
       prerequisiteIds,
@@ -96,12 +99,11 @@ export class AdminTopicsController {
     return { ok: true, data: { ...node, children } };
   }
 
-  @ValidateBody(UpdateTopicSchema)
-  async update(id: string, @Body() body: z.infer<typeof UpdateTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
+  async update(id: string, body: z.infer<typeof UpdateTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
     const existing = await this.topics.findById(id);
     if (!existing) return { ok: false, status: 404, error: 'NotFound' };
 
-    const { title, content, status, estimatedMinutes, tagIds, prerequisiteIds } = body;
+    const { title, content, status, visibility, estimatedMinutes, tagIds, prerequisiteIds } = body;
 
     if (prerequisiteIds && prerequisiteIds.length > 0) {
       for (const prereqId of prerequisiteIds) {
@@ -116,6 +118,7 @@ export class AdminTopicsController {
       title,
       content: content !== undefined ? sanitizeMarkdown(content) : undefined,
       status: status as Entities.Config.TopicNodeStatus,
+      visibility: visibility as Entities.Config.TopicVisibility,
       estimatedMinutes,
       tagIds,
       prerequisiteIds,
@@ -124,8 +127,7 @@ export class AdminTopicsController {
     return { ok: true, data: node };
   }
 
-  @ValidateBody(MoveTopicSchema)
-  async move(id: string, @Body() body: z.infer<typeof MoveTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
+  async move(id: string, body: z.infer<typeof MoveTopicSchema>): Promise<ControllerResult<TopicNodeRecord>> {
     const existing = await this.topics.findById(id);
     if (!existing) return { ok: false, status: 404, error: 'NotFound' };
 

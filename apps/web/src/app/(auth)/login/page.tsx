@@ -11,6 +11,8 @@ import { AuthTabs } from '@web/components/auth/auth-tabs';
 import { PasswordStrength } from '@web/components/auth/password-strength';
 import { RoleSelect } from '@web/components/auth/role-select';
 import { RegisterSuccess } from '@web/components/auth/register-success';
+import { useDict } from '@web/context/dict-context';
+import type { Dictionary } from '@web/i18n';
 
 const PENDING_ACTIVATION_STORAGE_KEY = 'aq_pending_activation_email';
 
@@ -126,6 +128,8 @@ const s = {
 function LoginForm({ onSwitch }: { onSwitch: () => void }) {
   const { login } = useAuth();
   const router = useRouter();
+  const dict = useDict();
+  const d = dict.auth.login;
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -135,8 +139,8 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!email) { setError('Informe seu e-mail.'); return; }
-    if (!pw) { setError('Informe sua senha.'); return; }
+    if (!email) { setError(d.errorEmailRequired); return; }
+    if (!pw) { setError(d.errorPasswordRequired); return; }
     setError('');
     setLoading(true);
     try {
@@ -158,9 +162,9 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
           ? window.localStorage.getItem(PENDING_ACTIVATION_STORAGE_KEY)
           : null;
       if (pendingEmail && pendingEmail === email.trim().toLowerCase()) {
-        setError('Confira seu e-mail para ativar sua conta antes de entrar.');
+        setError(d.errorCheckEmail);
       } else {
-        setError('E-mail ou senha inválidos.');
+        setError(d.errorInvalidCredentials);
       }
     } finally {
       setLoading(false);
@@ -171,10 +175,10 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
     <div className="aq-anim">
       <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 22, fontWeight: 700, letterSpacing: '-0.3px', marginBottom: 6 }}>
-          Bem-vindo de volta
+          {d.title}
         </h2>
         <p style={{ fontSize: 13, color: 'var(--aq-text2)', lineHeight: 1.5 }}>
-          Entre na sua conta para continuar sua jornada.
+          {d.subtitle}
         </p>
       </div>
 
@@ -187,13 +191,13 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
       <form onSubmit={handleSubmit} noValidate>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
           <div>
-            <label htmlFor="login-email" style={s.fieldLabel}>E-mail</label>
+            <label htmlFor="login-email" style={s.fieldLabel}>{d.emailLabel}</label>
             <div style={s.inputWrap}>
               <span style={s.inputIcon}><MailIcon /></span>
               <input
                 id="login-email"
                 type="email"
-                placeholder="seu@email.com"
+                placeholder={d.emailPlaceholder}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
@@ -203,7 +207,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
           </div>
 
           <div>
-            <label htmlFor="login-password" style={s.fieldLabel}>Senha</label>
+            <label htmlFor="login-password" style={s.fieldLabel}>{d.passwordLabel}</label>
             <div style={s.inputWrap}>
               <span style={s.inputIcon}><LockIcon /></span>
               <input
@@ -234,10 +238,10 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             <div style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${rememberMe ? 'var(--aq-accent)' : 'var(--aq-border2)'}`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: rememberMe ? 'var(--aq-accent)' : 'var(--aq-bg3)', transition: 'all 0.2s' }}>
               {rememberMe && <CheckIcon />}
             </div>
-            Lembrar de mim
+            {d.rememberMe}
           </label>
           <Link href="/forgot-password" style={{ fontSize: 12, color: 'var(--aq-accent)', textDecoration: 'none', fontWeight: 500 }}>
-            Esqueci a senha
+            {d.forgotPassword}
           </Link>
         </div>
 
@@ -247,27 +251,27 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
           className={loading ? 'aq-submit-btn-loading' : ''}
           style={{ width: '100%', padding: 13, borderRadius: 10, border: 'none', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', position: 'relative', overflow: 'hidden', background: 'var(--aq-accent)', color: '#0B0E17', boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)', letterSpacing: '0.2px', opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s' }}
         >
-          {loading ? 'Entrando…' : 'Entrar na Arena'}
+          {loading ? d.loadingButton : d.submitButton}
         </button>
       </form>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: 'var(--aq-text3)', margin: '20px 0' }}>
         <div style={{ flex: 1, height: 1, background: 'var(--aq-border)' }} />
-        ou continue com
+        {d.orContinueWith}
         <div style={{ flex: 1, height: 1, background: 'var(--aq-border)' }} />
       </div>
 
       <a
-        href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/auth/google`}
+        href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/v1/auth/google`}
         style={{ width: '100%', padding: 11, borderRadius: 10, border: '1px solid var(--aq-border2)', background: 'var(--aq-bg3)', fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif', fontSize: 13, fontWeight: 500, color: 'var(--aq-text2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'all 0.2s', textDecoration: 'none' }}
       >
-        <GoogleIcon /> Entrar com Google
+        <GoogleIcon /> {d.googleButton}
       </a>
 
       <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--aq-text3)', marginTop: 24 }}>
-        Não tem conta?{' '}
+        {d.noAccount}{' '}
         <button onClick={onSwitch} style={{ color: 'var(--aq-accent)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif' }}>
-          Criar conta grátis
+          {d.createAccountLink}
         </button>
       </div>
     </div>
@@ -283,29 +287,34 @@ type RegisterErrors = Partial<Record<'firstName' | 'email' | 'pw' | 'pwConfirm' 
  * RegisterErrors shape. The API speaks `name`/`email`/`password`; the
  * form's first-step inputs are `firstName`/`email`/`pw`. `code` carries
  * a stable identifier (TooShort, TooLong, Invalid, NoDigit) that we
- * translate into Portuguese copy here so the spec lives next to the UI.
+ * translate into copy from the dictionary.
  */
-function mapApiErrorsToFields(fields: ValidationFieldError[]): RegisterErrors {
+function mapApiErrorsToFields(
+  fields: ValidationFieldError[],
+  d: Dictionary['auth']['register'],
+): RegisterErrors {
   const next: RegisterErrors = {};
   for (const f of fields) {
     if (f.field === 'name') {
       next.firstName =
-        f.code === 'TooShort' ? 'Nome muito curto' :
-        f.code === 'TooLong'  ? 'Nome muito longo' :
-                                'Nome inválido';
+        f.code === 'TooShort' ? d.errorNameTooShort :
+        f.code === 'TooLong'  ? d.errorNameTooLong :
+                                d.errorNameInvalid;
     } else if (f.field === 'email') {
-      next.email = f.code === 'Invalid' ? 'E-mail inválido' : 'E-mail inválido';
+      next.email = d.errorEmailInvalid;
     } else if (f.field === 'password') {
       next.pw =
-        f.code === 'TooShort' ? 'Mínimo 8 caracteres' :
-        f.code === 'NoDigit'  ? 'Inclua pelo menos um número' :
-                                'Senha inválida';
+        f.code === 'TooShort' ? d.errorPasswordMinLength :
+        f.code === 'NoDigit'  ? d.errorPasswordNoDigit :
+                                d.errorPasswordInvalid;
     }
   }
   return next;
 }
 
 function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess: (email: string) => void }) {
+  const dict = useDict();
+  const d = dict.auth.register;
   const [step, setStep] = useState(1);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -320,12 +329,12 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
 
   function validateStep1(): boolean {
     const e: RegisterErrors = {};
-    if (!firstName.trim()) e.firstName = 'Campo obrigatório';
-    if (!email.trim()) e.email = 'Campo obrigatório';
-    else if (!/\S+@\S+\.\S+/.test(email)) e.email = 'E-mail inválido';
-    if (!pw) e.pw = 'Campo obrigatório';
-    else if (pw.length < 8) e.pw = 'Mínimo 8 caracteres';
-    if (pw !== pwConfirm) e.pwConfirm = 'Senhas não coincidem';
+    if (!firstName.trim()) e.firstName = d.errorRequired;
+    if (!email.trim()) e.email = d.errorRequired;
+    else if (!/\S+@\S+\.\S+/.test(email)) e.email = d.errorEmailInvalid;
+    if (!pw) e.pw = d.errorRequired;
+    else if (pw.length < 8) e.pw = d.errorPasswordMinLength;
+    if (pw !== pwConfirm) e.pwConfirm = d.errorPasswordsMismatch;
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -337,7 +346,7 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!terms) { setErrors({ terms: 'Aceite os termos para continuar' }); return; }
+    if (!terms) { setErrors({ terms: d.errorTerms }); return; }
     setErrors({});
     setLoading(true);
 
@@ -358,21 +367,25 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
       onSuccess(normalizedEmail);
     } catch (err) {
       if (err instanceof AuthApiError && err.code === 'ValidationFailed' && err.fields) {
-        setErrors(mapApiErrorsToFields(err.fields));
+        setErrors(mapApiErrorsToFields(err.fields, d));
         // Surface field-level errors at step 1 — bring the user back so
         // they can see the highlighted inputs.
         if (err.fields.some(f => f.field === 'name' || f.field === 'email' || f.field === 'password')) {
           setStep(1);
         }
       } else if (err instanceof AuthApiError && err.code === 'RateLimited') {
-        setErrors({ terms: 'Muitas tentativas. Tente novamente em alguns minutos.' });
+        setErrors({ terms: d.errorRateLimited });
       } else {
-        setErrors({ terms: 'Não foi possível concluir o cadastro. Tente novamente.' });
+        setErrors({ terms: d.errorGeneral });
       }
     } finally {
       setLoading(false);
     }
   }
+
+  // Render terms text with embedded links by splitting the template string.
+  const [termsBefore, termsRest] = d.termsText.split('{termsLink}');
+  const [termsMiddle, termsAfter] = termsRest.split('{privacyLink}');
 
   const stepIndicator = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 28 }}>
@@ -382,7 +395,7 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
             {step > n ? <CheckIcon /> : n}
           </div>
           <div style={{ fontSize: 12, color: step >= n ? 'var(--aq-text2)' : 'var(--aq-text3)', fontWeight: step === n ? 600 : 400 }}>
-            {n === 1 ? 'Suas informações' : 'Tipo de conta'}
+            {n === 1 ? d.step1Label : d.step2Label}
           </div>
           {n < 2 && <div style={{ flex: 1, height: 1, background: step > n ? 'var(--aq-accent)' : 'var(--aq-border2)', transition: 'background 0.4s' }} />}
         </span>
@@ -398,10 +411,10 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
         <div className="aq-anim">
           <div style={{ marginBottom: 28 }}>
             <h2 style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 22, fontWeight: 700, letterSpacing: '-0.3px', marginBottom: 6 }}>
-              Criar sua conta
+              {d.title}
             </h2>
             <p style={{ fontSize: 13, color: 'var(--aq-text2)', lineHeight: 1.5 }}>
-              Comece sua jornada de alta performance hoje.
+              {d.subtitle}
             </p>
           </div>
 
@@ -409,36 +422,36 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={s.fieldLabel}>Nome</label>
+                  <label style={s.fieldLabel}>{d.firstNameLabel}</label>
                   <div style={s.inputWrap}>
                     <span style={s.inputIcon}><UserIcon /></span>
-                    <input type="text" placeholder="João" value={firstName} onChange={(e) => setFirstName(e.target.value)} style={{ ...s.input, ...(errors.firstName ? s.inputError : {}) }} />
+                    <input type="text" placeholder={d.firstNamePlaceholder} value={firstName} onChange={(e) => setFirstName(e.target.value)} style={{ ...s.input, ...(errors.firstName ? s.inputError : {}) }} />
                   </div>
                   {errors.firstName && <div style={s.fieldError}><AlertIcon />{errors.firstName}</div>}
                 </div>
                 <div>
-                  <label style={s.fieldLabel}>Sobrenome</label>
+                  <label style={s.fieldLabel}>{d.lastNameLabel}</label>
                   <div style={s.inputWrap}>
                     <span style={s.inputIcon}><UserIcon /></span>
-                    <input type="text" placeholder="Silva" value={lastName} onChange={(e) => setLastName(e.target.value)} style={s.input} />
+                    <input type="text" placeholder={d.lastNamePlaceholder} value={lastName} onChange={(e) => setLastName(e.target.value)} style={s.input} />
                   </div>
                 </div>
               </div>
 
               <div>
-                <label style={s.fieldLabel}>E-mail</label>
+                <label style={s.fieldLabel}>{dict.auth.login.emailLabel}</label>
                 <div style={s.inputWrap}>
                   <span style={s.inputIcon}><MailIcon /></span>
-                  <input type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ ...s.input, ...(errors.email ? s.inputError : {}) }} />
+                  <input type="email" placeholder={dict.auth.login.emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)} style={{ ...s.input, ...(errors.email ? s.inputError : {}) }} />
                 </div>
                 {errors.email && <div style={s.fieldError}><AlertIcon />{errors.email}</div>}
               </div>
 
               <div>
-                <label style={s.fieldLabel}>Senha</label>
+                <label style={s.fieldLabel}>{dict.auth.login.passwordLabel}</label>
                 <div style={s.inputWrap}>
                   <span style={s.inputIcon}><LockIcon /></span>
-                  <input type={showPw ? 'text' : 'password'} placeholder="Mínimo 8 caracteres" value={pw} onChange={(e) => setPw(e.target.value)} style={{ ...s.input, paddingRight: 40, ...(errors.pw ? s.inputError : {}) }} />
+                  <input type={showPw ? 'text' : 'password'} placeholder={d.passwordPlaceholder} value={pw} onChange={(e) => setPw(e.target.value)} style={{ ...s.input, paddingRight: 40, ...(errors.pw ? s.inputError : {}) }} />
                   <button type="button" onClick={() => setShowPw(!showPw)} style={{ position: 'absolute', right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--aq-text3)', display: 'flex', alignItems: 'center' }}>
                     <EyeIcon off={showPw} />
                   </button>
@@ -448,17 +461,17 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
               </div>
 
               <div>
-                <label style={s.fieldLabel}>Confirmar senha</label>
+                <label style={s.fieldLabel}>{d.confirmPasswordLabel}</label>
                 <div style={s.inputWrap}>
                   <span style={s.inputIcon}><LockIcon /></span>
-                  <input type={showPw ? 'text' : 'password'} placeholder="Repita a senha" value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} style={{ ...s.input, ...(errors.pwConfirm ? s.inputError : {}) }} />
+                  <input type={showPw ? 'text' : 'password'} placeholder={d.confirmPasswordPlaceholder} value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} style={{ ...s.input, ...(errors.pwConfirm ? s.inputError : {}) }} />
                 </div>
                 {errors.pwConfirm && <div style={s.fieldError}><AlertIcon />{errors.pwConfirm}</div>}
               </div>
             </div>
 
             <button type="submit" style={{ width: '100%', padding: 13, borderRadius: 10, border: 'none', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 15, fontWeight: 700, cursor: 'pointer', background: 'var(--aq-accent)', color: '#0B0E17', boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)' }}>
-              Continuar →
+              {d.continueButton}
             </button>
           </form>
         </div>
@@ -468,17 +481,17 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
         <div className="aq-anim">
           <div style={{ marginBottom: 28 }}>
             <h2 style={{ fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 22, fontWeight: 700, letterSpacing: '-0.3px', marginBottom: 6 }}>
-              Como você vai usar?
+              {d.accountTypeTitle}
             </h2>
             <p style={{ fontSize: 13, color: 'var(--aq-text2)', lineHeight: 1.5 }}>
-              Isso personaliza sua experiência na plataforma.
+              {d.accountTypeSubtitle}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} noValidate>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
               <div>
-                <label style={s.fieldLabel}>Tipo de conta</label>
+                <label style={s.fieldLabel}>{d.accountTypeLabel}</label>
                 <RoleSelect value={role} onChange={setRole} />
               </div>
 
@@ -487,7 +500,11 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
                   {terms && <CheckIcon />}
                 </div>
                 <span>
-                  Concordo com os <a href="#" style={{ color: 'var(--aq-accent)', textDecoration: 'none' }}>Termos de Uso</a> e a <a href="#" style={{ color: 'var(--aq-accent)', textDecoration: 'none' }}>Política de Privacidade</a> do ArenaQuest.
+                  {termsBefore}
+                  <a href="#" style={{ color: 'var(--aq-accent)', textDecoration: 'none' }}>{d.termsLink}</a>
+                  {termsMiddle}
+                  <a href="#" style={{ color: 'var(--aq-accent)', textDecoration: 'none' }}>{d.privacyLink}</a>
+                  {termsAfter}
                 </span>
               </label>
               {errors.terms && <div style={{ ...s.fieldError, marginTop: -8 }}><AlertIcon />{errors.terms}</div>}
@@ -495,7 +512,7 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
 
             <div style={{ display: 'flex', gap: 10 }}>
               <button type="button" onClick={() => setStep(1)} style={{ flexShrink: 0, padding: '13px 18px', borderRadius: 10, border: '1px solid var(--aq-border2)', background: 'var(--aq-bg3)', color: 'var(--aq-text2)', fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-                ← Voltar
+                {d.backButton}
               </button>
               <button
                 type="submit"
@@ -503,7 +520,7 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
                 className={loading ? 'aq-submit-btn-loading' : ''}
                 style={{ flex: 1, padding: 13, borderRadius: 10, border: 'none', fontFamily: 'var(--font-space-grotesk), Space Grotesk, sans-serif', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', position: 'relative', overflow: 'hidden', background: 'var(--aq-accent)', color: '#0B0E17', boxShadow: '0 4px 20px oklch(0.74 0.19 52 / 0.35)', opacity: loading ? 0.5 : 1 }}
               >
-                {loading ? 'Criando conta…' : 'Criar conta'}
+                {loading ? d.creatingButton : d.createButton}
               </button>
             </div>
           </form>
@@ -511,9 +528,9 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
       )}
 
       <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--aq-text3)', marginTop: 24 }}>
-        Já tem conta?{' '}
+        {d.hasAccount}{' '}
         <button onClick={onSwitch} style={{ color: 'var(--aq-accent)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-dm-sans), DM Sans, sans-serif' }}>
-          Entrar
+          {d.signInLink}
         </button>
       </div>
     </div>
@@ -525,6 +542,8 @@ function RegisterForm({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess
 function LoginPageInner() {
   const { isLoading } = useAuth();
   const searchParams = useSearchParams();
+  const dict = useDict();
+  const d = dict.auth.login;
   const [mode, setMode] = useState<'login' | 'register' | 'pending'>('login');
   const [pendingEmail, setPendingEmail] = useState('');
   // `?activated=1` lands here from the /activate page after a successful
@@ -579,13 +598,13 @@ function LoginPageInner() {
         <div style={{ width: 480, minWidth: 480, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '40px 48px', background: 'var(--aq-bg2)', borderLeft: '1px solid var(--aq-border)', position: 'relative', zIndex: 1, overflowY: 'auto' }} className="aq-auth-panel">
           {activatedBannerVisible && (
             <div role="status" style={{ marginBottom: 18, padding: '10px 14px', borderRadius: 9, background: 'oklch(0.68 0.17 150 / 0.15)', border: '1px solid var(--aq-accent3)', fontSize: 13, color: 'var(--aq-accent3)' }}>
-              Conta ativada! Faça login para continuar.
+              {d.activatedBanner}
             </div>
           )}
 
           {passwordResetBannerVisible && (
             <div role="status" style={{ marginBottom: 18, padding: '10px 14px', borderRadius: 9, background: 'oklch(0.68 0.17 150 / 0.15)', border: '1px solid var(--aq-accent3)', fontSize: 13, color: 'var(--aq-accent3)' }}>
-              Senha redefinida com sucesso! Faça login com sua nova senha.
+              {d.passwordResetBanner}
             </div>
           )}
 

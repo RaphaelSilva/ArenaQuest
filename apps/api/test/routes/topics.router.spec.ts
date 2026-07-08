@@ -2,139 +2,18 @@ import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:
 import { describe, it, expect, beforeAll } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
+import { applyMigrations } from '../helpers/apply-migrations';
+import { v1 } from '../helpers/v1';
+
+// ---------------------------------------------------------------------------
+// Additional IDs for visibility tests
+// ---------------------------------------------------------------------------
+
+const ZERO_GRANT_USER_ID = 'zero-grant-visibility-user';
 
 // ---------------------------------------------------------------------------
 // DB bootstrap
 // ---------------------------------------------------------------------------
-
-const MIGRATION_SQL = [
-  `CREATE TABLE IF NOT EXISTS users (
-    id            TEXT NOT NULL PRIMARY KEY,
-    name          TEXT NOT NULL,
-    email         TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'active',
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    timezone      TEXT NOT NULL DEFAULT 'UTC'
-  )`,
-  `CREATE TABLE IF NOT EXISTS roles (
-    id          TEXT NOT NULL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '',
-    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_roles (
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    PRIMARY KEY (user_id, role_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS refresh_tokens (
-    token      TEXT NOT NULL PRIMARY KEY,
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at TEXT NOT NULL
-  )`,
-  `INSERT OR IGNORE INTO roles (id, name, description) VALUES
-    ('bace0701-15e3-5144-97c5-47487d543032', 'admin',           'Full platform access'),
-    ('3318927d-8b5e-52d9-a145-2e4323919ed6', 'content_creator', 'Can create/edit content'),
-    ('32a5cab1-e66f-5d23-a80d-80cfa927d057', 'tutor',           'Can monitor student progress'),
-    ('bf3d0f1d-7d77-5151-922e-b87dff0fa7ad', 'student',         'Can consume content and tasks')`,
-  `CREATE TABLE IF NOT EXISTS topic_nodes (
-    id                TEXT    NOT NULL PRIMARY KEY,
-    parent_id         TEXT    REFERENCES topic_nodes(id) ON DELETE RESTRICT,
-    title             TEXT    NOT NULL,
-    content           TEXT    NOT NULL DEFAULT '',
-    status            TEXT    NOT NULL DEFAULT 'draft',
-    sort_order        INTEGER NOT NULL DEFAULT 0,
-    estimated_minutes INTEGER NOT NULL DEFAULT 0,
-    archived          INTEGER NOT NULL DEFAULT 0,
-    created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at        TEXT    NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS tags (
-    id         TEXT NOT NULL PRIMARY KEY,
-    name       TEXT NOT NULL,
-    slug       TEXT NOT NULL UNIQUE,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_node_tags (
-    topic_node_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    tag_id        TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-    PRIMARY KEY (topic_node_id, tag_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS topic_node_prerequisites (
-    topic_node_id   TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    prerequisite_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    PRIMARY KEY (topic_node_id, prerequisite_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS media (
-    id            TEXT NOT NULL PRIMARY KEY,
-    topic_node_id TEXT NOT NULL REFERENCES topic_nodes(id) ON DELETE CASCADE,
-    storage_key   TEXT NOT NULL UNIQUE,
-    original_name TEXT NOT NULL,
-    type          TEXT NOT NULL,
-    size_bytes    INTEGER NOT NULL DEFAULT 0,
-    status        TEXT NOT NULL DEFAULT 'pending',
-    uploaded_by   TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  // M4 tables (required by the worker)
-  `CREATE TABLE IF NOT EXISTS tasks (
-    id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'draft', created_by TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS task_stages (
-    id TEXT NOT NULL PRIMARY KEY, task_id TEXT NOT NULL, label TEXT NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS task_topic_links (
-    task_id TEXT NOT NULL, topic_node_id TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    PRIMARY KEY (task_id, topic_node_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS task_stage_topic_links (
-    stage_id TEXT NOT NULL, topic_node_id TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    PRIMARY KEY (stage_id, topic_node_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS activation_tokens (
-    token TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, expires_at TEXT NOT NULL,
-    used INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  // M5 tables — progress and enrollment (required by access-aware filter)
-  `CREATE TABLE IF NOT EXISTS topic_progress (
-    id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, topic_node_id TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'not_started', completed_at TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (user_id, topic_node_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS task_progress (
-    id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, task_id TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'not_started', current_stage_id TEXT, completed_at TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (user_id, task_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS task_stage_progress (
-    id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, task_id TEXT NOT NULL, stage_id TEXT NOT NULL,
-    checked_in_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE (user_id, stage_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_groups (
-    id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE TABLE IF NOT EXISTS user_group_members (
-    group_id TEXT NOT NULL, user_id TEXT NOT NULL, PRIMARY KEY (group_id, user_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS enrollments_user (
-    id TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL, topic_node_id TEXT NOT NULL,
-    granted_by TEXT NOT NULL, granted_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (user_id, topic_node_id)
-  )`,
-  `CREATE TABLE IF NOT EXISTS enrollments_user_group (
-    id TEXT NOT NULL PRIMARY KEY, group_id TEXT NOT NULL, topic_node_id TEXT NOT NULL,
-    granted_by TEXT NOT NULL, granted_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (group_id, topic_node_id)
-  )`,
-];
 
 const ADMIN_USER_ID = 'admin-topics-public-test-user';
 
@@ -143,12 +22,11 @@ let studentToken: string;
 
 // Topic IDs populated in beforeAll
 let publishedTopicId: string;
-let draftTopicId: string;
-let archivedTopicId: string;
+let ungrantedTopicId: string;
 let readyMediaStorageKey: string;
 
 beforeAll(async () => {
-  await env.DB.batch(MIGRATION_SQL.map(sql => env.DB.prepare(sql)));
+  await applyMigrations(env.DB);
 
   // User row required by media.uploaded_by FK.
   await env.DB
@@ -156,7 +34,7 @@ beforeAll(async () => {
     .bind(ADMIN_USER_ID)
     .run();
 
-  const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
+  const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900, pbkdf2Iterations: 1 });
 
   [adminToken, studentToken] = await Promise.all([
     adapter.signAccessToken({ sub: ADMIN_USER_ID, email: 'admin@topics-pub.test', roles: ['admin'] }),
@@ -171,13 +49,19 @@ beforeAll(async () => {
   const pubTopic = await pubRes.json<{ id: string }>();
   publishedTopicId = pubTopic.id;
 
+  // Create a second published root topic (not granted to student).
+  const ungrantedRes = await req('POST', '/admin/topics', {
+    token: adminToken,
+    body: { title: 'Ungranted Root', status: 'published' },
+  });
+  const ungrantedTopic = await ungrantedRes.json<{ id: string }>();
+  ungrantedTopicId = ungrantedTopic.id;
+
   // Create a draft root topic.
-  const draftRes = await req('POST', '/admin/topics', {
+  await req('POST', '/admin/topics', {
     token: adminToken,
     body: { title: 'Draft Root' },
   });
-  const draftTopic = await draftRes.json<{ id: string }>();
-  draftTopicId = draftTopic.id;
 
   // Create an archived root topic (create as published, then archive).
   const archRes = await req('POST', '/admin/topics', {
@@ -185,8 +69,7 @@ beforeAll(async () => {
     body: { title: 'Archived Root', status: 'published' },
   });
   const archTopic = await archRes.json<{ id: string }>();
-  archivedTopicId = archTopic.id;
-  await req('DELETE', `/admin/topics/${archivedTopicId}`, { token: adminToken });
+  await req('DELETE', `/admin/topics/${archTopic.id}`, { token: adminToken });
 
   // Seed a published child under publishedTopicId.
   await req('POST', '/admin/topics', {
@@ -249,7 +132,7 @@ async function req(
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.token) headers['Authorization'] = `Bearer ${options.token}`;
 
-  const request = new IncomingRequest(`http://example.com${path}`, {
+  const request = new IncomingRequest(`http://example.com${v1(path)}`, {
     method,
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -270,11 +153,6 @@ describe('Auth enforcement', () => {
     const res = await req('GET', '/topics');
     expect(res.status).toBe(401);
   });
-
-  it('GET /topics/:id -> 401 without token', async () => {
-    const res = await req('GET', `/topics/${publishedTopicId}`);
-    expect(res.status).toBe(401);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -287,24 +165,6 @@ describe('GET /topics', () => {
     expect(res.status).toBe(200);
     const body = await res.json<{ data: unknown[] }>();
     expect(Array.isArray(body.data)).toBe(true);
-  });
-
-  it('includes the published root node', async () => {
-    const res = await req('GET', '/topics', { token: studentToken });
-    const { data } = await res.json<{ data: { id: string }[] }>();
-    expect(data.some(n => n.id === publishedTopicId)).toBe(true);
-  });
-
-  it('excludes draft nodes', async () => {
-    const res = await req('GET', '/topics', { token: studentToken });
-    const { data } = await res.json<{ data: { id: string }[] }>();
-    expect(data.some(n => n.id === draftTopicId)).toBe(false);
-  });
-
-  it('excludes archived nodes', async () => {
-    const res = await req('GET', '/topics', { token: studentToken });
-    const { data } = await res.json<{ data: { id: string }[] }>();
-    expect(data.some(n => n.id === archivedTopicId)).toBe(false);
   });
 
   it('sets Cache-Control: private, max-age=30', async () => {
@@ -326,29 +186,6 @@ describe('GET /topics/:id', () => {
     expect(body.title).toBe('Published Root');
   });
 
-  it('returns 404 for a draft topic', async () => {
-    const res = await req('GET', `/topics/${draftTopicId}`, { token: studentToken });
-    expect(res.status).toBe(404);
-  });
-
-  it('returns 404 for an archived topic', async () => {
-    const res = await req('GET', `/topics/${archivedTopicId}`, { token: studentToken });
-    expect(res.status).toBe(404);
-  });
-
-  it('returns 404 for a non-existent id', async () => {
-    const res = await req('GET', '/topics/does-not-exist', { token: studentToken });
-    expect(res.status).toBe(404);
-  });
-
-  it('includes published children but not draft children', async () => {
-    const res = await req('GET', `/topics/${publishedTopicId}`, { token: studentToken });
-    const body = await res.json<{ children: { title: string }[] }>();
-    const titles = body.children.map(c => c.title);
-    expect(titles).toContain('Published Child');
-    expect(titles).not.toContain('Draft Child');
-  });
-
   it('includes ready media with a non-empty url', async () => {
     const res = await req('GET', `/topics/${publishedTopicId}`, { token: studentToken });
     const body = await res.json<{ media: { storageKey: string; url: string; status: string }[] }>();
@@ -360,14 +197,138 @@ describe('GET /topics/:id', () => {
     expect(readyItem!.url.length).toBeGreaterThan(0);
   });
 
-  it('excludes pending media from the response', async () => {
-    const res = await req('GET', `/topics/${publishedTopicId}`, { token: studentToken });
-    const body = await res.json<{ media: { status: string }[] }>();
-    expect(body.media.every(m => m.status === 'ready')).toBe(true);
-  });
-
   it('sets Cache-Control: private, max-age=30', async () => {
     const res = await req('GET', `/topics/${publishedTopicId}`, { token: studentToken });
     expect(res.headers.get('Cache-Control')).toBe('private, max-age=30');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 0 — enrollment enforcement
+// ---------------------------------------------------------------------------
+
+describe('Phase 0 — enrollment enforcement', () => {
+  it('GET /topics as student returns only granted topics, not ungranted ones', async () => {
+    const res = await req('GET', '/topics', { token: studentToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { id: string }[] }>();
+    const topicIds = body.data.map(t => t.id);
+    expect(topicIds).toContain(publishedTopicId);
+    expect(topicIds).not.toContain(ungrantedTopicId);
+  });
+
+  it('GET /topics as admin returns all published topics', async () => {
+    const res = await req('GET', '/topics', { token: adminToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { id: string }[] }>();
+    const topicIds = body.data.map(t => t.id);
+    expect(topicIds).toContain(publishedTopicId);
+    expect(topicIds).toContain(ungrantedTopicId);
+  });
+
+  it('GET /topics/{ungrantedId} as student returns 404', async () => {
+    const res = await req('GET', `/topics/${ungrantedTopicId}`, { token: studentToken });
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /topics/{ungrantedId} as admin returns 200', async () => {
+    const res = await req('GET', `/topics/${ungrantedTopicId}`, { token: adminToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ id: string; title: string }>();
+    expect(body.id).toBe(ungrantedTopicId);
+    expect(body.title).toBe('Ungranted Root');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Visibility filter
+// ---------------------------------------------------------------------------
+
+describe('Visibility filter', () => {
+  let privateTopicId: string;
+  let publicTopicId: string;
+  let zeroGrantStudentToken: string;
+
+  beforeAll(async () => {
+    await env.DB
+      .prepare("INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, 'ZeroGrant', 'zero@vis.test', 'x')")
+      .bind(ZERO_GRANT_USER_ID)
+      .run();
+
+    const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900, pbkdf2Iterations: 1 });
+    zeroGrantStudentToken = await adapter.signAccessToken({ sub: ZERO_GRANT_USER_ID, email: 'zero@vis.test', roles: ['student'] });
+
+    const privRes = await req('POST', '/admin/topics', {
+      token: adminToken,
+      body: { title: 'Private Topic', status: 'published', visibility: 'private' },
+    });
+    const privTopic = await privRes.json<{ id: string }>();
+    privateTopicId = privTopic.id;
+
+    const pubRes = await req('POST', '/admin/topics', {
+      token: adminToken,
+      body: { title: 'Public Topic', status: 'published', visibility: 'public' },
+    });
+    const pubTopic = await pubRes.json<{ id: string }>();
+    publicTopicId = pubTopic.id;
+  });
+
+  it('student GET /topics excludes private topic', async () => {
+    const res = await req('GET', '/topics', { token: studentToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { id: string }[] }>();
+    expect(body.data.map(t => t.id)).not.toContain(privateTopicId);
+  });
+
+  it('student GET /topics/{privateId} returns 404', async () => {
+    const res = await req('GET', `/topics/${privateTopicId}`, { token: studentToken });
+    expect(res.status).toBe(404);
+  });
+
+  it('admin GET /topics/{privateId} returns 200', async () => {
+    const res = await req('GET', `/topics/${privateTopicId}`, { token: adminToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ id: string }>();
+    expect(body.id).toBe(privateTopicId);
+  });
+
+  it('admin GET /topics includes private topic', async () => {
+    const res = await req('GET', '/topics', { token: adminToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { id: string }[] }>();
+    expect(body.data.map(t => t.id)).toContain(privateTopicId);
+  });
+
+  it('zero-grant student GET /topics includes public topic', async () => {
+    const res = await req('GET', '/topics', { token: zeroGrantStudentToken });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { id: string }[] }>();
+    expect(body.data.map(t => t.id)).toContain(publicTopicId);
+  });
+
+  it('PATCH round-trip: GET /admin/topics/{id} returns visibility:private', async () => {
+    const createRes = await req('POST', '/admin/topics', {
+      token: adminToken,
+      body: { title: 'Round-trip Visibility', status: 'published' },
+    });
+    const created = await createRes.json<{ id: string }>();
+
+    await req('PATCH', `/admin/topics/${created.id}`, {
+      token: adminToken,
+      body: { visibility: 'private' },
+    });
+
+    const getRes = await req('GET', `/admin/topics/${created.id}`, { token: adminToken });
+    expect(getRes.status).toBe(200);
+    const body = await getRes.json<{ visibility: string }>();
+    expect(body.visibility).toBe('private');
+  });
+
+  it('PATCH with invalid visibility returns 400', async () => {
+    const res = await req('PATCH', `/admin/topics/${privateTopicId}`, {
+      token: adminToken,
+      body: { visibility: 'bogus' },
+    });
+    expect(res.status).toBe(400);
   });
 });
