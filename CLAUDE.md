@@ -4,6 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+**Makefile naming rule** — an unsuffixed target is **always local**. A target
+that touches a deployed environment **names that environment in its own name**
+(`db-migrate-staging`, `deploy-prod`). `-api` / `-web` / `-shared` are *scope*,
+not environment. There is no implicit production: every `-prod` target prompts
+for confirmation (`CONFIRM=1` bypasses). Never introduce a `-dev` suffix for an
+environment — `dev` means "development server", and `local` means the local
+replica.
+
+**First run on a new machine:**
+```bash
+make setup        # deps + .dev.vars/.env.local + local D1 migrate & seed (idempotent)
+make doctor       # read-only diagnosis; exit 0 clean / 1 hard gap / 2 soft gap
+```
+See `docs/onboarding.md` for the full runbook and known issues.
+
 **Run all apps locally:**
 ```bash
 make dev          # all apps in parallel (Turborepo)
@@ -29,22 +44,31 @@ cd apps/api && pnpm test --grep "test name"
 **Cloudflare & Database:**
 ```bash
 make cf-typegen            # regenerate Worker bindings types
-make db-migrations-dev     # apply migrations to local D1 (dev)
-make db-migrations-staging # apply migrations to remote staging D1
-make db-migrations-prod    # apply migrations to remote production D1
-make create-db             # create production D1 database
-make create-kv             # create RATE_LIMIT_KV namespace
+make db-migrate-local      # apply migrations to the local D1 replica
+make db-seed-local         # seed local test accounts (idempotent, local only)
+make db-reset-local        # delete the local replica, re-migrate, re-seed
+make db-migrate-staging    # apply migrations to remote staging D1
+make db-migrate-prod       # apply migrations to remote production D1 (confirms)
+make create-db-prod        # create production D1 database (confirms)
+make create-kv-prod        # create RATE_LIMIT_KV namespace (confirms)
 ```
 
 **Deploy:**
 ```bash
-make deploy                # Deploy both Web and API to production
-make deploy-staging        # Deploy both Web and API to staging
-make deploy-api            # API → production Workers
+make deploy-staging        # both apps → staging
 make deploy-api-staging    # API → staging Workers
-make deploy-web            # Web → production Pages
 make deploy-web-staging    # Web → staging Pages
+make deploy-prod           # both apps → production (confirms)
+make deploy-api-prod       # API → production Workers (confirms)
+make deploy-web-prod       # Web → production Pages (confirms)
 ```
+`deploy`, `deploy-api` and `deploy-web` were removed — they used to mean
+production implicitly. All deploy targets first run
+`apps/api/scripts/check-no-dev-seed.ts` against the target database.
+
+Renamed targets (`db-migrations-dev` → `db-migrate-local`, `db-seed-dev` →
+`db-seed-local`, `create-db` → `create-db-prod`, ...) still work as deprecated
+aliases that print a pointer. Use the new names.
 
 ## Architecture
 

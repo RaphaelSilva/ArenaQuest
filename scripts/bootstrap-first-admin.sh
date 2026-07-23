@@ -11,29 +11,18 @@
 
 set -euo pipefail
 
-# ── colours ──────────────────────────────────────────────────────────────────
-CYAN='\033[0;36m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-BOLD='\033[1m'
-RESET='\033[0m'
-
-info()    { printf "${CYAN}  →  %s${RESET}\n" "$*"; }
-ok()      { printf "${GREEN}  ✔  %s${RESET}\n" "$*"; }
-warn()    { printf "${YELLOW}  ⚠  %s${RESET}\n" "$*"; }
-die()     { printf "${RED}  ✖  %s${RESET}\n" "$*" >&2; exit 1; }
-hr()      { printf "${CYAN}%s${RESET}\n" "────────────────────────────────────────────────────"; }
-heading() { echo ""; printf "  ${BOLD}%s${RESET}\n" "$*"; echo ""; }
-
-# ── constants ─────────────────────────────────────────────────────────────────
-# Deterministic UUID for the 'admin' role — seeded by migration 0002_seed_roles.sql
-ADMIN_ROLE_ID='bace0701-15e3-5144-97c5-47487d543032'
-
 # ── paths ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 API_DIR="${REPO_ROOT}/apps/api"
+
+# ── colours & log helpers ─────────────────────────────────────────────────────
+# shellcheck source=scripts/lib/log.sh
+source "${SCRIPT_DIR}/lib/log.sh"
+
+# ── constants ─────────────────────────────────────────────────────────────────
+# Deterministic UUID for the 'admin' role — seeded by migration 0002_seed_roles.sql
+ADMIN_ROLE_ID='bace0701-15e3-5144-97c5-47487d543032'
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

@@ -5,6 +5,7 @@ This map outlines the actual directory layout and purpose of all documents withi
 ```markdown
 ArenaQuest/
 ├── docs/
+│   ├── onboarding.md               # New-machine runbook: make setup, make doctor, troubleshooting
 │   ├── architecture/               # Technical architecture blueprints and guidelines
 │   │   ├── api/                    # Specific backend (Worker) architecture guidelines
 │   │   └── web/                    # Specific frontend (Next.js) architecture guidelines
