@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+Desc Commands
+
 **Makefile naming rule** — an unsuffixed target is **always local**. A target
 that touches a deployed environment **names that environment in its own name**
 (`db-migrate-staging`, `deploy-prod`). `-api` / `-web` / `-shared` are *scope*,
