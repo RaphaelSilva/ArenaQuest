@@ -62,14 +62,28 @@ ArenaQuest/
 git clone https://github.com/your-org/ArenaQuest.git
 cd ArenaQuest
 
-# 2. Install all workspace dependencies
-make install
+# 2. Bring the machine to a working local stack (idempotent)
+make setup
 
 # 3. Start all apps in development mode (parallel)
 make dev
 ```
 
+`make setup` installs dependencies, creates `apps/api/.dev.vars` and
+`apps/web/.env.local` from their committed templates, generates a local
+`JWT_SECRET`, then migrates and seeds the local D1 database. It never
+overwrites a file you already have, so it is safe to re-run at any time.
+
 > The web app will be available at **http://localhost:3000** and the API Worker at **http://localhost:8787** by default.
+> Log in with the seed account `admin@arenaquest.dev` / `Admin1234!`.
+
+**Local development requires no Cloudflare account.** Only media upload (R2),
+Google sign-in, and staging/production targets need real credentials.
+
+If anything looks wrong, `make doctor` diagnoses the machine without changing
+it and names the exact target that fixes each gap. The full runbook —
+optional credentials, troubleshooting, known issues — lives in
+**[docs/onboarding.md](docs/onboarding.md)**.
 
 ---
 
@@ -77,22 +91,30 @@ make dev
 
 A `Makefile` is provided at the root of the repository with convenient shortcuts for the most common development tasks. Run `make help` at any time to list all available commands.
 
-### 📦 Install & Setup
+> **Naming rule:** an unsuffixed target is **always local**. A target that
+> touches a deployed environment **names that environment**. `-api` / `-web` /
+> `-shared` are *scope*, not environment. There is no implicit production —
+> every `-prod` target asks you to type `production` before it runs
+> (`CONFIRM=1` bypasses it for scripts).
+
+### 🩺 Local — first run & diagnosis
 
 | Command | Description |
 |---|---|
+| `make setup` | Bring a fresh machine to a working local stack (idempotent) |
+| `make doctor` | Diagnose the local environment — read-only, never mutates |
 | `make install` | Install all workspace dependencies via `pnpm install` |
-| `make bootstrap-admin` | Interactively create the first admin account |
+| `make bootstrap-admin` | Interactively create the first admin account (prompts for the environment) |
 
-### 🚀 Development
+### 🚀 Local — development
 
 | Command | Description |
 |---|---|
 | `make dev` | Start **all** apps in parallel (via Turborepo) |
-| `make dev-web` | Start only `apps/web` (Next.js dev server) |
-| `make dev-api` | Start only `apps/api` (Wrangler dev server) |
+| `make dev-web` | Start only `apps/web` (Next.js dev server, `:3000`) |
+| `make dev-api` | Start only `apps/api` (Wrangler dev server, `:8787`) |
 
-### 🏗️ Build & Lint
+### 🏗️ Local — build, lint & test
 
 | Command | Description |
 |---|---|
@@ -100,26 +122,48 @@ A `Makefile` is provided at the root of the repository with convenient shortcuts
 | `make lint` | Lint all workspaces |
 | `make test` | Run all tests across the monorepo |
 
-### 🗄️ Database & Cloudflare Resources
+Each accepts an `-api` / `-web` scope suffix, e.g. `make test-api`.
+
+### 🗄️ Local — database
 
 | Command | Description |
 |---|---|
-| `make db-migrations-dev` | Apply D1 migrations to the local dev database |
-| `make db-migrations-staging` | Apply D1 migrations to the remote staging database |
-| `make db-migrations-prod` | Apply D1 migrations to the remote production database |
-| `make create-db` / `create-db-staging` | Create a new D1 database (production / staging) |
-| `make create-kv` / `create-kv-staging` | Create the `RATE_LIMIT_KV` namespace |
-| `make list-kv` / `list-kv-staging` | List existing KV namespaces |
-| `make cf-typegen` | Regenerate Worker bindings types |
+| `make db-migrate-local` | Apply D1 migrations to the local replica |
+| `make db-seed-local` | Insert the three local test accounts (idempotent) |
+| `make db-reset-local` | Delete the local replica, then re-migrate and re-seed |
+| `make cf-typegen` | Regenerate Worker binding types |
 
-### ☁️ Deployment
+### 🟡 Staging — remote
 
 | Command | Description |
 |---|---|
-| `make deploy` | Deploy both Web and API to **Production** |
-| `make deploy-staging` | Deploy both Web and API to **Staging** |
-| `make deploy-api` / `deploy-api-staging` | Deploy only `apps/api` |
-| `make deploy-web` / `deploy-web-staging` | Deploy only `apps/web` |
+| `make deploy-staging` | Deploy **both** apps to staging |
+| `make deploy-api-staging` / `deploy-web-staging` | Deploy one app to staging |
+| `make db-migrate-staging` | Apply D1 migrations to the remote staging database |
+| `make create-db-staging` / `create-kv-staging` / `list-kv-staging` | Manage staging resources |
+| `make cf-info-staging` | List staging R2 buckets, D1 databases and KV namespaces |
+| `make secret-staging NAME=JWT_SECRET` | Set a staging Worker secret |
+
+### 🔴 Production — remote (each target asks for confirmation)
+
+| Command | Description |
+|---|---|
+| `make deploy-prod` | Deploy **both** apps to production |
+| `make deploy-api-prod` / `deploy-web-prod` | Deploy one app to production |
+| `make db-migrate-prod` | Apply D1 migrations to the remote production database |
+| `make create-db-prod` / `create-kv-prod` / `list-kv-prod` | Manage production resources |
+| `make cf-info-prod` | List production R2 buckets, D1 databases and KV namespaces |
+| `make secret-prod NAME=JWT_SECRET` | Set a production Worker secret |
+
+Both `deploy-*-staging` and `deploy-*-prod` first run
+`apps/api/scripts/check-no-dev-seed.ts` against the target database and abort
+if the local dev-seed accounts are found there.
+
+> **Renamed:** `db-migrations-dev` → `db-migrate-local`, `db-seed-dev` →
+> `db-seed-local`, `create-db` → `create-db-prod`, and so on. The old names
+> still work but print a deprecation pointer. The exceptions are `make deploy`,
+> `make deploy-api` and `make deploy-web`: they used to mean *production*
+> implicitly, so they now fail and tell you to name the environment.
 
 ### 🧹 Clean
 
