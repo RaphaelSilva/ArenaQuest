@@ -140,8 +140,8 @@ chore(infra): upgrade wrangler to v4
 git clone https://github.com/your-org/ArenaQuest.git
 cd ArenaQuest
 
-# 2. Install all dependencies
-make install
+# 2. Bring the machine to a working local stack (deps, env files, local DB)
+make setup
 
 # 3. Start all apps in development mode
 make dev
@@ -151,7 +151,14 @@ make dev-web   # Next.js at http://localhost:3000
 make dev-api   # Cloudflare Worker at http://localhost:8787
 ```
 
-Run `make help` to see the full list of available commands.
+Run `make help` to see the full list of available commands, and `make doctor`
+if anything looks wrong — it diagnoses the machine without changing it. New to
+the project? Start with **[docs/onboarding.md](docs/onboarding.md)**.
+
+> **Makefile naming rule:** an unsuffixed target is always local
+> (`make dev`, `make test`). A target that touches a deployed environment names
+> it (`make db-migrate-staging`, `make deploy-prod`). `-api` / `-web` are
+> *scope*, not environment.
 
 ---
 
@@ -181,14 +188,16 @@ Three pre-configured accounts are available for manual testing and cover all thr
 
 ### Provisioning
 
-After running the standard migrations, apply the seed:
+`make setup` provisions these for you on a fresh machine. To do it by hand:
 
 ```bash
-make db-migrations-dev   # apply production schema migrations first
-make db-seed-dev         # insert the three test accounts
+make db-migrate-local   # apply the schema migrations first
+make db-seed-local      # insert the three test accounts
 ```
 
-`make db-seed-dev` is idempotent — running it multiple times produces no duplicates or errors.
+`make db-seed-local` is idempotent — running it multiple times produces no duplicates or errors.
+If the local database ends up in a bad state, `make db-reset-local` deletes the
+replica and rebuilds it from scratch.
 
 ### Regenerating password hashes
 
