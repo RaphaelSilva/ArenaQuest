@@ -18,6 +18,7 @@ import {
   resolve,
   preflight,
   buildPlan,
+  confirmProduction,
 } from './core.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -151,6 +152,73 @@ test('preflight hard-gaps on a full "*" ALLOWED_ORIGINS in staging', () => {
   const pf = preflight(schema(), resolved, expected, 'staging');
   assert.equal(pf.exitCode, 1);
   assert.ok(pf.failedKeys.includes('ALLOWED_ORIGINS'));
+});
+
+// ── confirmProduction: the production safety gate ─────────────────────────────
+
+/** A prompt fake that records invocation and returns a canned answer. */
+function fakePrompt(answer) {
+  const calls = [];
+  const fn = async (question) => {
+    calls.push(question);
+    return answer;
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+test('confirmProduction proceeds when the operator types the exact label', async () => {
+  const prompt = fakePrompt('acme');
+  await confirmProduction({ env: 'production', label: 'acme', yes: false, promptFn: prompt, isTTY: true });
+  assert.equal(prompt.calls.length, 1, 'the operator was prompted once');
+});
+
+test('confirmProduction aborts (throws) on a wrong entry', async () => {
+  const prompt = fakePrompt('nope');
+  await assert.rejects(
+    () => confirmProduction({ env: 'production', label: 'acme', yes: false, promptFn: prompt, isTTY: true }),
+    /expected to type "acme"/,
+  );
+});
+
+test('confirmProduction is bypassed by --yes (no prompt)', async () => {
+  const prompt = fakePrompt('anything');
+  await confirmProduction({ env: 'production', label: 'acme', yes: true, promptFn: prompt, isTTY: true });
+  assert.equal(prompt.calls.length, 0, '--yes must not prompt');
+});
+
+test('confirmProduction is bypassed by CONFIRM=1 (no prompt)', async () => {
+  const prev = process.env.CONFIRM;
+  process.env.CONFIRM = '1';
+  try {
+    const prompt = fakePrompt('anything');
+    await confirmProduction({ env: 'production', label: 'acme', yes: false, promptFn: prompt, isTTY: true });
+    assert.equal(prompt.calls.length, 0, 'CONFIRM=1 must not prompt');
+  } finally {
+    if (prev === undefined) delete process.env.CONFIRM;
+    else process.env.CONFIRM = prev;
+  }
+});
+
+test('confirmProduction fails closed without a TTY and no bypass (never prompts)', async () => {
+  const prev = process.env.CONFIRM;
+  delete process.env.CONFIRM;
+  try {
+    const prompt = fakePrompt('acme');
+    await assert.rejects(
+      () => confirmProduction({ env: 'production', label: 'acme', yes: false, promptFn: prompt, isTTY: false }),
+      /requires confirmation/,
+    );
+    assert.equal(prompt.calls.length, 0, 'no prompt is issued when there is no TTY');
+  } finally {
+    if (prev !== undefined) process.env.CONFIRM = prev;
+  }
+});
+
+test('confirmProduction is a no-op for non-production environments', async () => {
+  const prompt = fakePrompt('anything');
+  await confirmProduction({ env: 'staging', label: 'acme', yes: false, promptFn: prompt, isTTY: false });
+  assert.equal(prompt.calls.length, 0, 'staging is never gated');
 });
 
 // ── structural invariant: core imports NO wrangler and NO cloud SDK ───────────

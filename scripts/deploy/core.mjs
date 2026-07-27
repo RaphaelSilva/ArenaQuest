@@ -17,6 +17,7 @@
 import { parseArgs as nodeParseArgs } from 'node:util';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import readline from 'node:readline';
 
 import {
   PATHS,
@@ -232,6 +233,59 @@ export function buildPlan({ label, env, scope, resolved, envConfig }) {
   }
 
   return steps;
+}
+
+// ── production confirmation gate (cloud-agnostic, stdlib only) ────────────────
+
+/**
+ * Default interactive prompt backed by `node:readline` over stdin/stdout.
+ * Resolves with the raw line the operator typed. Only ever reached on a real
+ * TTY-backed execute; unit tests inject their own `promptFn` instead.
+ */
+function defaultPrompt(question) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
+
+/**
+ * Production safety gate. When `env === 'production'` and neither `yes` nor
+ * `CONFIRM=1` is set, require the operator to type the label name before any
+ * mutation. A mismatch throws (the caller maps that to a non-zero abort).
+ *
+ * Fail-closed: if there is no TTY and no bypass, throw immediately rather than
+ * hang waiting for input. Pure stdlib (`node:readline`) — no cloud symbol.
+ *
+ * Injectable for tests: `promptFn(question) → string|Promise<string>` replaces
+ * the readline prompt and `isTTY` overrides the auto-detected stdin TTY flag.
+ */
+export async function confirmProduction({ env, label, yes, promptFn, isTTY } = {}) {
+  // Only production is gated; staging proceeds without confirmation.
+  if (env !== 'production') return;
+
+  // Explicit bypass: `--yes` flag or `CONFIRM=1` in the environment.
+  if (yes || process.env.CONFIRM === '1') return;
+
+  const tty = isTTY ?? Boolean(process.stdin.isTTY);
+  if (!tty) {
+    // Non-interactive and not bypassed → abort rather than block forever.
+    throw new Error(
+      `production deploy for "${label}" requires confirmation: ` +
+        're-run with --yes or set CONFIRM=1 (no TTY available to type the confirmation).',
+    );
+  }
+
+  const ask = promptFn ?? defaultPrompt;
+  const answer = String(await ask(`Type the label "${label}" to confirm the production deploy: `)).trim();
+  if (answer !== label) {
+    throw new Error(
+      `production deploy aborted: expected to type "${label}" to confirm, got "${answer}".`,
+    );
+  }
 }
 
 // ── orchestration ─────────────────────────────────────────────────────────────
