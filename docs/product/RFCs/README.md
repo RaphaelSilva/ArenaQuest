@@ -16,6 +16,7 @@ This directory contains formal proposals and architectural decisions for ArenaQu
 | [0008](./0008-user-dashboard-with-topic-recommendations-and-badge-achievem.md) | User Dashboard with Topic Recommendations and Badge Achievements | Draft | 2026-06-20 | raphaelsilva |
 | [0009](./0009-gamification-catalog-administration.md) | Gamification Catalog Administration | Implemented | 2026-06-23 | raphaelsilva |
 | [0010](./0010-player-progression-administration.md) | Player Progression Administration | Implemented | 2026-06-23 | raphaelsilva |
+| [0011](./0011-branded-deploy-cli-label-parametrized-ci-independent-release.md) | Branded deploy CLI - label-parametrized CI-independent release script | Approved | 2026-07-23 | raphaelsilva |
 
 ## RFC Process
 
