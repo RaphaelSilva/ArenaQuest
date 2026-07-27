@@ -1,6 +1,6 @@
 # Task 01 — Backend: Fix wrangler-action typo in prod CI jobs (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [17 — Branded deploy CLI - label-parametrized CI-independent release script](./milestone.md)
 **RFC:** [RFC 0011](../../RFCs/0011-branded-deploy-cli-label-parametrized-ci-independent-release.md)
 **Team:** Backend API
@@ -49,13 +49,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `grep -rn "@v3raphael" .github/workflows/` returns zero matches.
-- [ ] Every `cloudflare/wrangler-action` reference in `deploy-api.yml` (and
+- [x] `grep -rn "@v3raphael" .github/workflows/` returns zero matches.
+- [x] Every `cloudflare/wrangler-action` reference in `deploy-api.yml` (and
       `deploy-web.yml` if present) pins `@v3`.
-- [ ] The workflow YAML remains valid (jobs, steps, and matrix unchanged apart
+- [x] The workflow YAML remains valid (jobs, steps, and matrix unchanged apart
       from the version pin) — confirmed by a YAML lint / GitHub Actions parse.
-- [ ] `make lint` passes green.
-- [ ] No diff outside the scope guardrail.
+- [x] `make lint` passes green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
