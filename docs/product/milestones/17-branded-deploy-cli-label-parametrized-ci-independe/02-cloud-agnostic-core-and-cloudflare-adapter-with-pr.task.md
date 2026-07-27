@@ -1,6 +1,6 @@
 # Task 02 — Backend: Cloud-agnostic core and Cloudflare adapter with preflight and dry-run (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [17 — Branded deploy CLI - label-parametrized CI-independent release script](./milestone.md)
 **RFC:** [RFC 0011](../../RFCs/0011-branded-deploy-cli-label-parametrized-ci-independent-release.md)
 **Team:** Backend API
@@ -81,18 +81,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `node scripts/cloudflare/deploy.mjs --label <label> -e <env> --dry-run`
+- [x] `node scripts/cloudflare/deploy.mjs --label <label> -e <env> --dry-run`
       prints the exact `wrangler` commands (per `--scope`) and mutates nothing.
-- [ ] A deploy against a label with a missing required key **or** a wildcard
+- [x] A deploy against a label with a missing required key **or** a wildcard
       `ALLOWED_ORIGINS` in staging/production aborts before any mutation with a
       non-zero exit, printing the offending key.
-- [ ] Values are resolved solely from `config/labels/<label>.jsonc` via `label.mjs`
+- [x] Values are resolved solely from `config/labels/<label>.jsonc` via `label.mjs`
       — no brand value is read from or written to any other location.
-- [ ] A `node:test` unit test asserts `scripts/deploy/core.mjs` imports no
+- [x] A `node:test` unit test asserts `scripts/deploy/core.mjs` imports no
       `wrangler` and no cloud SDK.
-- [ ] `node:test` unit tests cover the arg parser and the plan builder; `make lint`
+- [x] `node:test` unit tests cover the arg parser and the plan builder; `make lint`
       passes green.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
