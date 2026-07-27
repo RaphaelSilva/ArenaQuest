@@ -1,6 +1,6 @@
 # Task 03 — Backend: Cloud credential resolution and production confirmation (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [17 — Branded deploy CLI - label-parametrized CI-independent release script](./milestone.md)
 **RFC:** [RFC 0011](../../RFCs/0011-branded-deploy-cli-label-parametrized-ci-independent-release.md)
 **Team:** Backend API
@@ -71,19 +71,19 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] With no `CF_API_TOKEN` in the environment and no `wrangler login` session,
+- [x] With no `CF_API_TOKEN` in the environment and no `wrangler login` session,
       the CLI exits non-zero telling the operator to log in or set the token — it
       never prompts and never hangs.
-- [ ] With `CF_API_TOKEN` set, the CLI uses it; with only a `wrangler login`
+- [x] With `CF_API_TOKEN` set, the CLI uses it; with only a `wrangler login`
       session, it uses that — each branch covered by a unit test.
-- [ ] `-e production` without `--yes`/`CONFIRM=1` requires typing the label name
+- [x] `-e production` without `--yes`/`CONFIRM=1` requires typing the label name
       before any mutation; a wrong entry aborts; `--yes` or `CONFIRM=1` bypasses.
-- [ ] A deploy never reads `JWT_SECRET` or the other app runtime secrets —
+- [x] A deploy never reads `JWT_SECRET` or the other app runtime secrets —
       asserted by a test / inspection of the resolved inputs.
-- [ ] `guard-no-dev-seed` runs as a preflight step before a staging/production
+- [x] `guard-no-dev-seed` runs as a preflight step before a staging/production
       deploy and blocks on a dev-seed-tainted target.
-- [ ] `make lint` and the `node:test` suite pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `make lint` and the `node:test` suite pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
