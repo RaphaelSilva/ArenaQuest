@@ -1,0 +1,41 @@
+/**
+ * Stock ArenaQuest profile; values extracted from apps/api/wrangler.jsonc
+ * (single source of truth for the CLI). Prod apiHost is api.arenaquest.app
+ * (the deployed worker's own value); the former Makefile web-prod host
+ * api.raphael-1d2.workers.dev was drift, now corrected.
+ */
+{
+  "label": "arenaquest",
+  "displayName": "ArenaQuest",
+  "brand": {
+    "NEXT_PUBLIC_BRAND_SIGLA": "AQ",
+    "NEXT_PUBLIC_BRAND_NAME_PREFIX": "Arena",
+    "NEXT_PUBLIC_BRAND_NAME_ACCENT": "Quest",
+    "NEXT_PUBLIC_BRAND_POWERED_BY": "false",
+    "NEXT_PUBLIC_BRAND_ACCENT": "#ff8101"
+  },
+  "environments": {
+    "staging": {
+      "apiHost":      "api-staging.raphael-1d2.workers.dev",
+      "webOrigin":    "arenaquest-web-staging.pages.dev",
+      "worker":       "api-staging",
+      "pagesProject": "arenaquest-web-staging",
+      "d1":   { "name": "arenaquest-db-staging", "id": "6a2f5784-c57e-46ae-a858-27ca876f1dfe" },
+      "kv":   { "binding": "RATE_LIMIT_KV", "id": "c697147935024190ada81e743c3479d9" },
+      "r2":   { "bucket": "arenaquest-media-staging", "s3Endpoint": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com", "publicBase": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com" },
+      "cookieSameSite": "None",
+      "mail": { "driver": "resend", "from": "ArenaQuest Staging <noreply@arenaquest.app>" }
+    },
+    "production": {
+      "apiHost":      "api.arenaquest.app",
+      "webOrigin":    "arenaquest-web.pages.dev",
+      "worker":       "api",
+      "pagesProject": "arenaquest-web",
+      "d1":   { "name": "arenaquest-db", "id": "<fill after `wrangler d1 create arenaquest-db`>" },
+      "kv":   { "binding": "RATE_LIMIT_KV", "id": "<fill after `wrangler kv namespace create RATE_LIMIT_KV`>" },
+      "r2":   { "bucket": "arenaquest-media", "s3Endpoint": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com", "publicBase": "" },
+      "cookieSameSite": "Strict",
+      "mail": { "driver": "resend", "from": "ArenaQuest <noreply@arenaquest.app>" }
+    }
+  }
+}

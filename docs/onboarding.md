@@ -128,6 +128,53 @@ removed eventually — prefer the new names in new code and docs.
 | `create-db`, `create-kv`, `list-kv` | `create-db-prod`, `create-kv-prod`, `list-kv-prod` |
 | `r2-cors-dev` | *(removed — it named a bucket that exists in no config)* |
 
+### The deploy CLI (single code path)
+
+The `make deploy-*` targets are thin wrappers — every release, local or in CI,
+goes through one script: `scripts/cloudflare/deploy.mjs`. It resolves a label
+profile from `config/labels/<label>.jsonc`, runs the fail-closed preflight and
+the no-dev-seed guard, and then applies the D1 migrations, deploys the Worker
+and builds + deploys the Pages project — baking the `NEXT_PUBLIC_BRAND_*` vars
+from the resolved profile.
+
+```bash
+node scripts/cloudflare/deploy.mjs --label <label> -e <staging|production> \
+     [--scope api|web|all] [--yes] [--dry-run]
+```
+
+- `--label` (required) — the profile in `config/labels/<label>.jsonc`
+  (`arenaquest` is the stock brand the Makefile defaults to).
+- `-e` / `--env` — `staging` (→ wrangler env `<label>-staging`) or `production`
+  (→ wrangler env `<label>`).
+- `--scope` — `api`, `web`, or `all` (default). `api` runs migrate + Worker
+  deploy; `web` runs the brand-parametrised build + Pages deploy.
+- `--dry-run` — print the exact commands (guard + steps) and execute nothing.
+  Needs no credential and no confirmation — safe to run anywhere.
+- `--yes` — skip the production confirmation prompt (same as `CONFIRM=1`);
+  used by CI.
+
+**Manual, CI-independent release.** You do not need GitHub Actions to ship.
+With a `wrangler login` session (or `CF_API_TOKEN` set), running the CLI
+directly performs a full production release — the same code path CI uses:
+
+```bash
+node scripts/cloudflare/deploy.mjs --label arenaquest -e production --scope all
+# → guard → confirm (type the label) → migrate → deploy worker → build + deploy web
+```
+
+**Credential contract.** The Cloudflare credential is resolved by context and
+never prompted for:
+
+- **Locally** — an existing `wrangler login` OAuth session is used.
+- **In CI** — set `CF_API_TOKEN` (and `CF_ACCOUNT_ID`) in the GitHub
+  environment; the CLI exports them to the wrangler spawns. App runtime secrets
+  (JWT_SECRET, R2_*, …) are never read — they persist on the Worker across
+  deploys.
+
+Adding a brand is one line in each workflow's `strategy.matrix.include` plus a
+new `config/labels/<label>.jsonc` — no copied job stanza and no new deploy
+config store.
+
 ---
 
 ## 5. Troubleshooting

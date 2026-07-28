@@ -175,16 +175,14 @@ cf-typegen: ## Regenerate Cloudflare Worker binding types (wrangler types)
 # ==============================================================================
 ##@ 🟡 STAGING — remote (requires wrangler login)
 # ==============================================================================
-deploy-staging: deploy-api-staging deploy-web-staging ## Deploy BOTH apps to staging
+deploy-staging: ## Deploy BOTH apps to staging (forwards to the deploy CLI)
+	node scripts/cloudflare/deploy.mjs --label arenaquest -e staging --scope all
 
-deploy-api-staging: guard-no-dev-seed-staging ## Deploy apps/api to staging Workers
-	pnpm --filter api exec wrangler deploy --env staging
+deploy-api-staging: ## Deploy apps/api to staging Workers (forwards to the deploy CLI)
+	node scripts/cloudflare/deploy.mjs --label arenaquest -e staging --scope api
 
-deploy-web-staging: ## Build and deploy apps/web to staging Pages
-	NEXT_PUBLIC_API_URL="https://api-staging.raphael-1d2.workers.dev" \
-	pnpm --filter web pages:build && \
-	pnpm --filter web exec wrangler pages deploy .vercel/output/static \
-		 --project-name=arenaquest-web-staging
+deploy-web-staging: ## Build and deploy apps/web to staging Pages (forwards to the deploy CLI)
+	node scripts/cloudflare/deploy.mjs --label arenaquest -e staging --scope web
 
 db-migrate-staging: ## Apply D1 migrations to the REMOTE staging database
 	pnpm --filter api exec wrangler d1 migrations apply arenaquest-db-staging --env staging --remote
@@ -211,15 +209,14 @@ secret-staging: ## Set a staging Worker secret (NAME=JWT_SECRET)
 # ==============================================================================
 ##@ 🔴 PRODUCTION — remote (every target asks for confirmation)
 # ==============================================================================
-deploy-prod: deploy-api-prod deploy-web-prod ## Deploy BOTH apps to production
+deploy-prod: ## Deploy BOTH apps to production (CLI runs guard + confirmation)
+	node scripts/cloudflare/deploy.mjs --label arenaquest -e production --scope all
 
-deploy-api-prod: confirm-prod guard-no-dev-seed-prod ## Deploy apps/api to production Workers
-	pnpm --filter api exec wrangler deploy
+deploy-api-prod: ## Deploy apps/api to production Workers (CLI runs guard + confirmation)
+	node scripts/cloudflare/deploy.mjs --label arenaquest -e production --scope api
 
-deploy-web-prod: confirm-prod ## Build and deploy apps/web to production Pages
-	NEXT_PUBLIC_API_URL="https://api.raphael-1d2.workers.dev" \
-	pnpm --filter web pages:build && \
-	pnpm --filter web exec wrangler pages deploy .vercel/output/static --project-name=arenaquest-web
+deploy-web-prod: ## Build and deploy apps/web to production Pages (CLI runs guard + confirmation)
+	node scripts/cloudflare/deploy.mjs --label arenaquest -e production --scope web
 
 db-migrate-prod: confirm-prod ## Apply D1 migrations to the REMOTE production database
 	pnpm --filter api exec wrangler d1 migrations apply arenaquest-db --remote
