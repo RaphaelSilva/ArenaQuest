@@ -38,6 +38,12 @@ command sections are updated to document the CLI. This closes the milestone.
   - `Makefile` — repoint the `deploy-*-staging` / `deploy-*-prod` targets (and any
     `deploy-*-shared` scope target) to forward to the CLI; remove hardcoded
     database names from those targets. Deprecated aliases keep working.
+  - `config/labels/arenaquest.jsonc`, `config/labels/budo.jsonc` — **approved
+    guardrail expansion (user decision, 2026-07-27):** the CLI/Makefile default
+    and the prod matrix reference these labels, so the stock profile (built from
+    values already in `apps/api/wrangler.jsonc`) and a placeholder budo profile
+    (same `<acct>` convention as `spaziord.jsonc`) are created here. This is
+    profile *data*, not cloud provisioning — the D1/KV/R2 Non-Goal still holds.
   - `.github/workflows/deploy-api.yml` — collapse the per-brand prod jobs into one
     `strategy.matrix.label` job invoking the CLI.
   - `.github/workflows/deploy-web.yml` — the Pages counterpart, likewise matrixed.
