@@ -63,8 +63,24 @@ make deploy-api-prod       # API → production Workers (confirms)
 make deploy-web-prod       # Web → production Pages (confirms)
 ```
 `deploy`, `deploy-api` and `deploy-web` were removed — they used to mean
-production implicitly. All deploy targets first run
-`apps/api/scripts/check-no-dev-seed.ts` against the target database.
+production implicitly. Every `deploy-*` target is now a thin wrapper that
+forwards to the label-aware deploy CLI, `scripts/cloudflare/deploy.mjs` (stock
+`arenaquest` label), e.g.:
+
+```bash
+node scripts/cloudflare/deploy.mjs --label arenaquest -e <staging|production> \
+     [--scope api|web|all] [--yes] [--dry-run]
+```
+
+The CLI resolves the tenant profile from `config/labels/<label>.jsonc`, runs the
+no-dev-seed guard (`apps/api/scripts/check-no-dev-seed.ts`) and the production
+confirmation itself, migrates the profile's D1 database, deploys the Worker, and
+builds + deploys the Pages project with the brand vars baked from the profile —
+so the Makefile targets no longer hardcode a database name or brand env.
+Cloudflare credentials are resolved by context: `wrangler login` locally, or
+`CF_API_TOKEN` + `CF_ACCOUNT_ID` in CI. CI runs the same CLI over a
+`strategy.matrix.label` of `[arenaquest, spaziord, budo]`. See
+`docs/onboarding.md` for the full invocation and the manual release path.
 
 Renamed targets (`db-migrations-dev` → `db-migrate-local`, `db-seed-dev` →
 `db-seed-local`, `create-db` → `create-db-prod`, ...) still work as deprecated

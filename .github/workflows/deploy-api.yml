@@ -93,15 +93,27 @@ jobs:
           command: deploy --env staging
 
   # ────────────────────────────────────────────────────────────────────────────
-  # 3. Deploy Production — runs only on main, requires manual approval
+  # 3. Deploy Production — one matrixed job over every label; runs only on main.
+  #    Each leg forwards to the label-aware deploy CLI, which resolves the
+  #    profile, runs the guard, and deploys. Adding a brand is one matrix line
+  #    plus a new config/labels/<label>.jsonc.
   # ────────────────────────────────────────────────────────────────────────────
   deploy-production:
     name: Deploy to Production
     needs: deploy-staging
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - label: arenaquest
+            environment: production
+          - label: spaziord
+            environment: prod-spaziord
+          - label: budo
+            environment: prod-budo
     environment:
-      name: production
+      name: ${{ matrix.environment }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -121,102 +133,8 @@ jobs:
       - name: Build shared
         run: pnpm turbo build --filter @arenaquest/shared
 
-      - name: Run D1 Migrations (Production)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: apps/api
-          command: d1 migrations apply arenaquest-db --remote
-
-      - name: Deploy Worker (Production)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: apps/api
-          command: deploy
-
-  deploy-prod-spaziord:
-    name: Deploy to Production
-    needs: deploy-staging
-    if: github.ref_name == 'main'
-    runs-on: ubuntu-latest
-    environment:
-      name: prod-spaziord
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build shared
-        run: pnpm turbo build --filter @arenaquest/shared
-
-      - name: Run D1 Migrations (Production)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: apps/api
-          command: d1 migrations apply spaziord-db --remote
-
-      - name: Deploy Worker (Production)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: apps/api
-          command: deploy
-
-  deploy-prod-budo:
-    name: Deploy to Production
-    needs: deploy-staging
-    if: github.ref_name == 'main'
-    runs-on: ubuntu-latest
-    environment:
-      name: prod-budo
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build shared
-        run: pnpm turbo build --filter @arenaquest/shared
-
-      - name: Run D1 Migrations (Production)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: apps/api
-          command: d1 migrations apply budo-db --remote
-
-      - name: Deploy Worker (Production)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: apps/api
-          command: deploy
+      - name: Deploy API (Production)
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: node scripts/cloudflare/deploy.mjs --label ${{ matrix.label }} -e production --yes --scope api

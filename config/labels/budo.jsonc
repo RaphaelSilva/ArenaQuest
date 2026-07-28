@@ -1,0 +1,42 @@
+/**
+ * Budo — placeholder label profile. All values are placeholders until Budo
+ * bring-up: `<acct>` stands for the Cloudflare account / workers.dev subdomain,
+ * and each resource `id` is `<fill …>` until `wrangler … create` returns it.
+ * Run `make label-scaffold LABEL=budo`, then the printed provisioning commands,
+ * and paste the ids/hosts back here.
+ */
+{
+  "label": "budo",
+  "displayName": "Budo",
+  "brand": {
+    "NEXT_PUBLIC_BRAND_SIGLA": "BUD",
+    "NEXT_PUBLIC_BRAND_NAME_PREFIX": "Budo",
+    "NEXT_PUBLIC_BRAND_NAME_ACCENT": "",
+    "NEXT_PUBLIC_BRAND_POWERED_BY": "true",
+    "NEXT_PUBLIC_BRAND_ACCENT": "#8423c5"
+  },
+  "environments": {
+    "staging": {
+      "apiHost":      "api-budo-staging.<acct>.workers.dev",
+      "webOrigin":    "budo-web-staging.pages.dev",
+      "worker":       "api-budo-staging",
+      "pagesProject": "budo-web-staging",
+      "d1":   { "name": "budo-db-staging", "id": "<fill after `wrangler d1 create budo-db-staging`>" },
+      "kv":   { "binding": "RATE_LIMIT_KV", "id": "<fill after `wrangler kv namespace create RATE_LIMIT_KV`>" },
+      "r2":   { "bucket": "budo-media-staging", "s3Endpoint": "https://<acct>.r2.cloudflarestorage.com" },
+      "cookieSameSite": "None",
+      "mail": { "driver": "resend", "from": "Budo Staging <noreply@budo.app>" }
+    },
+    "production": {
+      "apiHost":      "api.budo.app",
+      "webOrigin":    "app.budo.app",
+      "worker":       "api-budo",
+      "pagesProject": "budo-web",
+      "d1":   { "name": "budo-db", "id": "<fill after `wrangler d1 create budo-db`>" },
+      "kv":   { "binding": "RATE_LIMIT_KV", "id": "<fill after `wrangler kv namespace create RATE_LIMIT_KV`>" },
+      "r2":   { "bucket": "budo-media", "s3Endpoint": "https://<acct>.r2.cloudflarestorage.com" },
+      "cookieSameSite": "Strict",
+      "mail": { "driver": "resend", "from": "Budo <noreply@budo.app>" }
+    }
+  }
+}
