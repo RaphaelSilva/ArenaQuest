@@ -82,7 +82,7 @@ The execution plan. Each row is a `.task.md` file. All tasks are Backend
 | 01 | [Fix wrangler-action typo in prod CI jobs](./01-fix-wrangler-action-typo-in-prod-ci-jobs.task.md) | 0 | Backend | ✅ Done |
 | 02 | [Cloud-agnostic core and Cloudflare adapter with preflight and dry-run](./02-cloud-agnostic-core-and-cloudflare-adapter-with-pr.task.md) | 1 | Backend | ✅ Done |
 | 03 | [Cloud credential resolution and production confirmation](./03-cloud-credential-resolution-and-production-confirm.task.md) | 2 | Backend | ✅ Done |
-| 04 | [Wire Makefile and CI matrix to the deploy CLI](./04-wire-makefile-and-ci-matrix-to-the-deploy-cli.task.md) | 3 | Backend | 📝 Open |
+| 04 | [Wire Makefile and CI matrix to the deploy CLI](./04-wire-makefile-and-ci-matrix-to-the-deploy-cli.task.md) | 3 | Backend | ✅ Done |
 
 Dependency graph:
 

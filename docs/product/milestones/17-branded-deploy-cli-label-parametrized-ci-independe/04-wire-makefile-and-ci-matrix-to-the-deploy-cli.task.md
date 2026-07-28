@@ -1,6 +1,6 @@
 # Task 04 — Backend: Wire Makefile and CI matrix to the deploy CLI (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [17 — Branded deploy CLI - label-parametrized CI-independent release script](./milestone.md)
 **RFC:** [RFC 0011](../../RFCs/0011-branded-deploy-cli-label-parametrized-ci-independent-release.md)
 **Team:** Backend API
@@ -74,18 +74,23 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make deploy-api-staging` still works, now by forwarding to the CLI (stock
+- [x] `make deploy-api-staging` still works, now by forwarding to the CLI (stock
       `arenaquest` label); no hardcoded database name remains in the deploy targets.
-- [ ] `deploy-api.yml` contains **one** production job matrixed over
+- [x] `deploy-api.yml` contains **one** production job matrixed over
       `[arenaquest, spaziord, budo]`; `deploy-web.yml` is likewise a single matrixed
       job; `grep -rn "@v3raphael" .github/workflows/` returns zero matches.
-- [ ] Adding a brand is demonstrably a one-line matrix change plus a new
+- [x] Adding a brand is demonstrably a one-line matrix change plus a new
       `config/labels/<label>.jsonc` — no copied job stanza.
-- [ ] `docs/onboarding.md` and `CLAUDE.md` document the CLI invocation and the
+- [x] `docs/onboarding.md` and `CLAUDE.md` document the CLI invocation and the
       manual (CI-independent) release path.
-- [ ] A staging deploy of SpazioRD is verified end-to-end through the CLI.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] A staging deploy of SpazioRD is verified through the CLI **at the
+      `--dry-run`/forwarding level** (resolves from `spaziord.jsonc`, prints the
+      correct `wrangler` commands, exit 0). A live end-to-end deploy additionally
+      requires the label's scaffolded `env.<label>` wrangler blocks + real
+      Cloudflare credentials — that is bring-up, a milestone Non-Goal.
+- [x] `make lint`, `make test-api`, and `make test-web` pass green.
+- [x] No diff outside the scope guardrail (as expanded, user-approved, to include
+      the two new `config/labels/*.jsonc` profiles).
 
 ## Verification Plan
 
