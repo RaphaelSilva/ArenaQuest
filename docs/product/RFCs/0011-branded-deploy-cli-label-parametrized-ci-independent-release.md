@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-23
 **Revised:** 2026-07-27
-**Status:** Approved
+**Status:** Implemented
 **Author:** raphaelsilva
 **Affected:**
 - `scripts/deploy/core.mjs` (new) — the **cloud-agnostic** core (Node, stdlib only): arg parsing, label resolution, preflight, secret prompting, prod confirmation. Knows brands and environments; knows nothing about any cloud.
