@@ -140,7 +140,7 @@
 		    }
 		  ],
 		  "vars": {
-		    "ALLOWED_ORIGINS": "https://app.budo.app",
+		    "ALLOWED_ORIGINS": "https://budo.spaziord.com.br,https://*.budo.spaziord.com.br",
 		    "COOKIE_SAMESITE": "Strict",
 		    "R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 		    "R2_PUBLIC_BASE": "",
@@ -224,7 +224,7 @@
 		    }
 		  ],
 		  "vars": {
-		    "ALLOWED_ORIGINS": "https://app.spaziord.app",
+		    "ALLOWED_ORIGINS": "https://app.spaziord.com.br,https://*.app.spaziord.com.br",
 		    "COOKIE_SAMESITE": "Strict",
 		    "R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 		    "R2_PUBLIC_BASE": "",
