@@ -23,7 +23,7 @@
   "environments": {
     "staging": {
       "apiHost":      "api-staging.spaziord.com.br",
-      "webOrigin":    "spaziord-web-staging.pages.dev",
+      "webOrigin":    "app.spaziord.com.br",
       "worker":       "api-spaziord-staging",
       "pagesProject": "spaziord-web-staging",
       "d1":   { "name": "spaziord-db-staging", "id": "fc1fe1ce-df8f-4579-b9f8-3b3c1abc206f" },
@@ -34,7 +34,7 @@
     },
     "production": {
       "apiHost":      "api.spaziord.com.br",
-      "webOrigin":    "app.spaziord.app",
+      "webOrigin":    "app.spaziord.com.br",
       "worker":       "api-spaziord",
       "pagesProject": "spaziord-web",
       "d1":   { "name": "spaziord-db", "id": "06614104-3acb-4d98-b29d-0dd141f37b98" },

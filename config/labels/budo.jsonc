@@ -17,7 +17,7 @@
   },
   "environments": {
     "staging": {
-      "apiHost":      "api-budo-staging.<acct>.workers.dev",
+      "apiHost":      "api-budo-staging.spaziord.com.br",
       "webOrigin":    "budo-web-staging.pages.dev",
       "worker":       "api-budo-staging",
       "pagesProject": "budo-web-staging",
@@ -28,8 +28,8 @@
       "mail": { "driver": "resend", "from": "Budo Staging <noreply@budo.app>" }
     },
     "production": {
-      "apiHost":      "api.budo.app",
-      "webOrigin":    "app.budo.app",
+      "apiHost":      "api-budo.spaziord.com.br",
+      "webOrigin":    "budo.spaziord.com.br",
       "worker":       "api-budo",
       "pagesProject": "budo-web",
       "d1":   { "name": "budo-db", "id": "9cadb9ea-9a8b-4f85-a1c9-5dcb7c3a0b1a" },
