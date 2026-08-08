@@ -22,7 +22,7 @@
   },
   "environments": {
     "staging": {
-      "apiHost":      "api-spaziord-staging.<acct>.workers.dev",
+      "apiHost":      "api-staging.spaziord.com.br",
       "webOrigin":    "spaziord-web-staging.pages.dev",
       "worker":       "api-spaziord-staging",
       "pagesProject": "spaziord-web-staging",
@@ -33,7 +33,7 @@
       "mail": { "driver": "resend", "from": "SpazioRD Staging <noreply@spaziord.app>" }
     },
     "production": {
-      "apiHost":      "api.spaziord.app",
+      "apiHost":      "api.spaziord.com.br",
       "webOrigin":    "app.spaziord.app",
       "worker":       "api-spaziord",
       "pagesProject": "spaziord-web",

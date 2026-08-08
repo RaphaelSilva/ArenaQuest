@@ -107,8 +107,8 @@
 		    "MAIL_DRIVER": "resend",
 		    "MAIL_FROM": "Budo Staging <noreply@budo.app>",
 		    "WEB_BASE_URL": "https://budo-web-staging.pages.dev",
-		    "GOOGLE_REDIRECT_URI": "https://api-budo-staging.<acct>.workers.dev/auth/google/callback",
-		    "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
+		    // "GOOGLE_CLIENT_ID": it was setted manually in Cloudflare dashboard, because we don't want to expose it in the repo.
+		    "GOOGLE_REDIRECT_URI": "https://api-budo-staging.spaziord.com.br/auth/google/callback"
 		  },
 		  "observability": {
 		    "enabled": true,
@@ -148,8 +148,8 @@
 		    "MAIL_DRIVER": "resend",
 		    "MAIL_FROM": "Budo <noreply@budo.app>",
 		    "WEB_BASE_URL": "https://app.budo.app",
-		    "GOOGLE_REDIRECT_URI": "https://api.budo.app/auth/google/callback",
-		    "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
+		    // "GOOGLE_CLIENT_ID": it was setted manually in Cloudflare dashboard, because we don't want to expose it in the repo.
+		    "GOOGLE_REDIRECT_URI": "https://api-budo.spaziord.com.br/auth/google/callback"
 		  },
 		  "observability": {
 		    "enabled": true,
@@ -191,7 +191,7 @@
 		    "MAIL_DRIVER": "resend",
 		    "MAIL_FROM": "SpazioRD Staging <noreply@spaziord.app>",
 		    "WEB_BASE_URL": "https://spaziord-web-staging.pages.dev",
-		    "GOOGLE_REDIRECT_URI": "https://api-spaziord-staging.<acct>.workers.dev/auth/google/callback",
+		    "GOOGLE_REDIRECT_URI": "https://api-staging.spaziord.com.br/auth/google/callback",
 		    "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
 		  },
 		  "observability": {
@@ -232,8 +232,8 @@
 		    "MAIL_DRIVER": "resend",
 		    "MAIL_FROM": "SpazioRD <noreply@spaziord.app>",
 		    "WEB_BASE_URL": "https://app.spaziord.app",
-		    "GOOGLE_REDIRECT_URI": "https://api.spaziord.app/auth/google/callback",
-		    "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
+		    "GOOGLE_REDIRECT_URI": "https://api.spaziord.app/auth/google/callback"
+		    // "GOOGLE_CLIENT_ID": it was setted manually in Cloudflare dashboard, because we don't want to expose it in the repo.
 		  },
 		  "observability": {
 		    "enabled": true,
@@ -320,7 +320,7 @@
 				"WEB_BASE_URL": "https://arenaquest-web.pages.dev",
 				// Google OAuth — replace with your staging OAuth client values.
 				// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET --env staging`
-				// "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
+				// "GOOGLE_CLIENT_ID": it was setted manually in Cloudflare dashboard, because we don't want to expose it in the repo.
 				"GOOGLE_REDIRECT_URI": "https://api.arenaquest.app/auth/google/callback"
 			},
 			"observability": {
