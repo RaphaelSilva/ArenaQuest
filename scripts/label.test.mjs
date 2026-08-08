@@ -23,6 +23,10 @@ import {
   mapExitCode,
   formatChecklist,
   scaffoldWranglerText,
+  deriveCorsRules,
+  renderCorsFile,
+  workersDevHost,
+  kvNamespaceName,
 } from './label.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -231,4 +235,90 @@ test('scaffolded vars agree by construction (redirect host == api url host)', ()
   const apiHost = profile().environments.staging.apiHost;
   assert.ok(v.GOOGLE_REDIRECT_URI.startsWith(`https://${apiHost}`));
   assert.ok(v.ALLOWED_ORIGINS.includes('acme-web-staging.pages.dev'));
+});
+
+// ── R2 CORS derivation ───────────────────────────────────────────────────────
+test('deriveCorsRules gives production exact origins only', () => {
+  const rules = deriveCorsRules(profile(), 'production');
+  assert.equal(rules.length, 1);
+  assert.deepEqual(rules[0].allowed.origins, ['https://app.acme.app']);
+  assert.ok(!rules[0].allowed.origins.some((o) => o.includes('*')));
+  // The bucket policy must satisfy the same rule the Worker policy does.
+  assert.deepEqual(checkPolicy(rules[0].allowed.origins.join(','), 'production'), []);
+});
+
+test('deriveCorsRules gives staging the preview wildcard carve-out', () => {
+  const rules = deriveCorsRules(profile(), 'staging');
+  assert.deepEqual(rules[0].allowed.origins, [
+    'https://acme-web-staging.pages.dev',
+    'https://*.acme-web-staging.pages.dev',
+    'http://localhost:3000',
+  ]);
+  assert.deepEqual(checkPolicy(rules[0].allowed.origins.join(','), 'staging'), []);
+});
+
+test('deriveCorsRules cannot drift from ALLOWED_ORIGINS', () => {
+  // The bucket CORS and the Worker CORS are two consumers of ONE derivation.
+  for (const env of ['staging', 'production']) {
+    const p = profile();
+    assert.equal(
+      deriveCorsRules(p, env)[0].allowed.origins.join(','),
+      deriveExpected(p, env).ALLOWED_ORIGINS,
+      `${env} CORS origins diverged from ALLOWED_ORIGINS`,
+    );
+  }
+});
+
+test('deriveCorsRules allows the presigned-upload lifecycle', () => {
+  const allowed = deriveCorsRules(profile(), 'staging')[0].allowed;
+  assert.deepEqual(allowed.methods, ['PUT', 'GET']);
+  assert.deepEqual(allowed.headers, ['Content-Type', 'Content-Length']);
+});
+
+test('renderCorsFile emits the document wrangler expects', () => {
+  const text = renderCorsFile(deriveCorsRules(profile(), 'production'));
+  const parsed = JSON.parse(text);
+  assert.ok(Array.isArray(parsed.rules));
+  assert.ok(parsed.rules[0].allowed.origins.length > 0);
+  assert.equal(typeof parsed.rules[0].maxAgeSeconds, 'number');
+  assert.ok(text.endsWith('\n'));
+});
+
+// ── naming helpers ───────────────────────────────────────────────────────────
+test('workersDevHost assembles the account subdomain host', () => {
+  assert.equal(
+    workersDevHost('api-budo-staging', 'raphael-1d2'),
+    'api-budo-staging.raphael-1d2.workers.dev',
+  );
+});
+
+test('kvNamespaceName is per label and env, never the shared binding name', () => {
+  assert.equal(kvNamespaceName('budo', 'staging'), 'budo-rate-limit-staging');
+  assert.equal(kvNamespaceName('budo', 'production'), 'budo-rate-limit-production');
+  assert.notEqual(kvNamespaceName('budo', 'staging'), 'RATE_LIMIT_KV');
+});
+
+// ── custom domain routes ─────────────────────────────────────────────────────
+test('scaffoldWranglerText emits routes only when the profile records a custom domain', () => {
+  const real = readFileSync(join(ROOT, 'apps', 'api', 'wrangler.jsonc'), 'utf8');
+
+  const without = parseJsonc(scaffoldWranglerText(real, 'acme', profile()));
+  assert.equal(without.env['acme'].routes, undefined);
+
+  const p = profile();
+  p.environments.production.customDomain = true;
+  const withDomain = parseJsonc(scaffoldWranglerText(real, 'acme', p));
+  assert.deepEqual(withDomain.env['acme'].routes, [
+    { pattern: 'api.acme.app', custom_domain: true },
+  ]);
+  // staging did not opt in, so it stays route-less
+  assert.equal(withDomain.env['acme-staging'].routes, undefined);
+});
+
+test('scaffoldWranglerText stays idempotent once routes are emitted', () => {
+  const real = readFileSync(join(ROOT, 'apps', 'api', 'wrangler.jsonc'), 'utf8');
+  const p = profile();
+  p.environments.production.customDomain = true;
+  const once = scaffoldWranglerText(real, 'acme', p);
+  assert.equal(scaffoldWranglerText(once, 'acme', p), once);
 });

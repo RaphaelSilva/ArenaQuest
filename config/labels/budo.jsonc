@@ -1,0 +1,42 @@
+/**
+ * Budo — placeholder label profile. All values are placeholders until Budo
+ * bring-up: `<acct>` stands for the Cloudflare account / workers.dev subdomain,
+ * and each resource `id` is `<fill …>` until `wrangler … create` returns it.
+ * Run `make label-scaffold LABEL=budo`, then the printed provisioning commands,
+ * and paste the ids/hosts back here.
+ */
+{
+  "label": "budo",
+  "displayName": "Budo",
+  "brand": {
+    "NEXT_PUBLIC_BRAND_SIGLA": "BUD",
+    "NEXT_PUBLIC_BRAND_NAME_PREFIX": "Budo",
+    "NEXT_PUBLIC_BRAND_NAME_ACCENT": "",
+    "NEXT_PUBLIC_BRAND_POWERED_BY": "true",
+    "NEXT_PUBLIC_BRAND_ACCENT": "#8423c5"
+  },
+  "environments": {
+    "staging": {
+      "apiHost":      "api-budo-staging.spaziord.com.br",
+      "webOrigin":    "budo-web-staging.pages.dev",
+      "worker":       "api-budo-staging",
+      "pagesProject": "budo-web-staging",
+      "d1":   { "name": "budo-db-staging", "id": "314fa333-c39e-478b-90a9-c09625420744" },
+      "kv":   { "binding": "RATE_LIMIT_KV", "id": "c75ab14e35164e22b7c6eb3581969295" },
+      "r2":   { "bucket": "budo-media-staging", "s3Endpoint": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com" },
+      "cookieSameSite": "None",
+      "mail": { "driver": "resend", "from": "Budo Staging <noreply@budo.app>" }
+    },
+    "production": {
+      "apiHost":      "api-budo.spaziord.com.br",
+      "webOrigin":    "budo.spaziord.com.br",
+      "worker":       "api-budo",
+      "pagesProject": "budo-web",
+      "d1":   { "name": "budo-db", "id": "9cadb9ea-9a8b-4f85-a1c9-5dcb7c3a0b1a" },
+      "kv":   { "binding": "RATE_LIMIT_KV", "id": "8490968f05aa41a0a0abd57f7551e63d" },
+      "r2":   { "bucket": "budo-media", "s3Endpoint": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com" },
+      "cookieSameSite": "Strict",
+      "mail": { "driver": "resend", "from": "Budo <noreply@budo.app>" }
+    }
+  }
+}

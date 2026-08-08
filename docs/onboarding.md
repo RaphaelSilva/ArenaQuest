@@ -125,8 +125,123 @@ removed eventually — prefer the new names in new code and docs.
 | `db-seed-dev` | `db-seed-local` |
 | `db-migrations-staging` | `db-migrate-staging` |
 | `db-migrations-prod` | `db-migrate-prod` |
-| `create-db`, `create-kv`, `list-kv` | `create-db-prod`, `create-kv-prod`, `list-kv-prod` |
+| `list-kv` | `list-kv-prod` |
+| `create-db`, `create-db-staging`, `create-db-prod` | `set-new-label LABEL=<label>` |
+| `create-kv`, `create-kv-staging`, `create-kv-prod` | `set-new-label LABEL=<label>` |
 | `r2-cors-dev` | *(removed — it named a bucket that exists in no config)* |
+
+The `create-*` targets are *superseded*, not renamed: they print a pointer and exit
+non-zero rather than forwarding, because the replacement is label-scoped and needs a
+`LABEL`. `create-kv-*` in particular was actively wrong — it created a namespace
+titled `RATE_LIMIT_KV`, the binding name every tenant shares, which collides across
+labels. The provisioner uses `<label>-rate-limit-<env>`.
+
+### The deploy CLI (single code path)
+
+The `make deploy-*` targets are thin wrappers — every release, local or in CI,
+goes through one script: `scripts/cloudflare/deploy.mjs`. It resolves a label
+profile from `config/labels/<label>.jsonc`, runs the fail-closed preflight and
+the no-dev-seed guard, and then applies the D1 migrations, deploys the Worker
+and builds + deploys the Pages project — baking the `NEXT_PUBLIC_BRAND_*` vars
+from the resolved profile.
+
+```bash
+node scripts/cloudflare/deploy.mjs --label <label> -e <staging|production> \
+     [--scope api|web|all] [--yes] [--dry-run]
+```
+
+- `--label` (required) — the profile in `config/labels/<label>.jsonc`
+  (`arenaquest` is the stock brand the Makefile defaults to).
+- `-e` / `--env` — `staging` (→ wrangler env `<label>-staging`) or `production`
+  (→ wrangler env `<label>`).
+- `--scope` — `api`, `web`, or `all` (default). `api` runs migrate + Worker
+  deploy; `web` runs the brand-parametrised build + Pages deploy.
+- `--dry-run` — print the exact commands (guard + steps) and execute nothing.
+  Needs no credential and no confirmation — safe to run anywhere.
+- `--yes` — skip the production confirmation prompt (same as `CONFIRM=1`);
+  used by CI.
+
+**Manual, CI-independent release.** You do not need GitHub Actions to ship.
+With a `wrangler login` session (or `CF_API_TOKEN` set), running the CLI
+directly performs a full production release — the same code path CI uses:
+
+```bash
+node scripts/cloudflare/deploy.mjs --label arenaquest -e production --scope all
+# → guard → confirm (type the label) → migrate → deploy worker → build + deploy web
+```
+
+**Credential contract.** The Cloudflare credential is resolved by context and
+never prompted for:
+
+- **Locally** — an existing `wrangler login` OAuth session is used.
+- **In CI** — set `CF_API_TOKEN` (and `CF_ACCOUNT_ID`) in the GitHub
+  environment; the CLI exports them to the wrangler spawns. App runtime secrets
+  (JWT_SECRET, R2_*, …) are never read — they persist on the Worker across
+  deploys.
+
+Adding a brand is one line in each workflow's `strategy.matrix.include` plus a
+new `config/labels/<label>.jsonc` — no copied job stanza and no new deploy
+config store.
+
+### Bringing up a new tenant
+
+Deploy assumes the tenant already exists. Creating it is the provisioner's job:
+`scripts/cloudflare/provision-label.mjs`, wrapped by `make set-new-label`.
+
+```bash
+make label-new LABEL=acme                       # 1. write the profile skeleton
+$EDITOR config/labels/acme.jsonc                # 2. fill the two anchors + brand block
+make set-new-label LABEL=acme DRY_RUN=1         # 3. preview — no credential needed
+make set-new-label LABEL=acme                   # 4. provision staging
+make label-check LABEL=acme ENV=staging         # 5. what is still missing
+```
+
+Step 2 means `apiHost`, `webOrigin`, `worker`, `pagesProject`, the `d1`/`kv`/`r2`
+names and the `brand` block. Leave the `id` fields as `<fill …>` — the provisioner
+creates the resources and writes the real identifiers back into the profile, then
+regenerates the label's `env.<label>` block in `apps/api/wrangler.jsonc`.
+
+What one run does, in order:
+
+| Step | What it creates |
+|---|---|
+| `d1` / `kv` / `r2` | The data plane. KV is titled `<label>-rate-limit-<env>`, never the shared binding name. |
+| `subdomain` | Resolves the account's workers.dev subdomain and substitutes the `<acct>` placeholder in `apiHost`. |
+| `profile` | Writes the resolved ids back and regenerates the wrangler env block. **Must precede every `--env` command** — wrangler resolves the target Worker name from that block. |
+| `cors` | Applies R2 bucket CORS derived from `webOrigin`, so it cannot drift from the Worker's `ALLOWED_ORIGINS`. |
+| `pages` | The Cloudflare Pages project. |
+| `secrets` | Generates and sets `JWT_SECRET`. **Runs before the deploy** — `wrangler secret put` creates a draft Worker and deploys never delete secrets, so the first real deploy boots with a valid signing key. |
+| `worker` | A real deploy, by spawning the deploy CLI (`--scope api`), which brings the guard, the preflight and `migrate`-before-`deploy` with it. |
+| `domain` | Only with `WITH_DOMAIN=1`. Attaches the `apiHost` custom domain when its zone is already active; otherwise warns and keeps the workers.dev host. |
+
+Flags: `PRODUCTION=1` (staging then production, behind the confirmation),
+`CONFIRM=1` (bypass that prompt), `WITH_DOMAIN=1`, `DRY_RUN=1`, and
+`ONLY=cors|secrets|worker|domain` for a targeted repair. An `ONLY` run targets a
+single environment — `PRODUCTION=1` there means production *instead of* staging, so
+`make r2-cors-prod` cannot quietly rewrite staging.
+
+Re-running is a no-op: existing resources are detected, and an existing
+`JWT_SECRET` is never overwritten.
+
+**Provisioning secret contract.** This is where provisioning differs from deploy —
+deploy never touches secrets at all, provisioning touches exactly one:
+
+- `JWT_SECRET` is **generated** here (32 random bytes) per label *and* per
+  environment, and handed to wrangler over stdin. A shared value would mean an
+  access token minted for one tenant verifies on another, so `<label>` and
+  `<label>-staging` each get their own. It is set only when absent; if the secret
+  list cannot be read, the step *skips* rather than risk overwriting a good key.
+- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `GOOGLE_CLIENT_SECRET` and
+  `RESEND_API_KEY` are only **detected by name** and reported with the exact
+  `scripts/create-secrets.sh` command. Provisioning never writes them.
+- No secret value ever reaches argv, disk or a log line.
+
+**Still manual, and reported as follow-ups:** creating the Google OAuth client and
+registering its redirect URI (`https://<apiHost>/auth/google/callback` — re-register
+it whenever `apiHost` changes, or login fails *silently*), setting
+`GOOGLE_CLIENT_ID` in the env block's `vars`, verifying the Resend sender domain,
+adding and delegating the DNS zone, and attaching the Pages custom domain for
+`webOrigin` (a separate API from Worker routes).
 
 ---
 
