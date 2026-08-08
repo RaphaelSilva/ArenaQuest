@@ -82,6 +82,30 @@ Cloudflare credentials are resolved by context: `wrangler login` locally, or
 `strategy.matrix.label` of `[arenaquest, spaziord, budo]`. See
 `docs/onboarding.md` for the full invocation and the manual release path.
 
+**Provisioning a new tenant:**
+```bash
+make label-new LABEL=x            # write config/labels/x.jsonc, fill the anchors
+make set-new-label LABEL=x        # provision staging (DRY_RUN=1 to preview)
+make set-new-label LABEL=x PRODUCTION=1   # staging, then production (confirms)
+```
+`set-new-label` forwards to `scripts/cloudflare/provision-label.mjs`, which creates
+**both planes** for a label: D1, KV, R2 and the Pages project, plus the backend —
+profile-derived R2 CORS, a generated `JWT_SECRET`, and a real Worker (by spawning
+the deploy CLI, so there is still one release code path). Extra knobs:
+`WITH_DOMAIN=1` attaches the `apiHost` custom domain when its zone is already active
+in the account; `ONLY=cors|secrets|worker|domain` runs one group for a targeted
+repair, against a single environment. `make r2-cors-*` now forward to it —
+R2 CORS is derived from the profile's `webOrigin`, not from a committed file.
+`create-db-*` / `create-kv-*` are superseded by `set-new-label`.
+
+**Secret contract for provisioning.** `JWT_SECRET` is generated per label *and* per
+environment (a shared key would let a token minted for one tenant verify on another),
+handed to wrangler over stdin, and never overwritten once set. The externally-valued
+secrets (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `GOOGLE_CLIENT_SECRET`,
+`RESEND_API_KEY`) are only *detected by name* and reported with their fix command —
+provisioning never writes them, and no secret value ever reaches argv, disk or a log
+line. See RFC 0012 and `docs/onboarding.md`.
+
 Renamed targets (`db-migrations-dev` → `db-migrate-local`, `db-seed-dev` →
 `db-seed-local`, `create-db` → `create-db-prod`, ...) still work as deprecated
 aliases that print a pointer. Use the new names.
@@ -103,7 +127,7 @@ Cloudflare Workers serverless backend (Hono). Patterns to follow:
 - **Routes vs controllers** — `src/routes/*` only handle HTTP concerns (parsing, auth guards, response shaping). All business logic lives in `src/controllers/*` and returns a `ControllerResult<T>` (`{ ok: true, data } | { ok: false, status, error, meta? }`) defined in `src/core/result.ts`. Use the `@ValidateBody(schema)` method decorator together with the `@Body()` parameter decorator (`src/core/decorators.ts`) to centralise Zod validation; on failure they short-circuit with a `400 BadRequest` `ControllerResult`.
 - **Auth** — `JwtAuthAdapter` implements `IAuthAdapter` using Web Crypto API. **PBKDF2 uses 100,000 iterations** (Cloudflare limit). Refresh tokens are persisted hashed via `D1RefreshTokenRepository`.
 - **Storage** — `R2StorageAdapter` exposes a presigned-upload lifecycle backed by R2 over the S3-compatible API; `D1MediaRepository` tracks media records and their topic associations.
-- **Bindings** — `JWT_SECRET` (secret), `DB` (D1), `RATE_LIMIT_KV` (KV), `R2` (bucket binding), `R2_S3_ENDPOINT`, `R2_BUCKET_NAME`, `R2_PUBLIC_BASE`, `R2_ACCESS_KEY_ID` (secret), `R2_SECRET_ACCESS_KEY` (secret), `ALLOWED_ORIGINS` (CORS), `COOKIE_SAMESITE` (security policy).
+- **Bindings** — `JWT_SECRET` (secret — the HMAC-SHA256 key for HS256 access tokens; auto-generated per label *and* per environment by the label provisioner, never shared across tenants), `DB` (D1), `RATE_LIMIT_KV` (KV), `R2` (bucket binding), `R2_S3_ENDPOINT`, `R2_BUCKET_NAME`, `R2_PUBLIC_BASE`, `R2_ACCESS_KEY_ID` (secret), `R2_SECRET_ACCESS_KEY` (secret), `ALLOWED_ORIGINS` (CORS), `COOKIE_SAMESITE` (security policy).
   - **`ALLOWED_ORIGINS`** — comma-separated list of allowed request origins. Three forms are supported by the `OriginPolicy` core module (`src/core/cors/`):
     1. **Exact** — `https://arenaquest-web.pages.dev` — only that literal origin is accepted.
     2. **Wildcard subdomain** — `https://*.arenaquest-web-staging.pages.dev` — any single-label subdomain of that host (e.g. PR preview deployments). Patterns with multiple wildcard labels are not supported.

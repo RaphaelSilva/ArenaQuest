@@ -26,9 +26,9 @@
       "webOrigin":    "spaziord-web-staging.pages.dev",
       "worker":       "api-spaziord-staging",
       "pagesProject": "spaziord-web-staging",
-      "d1":   { "name": "spaziord-db-staging", "id": "<fill after `wrangler d1 create spaziord-db-staging`>" },
-      "kv":   { "binding": "RATE_LIMIT_KV", "id": "<fill after `wrangler kv namespace create RATE_LIMIT_KV`>" },
-      "r2":   { "bucket": "spaziord-media-staging", "s3Endpoint": "https://<acct>.r2.cloudflarestorage.com" },
+      "d1":   { "name": "spaziord-db-staging", "id": "fc1fe1ce-df8f-4579-b9f8-3b3c1abc206f" },
+      "kv":   { "binding": "RATE_LIMIT_KV", "id": "fec26f8faa614796bac63f9f529f7616" },
+      "r2":   { "bucket": "spaziord-media-staging", "s3Endpoint": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com" },
       "cookieSameSite": "None",
       "mail": { "driver": "resend", "from": "SpazioRD Staging <noreply@spaziord.app>" }
     },
@@ -37,9 +37,9 @@
       "webOrigin":    "app.spaziord.app",
       "worker":       "api-spaziord",
       "pagesProject": "spaziord-web",
-      "d1":   { "name": "spaziord-db", "id": "<fill after `wrangler d1 create spaziord-db`>" },
-      "kv":   { "binding": "RATE_LIMIT_KV", "id": "<fill after `wrangler kv namespace create RATE_LIMIT_KV`>" },
-      "r2":   { "bucket": "spaziord-media", "s3Endpoint": "https://<acct>.r2.cloudflarestorage.com" },
+      "d1":   { "name": "spaziord-db", "id": "06614104-3acb-4d98-b29d-0dd141f37b98" },
+      "kv":   { "binding": "RATE_LIMIT_KV", "id": "4f003fdaa23747409e56f9e0d31329a2" },
+      "r2":   { "bucket": "spaziord-media", "s3Endpoint": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com" },
       "cookieSameSite": "Strict",
       "mail": { "driver": "resend", "from": "SpazioRD <noreply@spaziord.app>" }
     }

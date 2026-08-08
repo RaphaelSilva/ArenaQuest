@@ -122,6 +122,55 @@ export function deriveExpected(profile, env) {
 }
 
 /**
+ * Derive the R2 bucket CORS rules for an environment.
+ *
+ * The origin list is NOT re-implemented here: it is `ALLOWED_ORIGINS` split
+ * back apart. That single reuse is the point — the Worker's CORS policy and
+ * the bucket's CORS policy can never drift, production inherits
+ * exact-origins-only and staging inherits the single preview-wildcard carve-out
+ * for free, and `checkPolicy` already governs the one string both consume.
+ *
+ * PUT + GET are the presigned-upload lifecycle (browser PUTs to the presigned
+ * URL, then GETs the object); Content-Type/Content-Length are the headers the
+ * uploader sends.
+ */
+export function deriveCorsRules(profile, env) {
+  const origins = String(deriveExpected(profile, env).ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return [
+    {
+      allowed: {
+        origins,
+        methods: ['PUT', 'GET'],
+        headers: ['Content-Type', 'Content-Length'],
+      },
+      maxAgeSeconds: 3600,
+    },
+  ];
+}
+
+/** Serialise CORS rules to the JSON document `wrangler r2 bucket cors set --file` expects. */
+export function renderCorsFile(rules) {
+  return `${JSON.stringify({ rules }, null, 2)}\n`;
+}
+
+/** The workers.dev host for a Worker, once the account subdomain is known. */
+export function workersDevHost(worker, subdomain) {
+  return `${worker}.${subdomain}.workers.dev`;
+}
+
+/**
+ * The KV namespace TITLE for a label/env. Deliberately not the binding name:
+ * the binding (`RATE_LIMIT_KV`) is shared by every tenant, so using it as the
+ * title collides across labels in the account namespace list.
+ */
+export function kvNamespaceName(label, env) {
+  return `${label}-rate-limit-${env === 'production' ? 'production' : 'staging'}`;
+}
+
+/**
  * Build the resolved config map for an environment (build + api-vars),
  * combining brand values, derived anchors, non-derived profile fields, and
  * — when an env.<label> block already exists in wrangler.jsonc — its `vars`
@@ -272,6 +321,11 @@ function buildEnvBlockObject(profile, env, expected) {
     ],
     kv_namespaces: [{ binding: e.kv?.binding || 'RATE_LIMIT_KV', id: e.kv?.id }],
     r2_buckets: [{ binding: 'R2', bucket_name: e.r2.bucket }],
+    // A custom domain is only bound once the profile records that one was
+    // attached. The switch lives in the profile — not in the provisioning
+    // script — because every provision run regenerates this whole block, and
+    // anything not derivable from the profile would be silently stripped.
+    ...(e.customDomain ? { routes: [{ pattern: e.apiHost, custom_domain: true }] } : {}),
     vars: {
       ALLOWED_ORIGINS: expected.ALLOWED_ORIGINS,
       COOKIE_SAMESITE: e.cookieSameSite,
@@ -342,12 +396,14 @@ export function scaffoldWranglerText(text, label, profile) {
 export function provisioningCommands(profile, schema, env) {
   const e = profile.environments[env];
   const wEnv = env === 'production' ? profile.label : `${profile.label}-staging`;
+  const kvNamespace = kvNamespaceName(profile.label, env);
   const lines = [];
   lines.push(`# Cloudflare resources for ${profile.label} (${env}) — run these, then paste ids into the profile`);
   lines.push(`wrangler d1 create ${e.d1.name}`);
-  lines.push(`wrangler kv namespace create ${e.kv?.binding || 'RATE_LIMIT_KV'} --env ${wEnv}`);
+  lines.push(`wrangler kv namespace create ${kvNamespace}`);
   lines.push(`wrangler r2 bucket create ${e.r2.bucket}`);
-  lines.push(`# Pages project: create "${e.pagesProject}" (dashboard) or: wrangler pages project create ${e.pagesProject}`);
+  const pagesBranch = env === 'production' ? 'main' : 'develop';
+  lines.push(`# Pages project: create "${e.pagesProject}" (dashboard) or: wrangler pages project create ${e.pagesProject} --production-branch ${pagesBranch}`);
   lines.push(`# Google OAuth: create a Web client and register the redirect URI:`);
   lines.push(`#   https://${e.apiHost}/auth/google/callback`);
   lines.push(`# Secrets (values entered interactively — never committed):`);
@@ -436,7 +492,10 @@ function runWrangler(args) {
  */
 function listSecretNames(label, env) {
   const wEnv = wranglerEnvName(label, env);
-  const res = runWrangler(['secret', 'list', '--env', wEnv, '--json']);
+  // `wrangler secret list` takes --format {json,pretty} — there is no --json.
+  // Passing --json makes wrangler print help and exit non-zero, which silently
+  // downgraded every api-secrets row to "skipped (no creds)".
+  const res = runWrangler(['secret', 'list', '--env', wEnv, '--format', 'json']);
   if (!res.ok) return { ok: false, names: [] };
   try {
     const arr = JSON.parse(res.stdout);
@@ -539,7 +598,7 @@ function cmdCheck(label, env) {
     { key: 'worker', name: e.worker, kind: null, match: e.worker, create: `wrangler deploy --env ${wEnv}` },
     { key: 'pagesProject', name: e.pagesProject, kind: 'pagesProject', match: e.pagesProject, create: `wrangler pages project create ${e.pagesProject}` },
     { key: 'd1', name: e.d1?.name, kind: 'd1', match: e.d1?.name, create: `wrangler d1 create ${e.d1?.name}` },
-    { key: 'kv', name: `${e.kv?.binding} (${e.kv?.id})`, kind: 'kv', match: e.kv?.id, create: `wrangler kv namespace create ${e.kv?.binding} --env ${wEnv}  (then paste the id into the profile)` },
+    { key: 'kv', name: `${e.kv?.binding} (${e.kv?.id})`, kind: 'kv', match: e.kv?.id, create: `wrangler kv namespace create ${kvNamespaceName(label, env)}  (then paste the id into the profile)` },
     { key: 'r2', name: e.r2?.bucket, kind: 'r2', match: e.r2?.bucket, create: `wrangler r2 bucket create ${e.r2?.bucket}` },
   ];
   for (const t of resourceTargets) {

@@ -75,6 +75,262 @@
 	 * "production" (default, no env flag) is deployed from the main branch.
 	 */
 	"env": {
+		// >>> label:budo (generated) >>>
+		"budo-staging": {
+		  "name": "api-budo-staging",
+		  "d1_databases": [
+		    {
+		      "binding": "DB",
+		      "database_name": "budo-db-staging",
+		      "database_id": "314fa333-c39e-478b-90a9-c09625420744",
+		      "migrations_dir": "migrations"
+		    }
+		  ],
+		  "kv_namespaces": [
+		    {
+		      "binding": "RATE_LIMIT_KV",
+		      "id": "c75ab14e35164e22b7c6eb3581969295"
+		    }
+		  ],
+		  "r2_buckets": [
+		    {
+		      "binding": "R2",
+		      "bucket_name": "budo-media-staging"
+		    }
+		  ],
+		  "vars": {
+		    "ALLOWED_ORIGINS": "https://budo-web-staging.pages.dev,https://*.budo-web-staging.pages.dev,http://localhost:3000",
+		    "COOKIE_SAMESITE": "None",
+		    "R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+		    "R2_PUBLIC_BASE": "",
+		    "R2_BUCKET_NAME": "budo-media-staging",
+		    "MAIL_DRIVER": "resend",
+		    "MAIL_FROM": "Budo Staging <noreply@budo.app>",
+		    "WEB_BASE_URL": "https://budo-web-staging.pages.dev",
+		    "GOOGLE_REDIRECT_URI": "https://api-budo-staging.<acct>.workers.dev/auth/google/callback",
+		    "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
+		  },
+		  "observability": {
+		    "enabled": true,
+		    "logs": {
+		      "enabled": true
+		    }
+		  }
+		},
+		"budo": {
+		  "name": "api-budo",
+		  "d1_databases": [
+		    {
+		      "binding": "DB",
+		      "database_name": "budo-db",
+		      "database_id": "9cadb9ea-9a8b-4f85-a1c9-5dcb7c3a0b1a",
+		      "migrations_dir": "migrations"
+		    }
+		  ],
+		  "kv_namespaces": [
+		    {
+		      "binding": "RATE_LIMIT_KV",
+		      "id": "8490968f05aa41a0a0abd57f7551e63d"
+		    }
+		  ],
+		  "r2_buckets": [
+		    {
+		      "binding": "R2",
+		      "bucket_name": "budo-media"
+		    }
+		  ],
+		  "vars": {
+		    "ALLOWED_ORIGINS": "https://app.budo.app",
+		    "COOKIE_SAMESITE": "Strict",
+		    "R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+		    "R2_PUBLIC_BASE": "",
+		    "R2_BUCKET_NAME": "budo-media",
+		    "MAIL_DRIVER": "resend",
+		    "MAIL_FROM": "Budo <noreply@budo.app>",
+		    "WEB_BASE_URL": "https://app.budo.app",
+		    "GOOGLE_REDIRECT_URI": "https://api.budo.app/auth/google/callback",
+		    "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
+		  },
+		  "observability": {
+		    "enabled": true,
+		    "logs": {
+		      "enabled": true
+		    }
+		  }
+		},
+		// <<< label:budo <<<
+		// >>> label:spaziord (generated) >>>
+		"spaziord-staging": {
+		  "name": "api-spaziord-staging",
+		  "d1_databases": [
+		    {
+		      "binding": "DB",
+		      "database_name": "spaziord-db-staging",
+		      "database_id": "fc1fe1ce-df8f-4579-b9f8-3b3c1abc206f",
+		      "migrations_dir": "migrations"
+		    }
+		  ],
+		  "kv_namespaces": [
+		    {
+		      "binding": "RATE_LIMIT_KV",
+		      "id": "fec26f8faa614796bac63f9f529f7616"
+		    }
+		  ],
+		  "r2_buckets": [
+		    {
+		      "binding": "R2",
+		      "bucket_name": "spaziord-media-staging"
+		    }
+		  ],
+		  "vars": {
+		    "ALLOWED_ORIGINS": "https://spaziord-web-staging.pages.dev,https://*.spaziord-web-staging.pages.dev,http://localhost:3000",
+		    "COOKIE_SAMESITE": "None",
+		    "R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+		    "R2_PUBLIC_BASE": "",
+		    "R2_BUCKET_NAME": "spaziord-media-staging",
+		    "MAIL_DRIVER": "resend",
+		    "MAIL_FROM": "SpazioRD Staging <noreply@spaziord.app>",
+		    "WEB_BASE_URL": "https://spaziord-web-staging.pages.dev",
+		    "GOOGLE_REDIRECT_URI": "https://api-spaziord-staging.<acct>.workers.dev/auth/google/callback",
+		    "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
+		  },
+		  "observability": {
+		    "enabled": true,
+		    "logs": {
+		      "enabled": true
+		    }
+		  }
+		},
+		"spaziord": {
+		  "name": "api-spaziord",
+		  "d1_databases": [
+		    {
+		      "binding": "DB",
+		      "database_name": "spaziord-db",
+		      "database_id": "06614104-3acb-4d98-b29d-0dd141f37b98",
+		      "migrations_dir": "migrations"
+		    }
+		  ],
+		  "kv_namespaces": [
+		    {
+		      "binding": "RATE_LIMIT_KV",
+		      "id": "4f003fdaa23747409e56f9e0d31329a2"
+		    }
+		  ],
+		  "r2_buckets": [
+		    {
+		      "binding": "R2",
+		      "bucket_name": "spaziord-media"
+		    }
+		  ],
+		  "vars": {
+		    "ALLOWED_ORIGINS": "https://app.spaziord.app",
+		    "COOKIE_SAMESITE": "Strict",
+		    "R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+		    "R2_PUBLIC_BASE": "",
+		    "R2_BUCKET_NAME": "spaziord-media",
+		    "MAIL_DRIVER": "resend",
+		    "MAIL_FROM": "SpazioRD <noreply@spaziord.app>",
+		    "WEB_BASE_URL": "https://app.spaziord.app",
+		    "GOOGLE_REDIRECT_URI": "https://api.spaziord.app/auth/google/callback",
+		    "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
+		  },
+		  "observability": {
+		    "enabled": true,
+		    "logs": {
+		      "enabled": true
+		    }
+		  }
+		},
+		// <<< label:spaziord <<<
+		// >>> label:arenaquest (generated) >>>
+		"arenaquest-staging": {
+			"name": "api-staging",
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "arenaquest-db-staging",
+					"database_id": "6a2f5784-c57e-46ae-a858-27ca876f1dfe",
+					"migrations_dir": "migrations"
+				}
+			],
+			"kv_namespaces": [
+				{
+					"binding": "RATE_LIMIT_KV",
+					"id": "c697147935024190ada81e743c3479d9"
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "R2",
+					"bucket_name": "arenaquest-media-staging"
+				}
+			],
+			"vars": {
+				"ALLOWED_ORIGINS": "https://arenaquest-web-staging.pages.dev,https://*.arenaquest-web-staging.pages.dev,http://localhost:3000",
+				"COOKIE_SAMESITE": "None",
+				"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+				"R2_PUBLIC_BASE": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+				"R2_BUCKET_NAME": "arenaquest-media-staging",
+				"MAIL_DRIVER": "resend",
+				"MAIL_FROM": "ArenaQuest Staging <noreply@arenaquest.app>",
+				"WEB_BASE_URL": "https://arenaquest-web-staging.pages.dev",
+				// Google OAuth — replace with your staging OAuth client values.
+				// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET --env staging`
+				// "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
+				"GOOGLE_REDIRECT_URI": "https://api-staging.raphael-1d2.workers.dev/auth/google/callback"
+			},
+			"observability": {
+				"enabled": true,
+				"logs": {
+					"enabled": true
+				}
+			}
+		},
+		"arenaquest": {
+			"name": "api",
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "arenaquest-db",
+					"database_id": "148eaf0b-b615-4e0d-83c0-8d8c681061e4",
+					"migrations_dir": "migrations"
+				}
+			],
+			"kv_namespaces": [
+				{
+					"binding": "RATE_LIMIT_KV",
+					"id": "c697147935024190ada81e743c3479d9"
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "R2",
+					"bucket_name": "arenaquest-media"
+				}
+			],
+			"vars": {
+				"ALLOWED_ORIGINS": "https://arenaquest-web.pages.dev",
+				"COOKIE_SAMESITE": "Strict",
+				"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+				"R2_PUBLIC_BASE": "",
+				"R2_BUCKET_NAME": "arenaquest-media",
+				"MAIL_DRIVER": "resend",
+				"MAIL_FROM": "ArenaQuest <noreply@arenaquest.app>",
+				"WEB_BASE_URL": "https://arenaquest-web.pages.dev",
+				// Google OAuth — replace with your staging OAuth client values.
+				// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET --env staging`
+				// "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
+				"GOOGLE_REDIRECT_URI": "https://api.arenaquest.app/auth/google/callback"
+			},
+			"observability": {
+				"enabled": true,
+				"logs": {
+					"enabled": true
+				}
+			}
+		},
+		// <<< label:arenaquest <<<
 		"staging": {
 			"name": "api-staging",
 			"d1_databases": [

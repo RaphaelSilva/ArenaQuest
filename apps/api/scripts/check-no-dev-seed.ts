@@ -20,6 +20,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 // Full prefix of the known dev-seed password_hash.
 // Used for exact startsWith() filtering in JS after the DB query.
@@ -31,6 +32,11 @@ const DEV_PASSWORD_HASH_PREFIX =
 // complex" for long patterns, so we use the iteration count + salt prefix
 // (unique enough to the dev seed) and filter the exact prefix in JavaScript.
 const DEV_HASH_LIKE_PATTERN = 'pbkdf2:100000:e83835066ab015b5%';
+
+/** A newly provisioned D1 has no schema yet; migrations will create it. */
+export function isFreshDatabaseError(output: string): boolean {
+  return /no such table:\s*users\b/i.test(output);
+}
 
 // ---------------------------------------------------------------------------
 // Argument parsing (no external deps)
@@ -83,9 +89,18 @@ function main() {
     ...(args.env ? ['--env', args.env] : []),
   ];
 
+  const wranglerEnv = { ...process.env };
+  if (wranglerEnv.CF_ACCOUNT_ID && !wranglerEnv.CLOUDFLARE_ACCOUNT_ID) {
+    wranglerEnv.CLOUDFLARE_ACCOUNT_ID = wranglerEnv.CF_ACCOUNT_ID;
+  }
+  if (wranglerEnv.CF_API_TOKEN && !wranglerEnv.CLOUDFLARE_API_TOKEN) {
+    wranglerEnv.CLOUDFLARE_API_TOKEN = wranglerEnv.CF_API_TOKEN;
+  }
+
   const result = spawnSync('pnpm', wranglerArgs, {
     encoding: 'utf8',
     stdio: ['pipe', 'pipe', 'pipe'],
+    env: wranglerEnv,
   });
 
   // Surface the real wrangler error (auth, unknown DB, network, etc.)
@@ -95,6 +110,12 @@ function main() {
       .map(s => s?.trim())
       .filter(Boolean)
       .join('\n');
+    if (isFreshDatabaseError(wranglerOutput)) {
+      process.stdout.write(
+        `[check-no-dev-seed] OK — database "${args.db}" has no users table yet; migrations will initialize it.\n`,
+      );
+      process.exit(0);
+    }
     if (wranglerOutput) {
       process.stderr.write(`${wranglerOutput}\n`);
     }
@@ -140,4 +161,6 @@ function main() {
   process.exit(1);
 }
 
-main();
+if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+  main();
+}
