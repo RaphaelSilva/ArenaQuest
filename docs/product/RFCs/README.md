@@ -17,6 +17,7 @@ This directory contains formal proposals and architectural decisions for ArenaQu
 | [0009](./0009-gamification-catalog-administration.md) | Gamification Catalog Administration | Implemented | 2026-06-23 | raphaelsilva |
 | [0010](./0010-player-progression-administration.md) | Player Progression Administration | Implemented | 2026-06-23 | raphaelsilva |
 | [0011](./0011-branded-deploy-cli-label-parametrized-ci-independent-release.md) | Branded deploy CLI - label-parametrized CI-independent release script | Implemented | 2026-07-23 | raphaelsilva |
+| [0012](./0012-tenant-provisioning-backend-parity.md) | Tenant provisioning — Cloudflare resource bring-up with backend parity | Implemented | 2026-08-08 | raphaelsilva |
 
 ## RFC Process
 

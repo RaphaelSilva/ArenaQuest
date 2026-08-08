@@ -25,7 +25,7 @@
         dev dev-api dev-web dev-web-arenaquest dev-web-srd dev-web-budo \
         build build-api build-web \
         lint lint-api lint-web lint-shared \
-        test test-api test-web \
+        test test-api test-web test-scripts \
         db-migrate-local db-seed-local db-reset-local \
         db-migrate-staging db-migrate-prod db-migrations-staging-local \
         bootstrap-admin cf-typegen \
@@ -37,6 +37,7 @@
         list-kv-staging list-kv-prod cf-info-staging cf-info-prod \
         secret-staging secret-prod create-google-oauth-secret \
         label-new label-scaffold label-check \
+        set-new-label \
         clean clean-cache clean-all \
         confirm-prod guard-no-dev-seed-staging guard-no-dev-seed-prod \
         db-migrations-dev db-migrations-staging db-migrations-prod db-seed-dev \
@@ -51,6 +52,9 @@ DIM    := \033[2m
 RESET  := \033[0m
 BOLD   := \033[1m
 
+# ── Default Values ──────────────────────────────────────────────────────────────
+DEPLOY_LABEL ?= arenaquest
+
 # ── Reusable guards ────────────────────────────────────────────────────────────
 
 # Announce that an old target name is deprecated, then run the new one.
@@ -58,6 +62,16 @@ BOLD   := \033[1m
 define deprecated
 	@printf "$(YELLOW)  ⚠  '$(1)' is deprecated → use '$(BOLD)make $(2)$(RESET)$(YELLOW)'$(RESET)\n"
 	@$(MAKE) --no-print-directory $(2)
+endef
+
+# A target superseded by the label provisioner. It cannot auto-forward, because
+# the replacement is label-scoped and needs a LABEL.
+# Usage:  $(call superseded,old-name)
+define superseded
+	@printf "$(YELLOW)  ⚠  '$(1)' is superseded by the label provisioner.$(RESET)\n"
+	@printf "$(YELLOW)     Resources are created from config/labels/<label>.jsonc:$(RESET)\n"
+	@printf "$(YELLOW)     $(BOLD)make set-new-label LABEL=<label>$(RESET)$(YELLOW)  (add PRODUCTION=1 for production)$(RESET)\n"
+	@exit 1
 endef
 
 # ==============================================================================
@@ -139,8 +153,13 @@ lint-web: ## Lint only apps/web
 lint-shared: ## Lint only packages/shared
 	pnpm turbo lint --filter @arenaquest/shared
 
-test: ## Run all tests
+test: test-scripts ## Run all tests
 	pnpm turbo run test
+
+test-scripts: ## Run the operational script unit tests (node:test — no network, no wrangler)
+	node --test scripts/label.test.mjs \
+		scripts/deploy/core.test.mjs \
+		scripts/cloudflare/provision-label.test.mjs
 
 test-api: ## Run apps/api tests (Vitest + Cloudflare Workers pool)
 	pnpm turbo test --filter api
@@ -176,25 +195,19 @@ cf-typegen: ## Regenerate Cloudflare Worker binding types (wrangler types)
 ##@ 🟡 STAGING — remote (requires wrangler login)
 # ==============================================================================
 deploy-staging: ## Deploy BOTH apps to staging (forwards to the deploy CLI)
-	node scripts/cloudflare/deploy.mjs --label arenaquest -e staging --scope all
+	node scripts/cloudflare/deploy.mjs --label $(DEPLOY_LABEL) -e staging --scope all
 
 deploy-api-staging: ## Deploy apps/api to staging Workers (forwards to the deploy CLI)
-	node scripts/cloudflare/deploy.mjs --label arenaquest -e staging --scope api
+	node scripts/cloudflare/deploy.mjs --label $(DEPLOY_LABEL) -e staging --scope api
 
 deploy-web-staging: ## Build and deploy apps/web to staging Pages (forwards to the deploy CLI)
-	node scripts/cloudflare/deploy.mjs --label arenaquest -e staging --scope web
+	node scripts/cloudflare/deploy.mjs --label $(DEPLOY_LABEL) -e staging --scope web
 
 db-migrate-staging: ## Apply D1 migrations to the REMOTE staging database
-	pnpm --filter api exec wrangler d1 migrations apply arenaquest-db-staging --env staging --remote
+	pnpm --filter api exec wrangler d1 migrations apply $(DEPLOY_LABEL)-db-staging --env staging --remote
 
-r2-cors-staging: ## Apply CORS rules to the staging bucket (arenaquest-media-staging)
-	pnpm --filter api exec wrangler r2 bucket cors set arenaquest-media-staging --file cors.json -y
-
-create-db-staging: ## Create the staging D1 database
-	pnpm --filter api exec wrangler d1 create arenaquest-db-staging --env staging
-
-create-kv-staging: ## Create the staging RATE_LIMIT_KV namespace
-	pnpm --filter api exec wrangler kv namespace create RATE_LIMIT_KV --env staging
+r2-cors-staging: ## Apply the profile-derived CORS rules to the staging bucket
+	node scripts/cloudflare/provision-label.mjs $(DEPLOY_LABEL) --only cors
 
 list-kv-staging: ## List staging KV namespaces
 	pnpm --filter api exec wrangler kv namespace list --env staging
@@ -210,25 +223,19 @@ secret-staging: ## Set a staging Worker secret (NAME=JWT_SECRET)
 ##@ 🔴 PRODUCTION — remote (every target asks for confirmation)
 # ==============================================================================
 deploy-prod: ## Deploy BOTH apps to production (CLI runs guard + confirmation)
-	node scripts/cloudflare/deploy.mjs --label arenaquest -e production --scope all
+	node scripts/cloudflare/deploy.mjs --label $(DEPLOY_LABEL) -e production --scope all
 
 deploy-api-prod: ## Deploy apps/api to production Workers (CLI runs guard + confirmation)
-	node scripts/cloudflare/deploy.mjs --label arenaquest -e production --scope api
+	node scripts/cloudflare/deploy.mjs --label $(DEPLOY_LABEL) -e production --scope api
 
 deploy-web-prod: ## Build and deploy apps/web to production Pages (CLI runs guard + confirmation)
-	node scripts/cloudflare/deploy.mjs --label arenaquest -e production --scope web
+	node scripts/cloudflare/deploy.mjs --label $(DEPLOY_LABEL) -e production --scope web
 
 db-migrate-prod: confirm-prod ## Apply D1 migrations to the REMOTE production database
-	pnpm --filter api exec wrangler d1 migrations apply arenaquest-db --remote
+	pnpm --filter api exec wrangler d1 migrations apply $(DEPLOY_LABEL)-db --remote
 
-r2-cors-prod: confirm-prod ## Apply CORS rules to the production bucket (arenaquest-media)
-	pnpm --filter api exec wrangler r2 bucket cors set arenaquest-media --file cors.json -y
-
-create-db-prod: confirm-prod ## Create the production D1 database
-	pnpm --filter api exec wrangler d1 create arenaquest-db
-
-create-kv-prod: confirm-prod ## Create the production RATE_LIMIT_KV namespace
-	pnpm --filter api exec wrangler kv namespace create RATE_LIMIT_KV
+r2-cors-prod: confirm-prod ## Apply the profile-derived CORS rules to the production bucket
+	node scripts/cloudflare/provision-label.mjs $(DEPLOY_LABEL) --production --only cors --yes
 
 list-kv-prod: ## List production KV namespaces (read-only — no confirmation)
 	pnpm --filter api exec wrangler kv namespace list
@@ -254,6 +261,14 @@ label-scaffold: ## Generate wrangler/workflow/env boilerplate (LABEL=spaziord)
 
 label-check: ## Checklist of what's missing for a label (LABEL=spaziord ENV=staging)
 	node scripts/label.mjs check $(LABEL) --env $(or $(ENV),staging)
+
+set-new-label: ## Provision a label end-to-end (LABEL=x; PRODUCTION=1, WITH_DOMAIN=1, ONLY=cors|secrets|worker|domain)
+	node scripts/cloudflare/provision-label.mjs $(LABEL) \
+		$(if $(filter 1,$(PRODUCTION)),--production,) \
+		$(if $(filter 1,$(CONFIRM)),--yes,) \
+		$(if $(filter 1,$(WITH_DOMAIN)),--with-domain,) \
+		$(if $(ONLY),--only $(ONLY),) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
 # ==============================================================================
 ##@ 🧹 CLEAN
@@ -328,7 +343,25 @@ create-db:
 	$(call deprecated,create-db,create-db-prod)
 
 create-kv:
-	$(call deprecated,create-kv,create-kv-prod)
+	$(call superseded,create-kv)
+
+# The create-* targets predate the provisioner. They created resources whose
+# names/titles the label profile no longer agrees with — in particular a KV
+# namespace literally titled 'RATE_LIMIT_KV' (the shared binding name), which
+# collides across tenants. 'make set-new-label LABEL=x' creates every resource
+# for a label from its profile, idempotently. They cannot auto-forward because
+# the replacement needs a LABEL.
+create-db-staging:
+	$(call superseded,create-db-staging)
+
+create-db-prod:
+	$(call superseded,create-db-prod)
+
+create-kv-staging:
+	$(call superseded,create-kv-staging)
+
+create-kv-prod:
+	$(call superseded,create-kv-prod)
 
 list-kv:
 	$(call deprecated,list-kv,list-kv-prod)
