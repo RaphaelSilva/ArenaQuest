@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-19
 **Revised:** 2026-06-25
-**Status:** Draft
+**Status:** Partially implemented — the presence/coherence/policy checks shipped inside `scripts/label.mjs` (`make label-check`), not as the standalone `scripts/preflight.mjs` proposed here.
 **Author:** raphaelsilva
 **Affected:**
 - `config/labels/<label>.jsonc` (**new** — per-label deployment profile; single source of truth for *one* label's anchors)

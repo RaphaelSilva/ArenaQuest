@@ -239,8 +239,8 @@ A: No measurable impact. It's a single write to the user table + email send (asy
 
 ## 9. References
 
-- **Milestone 2:** User Management & RBAC — `docs/product/milestones/2/milestone.md`
-- **Milestone 6:** Password Management — `docs/product/milestones/6/milestone.md`
+- **Milestone 2:** User Management & RBAC — `docs/product/milestones/2-authentication-and-user-management/milestone.md`
+- **Milestone 6:** Password Management — `docs/product/milestones/6-auth-self-service-and-social-login/milestone.md`
 - **Architecture:** Adapter Pattern & Cloud-Agnosticism — `docs/product/architecture/`
 - **Vision:** Long-term goals — `docs/product/vision.md`
 

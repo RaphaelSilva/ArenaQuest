@@ -102,7 +102,7 @@
 ## Milestone 2 — Auth Hardening (Security Epic S-01 → S-10)
 
 > All findings from the Milestone 2 close-out security audit are now closed.
-> See [`docs/product/milestones/2-extends/auth-hardening.story.md`](product/milestones/2-extends/auth-hardening.story.md) for the full story.
+> See [`docs/product/milestones/2-extends-auth-hardening/auth-hardening.story.md`](product/milestones/2-extends-auth-hardening/auth-hardening.story.md) for the full story.
 
 ### Security fixes
 

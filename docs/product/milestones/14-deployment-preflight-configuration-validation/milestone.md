@@ -1,6 +1,6 @@
 # Milestone 14 — Deployment preflight & configuration validation
 
-**Status:** 📝 Draft
+**Status:** 🚧 Partially implemented — the presence / coherence / policy checks shipped inside `scripts/label.mjs` against `config/deployment.schema.jsonc` (exposed as `make label-check`), not as the standalone `scripts/preflight.mjs` + `config/deployment.manifest.jsonc` specified below.
 **Scope:** Repo tooling and CI — `scripts/preflight.mjs`, `config/deployment.manifest.jsonc`, the two deploy workflows, the `Makefile`, and the `*.example` env files. Derived from [RFC 0007](../../RFCs/0007-deployment-preflight-and-config-validation.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone ships a

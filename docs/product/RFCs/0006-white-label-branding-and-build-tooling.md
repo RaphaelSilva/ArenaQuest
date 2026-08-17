@@ -1,7 +1,7 @@
 # RFC 0006: White-label branding
 
 **Date:** 2026-06-19
-**Status:** Draft
+**Status:** Implemented
 **Author:** raphaelsilva
 **Affected:**
 - `apps/web/src/components/design-system/Logo.tsx` (configurable sigla + label)

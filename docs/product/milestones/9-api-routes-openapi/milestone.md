@@ -1,6 +1,6 @@
 # Milestone 9 — `apps/api` Route Reorganization and OpenAPI Adoption
 
-**Status:** 📝 Draft
+**Status:** ✅ Implemented
 **Scope:** `apps/api/src/routes/**`, `apps/api/src/index.ts`, controller signatures (where strictly required), and the generated OpenAPI contract consumed by `apps/web`. Derived from [RFC 0003](../../RFCs/0003-apps-api-route-organization-and-openapi.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone reshapes the HTTP layer of `apps/api` and introduces an OpenAPI contract. It may touch: `apps/api/src/routes/**`, `apps/api/src/index.ts`, a new `apps/api/src/container.ts`, a new `apps/api/src/openapi/**` tree, a new `apps/api/scripts/dump-openapi.ts`, the committed `apps/api/openapi.json`, and the generated types consumed by `apps/web/src/lib/api-types.gen.ts`. It is **not** an opportunity to rewrite business logic: controllers under `apps/api/src/controllers/**` keep their behaviour. Domain entities under `packages/shared/**`, migrations, and adapter implementations are **out of scope** unless a phase explicitly calls them out. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.

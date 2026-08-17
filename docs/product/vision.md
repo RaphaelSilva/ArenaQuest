@@ -41,17 +41,17 @@ The portal serves as a centralized hub for knowledge management, progress tracki
 
 To track our exact progress, each phase maps to a dedicated milestone folder:
 
-* **[Milestone 1: Foundation & Infrastructure](file:///home/my-ubuntu/projects/ArenaQuest/docs/product/milestones/1/milestone.md)**
+* **[Milestone 1: Foundation & Infrastructure](./milestones/1-foundation-and-infrastructure/milestone.md)**
   * Monorepo setup, Turborepo pipeline, CI/CD configuration, and core agnostic architecture interfaces.
-* **[Milestone 2: Auth & Identity](file:///home/my-ubuntu/projects/ArenaQuest/docs/product/milestones/2/milestone.md)**
+* **[Milestone 2: Auth & Identity](./milestones/2-authentication-and-user-management/milestone.md)**
   * JWT-based authentication and base RBAC (Roles) implementation.
-* **[Milestone 3: Content & Media Core](file:///home/my-ubuntu/projects/ArenaQuest/docs/product/milestones/3/milestone.md)**
+* **[Milestone 3: Content & Media Core](./milestones/3-content-and-media-core/milestone.md)**
   * Tree structure implementation and swappable Object Storage adapter integration.
-* **[Milestone 4: Task Engine](file:///home/my-ubuntu/projects/ArenaQuest/docs/product/milestones/4/milestone.md)**
+* **[Milestone 4: Task Engine](./milestones/4-task-engine-and-interconnection/milestone.md)**
   * Implementation of the task and stages engagement logic.
-* **[Milestone 5: Participant Experience](file:///home/my-ubuntu/projects/ArenaQuest/docs/product/milestones/5/milestone.md)**
+* **[Milestone 5: Participant Experience](./milestones/5-engagement-and-student-progress/milestone.md)**
   * Launch of the mobile-friendly student portal with progress indicators.
-* **[Milestone 6: Portability & Launch](file:///home/my-ubuntu/projects/ArenaQuest/docs/product/milestones/6/milestone.md)**
+* **[Milestone 6: Portability & Launch](./milestones/6-auth-self-service-and-social-login/milestone.md)**
   * Agnosticism proofs, provider-swap validation tests, and initial release.
-* **[Milestone 11: Catalog Redesign](file:///home/my-ubuntu/projects/ArenaQuest/docs/product/milestones/11-catalog-redesign/milestone.md)**
+* **[Milestone 11: Catalog Redesign](./milestones/11-catalog-redesign/milestone.md)**
   * Wireframe-aligned participant catalog UX (sidebar, header stats trio, two-column subtopic grid, inline media stages, discussion thread). Derived from RFC 0004.

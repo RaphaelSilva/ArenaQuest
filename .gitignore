@@ -79,3 +79,10 @@ temp/
 .antigravitycli
 .claude/worktrees
 .claude/settings.local.json
+# ── Documentation scratch ──────────────────────────────────────────────────────
+# Agent-generated implementation exhaust under docs/product/**. These are working
+# artefacts of a single execution run, not the record of the feature — the record
+# is milestone.md / *.task.md and docs/product/FEATURES.md.
+docs/product/**/planing/
+docs/product/**/.executor-logs/
+docs/product/**/closeout-analysis.md

@@ -1,6 +1,6 @@
 # Milestone 13 — White-label branding
 
-**Status:** 📝 Draft
+**Status:** ✅ Implemented
 **Scope:** `apps/web` brand surfaces (Logo, OAuth callback, footer, metadata, favicon), build-time env (`next.config.ts`, `.env.example`), the `deploy-web.yml` CI build step, and the two i18n dictionaries. Derived from [RFC 0006](../../RFCs/0006-white-label-branding-and-build-tooling.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may
