@@ -7,6 +7,7 @@ import { useAuth, useHasRole } from '@web/hooks/use-auth';
 import { Logo } from '@web/components/design-system';
 import { useSidebar } from '@web/context/sidebar-context';
 import { useDict } from '@web/context/dict-context';
+import { ThemeToggle } from './theme-toggle';
 
 function MobileDrawer({ onClose }: { onClose: () => void }) {
   const pathname = usePathname();
@@ -110,7 +111,8 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
           )}
         </nav>
 
-        <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
+        <div className="space-y-1 border-t border-zinc-200 p-4 dark:border-zinc-800">
+          <ThemeToggle variant="menu" />
           <button
             onClick={() => { onClose(); logout(); }}
             className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
@@ -179,13 +181,16 @@ export function Nav() {
           )}
         </div>
 
-        {/* Desktop sign out */}
-        <button
-          onClick={logout}
-          className="hidden text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50 md:block"
-        >
-          {dict.layout.nav.signOut}
-        </button>
+        {/* Desktop theme toggle + sign out. On mobile both live in the drawer. */}
+        <div className="ml-auto hidden items-center gap-3 md:flex">
+          <ThemeToggle />
+          <button
+            onClick={logout}
+            className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            {dict.layout.nav.signOut}
+          </button>
+        </div>
       </nav>
 
       {/* Mobile drawer */}

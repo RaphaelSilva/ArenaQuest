@@ -1,9 +1,20 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Bind Tailwind's `dark:` variant to the same `data-theme` switch the --aq-*
+   tokens use. Tailwind v4 defaults `dark:` to `prefers-color-scheme`, which made
+   utility-styled surfaces follow the OS while the tokens stayed on the user's
+   choice — the two halves of the UI could disagree. Phrased as "dark unless
+   explicitly light" so it mirrors the token cascade below: :root is dark, and
+   [data-theme="light"] is the only override. */
+@custom-variant dark (&:where(:not([data-theme="light"]) *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Dark is the default palette: no stored preference renders dark, never the OS. */
+  color-scheme: dark;
+
+  --background: #0a0a0a;
+  --foreground: #ededed;
 
   /* ArenaQuest design tokens */
   --aq-bg: #0B0E17;
@@ -60,15 +71,16 @@
   --breakpoint-detail: 1500px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-/* Light theme override — toggled via data-theme="light" on <html> */
+/* Light theme override — toggled via data-theme="light" on <html>, set by the
+   bootstrap script in the root layout and kept in sync by ThemeProvider.
+   The OS setting reaches this only through the "system" preference, which the
+   provider resolves to a concrete data-theme value. */
 [data-theme="light"] {
+  color-scheme: light;
+
+  --background: #ffffff;
+  --foreground: #171717;
+
   --aq-bg: #F0F2F8;
   --aq-bg2: #FFFFFF;
   --aq-bg3: #E8EBF4;

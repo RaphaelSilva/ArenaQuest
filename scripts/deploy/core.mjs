@@ -28,6 +28,7 @@ import {
   checkCoherence,
   checkPolicy,
   mapExitCode,
+  isActive,
 } from '../label.mjs';
 
 const ENVS = ['staging', 'production'];
@@ -46,8 +47,14 @@ const DEPLOY_BLOCK_ONLY_VARS = new Set(['GOOGLE_CLIENT_ID']);
 /**
  * Parse the deploy CLI arguments into a normalised shape.
  * Rules: `--label` required; `-e|--env` ∈ {staging, production}; `--scope` ∈
- * {api, web, all} (default `all`); `--yes` and `--dry-run` booleans. Throws a
- * clear Error on any invalid or missing input.
+ * {api, web, all} (default `all`); `--yes`, `--dry-run` and
+ * `--skip-secret-check` booleans. Throws a clear Error on any invalid or
+ * missing input.
+ *
+ * `--skip-secret-check` exists for ONE caller: first-time provisioning, where
+ * the externally-valued secrets legitimately do not exist yet (the provisioner
+ * reports them as follow-ups and never writes them — RFC 0012). It must not be
+ * used to push past a real gap on an already-provisioned environment.
  */
 export function parseArgs(argv) {
   let parsed;
@@ -60,6 +67,7 @@ export function parseArgs(argv) {
         scope: { type: 'string' },
         yes: { type: 'boolean' },
         'dry-run': { type: 'boolean' },
+        'skip-secret-check': { type: 'boolean' },
       },
       allowPositionals: false,
     });
@@ -91,6 +99,7 @@ export function parseArgs(argv) {
     scope,
     yes: Boolean(values.yes),
     dryRun: Boolean(values['dry-run']),
+    skipSecretCheck: Boolean(values['skip-secret-check']),
   };
 }
 
@@ -124,12 +133,19 @@ export function resolve(profile, env) {
 // ── preflight (fail closed) ───────────────────────────────────────────────────
 
 /**
- * Fail-closed preflight: presence (build + api-vars), coherence and the
- * ALLOWED_ORIGINS wildcard policy. Returns a flat results array, the mapped
- * `exitCode` (1 = hard gap) and the list of offending keys. A hard gap must
- * abort before any mutation and the caller prints `failedKeys`.
+ * Fail-closed preflight: presence (build + api-vars + api-secrets), coherence
+ * and the ALLOWED_ORIGINS wildcard policy. Returns a flat results array, the
+ * mapped `exitCode` (1 = hard gap) and the list of offending keys. A hard gap
+ * must abort before any mutation and the caller prints `failedKeys`.
+ *
+ * `opts.secretNames` keeps this function PURE while still covering
+ * `api-secrets`: listing secrets requires a cloud credential, so the provider
+ * adapter fetches the NAMES (never values) and injects them here. `null` means
+ * "could not look them up" and downgrades every secret row to `skip` — never a
+ * false pass. `opts.label` is used only to render the fix command.
  */
-export function preflight(schema, resolved, expected, env) {
+export function preflight(schema, resolved, expected, env, opts = {}) {
+  const { secretNames = null, label = '' } = opts;
   const results = [];
 
   // presence — build section (brand tokens + NEXT_PUBLIC_API_URL)
@@ -143,6 +159,31 @@ export function preflight(schema, resolved, expected, env) {
   );
   for (const key of checkPresence(apiVars, resolved)) {
     results.push({ status: 'fail', group: 'api-vars', key, detail: `missing required api var: ${key}` });
+  }
+
+  // presence — api-secrets by NAME only (values are never read, compared or
+  // logged; the sole source of truth is the cloud's own secret store).
+  for (const [key, spec] of Object.entries(schema['api-secrets'] ?? {})) {
+    if (!isActive(spec, resolved)) continue;
+    if (secretNames === null) {
+      results.push({
+        status: 'skip',
+        group: 'api-secrets',
+        key,
+        detail: `could not list secrets — ${key} unverified`,
+      });
+      continue;
+    }
+    if (secretNames.includes(key)) {
+      results.push({ status: 'pass', group: 'api-secrets', key, detail: 'set' });
+    } else {
+      results.push({
+        status: 'fail',
+        group: 'api-secrets',
+        key,
+        detail: `missing required secret: ${key} — set it with \`${PATHS.createSecrets} ${key} --env ${targetEnvName(label, env)}\``,
+      });
+    }
   }
 
   // coherence — derived anchors must match their re-derived expectation
@@ -295,14 +336,29 @@ export async function confirmProduction({ env, label, yes, promptFn, isTTY } = {
  * gap it returns `{ ok: false, preflight }` WITHOUT building a plan, so no
  * executable plan ever escapes past a hard gap. The provider adapter consumes
  * the result and decides how to print/execute.
+ *
+ * `opts.fetchSecretNames` is an optional `(label, env) => { ok, names }` hook
+ * injected by the provider adapter. Core must stay cloud-agnostic (it may not
+ * import wrangler or spawn anything), so listing secrets is a capability handed
+ * IN rather than reached for. Absent or failing → secrets go unverified (`skip`),
+ * which never blocks a deploy on its own.
  */
-export function run(argv) {
+export function run(argv, opts = {}) {
   const args = parseArgs(argv);
   const profile = loadProfile(args.label);
   const { expected, resolved, envConfig } = resolve(profile, args.env);
   const schema = loadSchema();
 
-  const pf = preflight(schema, resolved, expected, args.env);
+  let secretNames = null;
+  if (typeof opts.fetchSecretNames === 'function') {
+    const listed = opts.fetchSecretNames(args.label, args.env);
+    if (listed?.ok) secretNames = listed.names;
+  }
+
+  const pf = preflight(schema, resolved, expected, args.env, {
+    secretNames,
+    label: args.label,
+  });
   if (pf.exitCode === 1) {
     return { ok: false, args, preflight: pf, resolved, envConfig };
   }

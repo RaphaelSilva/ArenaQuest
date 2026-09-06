@@ -144,6 +144,7 @@ declare namespace Cloudflare {
 		R2_BUCKET_NAME: "budo-media-staging" | "budo-media" | "spaziord-media-staging" | "spaziord-media" | "arenaquest-media-staging" | "arenaquest-media";
 		GOOGLE_REDIRECT_URI: "https://api-budo-staging.<acct>.workers.dev/auth/google/callback" | "https://api.budo.app/auth/google/callback" | "https://api-spaziord-staging.<acct>.workers.dev/auth/google/callback" | "https://api.spaziord.app/auth/google/callback" | "https://api-staging.raphael-1d2.workers.dev/auth/google/callback" | "https://api.arenaquest.app/auth/google/callback";
 		GOOGLE_CLIENT_ID?: "<fill: Google OAuth client id (not a secret)>";
+        GOOGLE_CLIENT_SECRET: string,
 		JWT_SECRET: string;
 		ALLOWED_ORIGINS: string;
 		COOKIE_SAMESITE: string;

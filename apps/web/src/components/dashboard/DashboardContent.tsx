@@ -14,7 +14,6 @@ import { MissionsList } from './MissionsList';
 import { BadgesGrid } from './BadgesGrid';
 import { Roadmap } from './Roadmap';
 import { DashboardSkeleton } from './DashboardSkeleton';
-import { ThemeToggle } from './ThemeToggle';
 
 export function DashboardContent() {
   const dict = useDict();
@@ -69,7 +68,6 @@ export function DashboardContent() {
           >
             {now.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'short' })}
           </time>
-          <ThemeToggle />
         </div>
       </div>
 

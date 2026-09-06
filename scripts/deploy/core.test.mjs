@@ -33,12 +33,18 @@ const schema = () => loadSchema();
 // ── parseArgs: valid combinations ─────────────────────────────────────────────
 test('parseArgs returns normalised defaults (scope=all, booleans false)', () => {
   const a = parseArgs(['--label', 'acme', '-e', 'staging']);
-  assert.deepEqual(a, { label: 'acme', env: 'staging', scope: 'all', yes: false, dryRun: false });
+  assert.deepEqual(a, { label: 'acme', env: 'staging', scope: 'all', yes: false, dryRun: false, skipSecretCheck: false });
 });
 
 test('parseArgs honours --scope, --yes and --dry-run', () => {
   const a = parseArgs(['--label', 'acme', '--env', 'production', '--scope', 'api', '--yes', '--dry-run']);
-  assert.deepEqual(a, { label: 'acme', env: 'production', scope: 'api', yes: true, dryRun: true });
+  assert.deepEqual(a, { label: 'acme', env: 'production', scope: 'api', yes: true, dryRun: true, skipSecretCheck: false });
+});
+
+test('parseArgs defaults skipSecretCheck to false and honours the flag', () => {
+  assert.equal(parseArgs(['--label', 'acme', '-e', 'staging']).skipSecretCheck, false);
+  const a = parseArgs(['--label', 'acme', '-e', 'staging', '--skip-secret-check']);
+  assert.equal(a.skipSecretCheck, true);
 });
 
 test('parseArgs accepts the -e short form for --env', () => {
@@ -109,13 +115,76 @@ test('buildPlan derives the staging wranglerEnv as `<label>-staging`', () => {
   assert.equal(plan.find((s) => s.kind === 'migrate').wranglerEnv, 'acme-staging');
 });
 
+// The fixture profile uses MAIL_DRIVER=resend, so RESEND_API_KEY is actively
+// required alongside the four unconditional secrets.
+const ALL_SECRETS = [
+  'JWT_SECRET',
+  'R2_ACCESS_KEY_ID',
+  'R2_SECRET_ACCESS_KEY',
+  'GOOGLE_CLIENT_SECRET',
+  'RESEND_API_KEY',
+];
+
 // ── preflight: clean profile passes (exit 0) ──────────────────────────────────
 test('preflight passes a complete profile (exit 0) — GOOGLE_CLIENT_ID is out of scope', () => {
   const p = goodProfile();
   const { expected, resolved } = resolve(p, 'production');
-  const pf = preflight(schema(), resolved, expected, 'production');
+  const pf = preflight(schema(), resolved, expected, 'production', {
+    secretNames: ALL_SECRETS,
+    label: 'acme',
+  });
   assert.equal(pf.exitCode, 0, JSON.stringify(pf.failedKeys));
   assert.deepEqual(pf.failedKeys, []);
+});
+
+// ── preflight: api-secrets presence (by NAME only) ────────────────────────────
+test('preflight hard-gaps (exit 1) on a missing required secret and names the fix', () => {
+  const p = goodProfile();
+  const { expected, resolved } = resolve(p, 'production');
+  const present = ALL_SECRETS.filter((k) => k !== 'R2_ACCESS_KEY_ID');
+  const pf = preflight(schema(), resolved, expected, 'production', {
+    secretNames: present,
+    label: 'acme',
+  });
+  assert.equal(pf.exitCode, 1);
+  assert.ok(pf.failedKeys.includes('R2_ACCESS_KEY_ID'), 'names the offending secret');
+  const row = pf.results.find((r) => r.group === 'api-secrets' && r.key === 'R2_ACCESS_KEY_ID');
+  assert.equal(row.status, 'fail');
+  // The operator gets the exact remedy, with the production env convention.
+  assert.match(row.detail, /create-secrets\.sh R2_ACCESS_KEY_ID --env acme/);
+});
+
+test('preflight skips (never fails) api-secrets when the names cannot be listed', () => {
+  const p = goodProfile();
+  const { expected, resolved } = resolve(p, 'production');
+  const pf = preflight(schema(), resolved, expected, 'production'); // no secretNames
+  const rows = pf.results.filter((r) => r.group === 'api-secrets');
+  assert.equal(rows.length, ALL_SECRETS.length);
+  assert.ok(rows.every((r) => r.status === 'skip'), 'unverified must never be a false pass');
+  // Soft gap (2), not a hard gap — an unverifiable secret must not block a deploy.
+  assert.equal(pf.exitCode, 2);
+  assert.deepEqual(pf.failedKeys, []);
+});
+
+test('preflight leaves RESEND_API_KEY out of scope when MAIL_DRIVER is not resend', () => {
+  const p = goodProfile();
+  p.environments.production.mail.driver = 'console';
+  const { expected, resolved } = resolve(p, 'production');
+  const pf = preflight(schema(), resolved, expected, 'production', {
+    secretNames: ALL_SECRETS.filter((k) => k !== 'RESEND_API_KEY'),
+    label: 'acme',
+  });
+  const reported = pf.results.some((r) => r.group === 'api-secrets' && r.key === 'RESEND_API_KEY');
+  assert.ok(!reported, 'RESEND_API_KEY is gated on MAIL_DRIVER=resend');
+  assert.ok(!pf.failedKeys.includes('RESEND_API_KEY'));
+});
+
+test('preflight renders the staging env convention in the secret fix hint', () => {
+  const p = goodProfile();
+  const { expected, resolved } = resolve(p, 'staging');
+  const pf = preflight(schema(), resolved, expected, 'staging', { secretNames: [], label: 'acme' });
+  const row = pf.results.find((r) => r.group === 'api-secrets' && r.key === 'JWT_SECRET');
+  assert.match(row.detail, /--env acme-staging/);
 });
 
 // ── preflight: hard gap on a missing required key (names the key) ──────────────
