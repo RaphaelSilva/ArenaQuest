@@ -27,7 +27,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 
-import { run, confirmProduction } from '../deploy/core.mjs';
+import { run, parseArgs, confirmProduction } from '../deploy/core.mjs';
+import { listSecretNames } from '../label.mjs';
 import log from '../lib/log.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -140,9 +141,41 @@ function resolveCredential() {
 }
 
 async function main() {
+  // Parse once up front (pure, cheap) so we know whether this is a --dry-run
+  // before deciding to touch a credential. `run()` re-parses the same argv.
+  let preArgs;
+  try {
+    preArgs = parseArgs(process.argv.slice(2));
+  } catch (err) {
+    log.die(err.message);
+    return;
+  }
+
+  // Secret presence is verified by NAME against Cloudflare's own secret store —
+  // never from the repository, and no secret value is ever read, compared or
+  // logged. That lookup needs a credential, so:
+  //   - `--dry-run` is contractually credential-free → skip it (secrets stay
+  //     `skip`, which is not a hard gap).
+  //   - `--skip-secret-check` → first-time provisioning, where the external
+  //     secrets do not exist yet by design.
+  //   - no credential → also skip, and let step 2 below emit the existing
+  //     "no credential" error, preserving the current failure ordering.
+  let cred = null;
+  let fetchSecretNames;
+  if (!preArgs.dryRun) {
+    cred = resolveCredential();
+    if (cred) {
+      // Export the resolved credential so the wrangler spawn inside
+      // listSecretNames() sees it (it inherits process.env). The same values
+      // are merged per-command at step 4.
+      Object.assign(process.env, cred.env);
+      if (!preArgs.skipSecretCheck) fetchSecretNames = listSecretNames;
+    }
+  }
+
   let result;
   try {
-    result = run(process.argv.slice(2));
+    result = run(process.argv.slice(2), { fetchSecretNames });
   } catch (err) {
     log.die(err.message);
     return;
@@ -198,8 +231,7 @@ async function main() {
     );
   }
 
-  // 2. Resolve the Cloudflare credential by context (never prompted for).
-  const cred = resolveCredential();
+  // 2. Cloudflare credential (resolved above, never prompted for).
   if (!cred) {
     log.die('No Cloudflare credential found — run `wrangler login`, or set CF_API_TOKEN.');
   }

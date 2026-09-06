@@ -203,7 +203,7 @@ export function requiredWhenActive(condition, resolved) {
   return String(resolved[key] ?? '') === val;
 }
 
-function isActive(spec, resolved) {
+export function isActive(spec, resolved) {
   return Boolean(spec.required) || requiredWhenActive(spec.requiredWhen, resolved);
 }
 
@@ -490,7 +490,7 @@ function runWrangler(args) {
  * Secret NAMES present for an env (presence only — values never requested).
  * Returns { ok, names }. ok:false → creds/command unavailable → skip.
  */
-function listSecretNames(label, env) {
+export function listSecretNames(label, env) {
   const wEnv = wranglerEnvName(label, env);
   // `wrangler secret list` takes --format {json,pretty} — there is no --json.
   // Passing --json makes wrangler print help and exit non-zero, which silently

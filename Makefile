@@ -105,10 +105,10 @@ dev: ## Start all apps in parallel (Turborepo)
 	pnpm turbo run dev
 
 dev-api: ## Start only apps/api (Wrangler dev server, :8787)
-	pnpm --filter api dev
+	pnpm --filter api dev --ip 0.0.0.0
 
 dev-web: ## Start only apps/web (Next.js dev server, :3000)
-	pnpm --filter web dev
+	pnpm --filter web dev 
 
 dev-web-arenaquest: ## Start apps/web with the stock ArenaQuest brand, in English
 	NEXT_PUBLIC_LANGUAGE=en $(MAKE) dev-web
@@ -122,10 +122,10 @@ dev-web-srd: ## Start apps/web with the Spazio RD white-label brand
 	$(MAKE) dev-web
 
 dev-web-budo: ## Start apps/web with the Budo Taijutsu white-label brand
-	NEXT_PUBLIC_BRAND_ACCENT="#8423c5" \
-	NEXT_PUBLIC_BRAND_SIGLA="NJS" \
-	NEXT_PUBLIC_BRAND_NAME_PREFIX="Budo" \
-	NEXT_PUBLIC_BRAND_NAME_ACCENT="Taijutsu" \
+	# NEXT_PUBLIC_BRAND_ACCENT="#8423c5" \
+	NEXT_PUBLIC_BRAND_SIGLA="TB" \
+	NEXT_PUBLIC_BRAND_NAME_PREFIX="Tai" \
+	NEXT_PUBLIC_BRAND_NAME_ACCENT="Budo" \
 	NEXT_PUBLIC_BRAND_POWERED_BY="true" \
 	$(MAKE) dev-web
 

@@ -704,8 +704,14 @@ function ensureWorkerSecrets(wranglerEnv) {
 
 /**
  * Report — never write — the secrets whose values come from outside the system.
- * A missing one is a warning, not a failure: only JWT_SECRET is load-bearing at
- * container construction time.
+ * A missing one is a warning here (this is bootstrap: the values come from
+ * outside and cannot exist yet), but it is NOT harmless.
+ *
+ * JWT_SECRET is not the only load-bearing one. `buildContainer()` constructs
+ * R2StorageAdapter eagerly on every request, and its constructor throws when
+ * R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY are absent — so a Worker provisioned
+ * without them answers 500 on EVERY route, not just the media ones. Treat the
+ * warnings below as release-blocking follow-ups, not optional polish.
  */
 function reportExternalSecrets(profile, env, wranglerEnv) {
   const schema = parseJsonc(readFileSync(PATHS.schema, 'utf8'));
@@ -741,10 +747,16 @@ function reportExternalSecrets(profile, env, wranglerEnv) {
  *
  * `--yes` is safe here only because provisionEnvironment() already passed
  * confirmProduction() before reaching a production environment.
+ *
+ * `--skip-secret-check` is the bootstrap exemption: the deploy CLI hard-gaps on
+ * a missing `api-secrets` entry, but at first provisioning the externally-valued
+ * secrets legitimately do not exist yet — this run is what creates the Worker
+ * they will be attached to. reportExternalSecrets() below names every one that
+ * is still missing. Regular deploys do NOT pass this flag and do hard-gap.
  */
 function ensureWorker(label, env) {
   const argv = ['node', 'scripts/cloudflare/deploy.mjs',
-    '--label', label, '-e', env, '--scope', 'api', '--yes'];
+    '--label', label, '-e', env, '--scope', 'api', '--yes', '--skip-secret-check'];
   log.cmd(renderCommand(argv));
   const res = spawnSync(process.execPath, argv.slice(1), {
     cwd: ROOT,

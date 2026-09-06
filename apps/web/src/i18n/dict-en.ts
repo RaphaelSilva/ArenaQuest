@@ -970,6 +970,12 @@ export const dictEn = {
       signOut: 'Sign out',
       openMenu: 'Open menu',
       closeMenu: 'Close menu',
+      theme: {
+        label: 'Theme',
+        dark: 'Dark',
+        light: 'Light',
+        system: 'System',
+      },
     },
     adminSidebar: {
       title: 'Admin',

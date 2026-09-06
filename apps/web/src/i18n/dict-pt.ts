@@ -968,6 +968,12 @@ export const dictPt = {
       signOut: 'Sair',
       openMenu: 'Abrir menu',
       closeMenu: 'Fechar menu',
+      theme: {
+        label: 'Tema',
+        dark: 'Escuro',
+        light: 'Claro',
+        system: 'Sistema',
+      },
     },
     adminSidebar: {
       title: 'Admin',
