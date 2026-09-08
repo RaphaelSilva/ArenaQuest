@@ -106,6 +106,74 @@ secrets (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `GOOGLE_CLIENT_SECRET`,
 provisioning never writes them, and no secret value ever reaches argv, disk or a log
 line. See RFC 0012 and `docs/onboarding.md`.
 
+**Bulk media import (folder tree → topics):**
+```bash
+make import-media-staging SOURCE=./content DRY_RUN=1        # preview a local tree
+make import-media-staging DRIVE_FOLDER=<id|url> LIMIT=5     # import from Google Drive
+make import-media-prod    DRIVE_FOLDER=<id|url>             # production (confirms)
+```
+Both forward to `scripts/content/import-media.mjs`, which mirrors a folder tree
+into the topic hierarchy and uploads its media through the **public API** — the
+same `presign → PUT → finalize` lifecycle the backoffice uses, so no new write
+path into a deployed environment exists. A directory becomes a topic (created as
+`draft`); a file becomes media on the topic of its containing directory. Files
+sitting at the source root need `--root-topic <uuid>`. Pass exactly one source:
+`SOURCE=` for a local folder or `DRIVE_FOLDER=` for Google Drive.
+
+**`README.md` drives the topic itself.** A `README.md` inside a folder is never
+media: its markdown becomes that topic's `content` (the API sanitises it with
+`sanitizeMarkdown`), and an optional fenced block declares overrides:
+
+````
+```arenaquest
+{ "order": 9, "status": "draft", "estimatedMinutes": 90, "title": "9th Kyu" }
+```
+````
+
+A fence is used rather than `---` front-matter because a Google Doc exported to
+markdown turns a lone `---` into a horizontal rule; a missing or malformed block
+is a warning, never a failure. `order` is applied after creation through
+`POST /v1/admin/topics/{id}/move`, since `CreateTopicSchema` does not accept an
+order — that is what fixes a tree whose folder names sort against their real
+sequence. On a re-run a reused topic is `PATCH`ed only when its README actually
+drifted, and a sibling group already in place is not moved, so a no-op re-run
+performs no writes at all.
+
+**Google Drive source.** `scripts/content/drive-source.mjs` lists a folder
+recursively (following `nextPageToken`, covering Shared Drives), downloads
+binaries with `alt=media`, and exports a `README.md` stored as a *Google Doc*
+via `files/{id}/export?mimeType=text/markdown`. Auth is an OAuth refresh token
+read from `AQ_GDRIVE_CLIENT_ID` / `AQ_GDRIVE_CLIENT_SECRET` /
+`AQ_GDRIVE_REFRESH_TOKEN`; mint it once with
+`node scripts/content/drive-source.mjs --login` (loopback PKCE consent against a
+"Desktop app" client with the Drive API enabled and scope `drive.readonly`). That
+command serves the callback for a local browser *and* accepts the callback URL
+pasted back into the prompt, so it works on a headless box; `--port <n>` pins the
+loopback port for `ssh -L` forwarding.
+Note that a Drive dry run *does* need that read-only token in order to list —
+it still writes nothing and touches no ArenaQuest credential.
+
+The run is idempotent and resumable: topics reconcile on `(parentId, title)`
+against `GET /v1/admin/topics`, and files are tracked in a JSONL ledger
+(`.arenaquest/import-<label>-<env>.jsonl`, gitignored) so a re-run skips what is
+already `ready` and recovers whatever was interrupted — including deleting the
+stale `pending` row when a presigned URL expired before its PUT landed. The
+ledger keys on the file's relative path locally and on its **Drive file id**
+remotely (a Drive file can be renamed or moved), and detects a changed file
+through one `revision` token: size+mtime locally, `md5Checksum` on Drive. Topic
+creation is deliberately **sequential**: `D1TopicNodeRepository.create` derives
+`sort_order` from a non-transactional `SELECT MAX(sort_order)`, so concurrent
+siblings would collide. Uploads run concurrently (`--concurrency`, default 3).
+
+Preflight validates every file against the API's own limits *before the first
+write* (`video/mp4` ≤ 100 MB, `application/pdf` ≤ 25 MB, images ≤ 5 MB — see
+`apps/api/src/controllers/admin-media.controller.ts`, the source of truth) and
+aborts with a per-file report; `--skip-invalid` imports the rest instead.
+Credentials are read from `AQ_ADMIN_EMAIL` / `AQ_ADMIN_PASSWORD` in the
+environment only, never argv, and the account needs role `admin` or
+`content_creator`. `AQ_API_BASE_URL` overrides the target for local development
+but is rejected unless it points at loopback.
+
 Renamed targets (`db-migrations-dev` → `db-migrate-local`, `db-seed-dev` →
 `db-seed-local`, `create-db` → `create-db-prod`, ...) still work as deprecated
 aliases that print a pointer. Use the new names.
