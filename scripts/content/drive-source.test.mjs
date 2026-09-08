@@ -103,6 +103,9 @@ test('looksLikePlaceholder spots a value copied straight out of the docs', () =>
   assert.ok(looksLikePlaceholder('GOCSPX-...'));
   assert.ok(looksLikePlaceholder('1//0...'));
   assert.ok(looksLikePlaceholder('<fill after create>'));
+  // The negative cases are deliberately not credential-shaped: a literal in the
+  // Google client id or secret format trips GitHub's push protection even in a
+  // test, and the detector only ever looks for an elision marker anyway.
   assert.ok(!looksLikePlaceholder('a-secret-that-is-not-elided'));
   assert.ok(!looksLikePlaceholder('a-refresh-token-that-is-not-elided'));
 });

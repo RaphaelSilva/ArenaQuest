@@ -133,6 +133,8 @@ export function parseArgs(argv) {
         limit: { type: 'string' },
         concurrency: { type: 'string' },
         crf: { type: 'string' },
+        'unresolved-report': { type: 'string' },
+        'strict-match': { type: 'boolean' },
         force: { type: 'boolean' },
         'dry-run': { type: 'boolean' },
         yes: { type: 'boolean', short: 'y' },
@@ -162,6 +164,8 @@ export function parseArgs(argv) {
     out: values.out?.trim() || join('.arenaquest', 'converted', name),
     ledger: values.ledger?.trim() || join('.arenaquest', `convert-${name}.jsonl`),
     manifest: values.manifest?.trim() || join('.arenaquest', `converted-${name}.jsonl`),
+    unresolvedReport: values['unresolved-report']?.trim() || join('.arenaquest', `unresolved-${name}.jsonl`),
+    relaxed: !values['strict-match'],
     only: parseOnly(values.only),
     limit: positiveInt(values.limit, '--limit'),
     concurrency: positiveInt(values.concurrency, '--concurrency') ?? DEFAULT_CONCURRENCY,
@@ -230,6 +234,12 @@ function usage() {
     --ledger <path>        Resume ledger (default .arenaquest/convert-<name>.jsonl)
     --manifest <path>      JSONL of converted files + topicId
                            (default .arenaquest/converted-<name>.jsonl)
+    --unresolved-report <p> JSONL of every report entry NOT converted, with why
+                           (default .arenaquest/unresolved-<name>.jsonl)
+    --strict-match         Match names byte-for-byte only. Off by default: a
+                           backup that turned "Chūdan" into "Chudan" or an en
+                           dash into a hyphen still matches, and the plan marks
+                           every such hit as [relaxed].
     --force                Re-convert even what the ledger already has
     --dry-run              Print the plan and exit; nothing is written
     -y, --yes              Skip the "convert these N files?" confirmation
@@ -305,6 +315,31 @@ export function normalizeRelPath(relPath) {
 }
 
 /**
+ * A deliberately lossy form, used only after the exact forms have failed.
+ *
+ * A folder that reached the local disk through a backup, a sync tool or a
+ * Windows share routinely arrives ASCII-fied: `Chūdan` becomes `Chudan`, the en
+ * dash in `Ro Ryu – Taki Ryu` becomes a hyphen, and runs of spaces collapse.
+ * The bytes are the same recording, but no exact comparison can see that. This
+ * folds diacritics, maps the Unicode dashes and quotes onto their ASCII
+ * counterparts, and squeezes whitespace — enough to reunite a name with its
+ * transliteration, and nothing broader.
+ *
+ * A relaxed hit is always reported as such in the plan, and never resolves a
+ * collision: two files that only differ by an accent stay ambiguous.
+ */
+export function relaxName(name) {
+  return normalizeRelPath(name)
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/[\u2018\u2019\u201b]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Walk the reference folder and index it twice: by relative path (the precise
  * match) and by bare file name (the match the report actually asks for). A name
  * can be indexed several times — the folder legitimately holds the same file
@@ -317,7 +352,15 @@ export function normalizeRelPath(relPath) {
 export function indexSourceTree(root, { readDir = defaultReadDir } = {}) {
   const byPath = new Map();
   const byName = new Map();
+  const byRelaxedPath = new Map();
+  const byRelaxedName = new Map();
   let count = 0;
+
+  const push = (map, key, value) => {
+    const bucket = map.get(key);
+    if (bucket) bucket.push(value);
+    else map.set(key, [value]);
+  };
 
   const walk = (relDir) => {
     for (const entry of readDir(relDir === '' ? root : join(root, relDir))) {
@@ -330,15 +373,16 @@ export function indexSourceTree(root, { readDir = defaultReadDir } = {}) {
       }
       count += 1;
       byPath.set(normalizeRelPath(rel), rel);
-      const nameKey = normalizeName(entry.name);
-      const bucket = byName.get(nameKey);
-      if (bucket) bucket.push(rel);
-      else byName.set(nameKey, [rel]);
+      push(byName, normalizeName(entry.name), rel);
+      // The relaxed maps hold LISTS even for paths: two names that differ only
+      // by an accent fold onto one key, and that collision must stay visible.
+      push(byRelaxedPath, relaxName(rel), rel);
+      push(byRelaxedName, relaxName(entry.name), rel);
     }
   };
 
   walk('');
-  return { byPath, byName, count };
+  return { byPath, byName, byRelaxedPath, byRelaxedName, count };
 }
 
 function defaultReadDir(absDir) {
@@ -357,14 +401,28 @@ function defaultReadDir(absDir) {
  * sharing a name and none matching the path is reported as `ambiguous` rather
  * than guessed: converting the wrong take into a topic is worse than skipping.
  */
-export function matchRecord(record, index) {
+export function matchRecord(record, index, { relaxed = true } = {}) {
   const byPath = index.byPath.get(normalizeRelPath(record.relPath));
   if (byPath) return { state: 'matched', sourceRelPath: byPath, via: 'path' };
 
-  const candidates = index.byName.get(normalizeName(record.fileName)) ?? [];
-  if (candidates.length === 0) return { state: 'missing' };
-  if (candidates.length === 1) return { state: 'matched', sourceRelPath: candidates[0], via: 'name' };
-  return { state: 'ambiguous', candidates };
+  const byName = index.byName.get(normalizeName(record.fileName)) ?? [];
+  if (byName.length === 1) return { state: 'matched', sourceRelPath: byName[0], via: 'name' };
+  if (byName.length > 1) return { state: 'ambiguous', candidates: byName };
+
+  if (!relaxed) return { state: 'missing' };
+
+  // Nothing matched exactly. Try again against the transliterated forms, path
+  // first — it is the tier that survives a backup which stripped the macrons
+  // out of every file name in the tree.
+  const relaxedPath = index.byRelaxedPath?.get(relaxName(record.relPath)) ?? [];
+  if (relaxedPath.length === 1) return { state: 'matched', sourceRelPath: relaxedPath[0], via: 'relaxed-path' };
+  if (relaxedPath.length > 1) return { state: 'ambiguous', candidates: relaxedPath };
+
+  const relaxedName = index.byRelaxedName?.get(relaxName(record.fileName)) ?? [];
+  if (relaxedName.length === 1) return { state: 'matched', sourceRelPath: relaxedName[0], via: 'relaxed-name' };
+  if (relaxedName.length > 1) return { state: 'ambiguous', candidates: relaxedName };
+
+  return { state: 'missing' };
 }
 
 // -- planning (pure) ----------------------------------------------------------
@@ -399,7 +457,7 @@ export function isSafeRelPath(relPath) {
  * `--limit` is applied LAST, to the pending jobs only, so it means "convert N
  * more files" rather than "look at the first N lines".
  */
-export function planJobs({ records, index, outDir, sourceRoot, entries = new Map(), only = null, force = false, limit = null, stat = defaultStat }) {
+export function planJobs({ records, index, outDir, sourceRoot, entries = new Map(), only = null, force = false, limit = null, relaxed = true, stat = defaultStat }) {
   const jobs = [];
   const unsupported = [];
   const missing = [];
@@ -423,7 +481,7 @@ export function planJobs({ records, index, outDir, sourceRoot, entries = new Map
       continue;
     }
 
-    const match = matchRecord(record, index);
+    const match = matchRecord(record, index, { relaxed });
     if (match.state === 'missing') {
       missing.push({ ...record, ext });
       continue;
@@ -530,6 +588,54 @@ export function buildManifest(records) {
       topicKey: record.topicKey,
       sourceRelPath: record.sourceRelPath,
     }));
+}
+
+/**
+ * Every report entry that did NOT become a converted file, and why.
+ *
+ * This is the counterpart to the manifest: the manifest answers "what can I
+ * import now", this one answers "what is still owed". Without it the buckets
+ * only ever exist as terminal output, and a run over 233 files scrolls the
+ * answer away long before it finishes — which is exactly when the question
+ * gets asked.
+ *
+ * Each row keeps the identity and the `topicId` from the source report, so it
+ * is also a valid input for a narrower re-run once the cause is fixed.
+ */
+export function buildUnresolvedRows(plan) {
+  const rows = [];
+  const push = (items, state, describe) => {
+    for (const item of items) {
+      rows.push({
+        key: item.key,
+        relPath: item.relPath,
+        fileName: item.fileName,
+        state,
+        reason: describe(item),
+        topicId: item.topicId,
+        topicKey: item.topicKey,
+        sizeBytes: item.sizeBytes,
+        ...(item.candidates ? { candidates: item.candidates } : {}),
+      });
+    }
+  };
+
+  push(plan.missing, 'not-found', (item) => `no file named "${item.fileName}" under the source folder`);
+  push(plan.ambiguous, 'ambiguous', (item) => `${item.candidates.length} files share this name and none matches the report's path`);
+  push(plan.unsupported, 'no-converter', (item) => `no converter for "${item.ext || '(no extension)'}" — original reason: ${item.reason ?? 'unknown'}`);
+  push(plan.unsafe, 'unsafe-path', (item) => `relPath "${item.relPath}" is not a safe relative path`);
+  // An oversized conversion is unresolved too: it exists on disk but the
+  // manifest deliberately leaves it out, so it would otherwise vanish silently.
+  push(plan.oversize ?? [], 'over-limit', (item) => item.reason);
+
+  return rows;
+}
+
+/** Replace the unresolved report: it describes the CURRENT run, not a history. */
+export function writeUnresolvedReport(path, rows) {
+  mkdirSync(dirname(resolvePath(path)), { recursive: true });
+  writeFileSync(path, rows.length ? `${rows.map((row) => JSON.stringify(row)).join('\n')}\n` : '', 'utf8');
+  return rows.length;
 }
 
 /** Replace the manifest: it describes the CURRENT output tree, not a history. */
@@ -827,10 +933,14 @@ function printPlan(plan, { report, sourceRoot, outDir, ledgerPath, manifestPath 
   for (const group of groupJobsByTopic(plan.jobs)) {
     console.log(`  ${group.topicKey}  ${group.jobs.length} file(s) · topic ${shortId(group.topicId)}`);
     for (const job of group.jobs) {
+      const note =
+        job.matchedVia === 'path'
+          ? ''
+          : job.matchedVia === 'name'
+            ? `   [matched by name at ${job.sourceRelPath}]`
+            : `   [relaxed: ${job.sourceRelPath}]`;
       console.log(
-        `      ${basename(job.relPath)}  ->  ${basename(job.outRelPath)}` +
-          `   ${formatBytes(job.sourceSizeBytes)}` +
-          (job.matchedVia === 'name' ? `   [matched by name at ${job.sourceRelPath}]` : ''),
+        `      ${basename(job.relPath)}  ->  ${basename(job.outRelPath)}   ${formatBytes(job.sourceSizeBytes)}${note}`,
       );
     }
     console.log('');
@@ -929,6 +1039,7 @@ async function main() {
     only: args.only,
     force: args.force,
     limit: args.limit,
+    relaxed: args.relaxed,
   });
 
   log.info(`${report.records.length} skipped file(s) in the report · ${index.count} file(s) indexed under the source.`);
@@ -938,11 +1049,24 @@ async function main() {
   reportBucket(plan.unsupported, 'No converter for this type', (item) => `${item.ext || '(no extension)'} — ${item.reason ?? 'not in the conversion registry'}`);
   reportBucket(plan.unsafe, 'Refused — path escapes the output tree', (item) => `relPath "${item.relPath}" is not a safe relative path`);
 
+  const relaxedHits = plan.jobs.filter((job) => job.matchedVia.startsWith('relaxed'));
+  if (relaxedHits.length > 0) {
+    log.warn(`${relaxedHits.length} file(s) matched only after folding accents, dashes and spacing — marked [relaxed] below.`);
+    log.hint('Their bytes come from a source whose name is a transliteration of the report\'s. Pass --strict-match to refuse them.');
+  }
+
   if (plan.filtered.length > 0) log.warn(`${plan.filtered.length} file(s) excluded by --only.`);
   if (plan.done.length > 0) log.ok(`${plan.done.length} file(s) already converted — skipping.`);
 
   if (plan.jobs.length === 0) {
     log.warn('No file left to convert.');
+    const rows = buildUnresolvedRows(plan);
+    if (rows.length > 0) {
+      if (!args.dryRun) writeUnresolvedReport(args.unresolvedReport, rows);
+      log.hint(
+        `${rows.length} unresolved entr(ies) ${args.dryRun ? 'would be written to' : 'written to'} ${args.unresolvedReport} — every file NOT converted, and why.`,
+      );
+    }
     // Nothing converted, nothing converted before, yet files were looked for:
     // that is a wrong --source, not a finished run.
     if (plan.done.length === 0 && plan.missing.length + plan.ambiguous.length > 0) {
@@ -969,6 +1093,10 @@ async function main() {
     for (const tool of missingTools) {
       log.warn(describeMissingTool(tool));
       log.hint(`Install it with: ${tool.fix}`);
+    }
+    const unresolved = buildUnresolvedRows(plan);
+    if (unresolved.length > 0) {
+      log.hint(`${unresolved.length} unresolved entr(ies) would be written to ${args.unresolvedReport}.`);
     }
     log.ok('Dry run — nothing was written.');
     return;
@@ -1049,17 +1177,38 @@ async function main() {
   const manifestRows = buildManifest([...readLedger(args.ledger).values()]);
   writeManifest(args.manifest, manifestRows);
 
+  // Everything this run owes an answer for, in one file: what was never found,
+  // what was ambiguous, what has no converter, and what converted but is still
+  // too big to import.
+  plan.oversize = outcomes
+    .filter((record) => !record.withinLimit)
+    .map((record) => ({
+      key: record.key,
+      relPath: record.relPath,
+      fileName: basename(record.relPath),
+      topicId: record.topicId,
+      topicKey: record.topicKey,
+      sizeBytes: record.outSizeBytes,
+      reason: `converted to ${record.outRelPath} (${formatBytes(record.outSizeBytes)}) but still over the API limit`,
+    }));
+  const unresolvedRows = buildUnresolvedRows(plan);
+  writeUnresolvedReport(args.unresolvedReport, unresolvedRows);
+
   log.heading('Summary');
   const converted = outcomes.filter((record) => record.withinLimit).length;
-  const oversize = outcomes.length - converted;
   log.ok(`${converted} file(s) converted and within the API limits.`);
-  if (oversize > 0) log.warn(`${oversize} file(s) converted but still over the limit.`);
-  if (plan.missing.length + plan.ambiguous.length > 0) {
-    log.warn(`${plan.missing.length + plan.ambiguous.length} file(s) could not be located in the source folder.`);
-  }
+  if (plan.oversize.length > 0) log.warn(`${plan.oversize.length} file(s) converted but still over the limit.`);
+  // Counted apart on purpose: "not found" points at the wrong source folder,
+  // "ambiguous" points at a source folder that does not mirror the tree. They
+  // are different problems with different fixes.
+  if (plan.missing.length > 0) log.warn(`${plan.missing.length} file(s) not found in the source folder.`);
+  if (plan.ambiguous.length > 0) log.warn(`${plan.ambiguous.length} file(s) matched several source files and were skipped.`);
   if (plan.unsupported.length > 0) log.warn(`${plan.unsupported.length} file(s) have no converter.`);
-  log.hint(`Manifest: ${args.manifest} (${manifestRows.length} row(s), each with its topicId)`);
-  log.hint(`Ledger:   ${args.ledger}`);
+  log.hint(`Manifest:   ${args.manifest} (${manifestRows.length} row(s), each with its topicId)`);
+  if (unresolvedRows.length > 0) {
+    log.hint(`Unresolved: ${args.unresolvedReport} (${unresolvedRows.length} row(s) — every file NOT converted, and why)`);
+  }
+  log.hint(`Ledger:     ${args.ledger}`);
 
   if (failures.length > 0) {
     log.heading('Failures');

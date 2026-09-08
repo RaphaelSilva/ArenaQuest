@@ -17,6 +17,7 @@ import {
   CONVERTERS,
   appendLedger,
   buildManifest,
+  buildUnresolvedRows,
   canRemux,
   confirmConversion,
   convertDocument,
@@ -37,6 +38,7 @@ import {
   parseOnly,
   parseProbe,
   planJobs,
+  relaxName,
   readLedger,
   readReport,
   reportName,
@@ -44,6 +46,7 @@ import {
   sofficeArgs,
   videoAttempts,
   writeManifest,
+  writeUnresolvedReport,
 } from './convert-skipped.mjs';
 
 function tempDir() {
@@ -609,4 +612,134 @@ test('the manifest rows carry exactly what the importer needs to upload', async 
   assert.equal(plan.files[0].topicId, 'c77c375e-3287-4e79-b3bd-6e04ccc8727f');
   assert.equal(plan.files[0].key, 'drive-1', 'the original source identity survives the round trip');
   rmSync(dir, { recursive: true, force: true });
+});
+
+// -- relaxed matching ---------------------------------------------------------
+
+test('relaxName folds exactly what a backup mangles, and nothing else', () => {
+  // Macrons stripped by an ASCII-fying copy.
+  assert.equal(relaxName('Chūdan Kangi.MOV'), relaxName('Chudan Kangi.mov'));
+  assert.equal(relaxName('Jō Jutsu/Roppō.MOV'), relaxName('Jo Jutsu/Roppo.MOV'));
+  // En dash rewritten as a hyphen.
+  assert.equal(relaxName('Ro Ryu \u2013 Taki Ryu.MOV'), relaxName('Ro Ryu - Taki Ryu.MOV'));
+  // Runs of spaces collapsed.
+  assert.equal(relaxName('Hito Tsukiai   (1).MOV'), relaxName('Hito Tsukiai (1).MOV'));
+  // Curly quotes normalised.
+  assert.equal(relaxName('Ken\u2019s.MOV'), relaxName("Ken's.MOV"));
+  // Genuinely different names must NOT fold together.
+  assert.notEqual(relaxName('Ichimonji.MOV'), relaxName('Ichimonjo.MOV'));
+  assert.notEqual(relaxName('Kangi (1).MOV'), relaxName('Kangi (2).MOV'));
+});
+
+test('matchRecord falls back to the relaxed tier only after both exact tiers miss', () => {
+  const readDir = (dir) => {
+    if (dir === '/root') return [{ name: 'Shoden', isDirectory: true }];
+    return [
+      { name: 'Chudan Kangi  (1).MOV', isDirectory: false },
+      { name: 'Ichimonji.MOV', isDirectory: false },
+    ];
+  };
+  const index = indexSourceTree('/root', { readDir });
+
+  // Exact path still wins and is still labelled 'path'.
+  assert.deepEqual(matchRecord(reportRow({ relPath: 'Shoden/Ichimonji.MOV', fileName: 'Ichimonji.MOV' }), index), {
+    state: 'matched',
+    sourceRelPath: 'Shoden/Ichimonji.MOV',
+    via: 'path',
+  });
+
+  const accented = reportRow({ relPath: 'Shoden/Chūdan Kangi  (1).MOV', fileName: 'Chūdan Kangi  (1).MOV' });
+  assert.deepEqual(matchRecord(accented, index), {
+    state: 'matched',
+    sourceRelPath: 'Shoden/Chudan Kangi  (1).MOV',
+    via: 'relaxed-path',
+  });
+  // ...and --strict-match refuses it outright.
+  assert.equal(matchRecord(accented, index, { relaxed: false }).state, 'missing');
+});
+
+test('an exact name match beats the relaxed tier', () => {
+  const readDir = (dir) => {
+    if (dir === '/root') return [{ name: 'A', isDirectory: true }, { name: 'B', isDirectory: true }];
+    // A/ holds the transliteration, B/ holds the exact name.
+    return [{ name: dir.endsWith('A') ? 'Chudan Kangi.MOV' : 'Chūdan Kangi.MOV', isDirectory: false }];
+  };
+  const index = indexSourceTree('/root', { readDir });
+  assert.deepEqual(matchRecord(reportRow({ relPath: 'C/Chūdan Kangi.MOV', fileName: 'Chūdan Kangi.MOV' }), index), {
+    state: 'matched',
+    sourceRelPath: 'B/Chūdan Kangi.MOV',
+    via: 'name',
+  });
+});
+
+test('the relaxed tier never resolves a collision', () => {
+  const readDir = (dir) => {
+    if (dir === '/root') return [{ name: 'A', isDirectory: true }, { name: 'B', isDirectory: true }];
+    // Neither matches the report's name exactly, and both fold onto it.
+    return [{ name: dir.endsWith('A') ? 'Chudan Kangi.MOV' : 'Chudan  Kangi.MOV', isDirectory: false }];
+  };
+  const index = indexSourceTree('/root', { readDir });
+  const match = matchRecord(reportRow({ relPath: 'C/Chūdan Kangi.MOV', fileName: 'Chūdan Kangi.MOV' }), index);
+  assert.equal(match.state, 'ambiguous', 'a lossy tier must never pick between two candidates');
+  assert.deepEqual(match.candidates.sort(), ['A/Chudan Kangi.MOV', 'B/Chudan  Kangi.MOV']);
+});
+
+test('planJobs records how each job was matched', () => {
+  const readDir = (dir) => (dir === '/root' ? [{ name: 'Chudan.MOV', isDirectory: false }] : []);
+  const index = indexSourceTree('/root', { readDir });
+  const plan = planJobs({
+    records: [reportRow({ relPath: 'Chūdan.MOV', fileName: 'Chūdan.MOV' })],
+    index,
+    outDir: '/out',
+    sourceRoot: '/src',
+    stat: () => ({ size: 1, mtimeMs: 1 }),
+  });
+  assert.equal(plan.jobs[0].matchedVia, 'relaxed-path');
+  // The OUTPUT keeps the report's spelling: the topic tree uses the canonical
+  // name, not the backup's transliteration.
+  assert.equal(plan.jobs[0].outRelPath, 'Chūdan.mp4');
+  assert.equal(plan.jobs[0].sourceRelPath, 'Chudan.MOV');
+});
+
+// -- unresolved report --------------------------------------------------------
+
+test('buildUnresolvedRows accounts for every bucket with its own state', () => {
+  const rows = buildUnresolvedRows({
+    jobs: [],
+    missing: [{ key: 'a', relPath: 'a.MOV', fileName: 'a.MOV', topicId: 't-1', topicKey: 'X', sizeBytes: 1 }],
+    ambiguous: [{ key: 'b', relPath: 'b.MOV', fileName: 'b.MOV', topicId: 't-2', topicKey: 'X', sizeBytes: 2, candidates: ['p/b.MOV', 'q/b.MOV'] }],
+    unsupported: [{ key: 'c', relPath: 'c.jpg', fileName: 'c.jpg', ext: '.jpg', reason: '5.1 MB exceeds the API limit', topicId: 't-3', topicKey: 'X', sizeBytes: 3 }],
+    unsafe: [{ key: 'd', relPath: '../d.MOV', fileName: 'd.MOV', topicId: 't-4', topicKey: null, sizeBytes: 4 }],
+    oversize: [{ key: 'e', relPath: 'e.MOV', fileName: 'e.MOV', topicId: 't-5', topicKey: 'X', sizeBytes: 5, reason: 'still over the API limit' }],
+  });
+
+  assert.deepEqual(rows.map((row) => row.state), ['not-found', 'ambiguous', 'no-converter', 'unsafe-path', 'over-limit']);
+  // The topicId survives, so a fixed re-run still knows where each file goes.
+  assert.deepEqual(rows.map((row) => row.topicId), ['t-1', 't-2', 't-3', 't-4', 't-5']);
+  assert.deepEqual(rows[1].candidates, ['p/b.MOV', 'q/b.MOV']);
+  assert.match(rows[2].reason, /5\.1 MB exceeds/);
+  assert.equal(rows[0].candidates, undefined, 'only ambiguity carries candidates');
+});
+
+test('buildUnresolvedRows is empty when a run resolves everything', () => {
+  assert.deepEqual(
+    buildUnresolvedRows({ jobs: [], missing: [], ambiguous: [], unsupported: [], unsafe: [] }),
+    [],
+  );
+});
+
+test('writeUnresolvedReport replaces the file so it describes only the current run', () => {
+  const dir = tempDir();
+  const path = join(dir, 'nested', 'unresolved.jsonl');
+  writeUnresolvedReport(path, [{ key: 'a' }, { key: 'b' }]);
+  assert.equal(writeUnresolvedReport(path, [{ key: 'c' }]), 1);
+  assert.equal(readFileSync(path, 'utf8'), '{"key":"c"}\n');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('parseArgs derives the unresolved report path and defaults to relaxed matching', () => {
+  const args = parseArgs(['-r', '.arenaquest/skipped-budo-production.jsonl', '-s', './content']);
+  assert.equal(args.unresolvedReport, join('.arenaquest', 'unresolved-budo-production.jsonl'));
+  assert.equal(args.relaxed, true);
+  assert.equal(parseArgs(['-r', 'r.jsonl', '-s', 's', '--strict-match']).relaxed, false);
 });

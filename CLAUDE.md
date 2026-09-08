@@ -188,6 +188,16 @@ from Drive in NFC while macOS stores `Chūdan`/`Jō` decomposed; without it ever
 accented name would miss. A name that appears twice with no path match is
 reported as ambiguous rather than guessed.
 
+When both exact tiers miss, a third **relaxed** tier retries against a
+transliterated form: diacritics folded, Unicode dashes and quotes mapped to
+ASCII, whitespace runs squeezed. A folder that reached the local disk through a
+backup or a Windows share routinely arrives ASCII-fied — `Chūdan` as `Chudan`,
+`Ro Ryu – Taki` as `Ro Ryu - Taki` — and the bytes are still the same recording.
+A relaxed hit is marked `[relaxed: <path>]` in the printed plan and **never**
+resolves a collision; `--strict-match` turns the tier off. The converted file
+keeps the *report's* spelling, so the media name matches the topic tree rather
+than the backup.
+
 `.mov` is **remuxed** (`-c copy`) when it already holds H.264/AAC and
 transcoded otherwise (H.264 · `yuv420p` · AAC · `+faststart`); if the result
 misses the 100 MB limit, a bounded ladder retries at a higher CRF and then at
@@ -204,6 +214,17 @@ the *wrong* files, and noticing that after two hours of transcoding costs the
 whole run. Output mirrors the report's tree under `--out`, conversions land on a
 `.part` file renamed into place, and a JSONL ledger makes a re-run skip what is
 already done.
+
+**Two reports come out of a run, and together they account for every line of the
+input.** The manifest (below) says what can be imported now;
+`.arenaquest/unresolved-<name>.jsonl` says what is still owed and why — one row
+per entry that did not become a converted file, keyed by `state`: `not-found`,
+`ambiguous` (with its `candidates`), `no-converter`, `unsafe-path`, and
+`over-limit` for a file that converted but still exceeds the API. Each row keeps
+its `topicId`, so it is a valid input for a narrower re-run once the cause is
+fixed. The counts are reported separately in the summary because they have
+different fixes: `not-found` points at the wrong `--source`, `ambiguous` at a
+`--source` that does not mirror the tree.
 
 **The converter's manifest is an importer input.** Alongside the ledger it
 writes `.arenaquest/converted-<name>.jsonl`, one row per converted file carrying

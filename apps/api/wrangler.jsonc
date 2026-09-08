@@ -148,7 +148,7 @@
 				"R2_PUBLIC_BASE": "",
 				"R2_BUCKET_NAME": "budo-media",
 				"MAIL_DRIVER": "resend",
-				"MAIL_FROM": "Budo <noreply@budo.app>",
+				"MAIL_FROM": "Budo <noreply@taibudo.com>",
 				"WEB_BASE_URL": "https://taibudo.com",
 				// GOOGLE_CLIENT_ID is not a secret — it travels in the authorization URL and
 				// is visible in the browser. Keeping it here (instead of the dashboard) means
