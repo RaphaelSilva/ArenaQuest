@@ -86,3 +86,7 @@ temp/
 docs/product/**/planing/
 docs/product/**/.executor-logs/
 docs/product/**/closeout-analysis.md
+
+# ── Operational script state ───────────────────────────────────────────────────
+# Bulk media import resume ledger (scripts/content/import-media.mjs)
+.arenaquest/

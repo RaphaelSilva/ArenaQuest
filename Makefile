@@ -25,13 +25,14 @@
         dev dev-api dev-web dev-web-arenaquest dev-web-srd dev-web-budo \
         build build-api build-web \
         lint lint-api lint-web lint-shared \
-        test test-api test-web test-scripts \
+        test test-api test-web test-scripts convert-skipped \
         db-migrate-local db-seed-local db-reset-local \
         db-migrate-staging db-migrate-prod db-migrations-staging-local \
         bootstrap-admin cf-typegen \
         deploy deploy-api deploy-web \
         deploy-staging deploy-api-staging deploy-web-staging \
         deploy-prod deploy-api-prod deploy-web-prod \
+        drive-login import-media-staging import-media-prod \
         r2-cors-staging r2-cors-prod \
         create-db-staging create-db-prod create-kv-staging create-kv-prod \
         list-kv-staging list-kv-prod cf-info-staging cf-info-prod \
@@ -159,7 +160,10 @@ test: test-scripts ## Run all tests
 test-scripts: ## Run the operational script unit tests (node:test — no network, no wrangler)
 	node --test scripts/label.test.mjs \
 		scripts/deploy/core.test.mjs \
-		scripts/cloudflare/provision-label.test.mjs
+		scripts/cloudflare/provision-label.test.mjs \
+		scripts/content/import-media.test.mjs \
+		scripts/content/drive-source.test.mjs \
+		scripts/media/convert-skipped.test.mjs
 
 test-api: ## Run apps/api tests (Vitest + Cloudflare Workers pool)
 	pnpm turbo test --filter api
@@ -192,6 +196,28 @@ cf-typegen: ## Regenerate Cloudflare Worker binding types (wrangler types)
 	pnpm --filter api cf-typegen
 
 # ==============================================================================
+##@ 📥 LOCAL — content import (Google Drive consent)
+# ==============================================================================
+drive-login: ## Mint the Google Drive refresh token for the importer (CLIENT_ID=..., PORT=n to pin the loopback port)
+	node scripts/content/drive-source.mjs --login \
+		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
+		$(if $(PORT),--port $(PORT),)
+
+convert-skipped: ## Convert the files an import skipped, locally (REPORT=path SOURCE=folder; ONLY=mov, OUT=dir, LIMIT=n, CRF=n, DRY_RUN=1, FORCE=1, CONFIRM=1)
+	@test -n "$(REPORT)" || { printf "$(RED)  ✖  REPORT is required — e.g. make convert-skipped REPORT=.arenaquest/skipped-budo-production.jsonl SOURCE=./content$(RESET)\n"; exit 1; }
+	@test -n "$(SOURCE)" || { printf "$(RED)  ✖  SOURCE is required — the folder holding the original files$(RESET)\n"; exit 1; }
+	node scripts/media/convert-skipped.mjs --report $(REPORT) --source $(SOURCE) \
+		$(if $(OUT),--out $(OUT),) \
+		$(if $(ONLY),--only $(ONLY),) \
+		$(if $(LIMIT),--limit $(LIMIT),) \
+		$(if $(CONCURRENCY),--concurrency $(CONCURRENCY),) \
+		$(if $(CRF),--crf $(CRF),) \
+		$(if $(MANIFEST),--manifest $(MANIFEST),) \
+		$(if $(filter 1,$(FORCE)),--force,) \
+		$(if $(filter 1,$(CONFIRM)),--yes,) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+# ==============================================================================
 ##@ 🟡 STAGING — remote (requires wrangler login)
 # ==============================================================================
 deploy-staging: ## Deploy BOTH apps to staging (forwards to the deploy CLI)
@@ -208,6 +234,19 @@ db-migrate-staging: ## Apply D1 migrations to the REMOTE staging database
 
 r2-cors-staging: ## Apply the profile-derived CORS rules to the staging bucket
 	node scripts/cloudflare/provision-label.mjs $(DEPLOY_LABEL) --only cors
+
+import-media-staging: ## Import a media tree into staging (LABEL=x, SOURCE=path | DRIVE_FOLDER=id; MANIFEST=path, DRY_RUN=1, LIMIT=n, SKIP_INVALID=1, ROOT_TOPIC=uuid, SKIPPED_REPORT=path)
+	@test -n "$(SOURCE)$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  SOURCE or DRIVE_FOLDER is required — e.g. make import-media-staging SOURCE=./content$(RESET)\n"; exit 1; }
+	@test -z "$(SOURCE)" -o -z "$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  Pass SOURCE or DRIVE_FOLDER, not both$(RESET)\n"; exit 1; }
+	node scripts/content/import-media.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e staging \
+		$(if $(SOURCE),--source $(SOURCE),) \
+		$(if $(DRIVE_FOLDER),--drive-folder $(DRIVE_FOLDER),) \
+		$(if $(MANIFEST),--manifest $(MANIFEST),) \
+		$(if $(ROOT_TOPIC),--root-topic $(ROOT_TOPIC),) \
+		$(if $(SKIPPED_REPORT),--skipped-report $(SKIPPED_REPORT),) \
+		$(if $(LIMIT),--limit $(LIMIT),) \
+		$(if $(filter 1,$(SKIP_INVALID)),--skip-invalid,) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
 list-kv-staging: ## List staging KV namespaces
 	pnpm --filter api exec wrangler kv namespace list --env staging
@@ -236,6 +275,19 @@ db-migrate-prod: confirm-prod ## Apply D1 migrations to the REMOTE production da
 
 r2-cors-prod: confirm-prod ## Apply the profile-derived CORS rules to the production bucket
 	node scripts/cloudflare/provision-label.mjs $(DEPLOY_LABEL) --production --only cors --yes
+
+import-media-prod: ## Import a media tree into production (LABEL=x, SOURCE=path | DRIVE_FOLDER=id; MANIFEST=path; CLI confirms; LIMIT=n, SKIP_INVALID=1, ROOT_TOPIC=uuid, SKIPPED_REPORT=path)
+	@test -n "$(SOURCE)$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  SOURCE or DRIVE_FOLDER is required — e.g. make import-media-prod SOURCE=./content$(RESET)\n"; exit 1; }
+	@test -z "$(SOURCE)" -o -z "$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  Pass SOURCE or DRIVE_FOLDER, not both$(RESET)\n"; exit 1; }
+	node scripts/content/import-media.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e production \
+		$(if $(SOURCE),--source $(SOURCE),) \
+		$(if $(DRIVE_FOLDER),--drive-folder $(DRIVE_FOLDER),) \
+		$(if $(MANIFEST),--manifest $(MANIFEST),) \
+		$(if $(ROOT_TOPIC),--root-topic $(ROOT_TOPIC),) \
+		$(if $(LIMIT),--limit $(LIMIT),) \
+		$(if $(filter 1,$(SKIP_INVALID)),--skip-invalid,) \
+		$(if $(filter 1,$(CONFIRM)),--yes,) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
 list-kv-prod: ## List production KV namespaces (read-only — no confirmation)
 	pnpm --filter api exec wrangler kv namespace list

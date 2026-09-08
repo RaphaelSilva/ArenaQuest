@@ -38,5 +38,4 @@
       "cookieSameSite": "Strict",
       "mail": { "driver": "resend", "from": "Budo <noreply@budo.app>" }
     }
-  }
-}
+  } }

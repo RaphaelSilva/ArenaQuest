@@ -243,6 +243,164 @@ it whenever `apiHost` changes, or login fails *silently*), setting
 adding and delegating the DNS zone, and attaching the Pages custom domain for
 `webOrigin` (a separate API from Worker routes).
 
+### Bulk-importing content
+
+Seeding the first full catalogue by hand means driving the media uploader once
+per file. `scripts/content/import-media.mjs` (wrapped by `make
+import-media-staging` / `make import-media-prod`) does the same thing from a
+folder tree — local or Google Drive — through the same public API the backoffice
+calls.
+
+```bash
+export AQ_ADMIN_EMAIL=admin@arenaquest.app
+read -rs AQ_ADMIN_PASSWORD; export AQ_ADMIN_PASSWORD   # never on the command line
+
+make import-media-staging SOURCE=./content DRY_RUN=1   # preview, no credential read
+make import-media-staging SOURCE=./content             # import into staging
+make import-media-prod    SOURCE=./content LIMIT=5     # smoke-test production first
+make import-media-prod    SOURCE=./content             # then the rest
+```
+
+Pass `DRIVE_FOLDER=<id|url>` instead of `SOURCE=` to read straight from Google
+Drive (setup below) — exactly one of the two.
+
+The mapping is positional, so the folder tree *is* the topic tree:
+
+```
+content/
+  01 - Fundamentos/          -> topic "Fundamentos"      (draft)
+    01 - Introducao.mp4      -> media on "Fundamentos"
+    02_Postura.mp4           -> media on "Fundamentos"
+    01-basico/               -> topic "basico" under "Fundamentos"
+      tecnica-inicial.mp4    -> media on "basico"
+  02 - Defesa/               -> topic "Defesa"           (draft)
+```
+
+A `NN -` / `NN_` / `NN.` prefix sets the order and is stripped from the title; a
+punctuation separator is required, so "2024 Retrospectiva" keeps its number.
+Topics are created as **drafts** — nothing reaches students until you publish
+them from the backoffice.
+
+Things worth knowing before a production run:
+
+- **Preflight is local and total.** Every file is checked against the API's own
+  limits (`video/mp4` ≤ 100 MB, `application/pdf` ≤ 25 MB, images ≤ 5 MB) before
+  the first write, and the run aborts with a per-file report rather than failing
+  on a 422 halfway through. `--skip-invalid` imports everything else instead.
+  `.mov`, `.mkv` and `.webm` are **not** accepted by the API — convert first.
+- **Re-running is safe and is the recovery path.** Topics reconcile on
+  `(parentId, title)`, and files are tracked in `.arenaquest/import-<label>-<env>.jsonl`.
+  A killed run resumes: finished files are skipped, a file whose bytes reached R2
+  only needs its `finalize`, and one whose presigned URL expired has its stale
+  `pending` row deleted before being redone. Delete the ledger only if you want
+  the whole tree re-uploaded.
+- **`--limit N` is the production smoke test.** Import a handful, check the
+  backoffice, then re-run without it — the ledger continues instead of
+  duplicating. Note that `--limit` bounds *files*; every topic is still created
+  on the first run, so ordering is correct from the start.
+- **Credentials come from the environment only.** `AQ_ADMIN_EMAIL` /
+  `AQ_ADMIN_PASSWORD`, never argv, on an account holding `admin` or
+  `content_creator` in *that* environment. Access tokens live 15 minutes; the
+  script re-logins on its own, and the login rate limiter only counts failures.
+- **Local testing.** `AQ_API_BASE_URL` retargets the importer at `make dev-api`,
+  and is rejected unless it points at loopback — an ambient variable must never
+  be able to redirect a staging or production import.
+
+#### `README.md` describes the topic
+
+A `README.md` inside a folder is never uploaded as media. Its markdown becomes
+that topic's body, and an optional fenced block declares overrides:
+
+````markdown
+```arenaquest
+{ "order": 9, "status": "draft", "estimatedMinutes": 90, "title": "9th Kyu" }
+```
+
+# 9th Kyu
+
+Instructions the students will read…
+````
+
+Every field is optional and a malformed block is a warning, not a failure — the
+prose still imports. A fenced block is used rather than `---` front-matter
+because a Google Doc exported to markdown turns a lone `---` into a rule.
+
+`order` is what fixes a tree whose folder names sort against their real
+sequence — `9th Kyu` … `1st Kyu` → `Shodan` is ascending skill but descending
+alphabet. It is applied after creation via `POST /v1/admin/topics/{id}/move`,
+because the create endpoint does not accept an order.
+
+Re-runs keep Drive as the source of truth without churning: a reused topic is
+`PATCH`ed only when its README actually changed, and a sibling group already in
+the declared order is not moved. A no-op re-run therefore performs no writes.
+
+#### Reading from Google Drive
+
+One-time setup, then it is just another source:
+
+1. In the Google Cloud console, **enable the Google Drive API** and create an
+   OAuth client of type **Desktop app**.
+2. Export its id and secret, then mint a refresh token:
+
+```bash
+export AQ_GDRIVE_CLIENT_ID=...apps.googleusercontent.com
+export AQ_GDRIVE_CLIENT_SECRET=...
+node scripts/content/drive-source.mjs --login
+```
+
+   It prints a consent URL and waits. **Where your browser runs decides how the
+   code comes back:**
+
+   - *Browser on the same machine* — open the URL, approve, and the loopback
+     callback is caught automatically. Nothing else to do.
+   - *Browser elsewhere (the usual case over SSH)* — the redirect to
+     `http://127.0.0.1:<port>/callback` lands on **your laptop's** loopback and
+     shows a connection error. That is expected: the address bar still holds
+     `?code=…`. Copy the whole URL and paste it into the prompt.
+   - *Or forward the port* and let the automatic path work:
+
+     ```bash
+     ssh -L 5555:localhost:5555 you@server
+     node scripts/content/drive-source.mjs --login --port 5555
+     ```
+
+   Either way it prints the refresh token **once**. Store it in your password
+   manager; it is never written to disk and the importer never logs it.
+
+   Google retired the out-of-band (`urn:ietf:wg:oauth:2.0:oob`) flow in 2022, so
+   pasting the callback URL is the supported way to complete consent on a
+   machine with no browser.
+
+3. `export AQ_GDRIVE_REFRESH_TOKEN=...`, then run the import with
+   `DRIVE_FOLDER=`.
+
+The scope requested is `drive.readonly` — the importer can never modify your
+Drive. Shared Drives are covered (`supportsAllDrives`), listing follows
+pagination to the end, and a `README.md` stored as a *Google Doc* (which is what
+Drive creates when you upload or author one) is fetched through the markdown
+export endpoint rather than a raw download.
+
+Two things behave differently from a local import:
+
+- **A Drive dry run needs the Drive token**, because listing the folder is an
+  authenticated call. It still writes nothing and never reads an ArenaQuest
+  credential. A local dry run remains completely credential-free.
+- **The ledger keys on the Drive file id**, not a path, so renaming or moving a
+  file in Drive does not cause a re-upload. A changed file is detected by
+  `md5Checksum`.
+
+Native Google files that are *not* the README (a `.docx` exam, a Sheet) cannot
+be uploaded as media and are reported with the fix: export them to PDF in Drive
+first.
+
+One known cosmetic gap, unrelated to the importer: the per-topic media counters
+in the backoffice read 0 after an import, because `fetchMediaCount` in
+`apps/api/src/adapters/db/d1-topic-node-repository.ts` buckets on `'video'` /
+`'pdf'` while the column stores full MIME strings (`'video/mp4'`). The media
+itself is correct.
+
+---
+
 ---
 
 ## 5. Troubleshooting

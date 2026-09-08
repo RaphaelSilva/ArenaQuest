@@ -95,3 +95,63 @@ After configuration, test the full flow:
 If the redirect URI in the request doesn't match the Console configuration, Google
 returns `redirect_uri_mismatch` — double-check both the `GOOGLE_REDIRECT_URI` binding
 and the Console's Authorised Redirect URI list.
+
+---
+
+## Drive access for the content importer (separate client)
+
+The sign-in client above is deliberately **not** reused by
+`scripts/content/import-media.mjs`. It requests `openid email profile` with no
+`access_type=offline`, so it never receives a refresh token and holds no Drive
+scope. Bulk content import needs its own credential:
+
+| | Sign-in client | Importer client |
+|---|---|---|
+| Type | Web application | **Desktop app** |
+| Scopes | `openid email profile` | `https://www.googleapis.com/auth/drive.readonly` |
+| Grant | authorization code (per user) | refresh token (long-lived, one operator) |
+| Redirect | `https://<apiHost>/auth/google/callback` | `http://127.0.0.1:<port>/callback` |
+| Env vars | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | `AQ_GDRIVE_CLIENT_ID` / `AQ_GDRIVE_CLIENT_SECRET` / `AQ_GDRIVE_REFRESH_TOKEN` |
+| Lives in | Worker vars + secret | the operator's shell, never in the repo |
+
+Setup:
+
+1. Enable the **Google Drive API** on the project (the sign-in flow needs no
+   extra APIs, so it is probably still off). Skipping this still lets `--login`
+   succeed, but the first listing fails with `403 accessNotConfigured`.
+2. Configure the **OAuth consent screen** (shown as *Google Auth Platform* in
+   newer consoles): user type **External** for a personal Google account, app
+   name, support email, developer contact. The scope does not need declaring —
+   the script requests `drive.readonly` at runtime. Add the content owner as a
+   test user.
+3. **Publish the app.** This is the trap: an External consent screen left in
+   **Testing** issues refresh tokens that **expire after 7 days**, so a long
+   import campaign would need a fresh `--login` every week. `Publishing status →
+   PUBLISH APP` removes that expiry.
+
+   The app stays *unverified*, so consent shows the "Google hasn't verified this
+   app" interstitial — proceed through *Advanced → Go to … (unsafe)*.
+   `drive.readonly` is a restricted scope, and an unverified app serves up to 100
+   users, which is ample for an operator importing their own content.
+4. Create an OAuth client of type **Desktop app**. A desktop client accepts any
+   loopback port, so there is no redirect URI to register.
+5. Mint the refresh token once:
+
+```bash
+export AQ_GDRIVE_CLIENT_ID=...apps.googleusercontent.com
+export AQ_GDRIVE_CLIENT_SECRET=...
+node scripts/content/drive-source.mjs --login
+```
+
+`--login` prints the consent URL and then takes the result either way: it serves
+the loopback callback for a browser on the same machine, and it also accepts the
+callback URL pasted back into the prompt for a headless box. `--port <n>` pins
+the loopback port when you would rather forward it
+(`ssh -L 5555:localhost:5555 you@server`). The out-of-band flow Google retired in
+2022 is not used and is not needed.
+
+The token is printed once to stdout — handing it over is that command's entire
+purpose. It is never written to disk, and the importer itself never logs it.
+Revoke it at <https://myaccount.google.com/permissions> if it leaks.
+
+See `docs/onboarding.md` for the import runbook.

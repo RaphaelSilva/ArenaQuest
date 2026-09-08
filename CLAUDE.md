@@ -106,6 +106,146 @@ secrets (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `GOOGLE_CLIENT_SECRET`,
 provisioning never writes them, and no secret value ever reaches argv, disk or a log
 line. See RFC 0012 and `docs/onboarding.md`.
 
+**Bulk media import (folder tree → topics):**
+```bash
+make import-media-staging SOURCE=./content DRY_RUN=1        # preview a local tree
+make import-media-staging DRIVE_FOLDER=<id|url> LIMIT=5     # import from Google Drive
+make import-media-prod    DRIVE_FOLDER=<id|url>             # production (confirms)
+```
+Both forward to `scripts/content/import-media.mjs`, which mirrors a folder tree
+into the topic hierarchy and uploads its media through the **public API** — the
+same `presign → PUT → finalize` lifecycle the backoffice uses, so no new write
+path into a deployed environment exists. A directory becomes a topic (created as
+`draft`); a file becomes media on the topic of its containing directory. Files
+sitting at the source root need `--root-topic <uuid>`. Pass exactly one source:
+`SOURCE=` for a local folder or `DRIVE_FOLDER=` for Google Drive.
+
+**`README.md` drives the topic itself.** A `README.md` inside a folder is never
+media: its markdown becomes that topic's `content` (the API sanitises it with
+`sanitizeMarkdown`), and an optional fenced block declares overrides:
+
+````
+```arenaquest
+{ "order": 9, "status": "draft", "estimatedMinutes": 90, "title": "9th Kyu" }
+```
+````
+
+A fence is used rather than `---` front-matter because a Google Doc exported to
+markdown turns a lone `---` into a horizontal rule; a missing or malformed block
+is a warning, never a failure. `order` is applied after creation through
+`POST /v1/admin/topics/{id}/move`, since `CreateTopicSchema` does not accept an
+order — that is what fixes a tree whose folder names sort against their real
+sequence. On a re-run a reused topic is `PATCH`ed only when its README actually
+drifted, and a sibling group already in place is not moved, so a no-op re-run
+performs no writes at all.
+
+**Google Drive source.** `scripts/content/drive-source.mjs` lists a folder
+recursively (following `nextPageToken`, covering Shared Drives), downloads
+binaries with `alt=media`, and exports a `README.md` stored as a *Google Doc*
+via `files/{id}/export?mimeType=text/markdown`. Auth is an OAuth refresh token
+read from `AQ_GDRIVE_CLIENT_ID` / `AQ_GDRIVE_CLIENT_SECRET` /
+`AQ_GDRIVE_REFRESH_TOKEN`; mint it once with
+`node scripts/content/drive-source.mjs --login` (loopback PKCE consent against a
+"Desktop app" client with the Drive API enabled and scope `drive.readonly`). That
+command serves the callback for a local browser *and* accepts the callback URL
+pasted back into the prompt, so it works on a headless box; `--port <n>` pins the
+loopback port for `ssh -L` forwarding.
+Note that a Drive dry run *does* need that read-only token in order to list —
+it still writes nothing and touches no ArenaQuest credential.
+
+The run is idempotent and resumable: topics reconcile on `(parentId, title)`
+against `GET /v1/admin/topics`, and files are tracked in a JSONL ledger
+(`.arenaquest/import-<label>-<env>.jsonl`, gitignored) so a re-run skips what is
+already `ready` and recovers whatever was interrupted — including deleting the
+stale `pending` row when a presigned URL expired before its PUT landed. The
+ledger keys on the file's relative path locally and on its **Drive file id**
+remotely (a Drive file can be renamed or moved), and detects a changed file
+through one `revision` token: size+mtime locally, `md5Checksum` on Drive. Topic
+creation is deliberately **sequential**: `D1TopicNodeRepository.create` derives
+`sort_order` from a non-transactional `SELECT MAX(sort_order)`, so concurrent
+siblings would collide. Uploads run concurrently (`--concurrency`, default 3).
+
+Preflight validates every file against the API's own limits *before the first
+write* (`video/mp4` ≤ 100 MB, `application/pdf` ≤ 25 MB, images ≤ 5 MB — see
+`apps/api/src/controllers/admin-media.controller.ts`, the source of truth) and
+aborts with a per-file report; `--skip-invalid` imports the rest instead.
+Credentials are read from `AQ_ADMIN_EMAIL` / `AQ_ADMIN_PASSWORD` in the
+environment only, never argv, and the account needs role `admin` or
+`content_creator`. `AQ_API_BASE_URL` overrides the target for local development
+but is rejected unless it points at loopback.
+
+**Rescuing what the import skipped (`.mov` → `.mp4`, `.docx` → `.pdf`):**
+```bash
+make convert-skipped REPORT=.arenaquest/skipped-budo-production.jsonl \
+     SOURCE=./content ONLY=mov DRY_RUN=1
+```
+`scripts/media/convert-skipped.mjs` closes the loop on the skipped report. It
+locates each entry inside a reference folder **by file name + extension** —
+matching on the full `relPath` first, then on the bare name, so a flat download
+folder works as well as a mirror — and converts it into a format the API
+accepts. Matching normalises to NFC and lower case, because the report comes
+from Drive in NFC while macOS stores `Chūdan`/`Jō` decomposed; without it every
+accented name would miss. A name that appears twice with no path match is
+reported as ambiguous rather than guessed.
+
+When both exact tiers miss, a third **relaxed** tier retries against a
+transliterated form: diacritics folded, Unicode dashes and quotes mapped to
+ASCII, whitespace runs squeezed. A folder that reached the local disk through a
+backup or a Windows share routinely arrives ASCII-fied — `Chūdan` as `Chudan`,
+`Ro Ryu – Taki` as `Ro Ryu - Taki` — and the bytes are still the same recording.
+A relaxed hit is marked `[relaxed: <path>]` in the printed plan and **never**
+resolves a collision; `--strict-match` turns the tier off. The converted file
+keeps the *report's* spelling, so the media name matches the topic tree rather
+than the backup.
+
+`.mov` is **remuxed** (`-c copy`) when it already holds H.264/AAC and
+transcoded otherwise (H.264 · `yuv420p` · AAC · `+faststart`); if the result
+misses the 100 MB limit, a bounded ladder retries at a higher CRF and then at
+720p. `.docx` goes through LibreOffice headless with a per-job
+`-env:UserInstallation`, without which concurrent runs sharing a profile exit
+cleanly having written nothing. A missing `ffmpeg` or `soffice` is *detected and
+reported with its install command*, never installed. `--only mov` narrows a run
+to one bottleneck.
+
+**Every run prints the files it matched — grouped by target topic — and waits
+for confirmation** before converting anything (`--yes` / `CONFIRM=1` bypasses;
+no TTY without one aborts). A mismatched `--source` produces a plausible list of
+the *wrong* files, and noticing that after two hours of transcoding costs the
+whole run. Output mirrors the report's tree under `--out`, conversions land on a
+`.part` file renamed into place, and a JSONL ledger makes a re-run skip what is
+already done.
+
+**Two reports come out of a run, and together they account for every line of the
+input.** The manifest (below) says what can be imported now;
+`.arenaquest/unresolved-<name>.jsonl` says what is still owed and why — one row
+per entry that did not become a converted file, keyed by `state`: `not-found`,
+`ambiguous` (with its `candidates`), `no-converter`, `unsafe-path`, and
+`over-limit` for a file that converted but still exceeds the API. Each row keeps
+its `topicId`, so it is a valid input for a narrower re-run once the cause is
+fixed. The counts are reported separately in the summary because they have
+different fixes: `not-found` points at the wrong `--source`, `ambiguous` at a
+`--source` that does not mirror the tree.
+
+**The converter's manifest is an importer input.** Alongside the ledger it
+writes `.arenaquest/converted-<name>.jsonl`, one row per converted file carrying
+the `topicId` its *original* was headed for:
+
+```bash
+node scripts/content/import-media.mjs --label budo -e production \
+     --source .arenaquest/converted/budo-production \
+     --manifest .arenaquest/converted-budo-production.jsonl
+```
+
+With `--manifest`, the importer skips the tree walk entirely: no topic is
+created, updated or reordered, and no README is read — every row already names
+an existing topic. It resolves each `relPath` under `--source` and uploads it
+through the same `presign → PUT → finalize` lifecycle, with the same ledger,
+resume and retry behaviour. `--manifest` requires `--source` and excludes
+`--drive-folder` and `--root-topic` (a root topic could only contradict the
+rows). Type and size are re-checked against the bytes **on disk** through
+`validateMediaFile`, the single preflight both plan builders share — a manifest
+is another route to the upload, not a way around a limit.
+
 Renamed targets (`db-migrations-dev` → `db-migrate-local`, `db-seed-dev` →
 `db-seed-local`, `create-db` → `create-db-prod`, ...) still work as deprecated
 aliases that print a pointer. Use the new names.
