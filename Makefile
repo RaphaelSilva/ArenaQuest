@@ -25,7 +25,7 @@
         dev dev-api dev-web dev-web-arenaquest dev-web-srd dev-web-budo \
         build build-api build-web \
         lint lint-api lint-web lint-shared \
-        test test-api test-web test-scripts \
+        test test-api test-web test-scripts convert-skipped \
         db-migrate-local db-seed-local db-reset-local \
         db-migrate-staging db-migrate-prod db-migrations-staging-local \
         bootstrap-admin cf-typegen \
@@ -203,6 +203,20 @@ drive-login: ## Mint the Google Drive refresh token for the importer (CLIENT_ID=
 		$(if $(CLIENT_ID),--client-id $(CLIENT_ID),) \
 		$(if $(PORT),--port $(PORT),)
 
+convert-skipped: ## Convert the files an import skipped, locally (REPORT=path SOURCE=folder; ONLY=mov, OUT=dir, LIMIT=n, CRF=n, DRY_RUN=1, FORCE=1, CONFIRM=1)
+	@test -n "$(REPORT)" || { printf "$(RED)  ✖  REPORT is required — e.g. make convert-skipped REPORT=.arenaquest/skipped-budo-production.jsonl SOURCE=./content$(RESET)\n"; exit 1; }
+	@test -n "$(SOURCE)" || { printf "$(RED)  ✖  SOURCE is required — the folder holding the original files$(RESET)\n"; exit 1; }
+	node scripts/media/convert-skipped.mjs --report $(REPORT) --source $(SOURCE) \
+		$(if $(OUT),--out $(OUT),) \
+		$(if $(ONLY),--only $(ONLY),) \
+		$(if $(LIMIT),--limit $(LIMIT),) \
+		$(if $(CONCURRENCY),--concurrency $(CONCURRENCY),) \
+		$(if $(CRF),--crf $(CRF),) \
+		$(if $(MANIFEST),--manifest $(MANIFEST),) \
+		$(if $(filter 1,$(FORCE)),--force,) \
+		$(if $(filter 1,$(CONFIRM)),--yes,) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
 # ==============================================================================
 ##@ 🟡 STAGING — remote (requires wrangler login)
 # ==============================================================================
@@ -221,14 +235,14 @@ db-migrate-staging: ## Apply D1 migrations to the REMOTE staging database
 r2-cors-staging: ## Apply the profile-derived CORS rules to the staging bucket
 	node scripts/cloudflare/provision-label.mjs $(DEPLOY_LABEL) --only cors
 
-import-media-staging: ## Import a media tree into staging (LABEL=x, SOURCE=path | DRIVE_FOLDER=id; DRY_RUN=1, LIMIT=n, SKIP_INVALID=1, ROOT_TOPIC=uuid, SKIPPED_REPORT=path)
+import-media-staging: ## Import a media tree into staging (LABEL=x, SOURCE=path | DRIVE_FOLDER=id; MANIFEST=path, DRY_RUN=1, LIMIT=n, SKIP_INVALID=1, ROOT_TOPIC=uuid, SKIPPED_REPORT=path)
 	@test -n "$(SOURCE)$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  SOURCE or DRIVE_FOLDER is required — e.g. make import-media-staging SOURCE=./content$(RESET)\n"; exit 1; }
 	@test -z "$(SOURCE)" -o -z "$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  Pass SOURCE or DRIVE_FOLDER, not both$(RESET)\n"; exit 1; }
 	node scripts/content/import-media.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e staging \
 		$(if $(SOURCE),--source $(SOURCE),) \
 		$(if $(DRIVE_FOLDER),--drive-folder $(DRIVE_FOLDER),) \
+		$(if $(MANIFEST),--manifest $(MANIFEST),) \
 		$(if $(ROOT_TOPIC),--root-topic $(ROOT_TOPIC),) \
-		$(if $(SKIPPED_REPORT),--skipped-report $(SKIPPED_REPORT),) \
 		$(if $(SKIPPED_REPORT),--skipped-report $(SKIPPED_REPORT),) \
 		$(if $(LIMIT),--limit $(LIMIT),) \
 		$(if $(filter 1,$(SKIP_INVALID)),--skip-invalid,) \
@@ -262,12 +276,13 @@ db-migrate-prod: confirm-prod ## Apply D1 migrations to the REMOTE production da
 r2-cors-prod: confirm-prod ## Apply the profile-derived CORS rules to the production bucket
 	node scripts/cloudflare/provision-label.mjs $(DEPLOY_LABEL) --production --only cors --yes
 
-import-media-prod: ## Import a media tree into production (LABEL=x, SOURCE=path | DRIVE_FOLDER=id; CLI confirms; LIMIT=n, SKIP_INVALID=1, ROOT_TOPIC=uuid, SKIPPED_REPORT=path)
+import-media-prod: ## Import a media tree into production (LABEL=x, SOURCE=path | DRIVE_FOLDER=id; MANIFEST=path; CLI confirms; LIMIT=n, SKIP_INVALID=1, ROOT_TOPIC=uuid, SKIPPED_REPORT=path)
 	@test -n "$(SOURCE)$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  SOURCE or DRIVE_FOLDER is required — e.g. make import-media-prod SOURCE=./content$(RESET)\n"; exit 1; }
 	@test -z "$(SOURCE)" -o -z "$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  Pass SOURCE or DRIVE_FOLDER, not both$(RESET)\n"; exit 1; }
 	node scripts/content/import-media.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e production \
 		$(if $(SOURCE),--source $(SOURCE),) \
 		$(if $(DRIVE_FOLDER),--drive-folder $(DRIVE_FOLDER),) \
+		$(if $(MANIFEST),--manifest $(MANIFEST),) \
 		$(if $(ROOT_TOPIC),--root-topic $(ROOT_TOPIC),) \
 		$(if $(LIMIT),--limit $(LIMIT),) \
 		$(if $(filter 1,$(SKIP_INVALID)),--skip-invalid,) \

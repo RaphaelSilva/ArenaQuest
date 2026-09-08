@@ -18,12 +18,14 @@ import {
   appendLedger,
   buildManifest,
   canRemux,
+  confirmConversion,
   convertDocument,
   convertJob,
   convertVideo,
   ffmpegRemuxArgs,
   ffmpegTranscodeArgs,
   findExecutable,
+  groupJobsByTopic,
   indexSourceTree,
   isSafeRelPath,
   matchRecord,
@@ -523,4 +525,88 @@ test('every converter targets an extension the importer accepts', async () => {
     );
     assert.ok(converter.tool in { ffmpeg: 1, soffice: 1 }, `${ext} names an unknown tool`);
   }
+});
+
+// -- review + confirmation ----------------------------------------------------
+
+test('groupJobsByTopic keeps first-seen order and carries the topicId', () => {
+  const groups = groupJobsByTopic([
+    { topicKey: 'A', topicId: 't-a', relPath: 'A/1.MOV' },
+    { topicKey: 'B', topicId: 't-b', relPath: 'B/1.MOV' },
+    { topicKey: 'A', topicId: 't-a', relPath: 'A/2.MOV' },
+    { topicKey: null, topicId: 't-root', relPath: '3.MOV' },
+  ]);
+  assert.deepEqual(groups.map((g) => [g.topicKey, g.topicId, g.jobs.length]), [
+    ['A', 't-a', 2],
+    ['B', 't-b', 1],
+    ['(source root)', 't-root', 1],
+  ]);
+});
+
+test('confirmConversion proceeds only on an explicit yes', async () => {
+  const env = {};
+  await confirmConversion({ count: 3, isTTY: true, env, promptFn: async () => 'y' });
+  await confirmConversion({ count: 3, isTTY: true, env, promptFn: async () => 'YES' });
+  await assert.rejects(
+    confirmConversion({ count: 3, isTTY: true, env, promptFn: async () => '' }),
+    /answered "nothing" — nothing was converted/,
+  );
+  await assert.rejects(
+    confirmConversion({ count: 3, isTTY: true, env, promptFn: async () => 'n' }),
+    /aborted/,
+  );
+});
+
+test('confirmConversion is bypassed by --yes or CONFIRM=1, and never blocks without a TTY', async () => {
+  const boom = async () => assert.fail('must not prompt');
+  await confirmConversion({ count: 1, yes: true, isTTY: true, env: {}, promptFn: boom });
+  await confirmConversion({ count: 1, isTTY: true, env: { CONFIRM: '1' }, promptFn: boom });
+  await assert.rejects(
+    confirmConversion({ count: 7, isTTY: false, env: {}, promptFn: boom }),
+    /requires confirmation: re-run with --yes or set CONFIRM=1/,
+  );
+});
+
+test('parseArgs exposes --yes', () => {
+  assert.equal(parseArgs(['-r', 'r.jsonl', '-s', 's']).yes, false);
+  assert.equal(parseArgs(['-r', 'r.jsonl', '-s', 's', '--yes']).yes, true);
+});
+
+// -- the manifest is an importer input ----------------------------------------
+
+test('the manifest rows carry exactly what the importer needs to upload', async () => {
+  const { buildManifestPlan, readManifest } = await import('../content/import-media.mjs');
+  const dir = tempDir();
+
+  // What the converter would write after rescuing one .mov.
+  const rows = buildManifest([
+    {
+      key: 'drive-1',
+      state: 'converted',
+      withinLimit: true,
+      outRelPath: 'Bojutsu/Shoden/Ichimonji.mp4',
+      contentType: 'video/mp4',
+      outSizeBytes: 2048,
+      topicId: 'c77c375e-3287-4e79-b3bd-6e04ccc8727f',
+      topicKey: 'Bojutsu/Shoden',
+      sourceRelPath: 'Bojutsu/Shoden/Ichimonji.MOV',
+    },
+  ]);
+  const manifestPath = join(dir, 'manifest.jsonl');
+  writeManifest(manifestPath, rows);
+
+  // ...and what the importer makes of it, against the converted tree on disk.
+  mkdirSync(join(dir, 'out', 'Bojutsu', 'Shoden'), { recursive: true });
+  writeFileSync(join(dir, 'out', 'Bojutsu', 'Shoden', 'Ichimonji.mp4'), Buffer.alloc(2048));
+
+  const { rows: parsed, invalid } = readManifest(manifestPath);
+  assert.deepEqual(invalid, [], 'the converter must not emit a row the importer rejects');
+
+  const plan = buildManifestPlan(parsed, { sourceRoot: join(dir, 'out') });
+  assert.deepEqual(plan.topics, []);
+  assert.deepEqual(plan.violations, []);
+  assert.equal(plan.files.length, 1);
+  assert.equal(plan.files[0].topicId, 'c77c375e-3287-4e79-b3bd-6e04ccc8727f');
+  assert.equal(plan.files[0].key, 'drive-1', 'the original source identity survives the round trip');
+  rmSync(dir, { recursive: true, force: true });
 });

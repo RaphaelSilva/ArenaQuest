@@ -149,13 +149,13 @@
 				"R2_BUCKET_NAME": "budo-media",
 				"MAIL_DRIVER": "resend",
 				"MAIL_FROM": "Budo <noreply@budo.app>",
-				"WEB_BASE_URL": "https://budo.spaziord.com.br",
+				"WEB_BASE_URL": "https://taibudo.com",
 				// GOOGLE_CLIENT_ID is not a secret — it travels in the authorization URL and
 				// is visible in the browser. Keeping it here (instead of the dashboard) means
 				// `wrangler deploy`, which replaces the whole vars set, cannot silently drop it.
 				// The matching GOOGLE_CLIENT_SECRET stays a Worker secret.
 				"GOOGLE_CLIENT_ID": "63847537881-4fudig0vngk2ll8u2pt4lkoijnppuv79.apps.googleusercontent.com",
-				"GOOGLE_REDIRECT_URI": "https://api-budo.spaziord.com.br/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api.taibudo.com/auth/google/callback"
 			},
 			"observability": {
 				"enabled": true,

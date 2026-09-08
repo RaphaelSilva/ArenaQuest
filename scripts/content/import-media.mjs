@@ -30,7 +30,7 @@
 
 import { parseArgs as nodeParseArgs } from 'node:util';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { basename, dirname, extname, join, relative, resolve as resolvePath } from 'node:path';
+import { basename, dirname, extname, join, relative, resolve as resolvePath, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { confirmProduction, loadProfile } from '../deploy/core.mjs';
@@ -105,6 +105,7 @@ export function parseArgs(argv) {
         env: { type: 'string', short: 'e' },
         source: { type: 'string' },
         'drive-folder': { type: 'string' },
+        manifest: { type: 'string' },
         'root-topic': { type: 'string' },
         ledger: { type: 'string' },
         'skipped-report': { type: 'string' },
@@ -137,6 +138,20 @@ export function parseArgs(argv) {
 
   const source = values.source?.trim() || null;
   const driveFolderRaw = values['drive-folder']?.trim() || null;
+  const manifest = values.manifest?.trim() || null;
+
+  if (manifest) {
+    // A manifest lists files by path, so it needs the folder those paths are
+    // relative to; it is checked first so `--manifest` alone says what is
+    // actually missing instead of the generic "pick a source".
+    if (!source) throw new Error('--manifest needs --source <dir> — the folder its relPaths are relative to');
+    // Every row already names its own topicId, so a root topic could only
+    // contradict it.
+    if (values['root-topic']) {
+      throw new Error('--manifest and --root-topic are mutually exclusive — each manifest row already names its topicId');
+    }
+  }
+
   if (!source && !driveFolderRaw) {
     throw new Error('one of --source <dir> or --drive-folder <id|url> is required');
   }
@@ -149,6 +164,7 @@ export function parseArgs(argv) {
     label,
     env,
     source,
+    manifest,
     driveFolderId: driveFolderRaw ? extractFolderId(driveFolderRaw) : null,
     rootTopicId: values['root-topic'] ?? null,
     ledger: values.ledger ?? null,
@@ -186,6 +202,14 @@ function usage() {
     --drive-folder <id>    Google Drive folder id or URL to mirror
 
   Options
+    --manifest <path>      Import an explicit list instead of walking --source.
+                           Each JSONL row names a file (relPath, under --source)
+                           and the topicId it belongs to, so NO topic is created,
+                           updated or reordered. This is what
+                           scripts/media/convert-skipped.mjs writes, which is how
+                           a converted .mov/.docx lands in the topic its original
+                           was headed for. Requires --source; excludes
+                           --drive-folder and --root-topic.
     --root-topic <uuid>    Attach the whole tree under an existing topic
     --limit <n>            Only process the first N files still pending
     --concurrency <n>      Parallel uploads (default ${DEFAULT_CONCURRENCY})
@@ -268,7 +292,58 @@ export const SKIP_STATES = {
   EMPTY: 'empty',
   NAME_TOO_LONG: 'name-too-long',
   NO_TOPIC: 'no-topic',
+  // Manifest-only: the row names a file that is not under --source.
+  MISSING: 'missing',
 };
+
+/**
+ * The API's preflight for one media file, in one place.
+ *
+ * Shared by `buildPlan` (tree sources) and `buildManifestPlan` (converter
+ * manifests) so both refuse exactly the same files for exactly the same
+ * reasons — a manifest is not a way around a limit, only a different way to
+ * arrive at the upload.
+ */
+export function validateMediaFile({ fileName, sizeBytes, mimeType = null }) {
+  const contentType = contentTypeFor(fileName);
+  if (!contentType) {
+    if (isGoogleAppsMime(mimeType)) {
+      return {
+        ok: false,
+        state: SKIP_STATES.GOOGLE_DOC,
+        reason: 'Google Docs/Sheets/Slides cannot be uploaded as media — export it to PDF in Drive first',
+      };
+    }
+    return {
+      ok: false,
+      state: SKIP_STATES.INVALID_TYPE,
+      reason: `unsupported extension "${extname(fileName) || '(none)'}" — the API accepts ${Object.keys(CONTENT_TYPE_BY_EXTENSION).join(', ')}`,
+    };
+  }
+
+  if (sizeBytes === 0) {
+    return { ok: false, state: SKIP_STATES.EMPTY, reason: 'file is empty (sizeBytes must be positive)' };
+  }
+
+  const maxBytes = SIZE_LIMIT_BYTES[contentType];
+  if (sizeBytes > maxBytes) {
+    return {
+      ok: false,
+      state: SKIP_STATES.TOO_LARGE,
+      reason: `${formatBytes(sizeBytes)} exceeds the API limit of ${formatBytes(maxBytes)} for ${contentType}`,
+    };
+  }
+
+  if (fileName.length > MAX_FILE_NAME_LENGTH) {
+    return {
+      ok: false,
+      state: SKIP_STATES.NAME_TOO_LONG,
+      reason: `file name is ${fileName.length} characters (max ${MAX_FILE_NAME_LENGTH})`,
+    };
+  }
+
+  return { ok: true, contentType };
+}
 
 /** True for the per-folder instructions file, whatever its casing. */
 export function isReadme(name) {
@@ -354,37 +429,12 @@ export function buildPlan(listing, { rootTopicId = null } = {}) {
         continue;
       }
 
-      const contentType = contentTypeFor(rawName);
-      if (!contentType) {
-        if (isGoogleAppsMime(node.mimeType)) {
-          skip(SKIP_STATES.GOOGLE_DOC, 'Google Docs/Sheets/Slides cannot be uploaded as media — export it to PDF in Drive first');
-        } else {
-          skip(
-            SKIP_STATES.INVALID_TYPE,
-            `unsupported extension "${extname(rawName) || '(none)'}" — the API accepts ${Object.keys(CONTENT_TYPE_BY_EXTENSION).join(', ')}`,
-          );
-        }
+      const check = validateMediaFile({ fileName: rawName, sizeBytes: node.sizeBytes, mimeType: node.mimeType });
+      if (!check.ok) {
+        skip(check.state, check.reason);
         continue;
       }
-
-      if (node.sizeBytes === 0) {
-        skip(SKIP_STATES.EMPTY, 'file is empty (sizeBytes must be positive)');
-        continue;
-      }
-
-      const maxBytes = SIZE_LIMIT_BYTES[contentType];
-      if (node.sizeBytes > maxBytes) {
-        skip(
-          SKIP_STATES.TOO_LARGE,
-          `${formatBytes(node.sizeBytes)} exceeds the API limit of ${formatBytes(maxBytes)} for ${contentType}`,
-        );
-        continue;
-      }
-
-      if (rawName.length > MAX_FILE_NAME_LENGTH) {
-        skip(SKIP_STATES.NAME_TOO_LONG, `file name is ${rawName.length} characters (max ${MAX_FILE_NAME_LENGTH})`);
-        continue;
-      }
+      const contentType = check.contentType;
 
       files.push({
         // `key` is the ledger identity: a path locally, a Drive file id remotely.
@@ -470,6 +520,158 @@ export function createLocalSource(dir) {
   };
 }
 
+// -- manifest source ----------------------------------------------------------
+
+/**
+ * A converter manifest as a source of media.
+ *
+ * `scripts/media/convert-skipped.mjs` rescues the files this importer refused
+ * (a `.mov` that had to become `.mp4`, a `.docx` that had to become `.pdf`) and
+ * writes one JSONL row per converted file:
+ *
+ *   { "relPath": "Bojutsu/Shoden/Ichimonji.mp4", "topicId": "<uuid>", ... }
+ *
+ * The row carries the `topicId` its ORIGINAL was headed for, which is the whole
+ * point: the tree that produced it was already reconciled on the first run, so
+ * a manifest import creates no topic, reads no README and derives no ordering.
+ * It resolves each `relPath` under `--source` and uploads it into the topic the
+ * row names, through the same presign -> PUT -> finalize path as every other
+ * file. Everything downstream of the plan — validation, ledger, resume, retry —
+ * is unchanged.
+ */
+export function readManifest(path) {
+  if (!existsSync(path)) throw new Error(`--manifest not found: ${path}`);
+
+  const rows = [];
+  const invalid = [];
+  let lineNumber = 0;
+
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    lineNumber += 1;
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    let record;
+    try {
+      record = JSON.parse(trimmed);
+    } catch {
+      invalid.push({ line: lineNumber, reason: 'not valid JSON' });
+      continue;
+    }
+    if (typeof record?.relPath !== 'string' || record.relPath.trim() === '') {
+      invalid.push({ line: lineNumber, reason: 'row has no relPath' });
+      continue;
+    }
+    // Without a topicId the row has nowhere to land, and guessing one from the
+    // path would recreate exactly the tree-walking this source exists to avoid.
+    if (typeof record?.topicId !== 'string' || record.topicId.trim() === '') {
+      invalid.push({ line: lineNumber, reason: `row for "${record.relPath}" has no topicId` });
+      continue;
+    }
+
+    rows.push({
+      key: typeof record.key === 'string' && record.key !== '' ? record.key : record.relPath,
+      relPath: record.relPath,
+      fileName: typeof record.fileName === 'string' && record.fileName !== '' ? record.fileName : basename(record.relPath),
+      topicId: record.topicId,
+      topicKey: record.topicKey ?? null,
+      sourceRelPath: record.sourceRelPath ?? null,
+    });
+  }
+
+  return { rows, invalid };
+}
+
+/**
+ * Build the upload plan straight from manifest rows.
+ *
+ * Emits the same `{ topics, files, violations }` shape as `buildPlan` with an
+ * empty `topics` — there is nothing to create — so `main()` reuses the ledger,
+ * the pool and `uploadFile` untouched. Size and type are re-checked against the
+ * file ON DISK rather than trusted from the manifest: the row was written by a
+ * converter, but the bytes may have been touched since.
+ */
+export function buildManifestPlan(rows, { sourceRoot, statFile = defaultStatFile } = {}) {
+  const root = resolvePath(sourceRoot);
+  const files = [];
+  const violations = [];
+
+  for (const row of rows) {
+    const push = (state, reason, sizeBytes = 0) => {
+      violations.push({
+        key: row.key,
+        relPath: row.relPath,
+        fileName: row.fileName,
+        state,
+        reason,
+        // Carried through so a re-run of the converter still knows the target.
+        topicId: row.topicId,
+        topicKey: row.topicKey,
+        sizeBytes,
+        revision: null,
+      });
+    };
+
+    const absPath = resolvePath(root, row.relPath);
+    // A manifest is an input file: a `..` in a relPath must not be able to
+    // reach outside the folder the operator pointed at.
+    if (absPath !== root && !absPath.startsWith(root + sep)) {
+      push(SKIP_STATES.MISSING, `relPath "${row.relPath}" resolves outside --source`);
+      continue;
+    }
+
+    const stat = statFile(absPath);
+    if (!stat) {
+      push(SKIP_STATES.MISSING, `not found under --source: ${row.relPath}`);
+      continue;
+    }
+
+    const check = validateMediaFile({ fileName: row.fileName, sizeBytes: stat.size });
+    if (!check.ok) {
+      push(check.state, check.reason, stat.size);
+      continue;
+    }
+
+    files.push({
+      key: row.key,
+      id: row.relPath,
+      relPath: row.relPath,
+      absPath,
+      fileName: row.fileName,
+      title: titleFromName(basename(row.fileName, extname(row.fileName))),
+      contentType: check.contentType,
+      sizeBytes: stat.size,
+      revision: `${stat.size}:${Math.floor(stat.mtimeMs)}`,
+      // `topicId` set here is what makes the upload loop skip topic resolution.
+      topicId: row.topicId,
+      topicKey: row.topicKey,
+    });
+  }
+
+  return { topics: [], files, violations, rootReadme: null, root: null };
+}
+
+/** `statSync` that answers `null` instead of throwing on a missing file. */
+function defaultStatFile(absPath) {
+  try {
+    const stat = statSync(absPath);
+    return stat.isFile() ? stat : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Source backed by a converter manifest plus the local folder it points into. */
+export function createManifestSource(dir, manifestPath) {
+  return {
+    kind: 'manifest',
+    describe: async () => `Manifest ${manifestPath} over ${resolvePath(dir)}`,
+    list: async () => readManifest(manifestPath),
+    readBytes: async (file) => readFileSync(file.absPath),
+    readText: async (node) => readFileSync(node.absPath, 'utf8'),
+  };
+}
+
 /** Human-readable byte size (binary units, matching the API's error wording). */
 export function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -507,7 +709,10 @@ export function skippedReportPathFor(label, env, explicit) {
  */
 export function writeSkippedReport(path, violations, { idByKey = new Map(), rootTopicId = null } = {}) {
   const lines = violations.map((violation) => {
-    const topicId = violation.topicKey === null ? rootTopicId : (idByKey.get(violation.topicKey) ?? null);
+    // A violation from a manifest already knows its topic; one from a tree walk
+    // gets it from the reconciliation index.
+    const topicId =
+      violation.topicId ?? (violation.topicKey === null ? rootTopicId : (idByKey.get(violation.topicKey) ?? null));
     return JSON.stringify({
       key: violation.key ?? violation.relPath,
       relPath: violation.relPath,
@@ -526,7 +731,14 @@ export function writeSkippedReport(path, violations, { idByKey = new Map(), root
   return lines.length;
 }
 
-/** Default ledger location for a label/environment pair. */
+/**
+ * Default ledger location for a label/environment pair.
+ *
+ * A manifest run shares it with the tree run that produced the manifest, on
+ * purpose: it is one ledger per environment, and the keys never collide —
+ * a skipped file goes to the skipped report, never to the ledger, so the row a
+ * manifest import writes for it is its first.
+ */
 export function ledgerPathFor(label, env, explicit) {
   return explicit ?? join('.arenaquest', `import-${label}-${env}.jsonl`);
 }
@@ -1181,6 +1393,7 @@ const TOPIC_LIST_LIMIT = 1000;
 
 /** Build the source the run will read from. Exactly one is configured. */
 function createSource(args) {
+  if (args.manifest) return createManifestSource(args.source, args.manifest);
   if (args.source) return createLocalSource(args.source);
 
   const credentials = driveClientFromEnv();
@@ -1236,6 +1449,18 @@ function printPlan(plan, { baseUrl, sourceLabel, ledgerEntries, rootTopicId }) {
   };
 
   console.log('');
+
+  // A manifest plan has no topic tree to indent under — each file names the
+  // existing topic it belongs to, so group by that instead.
+  if (plan.topics.length === 0 && plan.files.some((file) => file.topicId)) {
+    for (const [topicKey, files] of filesByTopic) {
+      console.log(`  [topic ${files[0].topicId}] ${topicKey ?? '(from the manifest)'}`);
+      for (const file of files) renderFile(file, '');
+    }
+    console.log('');
+    return;
+  }
+
   for (const file of filesByTopic.get(null) ?? []) renderFile(file, '');
   for (const topic of plan.topics) {
     const indent = '  '.repeat(topic.depth);
@@ -1285,13 +1510,23 @@ async function main() {
   let sourceLabel;
   try {
     sourceLabel = await source.describe();
-    plan = buildPlan(await source.list(), { rootTopicId: args.rootTopicId });
-    await resolveReadmes(plan, {
-      readText: source.readText,
-      onWarning: (topic, message) => {
-        log.warn(`${topic.key}: ${message}`);
-      },
-    });
+    if (source.kind === 'manifest') {
+      const { rows, invalid } = await source.list();
+      for (const bad of invalid) log.warn(`${args.manifest}:${bad.line} ignored — ${bad.reason}`);
+      if (rows.length === 0) {
+        log.die(`${args.manifest} lists no usable row — nothing to import.`);
+        return;
+      }
+      plan = buildManifestPlan(rows, { sourceRoot: args.source });
+    } else {
+      plan = buildPlan(await source.list(), { rootTopicId: args.rootTopicId });
+      await resolveReadmes(plan, {
+        readText: source.readText,
+        onWarning: (topic, message) => {
+          log.warn(`${topic.key}: ${message}`);
+        },
+      });
+    }
   } catch (err) {
     log.die(err.message);
     return;
@@ -1328,11 +1563,15 @@ async function main() {
     if (plan.root) {
       log.info(`Root topic ${args.rootTopicId} gets ${formatBytes(Buffer.byteLength(plan.root.content))} of README content.`);
     }
-    const described = plan.topics.filter((topic) => topic.content !== undefined).length;
-    log.ok(
-      `${plan.topics.length} topic(s) (${described} with a README), ` +
-        `${pending.length} file(s) to upload (${formatBytes(totalBytes)}).`,
-    );
+    if (args.manifest) {
+      log.ok(`${pending.length} file(s) to upload (${formatBytes(totalBytes)}) into ${new Set(plan.files.map((file) => file.topicId)).size} existing topic(s).`);
+    } else {
+      const described = plan.topics.filter((topic) => topic.content !== undefined).length;
+      log.ok(
+        `${plan.topics.length} topic(s) (${described} with a README), ` +
+          `${pending.length} file(s) to upload (${formatBytes(totalBytes)}).`,
+      );
+    }
     log.hint(`Ledger: ${ledgerPath}`);
     if (plan.violations.length > 0) {
       // The report's whole value is the resolved topicId, and that needs the
@@ -1375,31 +1614,43 @@ async function main() {
   }
   log.ok(`Authenticated as ${user?.email ?? email}`);
 
-  let topicResult;
-  try {
-    const listed = await withRetry(() => client.request('GET', '/v1/admin/topics'));
-    const records = listed?.data ?? [];
-    if (records.length >= TOPIC_LIST_LIMIT) {
-      throw new Error(
-        `GET /v1/admin/topics returned ${records.length} rows, at the repository's ${TOPIC_LIST_LIMIT} limit — ` +
-          'the existing-topic index would be incomplete and this run would create duplicates. ' +
-          'Import under a narrower --root-topic, or raise the listAll limit first.',
-      );
+  // A manifest run has no tree to reconcile: every row already names the topic
+  // an earlier run created. Skipping this also skips the TOPIC_LIST_LIMIT guard,
+  // which exists to prevent duplicate topics — impossible when none are created.
+  let topicResult = { created: 0, reused: 0, updated: 0, idByKey: new Map(), placed: [] };
+  const reconciles = source.kind !== 'manifest';
+
+  if (reconciles) {
+    try {
+      const listed = await withRetry(() => client.request('GET', '/v1/admin/topics'));
+      const records = listed?.data ?? [];
+      if (records.length >= TOPIC_LIST_LIMIT) {
+        throw new Error(
+          `GET /v1/admin/topics returned ${records.length} rows, at the repository's ${TOPIC_LIST_LIMIT} limit — ` +
+            'the existing-topic index would be incomplete and this run would create duplicates. ' +
+            'Import under a narrower --root-topic, or raise the listAll limit first.',
+        );
+      }
+      topicResult = await reconcileTopics(client, plan, {
+        rootTopicId: args.rootTopicId,
+        index: indexTopics(records),
+        onCreate: (topic) => log.ok(`topic created: ${topic.key}`),
+        onUpdate: (topic, fields) => log.ok(`topic updated: ${topic.key} (${fields.join(', ')})`),
+      });
+    } catch (err) {
+      log.fail(`Topic reconciliation failed: ${err.message}`);
+      process.exitCode = 1;
+      return;
     }
-    topicResult = await reconcileTopics(client, plan, {
-      rootTopicId: args.rootTopicId,
-      index: indexTopics(records),
-      onCreate: (topic) => log.ok(`topic created: ${topic.key}`),
-      onUpdate: (topic, fields) => log.ok(`topic updated: ${topic.key} (${fields.join(', ')})`),
-    });
-  } catch (err) {
-    log.fail(`Topic reconciliation failed: ${err.message}`);
-    process.exitCode = 1;
-    return;
   }
-  log.ok(
-    `Topics: ${topicResult.created} created, ${topicResult.reused} reused, ${topicResult.updated} updated from README.`,
-  );
+
+  if (reconciles) {
+    log.ok(
+      `Topics: ${topicResult.created} created, ${topicResult.reused} reused, ${topicResult.updated} updated from README.`,
+    );
+  } else {
+    log.info('Manifest source: every row names its own topic — none is created, updated or reordered.');
+  }
 
   if (plan.violations.length > 0) {
     const reportPath = skippedReportPathFor(args.label, args.env, args.skippedReport);
@@ -1412,22 +1663,23 @@ async function main() {
     log.hint(reportPath);
   }
 
-  try {
-    const updated = await applyRootReadme(client, args.rootTopicId, plan.root, {
-      onUpdate: (fields) => log.ok(`root topic updated from its README (${fields.join(', ')})`),
-    });
-    if (!updated && plan.root) log.info('Root topic already matches its README.');
-  } catch (err) {
-    log.warn(`Could not apply the root README: ${err.message}`);
-  }
+  if (reconciles) {
+    try {
+      const updated = await applyRootReadme(client, args.rootTopicId, plan.root, {
+        onUpdate: (fields) => log.ok(`root topic updated from its README (${fields.join(', ')})`),
+      });
+      if (!updated && plan.root) log.info('Root topic already matches its README.');
+    } catch (err) {
+      log.warn(`Could not apply the root README: ${err.message}`);
+    }
 
-  let moved = 0;
-  try {
-    moved = await applyDeclaredOrder(client, topicResult.placed);
-    if (moved > 0) log.ok(`Applied the order declared in ${moved} README(s).`);
-  } catch (err) {
-    // Ordering is cosmetic; a failure here must not cost the media upload.
-    log.warn(`Could not apply the declared topic order: ${err.message}`);
+    try {
+      const moved = await applyDeclaredOrder(client, topicResult.placed);
+      if (moved > 0) log.ok(`Applied the order declared in ${moved} README(s).`);
+    } catch (err) {
+      // Ordering is cosmetic; a failure here must not cost the media upload.
+      log.warn(`Could not apply the declared topic order: ${err.message}`);
+    }
   }
 
   let pending = plan.files.filter(isPending);
@@ -1443,7 +1695,9 @@ async function main() {
   log.info(`Uploading ${pending.length} file(s) with concurrency ${args.concurrency}...`);
 
   const results = await runPool(pending, args.concurrency, async (file) => {
-    const topicId = file.topicKey === null ? args.rootTopicId : topicResult.idByKey.get(file.topicKey);
+    // A manifest row carries its own topic; a tree file gets it from the
+    // reconciliation that just ran.
+    const topicId = file.topicId ?? (file.topicKey === null ? args.rootTopicId : topicResult.idByKey.get(file.topicKey));
     const outcome = await uploadFile(client, {
       file,
       topicId,
@@ -1461,7 +1715,9 @@ async function main() {
     .reduce((sum, result) => sum + result.item.sizeBytes, 0);
 
   log.heading('Summary');
-  log.ok(`Topics: ${topicResult.created} created, ${topicResult.reused} reused, ${topicResult.updated} updated`);
+  if (reconciles) {
+    log.ok(`Topics: ${topicResult.created} created, ${topicResult.reused} reused, ${topicResult.updated} updated`);
+  }
   log.ok(
     `Files: ${results.length - failures.length} imported (${formatBytes(uploadedBytes)}), ${alreadyDone} already done`,
   );

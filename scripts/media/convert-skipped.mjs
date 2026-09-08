@@ -39,6 +39,7 @@
  */
 
 import { parseArgs as nodeParseArgs } from 'node:util';
+import readline from 'node:readline';
 import { spawn } from 'node:child_process';
 import {
   accessSync,
@@ -134,6 +135,7 @@ export function parseArgs(argv) {
         crf: { type: 'string' },
         force: { type: 'boolean' },
         'dry-run': { type: 'boolean' },
+        yes: { type: 'boolean', short: 'y' },
         help: { type: 'boolean', short: 'h' },
       },
       allowPositionals: false,
@@ -166,6 +168,7 @@ export function parseArgs(argv) {
     crf: positiveInt(values.crf, '--crf') ?? DEFAULT_CRF,
     force: Boolean(values.force),
     dryRun: Boolean(values['dry-run']),
+    yes: Boolean(values.yes),
   };
 }
 
@@ -229,10 +232,18 @@ function usage() {
                            (default .arenaquest/converted-<name>.jsonl)
     --force                Re-convert even what the ledger already has
     --dry-run              Print the plan and exit; nothing is written
+    -y, --yes              Skip the "convert these N files?" confirmation
     -h, --help             Show this help
 
-  Re-import the result with:
-    node scripts/content/import-media.mjs --label <label> -e <env> --source <out>
+  Every run prints the files it matched and waits for confirmation before
+  converting anything. The manifest it writes is an importer input:
+
+    node scripts/content/import-media.mjs --label <label> -e <env> \\
+         --source <out> --manifest <manifest>
+
+  Each manifest row names a converted file and the topicId its original was
+  headed for, so the importer uploads straight into the right topic without
+  walking the tree or creating a single topic.
 `);
 }
 
@@ -518,7 +529,6 @@ export function buildManifest(records) {
       topicId: record.topicId,
       topicKey: record.topicKey,
       sourceRelPath: record.sourceRelPath,
-      sourceKey: record.key,
     }));
 }
 
@@ -779,6 +789,32 @@ export async function convertJob(job, ctx) {
 
 // -- CLI ----------------------------------------------------------------------
 
+/**
+ * Group the matched jobs by the topic they will be uploaded into, so the list a
+ * human reads before confirming is organised the way the content actually is —
+ * one block per topic — instead of 233 flat lines.
+ */
+export function groupJobsByTopic(jobs) {
+  const groups = new Map();
+  for (const job of jobs) {
+    const key = job.topicKey ?? '(source root)';
+    const group = groups.get(key);
+    if (group) group.jobs.push(job);
+    else groups.set(key, { topicKey: key, topicId: job.topicId, jobs: [job] });
+  }
+  return [...groups.values()];
+}
+
+/** `c77c375e-3287-…` — enough of a uuid to recognise, short enough to scan. */
+function shortId(id) {
+  return typeof id === 'string' && id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : (id ?? 'none');
+}
+
+/**
+ * Print exactly what the run would convert: destination paths, sizes and the
+ * topic each file is bound to. This is the review surface — it runs before the
+ * confirmation on a real run, not just under `--dry-run`.
+ */
 function printPlan(plan, { report, sourceRoot, outDir, ledgerPath, manifestPath }) {
   log.heading('Plan');
   log.info(`Report:    ${report}`);
@@ -786,15 +822,57 @@ function printPlan(plan, { report, sourceRoot, outDir, ledgerPath, manifestPath 
   log.info(`Output:    ${outDir}`);
   log.info(`Ledger:    ${ledgerPath}`);
   log.info(`Manifest:  ${manifestPath}`);
-  console.log('');
 
-  for (const job of plan.jobs) {
-    log.info(`${job.relPath}  ->  ${job.outRelPath}`);
-    log.hint(`${formatBytes(job.sourceSizeBytes)} · matched by ${job.matchedVia} at ${job.sourceRelPath}`);
+  log.heading(`Files matched for conversion (${plan.jobs.length})`);
+  for (const group of groupJobsByTopic(plan.jobs)) {
+    console.log(`  ${group.topicKey}  ${group.jobs.length} file(s) · topic ${shortId(group.topicId)}`);
+    for (const job of group.jobs) {
+      console.log(
+        `      ${basename(job.relPath)}  ->  ${basename(job.outRelPath)}` +
+          `   ${formatBytes(job.sourceSizeBytes)}` +
+          (job.matchedVia === 'name' ? `   [matched by name at ${job.sourceRelPath}]` : ''),
+      );
+    }
+    console.log('');
   }
   if (plan.jobs.length < plan.pendingTotal) {
     log.hint(`… and ${plan.pendingTotal - plan.jobs.length} more pending (raise or drop --limit)`);
   }
+}
+
+/**
+ * Ask before converting. Every run shows its plan and stops here, because a
+ * mismatched `--source` produces a plausible-looking list of the WRONG files
+ * and the cost of noticing that after two hours of transcoding is the whole
+ * run. `--yes` (or `CONFIRM=1`) bypasses it for CI, matching `confirmProduction`
+ * in the deploy CLI.
+ */
+export async function confirmConversion({ count, yes = false, isTTY, promptFn, env = process.env } = {}) {
+  if (yes || env.CONFIRM === '1') return;
+
+  const tty = isTTY ?? Boolean(process.stdin.isTTY);
+  if (!tty) {
+    throw new Error(
+      `converting ${count} file(s) requires confirmation: re-run with --yes or set CONFIRM=1 ` +
+        '(no TTY available to type the confirmation).',
+    );
+  }
+
+  const ask = promptFn ?? defaultPrompt;
+  const answer = String(await ask(`Convert these ${count} file(s)? [y/N] `)).trim().toLowerCase();
+  if (answer !== 'y' && answer !== 'yes') {
+    throw new Error(`aborted: answered "${answer || 'nothing'}" — nothing was converted.`);
+  }
+}
+
+function defaultPrompt(question) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
 }
 
 function reportBucket(items, label, describe) {
@@ -879,16 +957,20 @@ async function main() {
     `${tool.candidates.join(' / ')} not found on PATH — needed to convert ` +
     Object.keys(CONVERTERS).filter((ext) => CONVERTERS[ext].tool === tool.tool).join(', ');
 
+  // The plan is printed on EVERY run, not only under --dry-run: it is the list
+  // the operator reads before the confirmation below.
+  printPlan(plan, { report: args.report, sourceRoot, outDir, ledgerPath: args.ledger, manifestPath: args.manifest });
+  const totalBytes = plan.jobs.reduce((sum, job) => sum + job.sourceSizeBytes, 0);
+  log.info(`${plan.jobs.length} file(s), ${formatBytes(totalBytes)} of input -> ${outDir}`);
+
   if (args.dryRun) {
-    printPlan(plan, { report: args.report, sourceRoot, outDir, ledgerPath: args.ledger, manifestPath: args.manifest });
     // A missing tool is only a warning here: a dry run's job is to show the
     // whole plan, and the operator may well be checking it before installing.
     for (const tool of missingTools) {
       log.warn(describeMissingTool(tool));
       log.hint(`Install it with: ${tool.fix}`);
     }
-    const totalBytes = plan.jobs.reduce((sum, job) => sum + job.sourceSizeBytes, 0);
-    log.ok(`Dry run — nothing was written. ${plan.jobs.length} file(s) would be converted (${formatBytes(totalBytes)} of input).`);
+    log.ok('Dry run — nothing was written.');
     return;
   }
 
@@ -900,6 +982,13 @@ async function main() {
     }
     log.hint('Or restrict this run to what you can convert, e.g. --only mov');
     process.exitCode = 1;
+    return;
+  }
+
+  try {
+    await confirmConversion({ count: plan.jobs.length, yes: args.yes });
+  } catch (err) {
+    log.die(err.message);
     return;
   }
 
@@ -983,7 +1072,12 @@ async function main() {
     return;
   }
 
-  log.ok(`Done. Re-import with: node scripts/content/import-media.mjs --label <label> -e <env> --source ${args.out}`);
+  log.heading('Next step');
+  log.info('Import the converted files into the topics their originals belonged to:');
+  log.cmd(
+    `node scripts/content/import-media.mjs --label <label> -e <env> \\\n` +
+      `          --source ${args.out} --manifest ${args.manifest}`,
+  );
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {

@@ -174,6 +174,57 @@ environment only, never argv, and the account needs role `admin` or
 `content_creator`. `AQ_API_BASE_URL` overrides the target for local development
 but is rejected unless it points at loopback.
 
+**Rescuing what the import skipped (`.mov` → `.mp4`, `.docx` → `.pdf`):**
+```bash
+make convert-skipped REPORT=.arenaquest/skipped-budo-production.jsonl \
+     SOURCE=./content ONLY=mov DRY_RUN=1
+```
+`scripts/media/convert-skipped.mjs` closes the loop on the skipped report. It
+locates each entry inside a reference folder **by file name + extension** —
+matching on the full `relPath` first, then on the bare name, so a flat download
+folder works as well as a mirror — and converts it into a format the API
+accepts. Matching normalises to NFC and lower case, because the report comes
+from Drive in NFC while macOS stores `Chūdan`/`Jō` decomposed; without it every
+accented name would miss. A name that appears twice with no path match is
+reported as ambiguous rather than guessed.
+
+`.mov` is **remuxed** (`-c copy`) when it already holds H.264/AAC and
+transcoded otherwise (H.264 · `yuv420p` · AAC · `+faststart`); if the result
+misses the 100 MB limit, a bounded ladder retries at a higher CRF and then at
+720p. `.docx` goes through LibreOffice headless with a per-job
+`-env:UserInstallation`, without which concurrent runs sharing a profile exit
+cleanly having written nothing. A missing `ffmpeg` or `soffice` is *detected and
+reported with its install command*, never installed. `--only mov` narrows a run
+to one bottleneck.
+
+**Every run prints the files it matched — grouped by target topic — and waits
+for confirmation** before converting anything (`--yes` / `CONFIRM=1` bypasses;
+no TTY without one aborts). A mismatched `--source` produces a plausible list of
+the *wrong* files, and noticing that after two hours of transcoding costs the
+whole run. Output mirrors the report's tree under `--out`, conversions land on a
+`.part` file renamed into place, and a JSONL ledger makes a re-run skip what is
+already done.
+
+**The converter's manifest is an importer input.** Alongside the ledger it
+writes `.arenaquest/converted-<name>.jsonl`, one row per converted file carrying
+the `topicId` its *original* was headed for:
+
+```bash
+node scripts/content/import-media.mjs --label budo -e production \
+     --source .arenaquest/converted/budo-production \
+     --manifest .arenaquest/converted-budo-production.jsonl
+```
+
+With `--manifest`, the importer skips the tree walk entirely: no topic is
+created, updated or reordered, and no README is read — every row already names
+an existing topic. It resolves each `relPath` under `--source` and uploads it
+through the same `presign → PUT → finalize` lifecycle, with the same ledger,
+resume and retry behaviour. `--manifest` requires `--source` and excludes
+`--drive-folder` and `--root-topic` (a root topic could only contradict the
+rows). Type and size are re-checked against the bytes **on disk** through
+`validateMediaFile`, the single preflight both plan builders share — a manifest
+is another route to the upload, not a way around a limit.
+
 Renamed targets (`db-migrations-dev` → `db-migrate-local`, `db-seed-dev` →
 `db-seed-local`, `create-db` → `create-db-prod`, ...) still work as deprecated
 aliases that print a pointer. Use the new names.

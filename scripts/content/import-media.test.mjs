@@ -17,11 +17,13 @@ import {
   appendLedger,
   applyDeclaredOrder,
   applyRootReadme,
+  buildManifestPlan,
   buildPlan,
   compareSiblings,
   contentTypeFor,
   createApiClient,
   createLocalSource,
+  createManifestSource,
   formatBytes,
   indexTopics,
   isReadme,
@@ -32,10 +34,12 @@ import {
   parseOrderPrefix,
   parseReadmeMetadata,
   readLedger,
+  readManifest,
   reconcileTopics,
   resolveBaseUrl,
   resolveReadmes,
   runPool,
+  validateMediaFile,
   skippedReportPathFor,
   stripMetadataBlock,
   summariseHtmlError,
@@ -1150,5 +1154,142 @@ test('resolveBaseUrl refuses to let an env var redirect a deployed import', () =
   assert.throws(
     () => resolveBaseUrl('arenaquest', 'production', { override: 'https://evil.example.com' }),
     /may only point at localhost/,
+  );
+});
+
+// -- manifest source ----------------------------------------------------------
+
+test('validateMediaFile is the single preflight both plan builders use', () => {
+  assert.deepEqual(validateMediaFile({ fileName: 'a.mp4', sizeBytes: 10 }), { ok: true, contentType: 'video/mp4' });
+  assert.equal(validateMediaFile({ fileName: 'a.mov', sizeBytes: 10 }).state, 'invalid-type');
+  assert.equal(validateMediaFile({ fileName: 'a.mp4', sizeBytes: 0 }).state, 'empty');
+  assert.equal(validateMediaFile({ fileName: 'a.jpg', sizeBytes: 6 * 1024 * 1024 }).state, 'too-large');
+  assert.equal(validateMediaFile({ fileName: `${'x'.repeat(260)}.mp4`, sizeBytes: 10 }).state, 'name-too-long');
+  assert.equal(
+    validateMediaFile({ fileName: 'Doc', sizeBytes: 10, mimeType: 'application/vnd.google-apps.document' }).state,
+    'google-doc',
+  );
+});
+
+test('readManifest keeps usable rows and reports the rest with their line number', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aq-manifest-'));
+  const path = join(dir, 'manifest.jsonl');
+  writeFileSync(
+    path,
+    [
+      JSON.stringify({ key: 'drive-1', relPath: 'A/B.mp4', fileName: 'B.mp4', topicId: 't-1', topicKey: 'A' }),
+      'not json',
+      JSON.stringify({ relPath: 'A/C.mp4' }),
+      JSON.stringify({ topicId: 't-2' }),
+      JSON.stringify({ relPath: 'A/D.mp4', topicId: 't-3' }),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+
+  const { rows, invalid } = readManifest(path);
+  assert.deepEqual(rows.map((row) => row.relPath), ['A/B.mp4', 'A/D.mp4']);
+  assert.equal(rows[0].key, 'drive-1');
+  // A row without an explicit key falls back to its path, and the file name is
+  // derived so a hand-written manifest stays minimal.
+  assert.equal(rows[1].key, 'A/D.mp4');
+  assert.equal(rows[1].fileName, 'D.mp4');
+  assert.deepEqual(invalid.map((bad) => bad.line), [2, 3, 4]);
+  assert.match(invalid[1].reason, /no topicId/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('readManifest throws on a missing file', () => {
+  assert.throws(() => readManifest(join(tmpdir(), 'no-such-manifest.jsonl')), /--manifest not found/);
+});
+
+test('buildManifestPlan creates no topic and binds every file to its own topicId', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aq-manifest-'));
+  mkdirSync(join(dir, 'A'), { recursive: true });
+  writeFileSync(join(dir, 'A', 'B.mp4'), Buffer.alloc(2048));
+
+  const plan = buildManifestPlan(
+    [{ key: 'drive-1', relPath: 'A/B.mp4', fileName: 'B.mp4', topicId: 't-1', topicKey: 'A' }],
+    { sourceRoot: dir },
+  );
+
+  assert.deepEqual(plan.topics, [], 'a manifest import must never create a topic');
+  assert.equal(plan.violations.length, 0);
+  const [file] = plan.files;
+  assert.equal(file.topicId, 't-1');
+  assert.equal(file.key, 'drive-1', 'the ledger identity stays the original source key');
+  assert.equal(file.contentType, 'video/mp4');
+  assert.equal(file.sizeBytes, 2048, 'size comes from disk, not from the manifest');
+  assert.equal(file.absPath, join(dir, 'A', 'B.mp4'));
+  assert.match(file.revision, /^2048:\d+$/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('buildManifestPlan reports a row whose file is absent or escapes --source', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aq-manifest-'));
+  writeFileSync(join(dir, 'ok.mp4'), Buffer.alloc(10));
+
+  const plan = buildManifestPlan(
+    [
+      { key: 'a', relPath: 'gone.mp4', fileName: 'gone.mp4', topicId: 't-1', topicKey: null },
+      { key: 'b', relPath: '../escape.mp4', fileName: 'escape.mp4', topicId: 't-2', topicKey: null },
+      { key: 'c', relPath: 'ok.mp4', fileName: 'ok.mp4', topicId: 't-3', topicKey: null },
+    ],
+    { sourceRoot: dir },
+  );
+
+  assert.deepEqual(plan.files.map((file) => file.key), ['c']);
+  assert.deepEqual(plan.violations.map((v) => v.state), ['missing', 'missing']);
+  assert.match(plan.violations[1].reason, /outside --source/);
+  // The topicId survives into the report, so a re-conversion still knows where
+  // the file was headed.
+  assert.equal(plan.violations[0].topicId, 't-1');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('buildManifestPlan re-checks the API limits against the bytes on disk', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aq-manifest-'));
+  writeFileSync(join(dir, 'big.jpg'), Buffer.alloc(6 * 1024 * 1024));
+  writeFileSync(join(dir, 'clip.mov'), Buffer.alloc(10));
+
+  const plan = buildManifestPlan(
+    [
+      { key: 'a', relPath: 'big.jpg', fileName: 'big.jpg', topicId: 't-1', topicKey: null },
+      { key: 'b', relPath: 'clip.mov', fileName: 'clip.mov', topicId: 't-2', topicKey: null },
+    ],
+    { sourceRoot: dir },
+  );
+
+  assert.equal(plan.files.length, 0, 'a manifest is not a way around the API limits');
+  assert.deepEqual(plan.violations.map((v) => v.state), ['too-large', 'invalid-type']);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('createManifestSource reads bytes from the folder the paths are relative to', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aq-manifest-'));
+  const manifestPath = join(dir, 'manifest.jsonl');
+  writeFileSync(join(dir, 'a.mp4'), Buffer.from('bytes'));
+  writeFileSync(manifestPath, JSON.stringify({ relPath: 'a.mp4', topicId: 't-1' }) + '\n', 'utf8');
+
+  const source = createManifestSource(dir, manifestPath);
+  assert.equal(source.kind, 'manifest');
+  const { rows } = await source.list();
+  assert.equal(rows[0].topicId, 't-1');
+  assert.equal((await source.readBytes({ absPath: join(dir, 'a.mp4') })).toString(), 'bytes');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('parseArgs accepts --manifest only alongside --source and without --root-topic', () => {
+  const base = ['--label', 'budo', '-e', 'production'];
+  const args = parseArgs([...base, '--source', './out', '--manifest', './m.jsonl']);
+  assert.equal(args.manifest, './m.jsonl');
+  assert.equal(args.source, './out');
+
+  assert.throws(
+    () => parseArgs([...base, '--drive-folder', 'abc', '--manifest', './m.jsonl']),
+    /--manifest needs --source/,
+  );
+  assert.throws(
+    () => parseArgs([...base, '--source', './out', '--manifest', './m.jsonl', '--root-topic', 'uuid']),
+    /--manifest and --root-topic are mutually exclusive/,
   );
 });
