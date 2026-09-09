@@ -79,7 +79,15 @@ export function buildRegistrationMailHandler(
         expirationTtl: DUPLICATE_NOTICE_TTL_SECONDS,
       });
     } catch (err) {
-      console.error('[registration-mail] handler failed', event.type, err);
+      // Log the message as its own argument: a Worker log viewer renders an
+      // Error as a bare stack, which hides the Resend status/body that says
+      // *why* the send failed.
+      console.error(
+        '[registration-mail] handler failed',
+        event.type,
+        err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+        err,
+      );
     }
   };
 }
