@@ -12,6 +12,7 @@ const brandMock = {
   fullName: 'ArenaQuest',
   isCustom: false,
   showPoweredBy: false,
+  whatsapp: '',
 };
 
 vi.mock('@web/lib/brand', () => ({
@@ -31,6 +32,7 @@ describe('Landing footer — brand-driven copyright & Powered-by', () => {
     Object.assign(brandMock, {
       fullName: 'ArenaQuest',
       showPoweredBy: false,
+      whatsapp: '',
     });
     vi.resetModules();
   });

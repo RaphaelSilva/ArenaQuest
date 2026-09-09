@@ -3,6 +3,7 @@ import {
   brand,
   PLATFORM_NAME,
   computeIsCustom,
+  normalizeWhatsapp,
   resolveShowPoweredBy,
 } from '../brand';
 
@@ -29,6 +30,19 @@ describe('brand config — pure resolution', () => {
     expect(resolveShowPoweredBy('', true)).toBe(true);
     expect(resolveShowPoweredBy('yes', false)).toBe(false);
   });
+
+  it('normalizeWhatsapp keeps only digits, so a readable profile value works', () => {
+    expect(normalizeWhatsapp('5519999991155')).toBe('5519999991155');
+    expect(normalizeWhatsapp('+55 (19) 99999-1155')).toBe('5519999991155');
+  });
+
+  it('normalizeWhatsapp treats unset or implausible values as "no number"', () => {
+    expect(normalizeWhatsapp(undefined)).toBe('');
+    expect(normalizeWhatsapp('')).toBe('');
+    expect(normalizeWhatsapp('<fill>')).toBe('');
+    expect(normalizeWhatsapp('999991155')).toBe(''); // 9 digits — no country code
+    expect(normalizeWhatsapp('1'.repeat(16))).toBe(''); // longer than E.164
+  });
 });
 
 describe('brand config — default (no env)', () => {
@@ -41,6 +55,7 @@ describe('brand config — default (no env)', () => {
     expect(brand.onAccentHex).toBe('#0B0E17');
     expect(brand.isCustom).toBe(false);
     expect(brand.showPoweredBy).toBe(false);
+    expect(brand.whatsapp).toBe('');
   });
 });
 
@@ -65,6 +80,12 @@ describe('brand config — env resolution (module reload)', () => {
     expect(b.isCustom).toBe(true);
     // No POWERED_BY override → follows isCustom.
     expect(b.showPoweredBy).toBe(true);
+  });
+
+  it('exposes NEXT_PUBLIC_BRAND_WHATSAPP as wa.me digits', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BRAND_WHATSAPP', '+55 19 99999-1155');
+    const b = await loadBrand();
+    expect(b.whatsapp).toBe('5519999991155');
   });
 
   it('treats empty NAME_ACCENT as a valid single-tone value', async () => {

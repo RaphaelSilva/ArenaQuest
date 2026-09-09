@@ -31,7 +31,11 @@
     "NEXT_PUBLIC_BRAND_NAME_PREFIX": { "required": true,  "from": "brand" },
     "NEXT_PUBLIC_BRAND_NAME_ACCENT": { "required": false, "from": "brand" },
     "NEXT_PUBLIC_BRAND_POWERED_BY":  { "required": false, "from": "brand", "enum": ["", "true", "false"] },
-    "NEXT_PUBLIC_BRAND_ACCENT":      { "required": false, "from": "brand" }
+    "NEXT_PUBLIC_BRAND_ACCENT":      { "required": false, "from": "brand" },
+    // Public WhatsApp number in international digits (e.g. 5519999991155). When
+    // set, the landing page swaps its placeholder pricing CTAs for click-to-chat
+    // contact buttons; unset ⇒ the CTAs stay disabled ("Em breve").
+    "NEXT_PUBLIC_BRAND_WHATSAPP":    { "required": false, "from": "brand" }
   },
   "api-vars": {
     "ALLOWED_ORIGINS":     { "required": true,  "derivedFrom": "webOrigin", "policy": "no-wildcard-in-prod-staging" },

@@ -30,6 +30,20 @@ function readEnv(value: string | undefined, fallback: string): string {
   return value === undefined ? fallback : value;
 }
 
+/**
+ * Normalise a public WhatsApp number to the digits `wa.me` expects.
+ *
+ * Everything that is not a digit is dropped, so the profile may carry the
+ * number in any readable form (`+55 19 99999-1155`). A result shorter than a
+ * plausible international number (country code + area + subscriber) is treated
+ * as unset rather than rendered as a broken link — a half-filled placeholder
+ * must not ship a CTA that opens an empty chat.
+ */
+export function normalizeWhatsapp(value: string | undefined): string {
+  const digits = (value ?? '').replace(/\D/g, '');
+  return digits.length >= 10 && digits.length <= 15 ? digits : '';
+}
+
 /** A brand is "custom" when any identity field diverges from the ArenaQuest default. */
 export function computeIsCustom(sigla: string, namePrefix: string, nameAccent: string): boolean {
   return (
@@ -57,6 +71,9 @@ const namePrefix = readEnv(process.env.NEXT_PUBLIC_BRAND_NAME_PREFIX, DEFAULT_NA
 const nameAccent = readEnv(process.env.NEXT_PUBLIC_BRAND_NAME_ACCENT, DEFAULT_NAME_ACCENT);
 // An empty `_ACCENT` means "use the ArenaQuest accent hex default".
 const accentHex = process.env.NEXT_PUBLIC_BRAND_ACCENT || DEFAULT_ACCENT_HEX;
+// Unset (or unusable) means "this tenant has no public WhatsApp" — the landing
+// page keeps its disabled CTAs instead of linking anywhere.
+const whatsapp = normalizeWhatsapp(process.env.NEXT_PUBLIC_BRAND_WHATSAPP);
 
 const isCustom = computeIsCustom(sigla, namePrefix, nameAccent);
 
@@ -77,6 +94,8 @@ export interface Brand {
   isCustom: boolean;
   /** Whether to render the "Powered by ArenaQuest" line. */
   showPoweredBy: boolean;
+  /** Public WhatsApp number in `wa.me` digits, or `''` when the tenant has none. */
+  whatsapp: string;
 }
 
 export const brand: Brand = {
@@ -88,4 +107,5 @@ export const brand: Brand = {
   fullName: namePrefix + nameAccent,
   isCustom,
   showPoweredBy: resolveShowPoweredBy(process.env.NEXT_PUBLIC_BRAND_POWERED_BY, isCustom),
+  whatsapp,
 };

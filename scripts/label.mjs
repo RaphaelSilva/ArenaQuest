@@ -427,6 +427,7 @@ export function workflowStanza(profile, env) {
     `NEXT_PUBLIC_BRAND_NAME_ACCENT: ${b.NEXT_PUBLIC_BRAND_NAME_ACCENT ?? ''}`,
     `NEXT_PUBLIC_BRAND_POWERED_BY: ${b.NEXT_PUBLIC_BRAND_POWERED_BY ?? ''}`,
     `NEXT_PUBLIC_BRAND_ACCENT: ${b.NEXT_PUBLIC_BRAND_ACCENT ?? ''}`,
+    `NEXT_PUBLIC_BRAND_WHATSAPP: ${b.NEXT_PUBLIC_BRAND_WHATSAPP ?? ''}`,
     `# Pages project: --project-name=${e.pagesProject}`,
     `# deploy-api.yml: wrangler deploy --env ${env === 'production' ? profile.label : profile.label + '-staging'}`,
   ].join('\n');
@@ -690,7 +691,8 @@ function cmdNew(label) {
     "NEXT_PUBLIC_BRAND_NAME_PREFIX": "<fill>",
     "NEXT_PUBLIC_BRAND_NAME_ACCENT": "<fill or empty>",
     "NEXT_PUBLIC_BRAND_POWERED_BY": "",
-    "NEXT_PUBLIC_BRAND_ACCENT": ""
+    "NEXT_PUBLIC_BRAND_ACCENT": "",
+    "NEXT_PUBLIC_BRAND_WHATSAPP": ""
   },
   "environments": {
     "staging": {
