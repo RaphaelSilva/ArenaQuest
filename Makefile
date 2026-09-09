@@ -124,7 +124,7 @@ dev-web-srd: ## Start apps/web with the Spazio RD white-label brand
 
 dev-web-budo: ## Start apps/web with the Budo Taijutsu white-label brand
 	# NEXT_PUBLIC_BRAND_ACCENT="#8423c5" \
-	NEXT_PUBLIC_BRAND_SIGLA="TB" \
+	NEXT_PUBLIC_BRAND_SIGLA="BUD" \
 	NEXT_PUBLIC_BRAND_NAME_PREFIX="Tai" \
 	NEXT_PUBLIC_BRAND_NAME_ACCENT="Budo" \
 	NEXT_PUBLIC_BRAND_POWERED_BY="true" \
