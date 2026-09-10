@@ -122,23 +122,40 @@ Out of scope (explicit, from RFC 0013 Non-Goals):
 
 ## 5. Task Breakdown
 
-Task files are authored separately with `write-tasks`; the table below is the stub
-until they exist.
+Each row is a `.task.md` file in this folder, authored with `write-tasks`. Backend and
+frontend are separate tasks; each frontend task depends on the backend task whose
+contract it consumes. Phases map to RFC 0013's Implementation Plan.
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [<title>](./01-<slug>.task.md) | 0 | Backend | ☐ Open |
+| 01 | [Billing domain, entities and repository port](./01-billing-domain-entities-and-repository-port.task.md) | 0 | Backend | ☐ Open |
+| 02 | [Billing schema, D1 repository and local seed](./02-billing-schema-d1-repository-and-local-seed.task.md) | 1 | Backend | ☐ Open |
+| 03 | [Billing service and the admin lifecycle API](./03-billing-service-and-the-admin-lifecycle-api.task.md) | 2 | Backend | ☐ Open |
+| 04 | [Accounting reports and per-student statement](./04-accounting-reports-and-per-student-statement.task.md) | 2 | Backend | ☐ Open |
+| 05 | [Standing roster, holds and the student billing endpoint](./05-standing-roster-holds-and-me-billing.task.md) | 3 | Backend | ☐ Open |
+| 06 | [Scheduled invoice run and billing alerts](./06-scheduled-invoice-run-and-billing-alerts.task.md) | 4 | Backend | ☐ Open |
+| 07 | [Admin billing console](./07-admin-billing-console.task.md) | 5 | Frontend | ☐ Open |
+| 08 | [Student statement and standing banner](./08-student-statement-and-standing-banner.task.md) | 5 | Frontend | ☐ Open |
 
 Dependency graph:
 
 ```
-01 (independent)
-      │
-      ▼
-02 ──► 03
+01 (independent — pure domain, ships with no consumer)
+ │
+ ▼
+02 ──► 03 ──► 04 ──► 05 ──► 06
+                      │
+                      ├──────────► 07  (also needs 04)
+                      │
+                      └──────────► 08
 ```
 
-**Recommended execution order:** `01` → `02` → `03`.
+**Recommended execution order:** `01` → `02` → `03` → `04` → `05` → `06`, with `07` and
+`08` runnable in parallel once `05` has landed (`07` additionally needs `04`'s reports).
+`06` and the two frontend tasks share no files, so they can also overlap.
+
+Phase 6 of RFC 0013 (rollout) is not a task: it is a deploy with no plans and no
+contracts, and it is tracked in §7's Definition of Done.
 
 Each task is intended to land as an independent PR with `make lint`,
 `make test-api`, and `make test-web` passing.
