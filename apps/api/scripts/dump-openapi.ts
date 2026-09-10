@@ -28,7 +28,10 @@ const stubEnv: StubEnv = {
 
 async function main() {
   const app = buildApp(stubEnv);
-  const res = await app.request('http://localhost/openapi.json');
+  // Request through the canonical local origin: `servers` now leads with the
+  // origin the document is served from, so hitting a bare `http://localhost`
+  // here would add a portless entry the committed snapshot should not carry.
+  const res = await app.request('http://localhost:8787/openapi.json');
   
   if (!res.ok) {
     console.error(`Failed to fetch /openapi.json. Status: ${res.status}`);

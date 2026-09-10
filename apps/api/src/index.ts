@@ -37,5 +37,9 @@ export function buildApp(env: AppEnv): OpenAPIHono {
 export default {
   async fetch(request: Request, env: AppEnv, ctx: ExecutionContext): Promise<Response> {
     return buildApp(env).fetch(request, env, ctx);
-  },
+  }
+  // ,  async scheduled(controller: ScheduledController, env: AppEnv, ctx: ExecutionContext): Promise<void> { 
+  //   console.log(controller, env, ctx); 
+  //   return;
+  // }
 } satisfies ExportedHandler<AppEnv>;

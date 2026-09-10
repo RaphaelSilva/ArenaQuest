@@ -27,6 +27,37 @@ describe('OpenAPI & Documentation Routes', () => {
     expect(body.paths['/health']).toBeDefined();
   });
 
+  it('lists the origin the document was served from as the first server', async () => {
+    const req = new IncomingRequest('http://192.168.1.104:8787/openapi.json', {
+      method: 'GET',
+    });
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(req, env as AppEnv, ctx);
+    await waitOnExecutionContext(ctx);
+
+    const body = (await res.json()) as { servers: Array<{ url: string }> };
+    const urls = body.servers.map((server) => server.url);
+
+    expect(urls[0]).toBe('http://192.168.1.104:8787');
+    expect(urls).toContain('http://localhost:8787');
+    expect(urls).toContain('https://api.arenaquest.app');
+  });
+
+  it('does not duplicate a server that is already a known deployment', async () => {
+    const req = new IncomingRequest('http://localhost:8787/openapi.json', {
+      method: 'GET',
+    });
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(req, env as AppEnv, ctx);
+    await waitOnExecutionContext(ctx);
+
+    const body = (await res.json()) as { servers: Array<{ url: string }> };
+    const urls = body.servers.map((server) => server.url);
+
+    expect(urls[0]).toBe('http://localhost:8787');
+    expect(urls.filter((url) => url === 'http://localhost:8787')).toHaveLength(1);
+  });
+
   it('GET /docs returns an HTML page serving Scalar UI', async () => {
     const req = new IncomingRequest('http://example.com/docs', {
       method: 'GET',
