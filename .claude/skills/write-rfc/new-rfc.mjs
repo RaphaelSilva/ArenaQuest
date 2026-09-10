@@ -90,6 +90,47 @@ const body = readFileSync(join(HERE, 'template.md'), 'utf8')
 
 writeFileSync(filepath, body);
 
+// The index row is built from the README table's own header rather than from a
+// fixed column list, so the scaffolder follows the table instead of guessing at
+// it. A column it cannot know at scaffold time (Milestone) gets an em dash and is
+// reported, so the gap is visible rather than silently wrong.
+
+/** Status spellings used in the README index — the lifecycle table's own wording. */
+const STATUS_BADGE = {
+  draft: '📝 Draft',
+  implemented: '✅ Implemented',
+  partial: '🚧 Partial',
+};
+
+function badgeFor(status) {
+  return STATUS_BADGE[status.toLowerCase()] ?? status;
+}
+
+/** Splits a markdown table row into trimmed cells, dropping the outer pipes. */
+function tableCells(line) {
+  return line.replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+}
+
+/** Value for one recognised column header; null when the header is unknown. */
+function cellFor(header, ctx) {
+  switch (header.toLowerCase()) {
+    case 'rfc':
+    case '#':
+    case 'num':
+      return `[${ctx.num}](./${ctx.filename})`;
+    case 'title':
+      return ctx.title;
+    case 'status':
+      return badgeFor(ctx.status);
+    case 'date':
+      return ctx.date;
+    case 'author':
+      return ctx.author;
+    default:
+      return null; // Milestone, and anything added later.
+  }
+}
+
 // Append an index row to README.md, after the last existing table data row.
 const readmePath = join(dir, 'README.md');
 if (existsSync(readmePath)) {
@@ -99,10 +140,36 @@ if (existsSync(readmePath)) {
     if (/^\|\s*\[\d{4}\]/.test(lines[i])) lastRow = i;
   }
   if (lastRow !== -1) {
-    const row = `| [${num}](./${filename}) | ${opts.title} | ${opts.status} | ${date} | ${author} |`;
+    // Walk back to the `|---|---|` separator; the line above it is the header.
+    let sep = -1;
+    for (let i = lastRow; i >= 0; i--) {
+      if (/^\|[\s:|-]+\|$/.test(lines[i])) { sep = i; break; }
+    }
+
+    const ctx = { num, filename, title: opts.title, status: opts.status, date, author };
+    const unknown = [];
+    let row;
+
+    if (sep > 0) {
+      const headers = tableCells(lines[sep - 1]);
+      const cells = headers.map((h) => {
+        const v = cellFor(h, ctx);
+        if (v === null) unknown.push(h);
+        return v ?? '—';
+      });
+      row = `| ${cells.join(' | ')} |`;
+    } else {
+      // No header found — emit the canonical shape and say so.
+      row = `| [${num}](./${filename}) | ${opts.title} | ${badgeFor(opts.status)} | — | ${date} |`;
+      console.error('Could not read the index table header — emitted a best-effort row; check it.');
+    }
+
     lines.splice(lastRow + 1, 0, row);
     writeFileSync(readmePath, lines.join('\n'));
     console.error(`Index row added to ${opts.dir}/README.md`);
+    if (unknown.length) {
+      console.error(`  Left as \u2014 for you to fill: ${unknown.join(', ')}`);
+    }
   } else {
     console.error(`No RFC table rows found in README.md — add an index row manually.`);
   }
