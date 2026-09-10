@@ -87,6 +87,7 @@ jobs:
           NEXT_PUBLIC_BRAND_NAME_ACCENT: ${{ vars.NEXT_PUBLIC_BRAND_NAME_ACCENT }}
           NEXT_PUBLIC_BRAND_POWERED_BY: ${{ vars.NEXT_PUBLIC_BRAND_POWERED_BY }}
           NEXT_PUBLIC_BRAND_ACCENT: ${{ vars.NEXT_PUBLIC_BRAND_ACCENT }}
+          NEXT_PUBLIC_BRAND_WHATSAPP: ${{ vars.NEXT_PUBLIC_BRAND_WHATSAPP }}
 
       - name: Deploy to Cloudflare Pages (Staging)
         uses: cloudflare/wrangler-action@v3

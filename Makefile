@@ -128,6 +128,7 @@ dev-web-budo: ## Start apps/web with the Budo Taijutsu white-label brand
 	NEXT_PUBLIC_BRAND_NAME_PREFIX="Tai" \
 	NEXT_PUBLIC_BRAND_NAME_ACCENT="Budo" \
 	NEXT_PUBLIC_BRAND_POWERED_BY="true" \
+	NEXT_PUBLIC_BRAND_WHATSAPP="5519999991155" \
 	$(MAKE) dev-web
 
 # ==============================================================================

@@ -156,6 +156,37 @@ export const dictPt = {
       rights: 'Todos os direitos reservados.',
       poweredBy: 'Desenvolvido por',
     },
+    // Shown instead of the placeholder pricing plans when the brand profile
+    // carries a public WhatsApp number (NEXT_PUBLIC_BRAND_WHATSAPP).
+    contact: {
+      eyebrow: 'Fale com a gente',
+      title: 'Comece pelo WhatsApp',
+      subtitle: 'Sem formulário e sem cadastro: escolha o assunto e a conversa já abre pronta.',
+      note: 'Atendimento pelo WhatsApp em horário comercial.',
+      intents: {
+        trial: {
+          badge: 'Primeira aula',
+          title: 'Aula experimental',
+          description: 'Conheça o tatame, a turma e o método antes de decidir qualquer coisa.',
+          cta: 'Agendar aula experimental',
+          message: 'Olá! Quero agendar uma aula experimental.',
+        },
+        schedule: {
+          badge: 'Planejamento',
+          title: 'Valores e horários',
+          description: 'Turmas, dias da semana e mensalidade — a informação completa em uma conversa.',
+          cta: 'Ver valores e horários',
+          message: 'Olá! Gostaria de saber os valores e horários das turmas.',
+        },
+        teacher: {
+          badge: 'Direto com o professor',
+          title: 'Falar com o professor',
+          description: 'Dúvidas sobre graduação, treino específico ou turmas para a sua idade.',
+          cta: 'Falar com o professor',
+          message: 'Olá! Tenho uma dúvida e gostaria de falar com o professor.',
+        },
+      },
+    },
   },
   admin: {
     dashboard: {

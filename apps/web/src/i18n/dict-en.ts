@@ -158,6 +158,37 @@ export const dictEn = {
       rights: 'All rights reserved.',
       poweredBy: 'Powered by',
     },
+    // Shown instead of the placeholder pricing plans when the brand profile
+    // carries a public WhatsApp number (NEXT_PUBLIC_BRAND_WHATSAPP).
+    contact: {
+      eyebrow: 'Talk to us',
+      title: 'Start on WhatsApp',
+      subtitle: 'No form, no sign-up: pick a subject and the chat opens ready to send.',
+      note: 'WhatsApp support during business hours.',
+      intents: {
+        trial: {
+          badge: 'First class',
+          title: 'Trial class',
+          description: 'See the mat, the group and the method before committing to anything.',
+          cta: 'Book a trial class',
+          message: 'Hi! I would like to book a trial class.',
+        },
+        schedule: {
+          badge: 'Planning',
+          title: 'Prices and schedule',
+          description: 'Groups, weekdays and monthly fee — the full picture in one conversation.',
+          cta: 'See prices and schedule',
+          message: 'Hi! I would like to know the prices and class schedule.',
+        },
+        teacher: {
+          badge: 'Straight to the teacher',
+          title: 'Talk to the teacher',
+          description: 'Questions about grading, specific training or classes for your age group.',
+          cta: 'Talk to the teacher',
+          message: 'Hi! I have a question and would like to talk to the teacher.',
+        },
+      },
+    },
   },
   admin: {
     dashboard: {
