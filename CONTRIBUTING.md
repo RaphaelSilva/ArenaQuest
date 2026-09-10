@@ -21,37 +21,72 @@ Thank you for your interest in contributing to ArenaQuest! This document describ
 
 ## 🌿 Branch Strategy
 
+`main` is the trunk. Feature branches are cut from it and merged back into it;
+there is no long-lived integration branch in between.
+
 | Branch | Environment | Auto Deploy? |
 |---|---|---|
-| `main` | Production | ✅ Yes — after PR approval and merge |
-| `develop` | Staging / Preview | ✅ Yes — automatically on push |
+| `main` | Staging, then Production | ✅ Yes — staging and production, on every merge |
 | `feature/*` | PR Preview | ✅ Yes — Cloudflare Pages Preview per PR |
+| `feature/*` (on demand) | Staging | ▶️ Manual — `workflow_dispatch` on the branch |
 
 ### Rules
 
-- **`main`** is the stable, production-ready branch. Direct pushes are **not allowed**. Changes land here only via a reviewed and approved Pull Request from `develop`.
-- **`develop`** is the integration branch. All completed features are merged here first and deployed to the staging environment automatically.
-- **`feature/*`** branches are short-lived and created from `develop`. They are merged back into `develop` via Pull Request.
-- **`hotfix/*`** branches may be cut from `main` for critical production fixes and merged back into both `main` and `develop`.
+- **`main`** is the trunk and the only long-lived branch. Direct pushes are **not
+  allowed**: changes land through a reviewed Pull Request. A merge deploys
+  **staging first, then production** in one pipeline — see *What a merge deploys*.
+- **`feature/*`** branches are short-lived and created from `main`. They are
+  merged back into `main` via Pull Request.
+- **`hotfix/*`** branches are also cut from `main` and follow the same path; the
+  only difference is urgency, not mechanics.
+- There is **no `develop` branch**. Its two former jobs are covered directly:
+  staging validation by dispatching the deploy workflow on the feature branch,
+  and the production gate by the environment approval below. A long-lived
+  integration branch that lags behind `main` is worse than none — pushing to a
+  stale one redeploys staging with *older* code, silently.
+
+### What a merge deploys
+
+The deploy workflows (`.github/workflows/deploy-{api,web}.yml`) run three jobs in
+sequence:
+
+```
+verify (lint · build · test)
+   └─► deploy-staging      # no branch condition
+          └─► deploy-production   # if: github.ref_name == 'main'
+```
+
+So production is never reached without staging having just been deployed from the
+same commit — but that is a pipeline step, not a soak period. **The human gate is
+the environment approval**: the production jobs declare
+`environment: production | prod-spaziord | prod-budo`, so a *required reviewer*
+configured on those GitHub Environments pauses the run and waits for an explicit
+approval before anything touches production.
+
+### Validating on staging before merging
+
+`deploy-staging` has no branch condition and both workflows expose
+`workflow_dispatch`, so any branch can be deployed to staging on demand — from
+the Actions tab, run *Deploy API* / *Deploy Web* against your feature branch.
+Production is skipped automatically, because the ref is not `main`. Locally, the
+equivalent is `make deploy-staging`.
 
 ---
 
 ## 🔄 Workflow Overview
 
 ```
-main ◄──────────────────── PR (after staging validation)
-  │
-develop ◄──────────────── PR (feature complete)
+main ◄──────────────────── PR (reviewed, CI green)
   │
 feature/my-feature ◄───── your work here
 ```
 
 ### Step-by-step
 
-1. **Sync your local `develop`**
+1. **Sync your local `main`**
    ```bash
-   git checkout develop
-   git pull origin develop
+   git checkout main
+   git pull origin main
    ```
 
 2. **Create a feature branch**
@@ -66,13 +101,16 @@ feature/my-feature ◄───── your work here
    git push origin feature/short-description
    ```
 
-4. **Open a Pull Request** targeting `develop`.
+4. **Open a Pull Request** targeting `main`.
    - A Cloudflare Pages Preview URL will be generated automatically.
    - Ensure all CI checks pass before requesting review.
 
-5. **After approval**, the branch is merged into `develop` via squash or merge commit.
+5. **For a delicate change**, deploy the branch to staging first
+   (`workflow_dispatch`, see above) and validate there before requesting review.
 
-6. When `develop` is stable and validated in staging, a **release PR** is opened from `develop` → `main` and deployed to production after approval.
+6. **After approval**, the branch is merged into `main` via squash or merge
+   commit. The pipeline deploys staging, then waits for the production
+   environment approval.
 
 ---
 
@@ -120,7 +158,7 @@ chore(infra): upgrade wrangler to v4
 
 ## 🔀 Pull Request Guidelines
 
-- **Target branch:** Always target `develop` (never `main` directly, except for hotfixes).
+- **Target branch:** Always target `main`. Merging deploys staging and then queues production, so the PR is the review gate.
 - **Title:** Follow the commit convention format — `type(scope): description`.
 - **Description:** Explain *what* changed and *why*. Link related issues with `Closes #<issue-number>`.
 - **Size:** Keep PRs focused. Large PRs should be split into smaller, independent changes.
