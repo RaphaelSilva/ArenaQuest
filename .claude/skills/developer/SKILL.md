@@ -12,13 +12,12 @@ yourself — you delegate it to the `backend-developer` / `frontend-developer` s
 **Invocation (loop):** _"Act as developer. Run in loop: task-A.md, task-B.md, task-C.md."_ or _"…every task under docs/product/milestones/8-api-test-optimization/."_
 **Chained/stacked mode:** add the keyword `chained` (or `stacked`) to the invocation.
 
-## 1. The native harness (how this differs from `autonomous-executor`)
+## 1. Delegation model
 
-The `.agents/skills/autonomous-executor` persona shells out to an external
-`claude -p` CLI. **This skill does not.** It runs inside Claude Code and uses the
-built-in harness:
+You run inside Claude Code, so every step goes through the built-in harness —
+never an external CLI or a shelled-out subprocess:
 
-- **Delegation = the `Agent` tool**, not a subprocess. Spawn a subagent (default
+- **Delegation = the `Agent` tool.** Spawn a subagent (default
   `subagent_type: general-purpose`) and tell it to invoke the persona skill, e.g.
   *"Use the `backend-developer` skill to implement only the Backend steps of
   `<plan>` for `<task>`. Commit locally to apps/api. Do not push, merge, switch
@@ -38,18 +37,27 @@ built-in harness:
 
 Never invent topology. Compute it from the task's source folder.
 
-- **Never commit on `develop` or `main`.** Switch away first.
+- **`main` is the trunk and the only long-lived branch** (see `CONTRIBUTING.md`).
+  There is no `develop`: every branch is cut from `main` and returns to it through a
+  reviewed PR. **Never commit, merge or push on `main`** — switch away first. A merge
+  into `main` deploys staging and then queues production behind the environment
+  approval, so this skill always stops at the PR.
 - **Branch naming** (slashes literal; `<task_slug>` = filename minus `.task.md`):
-  - **Milestone:** candidate `feature/m<N>/candidate` (one per milestone, cut from `develop`); task `feature/m<N>/<task_slug>.task` (cut from candidate).
-  - **Backlog:** task `feature/backlog/<topic>/<task_slug>.task` (cut from `develop`, no candidate).
-  - **Epic:** candidate `feature/epic/<epic_name>/candidate` (cut from `develop`); task `feature/epic/<epic_name>/<task_slug>.task` (cut from epic candidate).
+  - **Milestone:** candidate `feature/m<N>/candidate` (one per milestone, cut from `main`); task `feature/m<N>/<task_slug>.task` (cut from candidate).
+  - **Backlog:** task `feature/backlog/<topic>/<task_slug>.task` (cut from `main`, no candidate).
+  - **Epic:** candidate `feature/epic/<epic_name>/candidate` (cut from `main`); task `feature/epic/<epic_name>/<task_slug>.task` (cut from epic candidate).
 - **Chained mode** (`chained`/`stacked`, milestone/epic only — backlog unsupported):
-  subject branch `feature/m<N>/<subject_slug>` cut from `develop` (`<subject_slug>` =
+  subject branch `feature/m<N>/<subject_slug>` cut from `main` (`<subject_slug>` =
   milestone folder name minus leading `<number>-`). First task cuts from the subject;
   each later task cuts from the **HEAD of the previous task branch**. No `candidate`.
-- **Push once per task, at the very end.** Never push intermediate commits. Merges to
-  candidate/`develop` are pushed immediately after they occur.
-- **PR creation requires explicit user confirmation.** (No PRs at all in chained mode.)
+- **Push once per task, at the very end.** Never push intermediate commits. A merge
+  into a candidate/subject branch is pushed immediately after it occurs.
+- **Reaching a real environment does not require `main`.** `deploy-staging` has no
+  branch condition and both deploy workflows expose `workflow_dispatch`, so a branch
+  can be validated on staging on demand (Actions → *Deploy API* / *Deploy Web*, or
+  `make deploy-staging` locally) — production is skipped because the ref is not `main`.
+- **PR creation requires explicit user confirmation.** The PR targets `main` and is the
+  only path into it. (No PRs at all in chained mode.)
 
 ### Smart Check & Swap
 
@@ -66,8 +74,8 @@ Never invent topology. Compute it from the task's source folder.
 ## 3. Loop control
 
 **Default loop (sequential):** fully complete one task (plan → implement → verify →
-merge to candidate/`develop`) before starting the next. Never cut a task's branch
-until the previous one merged. Report `✓ <task_slug> merged.` after each.
+merge into its candidate — or, for a backlog task, push) before starting the next.
+Never cut a task's branch until the previous one merged. Report `✓ <task_slug> merged.` after each.
 
 **DAG awareness:** read each task's `Dependencies` metadata. Independent tasks may be
 run concurrently as background subagents in isolated worktrees
@@ -114,9 +122,11 @@ For each task, after the branch is prepared (§2):
    in sync if present.
 6. **Push & merge (parent).** Single `git push -u origin <task_branch>`. Then per mode:
    - **Milestone/Epic:** `git checkout <candidate>` → `git merge --no-ff <task_branch>` → `git push origin <candidate>`. (Loop: auto-merge; single-task: confirm first.)
-   - **Backlog:** merge `--no-ff` into `develop` and push.
+   - **Backlog:** there is no local merge target — the pushed task branch *is* the unit
+     of review. Stop there and offer the PR to `main` (§2).
    - **Chained:** no per-task merge — only the final fast-forward (§3).
-   Offer to delete the local task branch after merge.
+   Offer to delete the local task branch after merge. **`main` is never a merge target
+   here:** the candidate/subject/backlog branch reaches it only through a confirmed PR.
 
 ## 5. Failure handling in a loop
 
@@ -137,6 +147,8 @@ If a task fails after 2 repairs or its subagent emits `BLOCKED:`:
 - **English only** in all plans, commits, and subagent prompts.
 - **Parent owns destructive/observable steps** (branches, verification, commits, pushes, merges, status files); subagents only write code and commit locally.
 - **Push once per task.** No intermediate pushes.
+- **`main` is PR-only.** Never commit, merge or push to `main`; a run ends at the
+  candidate/subject/task branch and, on explicit confirmation, at a PR targeting `main`.
 - **BLOCKED protocol.** A subagent `BLOCKED:` line halts the loop before any commit/merge; surface it and wait.
 - **Differential healing before escalating to the user**, max 2 attempts.
 - **PR creation only on explicit user confirmation** (never in chained mode).

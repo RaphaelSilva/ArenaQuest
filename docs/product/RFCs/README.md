@@ -21,6 +21,7 @@ it lives in the linked milestone, and is summarised in
 | [0010](./0010-player-progression-administration.md) | Player progression administration | ✅ Implemented | [M16](../milestones/16-player-progression-administration/milestone.md) | 2026-06-23 |
 | [0011](./0011-branded-deploy-cli-label-parametrized-ci-independent-release.md) | Branded deploy CLI — label-parametrized, CI-independent release | ✅ Implemented | [M17](../milestones/17-branded-deploy-cli/milestone.md) | 2026-07-23 |
 | [0012](./0012-tenant-provisioning-backend-parity.md) | Tenant provisioning — Cloudflare bring-up with backend parity | ✅ Implemented | [M18](../milestones/18-tenant-provisioning-backend-parity/milestone.md) | 2026-08-08 |
+| [0013](./0013-student-billing-contracts-and-receivables-accounting.md) | Student billing, contracts and receivables accounting | Approved | [M19](../milestones/19-student-billing-and-receivables/milestone.md) | 2026-09-10 |
 
 Milestones 1–7 predate this process and derive directly from
 [`../specification.md`](../specification.md).
