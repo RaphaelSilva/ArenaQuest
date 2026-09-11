@@ -134,7 +134,7 @@ contract it consumes. Phases map to RFC 0013's Implementation Plan.
 | 04 | [Accounting reports and per-student statement](./04-accounting-reports-and-per-student-statement.task.md) | 2 | Backend | ✅ Done |
 | 05 | [Standing roster, holds and the student billing endpoint](./05-standing-roster-holds-and-me-billing.task.md) | 3 | Backend | ✅ Done |
 | 06 | [Scheduled invoice run and billing alerts](./06-scheduled-invoice-run-and-billing-alerts.task.md) | 4 | Backend | ✅ Done |
-| 07 | [Admin billing console](./07-admin-billing-console.task.md) | 5 | Frontend | ☐ Open |
+| 07 | [Admin billing console](./07-admin-billing-console.task.md) | 5 | Frontend | ✅ Done |
 | 08 | [Student statement and standing banner](./08-student-statement-and-standing-banner.task.md) | 5 | Frontend | ☐ Open |
 
 Dependency graph:
