@@ -3,7 +3,11 @@ const SQL_FILES = import.meta.glob<string>(
 	{ eager: true, query: '?raw', import: 'default' },
 );
 
-function parseStatements(sql: string): string[] {
+/**
+ * Exported so a spec can replay one migration file through the exact splitter
+ * the suite uses, rather than a second copy of it that could drift.
+ */
+export function parseStatements(sql: string): string[] {
 	const lines = sql.split('\n');
 	const filtered = lines
 		.filter(line => !line.trim().startsWith('--'))
