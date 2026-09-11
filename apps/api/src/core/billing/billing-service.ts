@@ -4,6 +4,7 @@ import type {
   BillingPlanFilter,
   UpdateBillingPlanInput,
   BillingStandingHoldRecord,
+  CurrencyRecord,
   SubscriptionRecord,
   SubscriptionFilter,
   InvoiceRecord,
@@ -11,9 +12,13 @@ import type {
   InvoiceFilter,
   InvoiceAdjustmentRecord,
   PaymentRecord,
+  IMailer,
+  MailMessage,
+  IUserRepository,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
-import { computePeriod, nextPeriod } from '@arenaquest/shared/domain/billing/billing-cycle';
+import { ROLES } from '@arenaquest/shared/constants/roles';
+import { addDays, computePeriod, nextPeriod } from '@arenaquest/shared/domain/billing/billing-cycle';
 import {
   resolveStanding,
   type StandingInvoice,
@@ -48,7 +53,17 @@ import type { ControllerResult } from '@api/core/result';
  * acting admin for a void is carried by the audit event alone.
  */
 
-const { ContractStatus, ContractTermsSource, InvoiceStatus, AdjustmentKind } = Entities.Config;
+const {
+  ContractStatus,
+  ContractTermsSource,
+  InvoiceStatus,
+  AdjustmentKind,
+  BillingStanding,
+  UserStatus,
+} = Entities.Config;
+
+/** The only date shape that crosses this module's boundary. */
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /** The only lifecycle transitions `PATCH /subscriptions/{id}` may request. */
 export type LifecycleAction = 'pause' | 'resume' | 'cancel';
@@ -285,6 +300,190 @@ function nextDueDateOf(contract: SubscriptionRecord, asOf: string): string | nul
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// The daily run (RFC 0013 §6)
+//
+// One routine, two callers: the `scheduled` handler in `src/index.ts` and
+// `POST /v1/admin/billing/invoices/run`. Never two implementations — a manual
+// twin that drifts from the cron path is the failure this shape exists to make
+// impossible.
+//
+// Four rules the run is written to keep, each of which is a way it could lie:
+//
+// 1. **It writes no money.** The run issues invoices and sends mail. It writes
+//    no `invoice_adjustments` row of any kind, `surcharge` included: nothing
+//    accrues interest, a percentage, a cap or a daily incidence (RFC 0013 #8).
+//    `applyAdjustment` is not reachable from anything below.
+// 2. **Idempotent by construction.** Issuance leans on
+//    `UNIQUE (subscription_id, period_start)` rather than on the job having run
+//    exactly once, so a retry is a no-op that reports its duplicates as
+//    *absorbed* instead of failing.
+// 3. **Crossings, not a standing list, and no `last_alerted` column.** What is
+//    news is derived by resolving each student's standing twice — once at the
+//    previous run's day, once at this one's — and reporting only the movement
+//    between them. There is no per-student column to keep in sync, nothing to
+//    backfill, and a run told the previous run was today reports nobody.
+// 4. **Assert, do not repair.** The balance-versus-cached-status check logs and
+//    returns. Rewriting a drifted `invoices.status` would hide the bug that
+//    caused the drift.
+// ---------------------------------------------------------------------------
+
+/** Who a reminder or a digest is addressed to. */
+export interface BillingRecipient {
+  userId: string;
+  name: string;
+  email: string;
+}
+
+/**
+ * The one thing the run asks identity: an address to mail.
+ *
+ * Injected rather than imported, in the shape `StudentExistsProbe` already
+ * established, so `BillingService` still holds no `IUserRepository` and a
+ * node-pool spec can hand it two arrays.
+ */
+export interface BillingDirectory {
+  /** The student's contact details, or `null` when the account is gone. */
+  findRecipient(userId: string): Promise<BillingRecipient | null>;
+  /** Everyone who should receive the admin digest. */
+  listAdmins(): Promise<BillingRecipient[]>;
+}
+
+/** Everything the run needs that is not persistence. */
+export interface BillingRunDeps {
+  mailer: IMailer;
+  directory: BillingDirectory;
+}
+
+/**
+ * The window a run covers, as two `YYYY-MM-DD` days.
+ *
+ * `since` is **the previous run's day**, and the window is half-open —
+ * `(since, asOf]`. That is the whole of "since the previous run": a daily cron
+ * walks disjoint one-day windows, so every reminder and every crossing falls
+ * inside exactly one of them and fires exactly once, with no `last_sent` and no
+ * `last_alerted` column to drift. A caller that re-runs a day it has already
+ * run passes `since = asOf` and the window is empty.
+ */
+export interface BillingRunOptions {
+  /** The day to bill and resolve against; defaults to today. */
+  asOf?: string;
+  /** The previous run's day; defaults to the day before `asOf`. */
+  since?: string;
+}
+
+/** The two student notices. There is no sequence and no third (RFC Non-Goal). */
+export type BillingReminderKind = 'due_date' | 'grace_lapsed';
+
+export interface IssuedInvoiceLine {
+  invoiceId: string;
+  subscriptionId: string;
+  userId: string;
+  periodStart: string;
+  dueDate: string;
+  amountMinor: number;
+  currency: string;
+  /** `paid` already for a free contract's zero-amount invoice. */
+  status: Entities.Config.InvoiceStatus;
+}
+
+export interface ReminderLine {
+  invoiceId: string;
+  userId: string;
+  kind: BillingReminderKind;
+  dueDate: string;
+  /** The day the notice is owed — inside `(since, asOf]` or it is not here. */
+  triggerOn: string;
+  balanceMinor: number;
+  currency: string;
+  /** False when a hold suppressed it, or when no address could be resolved. */
+  sent: boolean;
+  /** True when a hold is what kept it quiet. */
+  suppressedByHold: boolean;
+}
+
+/** One student who moved into `due` or `delinquent` since the previous run. */
+export interface StandingCrossingLine {
+  userId: string;
+  from: Entities.Config.BillingStanding;
+  to: Entities.Config.BillingStanding;
+  oldestOverdueDate: string | null;
+  /** Unchanged by a hold, here as everywhere else. */
+  outstandingMinor: number;
+  currency: string;
+}
+
+/** A cached `invoices.status` that disagrees with the recomputed balance. */
+export interface StatusDivergenceLine {
+  invoiceId: string;
+  userId: string;
+  cachedStatus: Entities.Config.InvoiceStatus;
+  expectedStatus: Entities.Config.InvoiceStatus;
+  balanceMinor: number;
+}
+
+/**
+ * What one run did — the body of `POST /invoices/run` and the shape the cron
+ * logs. Every number here is reported; none of it is persisted.
+ */
+export interface BillingRunReport {
+  asOf: string;
+  since: string;
+  /** Contracts the run considered: `active`, started, not past their end date. */
+  eligibleContracts: number;
+  issued: IssuedInvoiceLine[];
+  /**
+   * Eligible contracts whose period already had an invoice. A second run for
+   * one period reports every invoice here and creates none — the retry is a
+   * no-op rather than a failure.
+   */
+  absorbed: number;
+  reminders: ReminderLine[];
+  crossings: StandingCrossingLine[];
+  /** Students a hold kept out of the mail and out of the digest. */
+  suppressedByHold: Array<{ userId: string; outstandingMinor: number }>;
+  divergences: StatusDivergenceLine[];
+  /** Messages actually handed to `IMailer`, students and admins together. */
+  mailsSent: number;
+  adminsNotified: number;
+}
+
+/** The actor recorded on an audit line the cron emitted rather than a person. */
+export const SCHEDULED_BILLING_ACTOR = 'system:scheduled';
+
+/**
+ * A hold is in force on `day` when it exists and has not expired. The same
+ * comparison `resolveStanding` makes, applied where mail is suppressed rather
+ * than where a label is chosen.
+ */
+function holdInForce(hold: BillingStandingHoldRecord | undefined, day: string): boolean {
+  return hold !== undefined && (hold.expiresAt === null || hold.expiresAt >= day);
+}
+
+/**
+ * Renders a minor-unit amount for an **email**.
+ *
+ * The reports never format — they ship integers and the currency's exponent so
+ * the client can. A message to a human is the exception: "R$150.00" is the only
+ * thing that can be written in a sentence.
+ */
+function formatAmount(amountMinor: number, currency: CurrencyRecord | null): string {
+  const exponent = currency?.exponent ?? 2;
+  const symbol = currency?.symbol ?? '';
+  const sign = amountMinor < 0 ? '-' : '';
+  return `${sign}${symbol}${(Math.abs(amountMinor) / 10 ** exponent).toFixed(exponent)}`;
+}
+
+/** The plain-text half of a message, mirrored into minimal HTML. */
+function asHtml(lines: string[]): string {
+  const escape = (line: string): string =>
+    line
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  return `<p>${lines.map(escape).join('<br />')}</p>`;
 }
 
 export class BillingService {
@@ -951,6 +1150,365 @@ export class BillingService {
   }
 
   // -------------------------------------------------------------------------
+  // The daily run (RFC 0013 §6)
+  //
+  // The cron calls this; `POST /v1/admin/billing/invoices/run` calls this. One
+  // routine, two callers.
+  // -------------------------------------------------------------------------
+
+  /**
+   * Issues, reminds, digests and asserts — in that order, for one day.
+   *
+   * It writes exactly one kind of row: an `invoices` row for a period that had
+   * none. No payment, no adjustment, no status repair and no hold.
+   */
+  async runBillingCycle(
+    deps: BillingRunDeps,
+    options: BillingRunOptions = {},
+    actorId: string = SCHEDULED_BILLING_ACTOR,
+  ): Promise<ControllerResult<BillingRunReport>> {
+    const asOf = options.asOf ?? today();
+    if (!ISO_DAY.test(asOf)) return badRequest('asOf must be a YYYY-MM-DD date');
+
+    const since = options.since ?? addDays(asOf, -1);
+    if (!ISO_DAY.test(since)) return badRequest('since must be a YYYY-MM-DD date');
+    if (since > asOf) return badRequest('since must not be after asOf');
+
+    // --- 1. Issue ----------------------------------------------------------
+    //
+    // The status filter is the whole of "a `paused` contract is skipped here
+    // and nowhere else": it never reaches issuance, and every step below reads
+    // invoices rather than contracts, so its already-open invoices keep their
+    // due dates and still count in the roster, the totals and the aging report.
+    const eligible = (await this.repo.listSubscriptions({ status: ContractStatus.ACTIVE })).filter(
+      (contract) =>
+        contract.startDate <= asOf && (contract.endDate === null || contract.endDate > asOf),
+    );
+
+    // Idempotency is the database's, not this function's:
+    // `UNIQUE (subscription_id, period_start)` decides, and the adapter returns
+    // only the rows it actually created. Whatever it did not create was already
+    // there — absorbed, not failed.
+    const created = await this.repo.issueInvoices({ referenceDate: asOf });
+    const issued: IssuedInvoiceLine[] = created.map((invoice) => ({
+      invoiceId: invoice.id,
+      subscriptionId: invoice.subscriptionId,
+      userId: invoice.userId,
+      periodStart: invoice.periodStart,
+      dueDate: invoice.dueDate,
+      amountMinor: invoice.amountMinor,
+      currency: invoice.currency,
+      // A free contract's zero-amount invoice arrives `paid` already, settled
+      // by the balance rather than by a payment row this run did not write.
+      status: invoice.status,
+    }));
+    const absorbed = Math.max(0, eligible.length - created.length);
+
+    // --- State, read once --------------------------------------------------
+    const [allInvoices, holds, currencies] = await Promise.all([
+      this.repo.listInvoices({}),
+      this.repo.listHolds(),
+      this.repo.listCurrencies(),
+    ]);
+
+    const currencyOf = new Map(currencies.map((currency) => [currency.code, currency]));
+    const holdByUser = new Map(holds.map((hold) => [hold.userId, hold]));
+
+    // --- 2. Assert the balance cache — log, never repair --------------------
+    const divergences: StatusDivergenceLine[] = [];
+    for (const invoice of allInvoices) {
+      // Voiding is a decision rather than an arithmetic outcome, so a void
+      // invoice's status is not a cache of anything and cannot diverge.
+      if (invoice.status === InvoiceStatus.VOID) continue;
+
+      const expectedStatus =
+        invoice.balanceMinor <= 0 ? InvoiceStatus.PAID : InvoiceStatus.OPEN;
+      if (invoice.status === expectedStatus) continue;
+
+      const divergence: StatusDivergenceLine = {
+        invoiceId: invoice.id,
+        userId: invoice.userId,
+        cachedStatus: invoice.status,
+        expectedStatus,
+        balanceMinor: invoice.balanceMinor,
+      };
+      divergences.push(divergence);
+
+      // Reported and left alone. A silent repair here would erase the evidence
+      // of whatever wrote the wrong status in the first place.
+      this.audit('billing.status_divergence', actorId, { ...divergence, asOf, repaired: false });
+    }
+
+    // --- 3. Remind the student ---------------------------------------------
+    const recipients = new Map<string, BillingRecipient | null>();
+    const recipientOf = async (userId: string): Promise<BillingRecipient | null> => {
+      if (!recipients.has(userId)) {
+        recipients.set(userId, await deps.directory.findRecipient(userId));
+      }
+      return recipients.get(userId) ?? null;
+    };
+
+    const reminders: ReminderLine[] = [];
+    let mailsSent = 0;
+
+    for (const invoice of unvoided(allInvoices).filter((i) => i.balanceMinor > 0)) {
+      const triggers: Array<[BillingReminderKind, string]> = [
+        ['due_date', invoice.dueDate],
+        // The first day the invoice is late: `resolveStanding` counts the last
+        // day of grace as still `due`, so grace lapses the day after it.
+        ['grace_lapsed', addDays(invoice.dueDate, invoice.graceDays + 1)],
+      ];
+
+      for (const [kind, triggerOn] of triggers) {
+        // Derived from the invoice's own dates against the window, so the
+        // notice fires on exactly one run of a daily chain and needs no
+        // `last_sent` column to remember that it did.
+        if (triggerOn <= since || triggerOn > asOf) continue;
+
+        const held = holdInForce(holdByUser.get(invoice.userId), asOf);
+        const line: ReminderLine = {
+          invoiceId: invoice.id,
+          userId: invoice.userId,
+          kind,
+          dueDate: invoice.dueDate,
+          triggerOn,
+          balanceMinor: invoice.balanceMinor,
+          currency: invoice.currency,
+          sent: false,
+          suppressedByHold: held,
+        };
+        reminders.push(line);
+
+        if (held) {
+          this.audit('billing.reminder_suppressed', actorId, {
+            userId: line.userId,
+            invoiceId: line.invoiceId,
+            kind,
+            reason: 'hold',
+          });
+          continue;
+        }
+
+        const recipient = await recipientOf(invoice.userId);
+        if (recipient === null) {
+          this.audit('billing.reminder_undeliverable', actorId, {
+            userId: line.userId,
+            invoiceId: line.invoiceId,
+            kind,
+            reason: 'no address',
+          });
+          continue;
+        }
+
+        line.sent = await this.send(
+          deps,
+          this.reminderMessage(kind, recipient, invoice, currencyOf.get(invoice.currency) ?? null),
+          actorId,
+        );
+        if (line.sent) mailsSent += 1;
+
+        this.audit('billing.reminder', actorId, {
+          userId: line.userId,
+          invoiceId: line.invoiceId,
+          kind,
+          triggerOn,
+          balanceMinor: line.balanceMinor,
+          currency: line.currency,
+          sent: line.sent,
+        });
+      }
+    }
+
+    // --- 4. Digest the admins — crossings, never a standing list -------------
+    const invoicesByUser = new Map<string, InvoiceWithBalanceRecord[]>();
+    for (const invoice of unvoided(allInvoices)) push(invoicesByUser, invoice.userId, invoice);
+
+    const crossings: StandingCrossingLine[] = [];
+    const suppressedByHold: Array<{ userId: string; outstandingMinor: number }> = [];
+
+    for (const [userId, invoices] of invoicesByUser) {
+      const hold = holdByUser.get(userId);
+      const holdInput = hold ? { expiresAt: hold.expiresAt } : null;
+      const openInvoices = invoices.map(toStandingInvoice);
+
+      // The same pure function the roster, the statement and the banner run.
+      // Twice, against two days — the movement between them is the news.
+      const before = resolveStanding({ openInvoices, hold: holdInput, today: since });
+      const now = resolveStanding({ openInvoices, hold: holdInput, today: asOf });
+
+      if (holdInForce(hold, asOf)) {
+        // `hold: null` is what makes the balance beside a suppressed name the
+        // real one: a hold stops the chasing, never the total.
+        const unheld = resolveStanding({ openInvoices, hold: null, today: asOf });
+        if (unheld.standing !== BillingStanding.GOOD) {
+          suppressedByHold.push({ userId, outstandingMinor: unheld.outstandingMinor });
+        }
+      }
+
+      // Only a move *into* one of the two chased states is news. A held student
+      // resolves to `exempt` and is therefore never here.
+      const chased =
+        now.standing === BillingStanding.DUE || now.standing === BillingStanding.DELINQUENT;
+      if (!chased || now.standing === before.standing) continue;
+
+      crossings.push({
+        userId,
+        from: before.standing,
+        to: now.standing,
+        oldestOverdueDate: now.oldestOverdueDate,
+        outstandingMinor: now.outstandingMinor,
+        currency: invoices[0].currency,
+      });
+    }
+
+    // Largest debt first, then by id so two identical runs read identically.
+    crossings.sort(
+      (a, b) =>
+        b.outstandingMinor - a.outstandingMinor ||
+        (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0),
+    );
+
+    let adminsNotified = 0;
+    if (crossings.length > 0) {
+      const digest = this.digestMessage(crossings, since, asOf, currencyOf);
+      for (const admin of await deps.directory.listAdmins()) {
+        if (await this.send(deps, { ...digest, to: admin.email }, actorId)) {
+          mailsSent += 1;
+          adminsNotified += 1;
+        }
+      }
+      this.audit('billing.delinquency_digest', actorId, {
+        asOf,
+        since,
+        crossings: crossings.length,
+        adminsNotified,
+      });
+    }
+
+    const report: BillingRunReport = {
+      asOf,
+      since,
+      eligibleContracts: eligible.length,
+      issued,
+      absorbed,
+      reminders,
+      crossings,
+      suppressedByHold,
+      divergences,
+      mailsSent,
+      adminsNotified,
+    };
+
+    this.audit('billing.invoice_run', actorId, {
+      asOf,
+      since,
+      eligibleContracts: report.eligibleContracts,
+      issuedCount: issued.length,
+      absorbed,
+      remindersSent: reminders.filter((reminder) => reminder.sent).length,
+      remindersSuppressed: reminders.filter((reminder) => reminder.suppressedByHold).length,
+      crossings: crossings.length,
+      divergences: divergences.length,
+      mailsSent,
+      // The grep that answers "did the job ever price anything?" with a `false`.
+      adjustmentsWritten: 0,
+    });
+
+    return { ok: true, data: report };
+  }
+
+  /**
+   * Hands one message to `IMailer`, and answers whether it left.
+   *
+   * A provider outage must not abort a run that has already issued invoices and
+   * still has an assertion pass to make, so the failure is logged and the run
+   * continues.
+   */
+  private async send(
+    deps: BillingRunDeps,
+    message: MailMessage,
+    actorId: string,
+  ): Promise<boolean> {
+    try {
+      await deps.mailer.send(message);
+      return true;
+    } catch (error) {
+      this.audit('billing.mail_failed', actorId, {
+        to: message.to,
+        subject: message.subject,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
+  /** The student's notice. Two of them exist and there is no third. */
+  private reminderMessage(
+    kind: BillingReminderKind,
+    recipient: BillingRecipient,
+    invoice: InvoiceWithBalanceRecord,
+    currency: CurrencyRecord | null,
+  ): MailMessage {
+    const amount = formatAmount(invoice.balanceMinor, currency);
+    const lines =
+      kind === 'due_date'
+        ? [
+            `Hello ${recipient.name},`,
+            '',
+            `Your membership invoice of ${amount} is due today, ${invoice.dueDate}.`,
+            'If you have already paid, please ignore this message.',
+          ]
+        : [
+            `Hello ${recipient.name},`,
+            '',
+            `Your membership invoice of ${amount}, due on ${invoice.dueDate}, is now past its grace period.`,
+            'Please get in touch so we can settle it together.',
+          ];
+
+    return {
+      to: recipient.email,
+      subject:
+        kind === 'due_date'
+          ? `Your membership invoice is due today (${invoice.dueDate})`
+          : `Your membership invoice is overdue (due ${invoice.dueDate})`,
+      text: lines.join('\n'),
+      html: asHtml(lines),
+    };
+  }
+
+  /**
+   * The admin digest. It names the movement and nothing else — a standing list
+   * is the thing people learn to stop opening (RFC 0013 §3).
+   */
+  private digestMessage(
+    crossings: StandingCrossingLine[],
+    since: string,
+    asOf: string,
+    currencyOf: Map<string, CurrencyRecord>,
+  ): MailMessage {
+    const lines = [
+      `Billing standing changes since ${since} (as of ${asOf}):`,
+      '',
+      ...crossings.map(
+        (crossing) =>
+          `- ${crossing.userId}: ${crossing.from} -> ${crossing.to}, ` +
+          `${formatAmount(crossing.outstandingMinor, currencyOf.get(crossing.currency) ?? null)} outstanding` +
+          (crossing.oldestOverdueDate ? ` (oldest due ${crossing.oldestOverdueDate})` : ''),
+      ),
+      '',
+      'Nobody has lost access: standing is reported, never enforced.',
+    ];
+
+    return {
+      // Replaced per admin by the caller.
+      to: '',
+      subject: `${crossings.length} student${crossings.length === 1 ? '' : 's'} changed billing standing`,
+      text: lines.join('\n'),
+      html: asHtml(lines),
+    };
+  }
+
+  // -------------------------------------------------------------------------
   // Internals
   // -------------------------------------------------------------------------
 
@@ -969,4 +1527,127 @@ export class BillingService {
       }),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Wiring the run to the container — the two callers, and nothing between them
+// ---------------------------------------------------------------------------
+
+/** One page of `users.list`, and the ceiling on how many pages are walked. */
+const ADMIN_PAGE_SIZE = 100;
+const ADMIN_PAGE_LIMIT = 5;
+
+/**
+ * Builds the run's dependencies out of the two ports it needs.
+ *
+ * Typed by the ports rather than by `AppContainer`, so `billing-service.ts`
+ * still imports no worker symbol, no D1 handle and no Hono type — and so the
+ * container does not have to import back into a module it already imports.
+ */
+export function billingRunDeps(mailer: IMailer, users: IUserRepository): BillingRunDeps {
+  const toRecipient = (user: Entities.Identity.User): BillingRecipient => ({
+    userId: user.id,
+    name: user.name,
+    email: user.email,
+  });
+
+  return {
+    mailer,
+    directory: {
+      async findRecipient(userId: string): Promise<BillingRecipient | null> {
+        const user = await users.findById(userId);
+        return user ? toRecipient(user) : null;
+      },
+
+      async listAdmins(): Promise<BillingRecipient[]> {
+        const admins: BillingRecipient[] = [];
+        // `IUserRepository` has no role-filtered listing and billing is not the
+        // module that should add one, so the pages are walked and bounded: a
+        // dojo is not a mailing list, and an unbounded walk inside a cron is a
+        // subrequest budget waiting to be exhausted.
+        for (let page = 0; page < ADMIN_PAGE_LIMIT; page += 1) {
+          const batch = await users.list({
+            limit: ADMIN_PAGE_SIZE,
+            offset: page * ADMIN_PAGE_SIZE,
+          });
+          for (const user of batch) {
+            if (user.status !== UserStatus.ACTIVE) continue;
+            if (!user.roles.some((role) => role.name === ROLES.ADMIN)) continue;
+            admins.push(toRecipient(user));
+          }
+          if (batch.length < ADMIN_PAGE_SIZE) break;
+        }
+        return admins;
+      },
+    },
+  };
+}
+
+/**
+ * Deps that resolve nobody and send nothing.
+ *
+ * The default for a caller constructed without a directory — a node-pool spec
+ * that only wants the report. The run still issues, asserts and computes its
+ * crossings; it simply has no address to mail them to.
+ */
+export function silentBillingRunDeps(): BillingRunDeps {
+  return {
+    mailer: { async send(): Promise<void> {} },
+    directory: {
+      async findRecipient(): Promise<BillingRecipient | null> {
+        return null;
+      },
+      async listAdmins(): Promise<BillingRecipient[]> {
+        return [];
+      },
+    },
+  };
+}
+
+/**
+ * The structural slice of `AppContainer` the scheduled run needs.
+ *
+ * Declared structurally rather than imported so there is no import cycle
+ * between the container and the service it constructs; `AppContainer` satisfies
+ * it without naming it.
+ */
+export interface ScheduledBillingHost {
+  billing: { billingService: BillingService };
+  identity: { users: IUserRepository };
+  infra: { mailer: IMailer };
+}
+
+/**
+ * What `scheduled` in `src/index.ts` delegates to.
+ *
+ * The container is built per invocation by the caller — Workers share no memory
+ * between invocations, so nothing here or there may be hoisted to module scope
+ * — and this function adds no rule of its own: it assembles the deps and calls
+ * the same `runBillingCycle` the admin route calls.
+ */
+export async function runScheduledBilling(
+  host: ScheduledBillingHost,
+  options?: BillingRunOptions,
+): Promise<ControllerResult<BillingRunReport>> {
+  const result = await host.billing.billingService.runBillingCycle(
+    billingRunDeps(host.infra.mailer, host.identity.users),
+    options,
+    SCHEDULED_BILLING_ACTOR,
+  );
+
+  if (!result.ok) {
+    // A cron has nobody to return a status to, so the refusal is the log line.
+    console.error(
+      JSON.stringify({
+        event: 'billing.invoice_run_failed',
+        actor: SCHEDULED_BILLING_ACTOR,
+        status: result.status,
+        error: result.error,
+        ...result.meta,
+        at: new Date().toISOString(),
+      }),
+    );
+  }
+
+  return result;
 }

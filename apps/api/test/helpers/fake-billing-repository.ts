@@ -24,6 +24,7 @@ import type {
   SetHoldInput,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
+import { computePeriod } from '@arenaquest/shared/domain/billing/billing-cycle';
 
 /**
  * An in-memory `IBillingRepository` for the node-pool specs.
@@ -274,8 +275,54 @@ export class FakeBillingRepository implements IBillingRepository {
     return invoice ? this.withBalance(invoice) : null;
   }
 
-  async issueInvoices(_period: IssueInvoicesInput): Promise<InvoiceRecord[]> {
-    throw new Error('not used by Task 03');
+  /**
+   * The daily run's issuance, reproducing the one behaviour Task 06 rests on:
+   * `UNIQUE (subscription_id, period_start)` decides, and only the rows this
+   * call actually created come back. The adapter expresses it as
+   * `INSERT OR IGNORE` and `meta.changes === 0`; here it is the same rule, said
+   * in a Map.
+   */
+  async issueInvoices(period: IssueInvoicesInput): Promise<InvoiceRecord[]> {
+    const { referenceDate } = period;
+    const created: InvoiceRecord[] = [];
+
+    for (const contract of this.subscriptions.values()) {
+      // The status filter the adapter's WHERE clause applies: `paused`,
+      // `cancelled` and `superseded` are skipped here and nowhere else.
+      if (contract.status !== ContractStatus.ACTIVE) continue;
+      if (contract.startDate > referenceDate) continue;
+      if (contract.endDate !== null && contract.endDate <= referenceDate) continue;
+
+      const cyclePeriod = computePeriod(
+        contract.cycle,
+        contract.startDate,
+        contract.dueDay,
+        referenceDate,
+      );
+
+      const alreadyIssued = [...this.invoices.values()].some(
+        (invoice) =>
+          invoice.subscriptionId === contract.id &&
+          invoice.periodStart === cyclePeriod.periodStart,
+      );
+      if (alreadyIssued) continue;
+
+      created.push(
+        await this.createInvoice({
+          subscriptionId: contract.id,
+          userId: contract.userId,
+          periodStart: cyclePeriod.periodStart,
+          periodEnd: cyclePeriod.periodEnd,
+          dueDate: cyclePeriod.dueDate,
+          // The contract's snapshot, never the plan's.
+          amountMinor: contract.amountMinor,
+          currency: contract.currency,
+          graceDays: contract.graceDays,
+        }),
+      );
+    }
+
+    return created;
   }
 
   async createInvoice(input: CreateInvoiceInput): Promise<InvoiceRecord> {

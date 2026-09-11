@@ -464,6 +464,10 @@ const ROUTES: Array<{ method: string; path: string; body?: unknown }> = [
   { method: 'GET', path: '/students' },
   { method: 'POST', path: '/holds/some-id', body: {} },
   { method: 'DELETE', path: '/holds/some-id' },
+  // Task 06's manual twin of the cron. It is the one route here that writes
+  // across every student at once, so it is the last one that should be
+  // reachable by a content_creator.
+  { method: 'POST', path: '/invoices/run', body: {} },
 ];
 
 describe('/v1/admin/billing — ADMIN-only on every route', () => {

@@ -13,6 +13,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { Scalar } from '@scalar/hono-api-reference';
 
 import { buildContainer } from '@api/container';
+import { runScheduledBilling } from '@api/core/billing/billing-service';
 import { AppRouter } from '@api/routes';
 import { configureOpenAPIDocument } from '@api/openapi/document';
 import '@api/types/hono-env';
@@ -37,9 +38,22 @@ export function buildApp(env: AppEnv): OpenAPIHono {
 export default {
   async fetch(request: Request, env: AppEnv, ctx: ExecutionContext): Promise<Response> {
     return buildApp(env).fetch(request, env, ctx);
-  }
-  // ,  async scheduled(controller: ScheduledController, env: AppEnv, ctx: ExecutionContext): Promise<void> { 
-  //   console.log(controller, env, ctx); 
-  //   return;
-  // }
+  },
+
+  /**
+   * The daily billing run (RFC 0013 §6), fired by `triggers.crons`.
+   *
+   * A delegation and nothing else: every rule lives in
+   * `BillingService.runBillingCycle`, which `POST /v1/admin/billing/invoices/run`
+   * calls too — one routine, two callers. The container is built **inside** the
+   * handler for the same reason `fetch` builds it per request: Workers share no
+   * memory between invocations, so a hoisted adapter is a correctness bug.
+   */
+  async scheduled(
+    _controller: ScheduledController,
+    env: AppEnv,
+    _ctx: ExecutionContext,
+  ): Promise<void> {
+    await runScheduledBilling(buildContainer(env));
+  },
 } satisfies ExportedHandler<AppEnv>;
