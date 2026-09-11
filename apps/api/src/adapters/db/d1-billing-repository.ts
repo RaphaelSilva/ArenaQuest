@@ -1,5 +1,6 @@
 import type {
   IBillingRepository,
+  CurrencyRecord,
   BillingPlanRecord,
   BillingPlanFilter,
   CreateBillingPlanInput,
@@ -48,6 +49,14 @@ import { computePeriod } from '@arenaquest/shared/domain/billing/billing-cycle';
 // ---------------------------------------------------------------------------
 // Rows — the on-disk shape, snake_case, integers for booleans
 // ---------------------------------------------------------------------------
+
+type CurrencyRow = {
+  code: string;
+  exponent: number;
+  symbol: string;
+  name: string;
+  active: number;
+};
 
 type BillingPlanRow = {
   id: string;
@@ -137,6 +146,16 @@ type BillingStandingHoldRow = {
 // ---------------------------------------------------------------------------
 // Row → record mappers
 // ---------------------------------------------------------------------------
+
+function rowToCurrency(row: CurrencyRow): CurrencyRecord {
+  return {
+    code: row.code,
+    exponent: row.exponent,
+    symbol: row.symbol,
+    name: row.name,
+    active: row.active === 1,
+  };
+}
 
 function rowToPlan(row: BillingPlanRow): BillingPlanRecord {
   return {
@@ -278,6 +297,35 @@ const REFRESH_INVOICE_STATUS = `
 
 export class D1BillingRepository implements IBillingRepository {
   constructor(private readonly db: D1Database) {}
+
+  // -------------------------------------------------------------------------
+  // Currencies — the table is the source of truth
+  // -------------------------------------------------------------------------
+
+  /**
+   * The whole point of this method: a code is known because the `currencies`
+   * table holds a row for it, not because a constant in the service lists it.
+   * A tenant who adds a currency with `wrangler d1 execute` is therefore able
+   * to price a plan in it without a deploy (RFC 0013 §1, decision #13).
+   */
+  async getCurrency(code: string): Promise<CurrencyRecord | null> {
+    const row = await this.db
+      .prepare('SELECT * FROM currencies WHERE code = ?')
+      .bind(code)
+      .first<CurrencyRow>();
+    return row ? rowToCurrency(row) : null;
+  }
+
+  /**
+   * Active first, so the tenant's live currency is `results[0]` when one is
+   * set — `idx_currencies_one_active` guarantees there is at most one.
+   */
+  async listCurrencies(): Promise<CurrencyRecord[]> {
+    const { results } = await this.db
+      .prepare('SELECT * FROM currencies ORDER BY active DESC, code ASC')
+      .all<CurrencyRow>();
+    return results.map(rowToCurrency);
+  }
 
   // -------------------------------------------------------------------------
   // Plans — the catalogue

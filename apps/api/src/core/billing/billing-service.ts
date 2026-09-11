@@ -45,15 +45,6 @@ import type { ControllerResult } from '@api/core/result';
 
 const { ContractStatus, ContractTermsSource, InvoiceStatus, AdjustmentKind } = Entities.Config;
 
-/**
- * The currency codes migration 0026 seeds. `IBillingRepository` declares no
- * currency reader — the database enforces the code through a foreign key — so
- * this list exists purely to turn "unknown currency" into a clean `400` instead
- * of a raised constraint error. It is a mirror of the migration's seed rows,
- * not a second source of truth: adding a currency means adding a row there.
- */
-export const SEEDED_CURRENCY_CODES = ['BRL', 'USD', 'EUR', 'JPY', 'BTC'] as const;
-
 /** The only lifecycle transitions `PATCH /subscriptions/{id}` may request. */
 export type LifecycleAction = 'pause' | 'resume' | 'cancel';
 
@@ -181,7 +172,14 @@ export class BillingService {
     input: CreatePlanCommand,
     actorId: string,
   ): Promise<ControllerResult<BillingPlanRecord>> {
-    if (!this.isKnownCurrency(input.currency)) {
+    // The `currencies` table is the source of truth, not a constant in this
+    // file: RFC 0013 §1 has an unknown code "rejected by the database rather
+    // than by convention", and decision #13 makes adding a currency a
+    // `wrangler d1 execute` rather than a deploy. Reading the row keeps both
+    // true — a code inserted by SQL is accepted here the moment it lands —
+    // while still turning an unknown one into a clean `400` rather than a
+    // raised foreign-key error.
+    if (!(await this.repo.getCurrency(input.currency))) {
       return badRequest(`unknown currency "${input.currency}"`);
     }
 
@@ -654,10 +652,6 @@ export class BillingService {
   // -------------------------------------------------------------------------
   // Internals
   // -------------------------------------------------------------------------
-
-  private isKnownCurrency(code: string): boolean {
-    return (SEEDED_CURRENCY_CODES as readonly string[]).includes(code);
-  }
 
   /**
    * One structured line per mutation, always carrying the acting admin, in the

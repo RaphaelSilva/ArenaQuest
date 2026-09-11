@@ -123,6 +123,88 @@ const IdParamSchema = z.object({
   id: z.string().openapi({ param: { name: 'id', in: 'path' }, example: 'plan-id' }),
 });
 
+const UserIdParamSchema = z.object({
+  userId: z.string().openapi({ param: { name: 'userId', in: 'path' }, example: 'user-id' }),
+});
+
+/**
+ * The currency a report is stated in. It travels with every report because the
+ * amounts are integers in the currency's minor unit and nothing on the server
+ * formats them — the client needs the exponent and the symbol to do it.
+ */
+const ReportCurrencySchema = z
+  .object({
+    code: z.string().openapi({ example: 'BRL' }),
+    exponent: z.number().int().openapi({ example: 2 }),
+    symbol: z.string().openapi({ example: 'R$' }),
+  })
+  .openapi('BillingReportCurrency');
+
+const MovementReportSchema = z
+  .object({
+    month: z.string().openapi({ example: '2026-08' }),
+    periodStart: IsoDate,
+    periodEnd: IsoDate,
+    currency: ReportCurrencySchema,
+    invoicedMinor: MinorUnits,
+    adjustmentsMinor: MinorUnits,
+    billedMinor: MinorUnits,
+    receivedMinor: MinorUnits,
+    outstandingMinor: MinorUnits,
+    invoicesIssued: z.number().int(),
+    activeStudents: z.number().int(),
+  })
+  .openapi('BillingMovementReport');
+
+const AgingBucketSchema = z
+  .object({
+    bucket: z.enum(['0-30', '31-60', '61-90', '90+']),
+    fromDaysPastDue: z.number().int().nullable(),
+    toDaysPastDue: z.number().int().nullable(),
+    invoiceCount: z.number().int(),
+    studentCount: z.number().int(),
+    totalMinor: MinorUnits,
+  })
+  .openapi('BillingAgingBucket');
+
+const AgingReportSchema = z
+  .object({
+    asOf: IsoDate,
+    currency: ReportCurrencySchema,
+    buckets: z.array(AgingBucketSchema),
+    totalMinor: MinorUnits,
+    invoiceCount: z.number().int(),
+    studentCount: z.number().int(),
+  })
+  .openapi('BillingAgingReport');
+
+const StatementInvoiceSchema = InvoiceWithBalanceSchema.extend({
+  adjustments: z.array(AdjustmentSchema),
+  payments: z.array(PaymentSchema),
+}).openapi('BillingStatementInvoice');
+
+const StatementContractGroupSchema = z
+  .object({
+    contractGroupId: z.string(),
+    startDate: IsoDate,
+    endDate: IsoDate.nullable(),
+    status: ContractStatusSchema,
+    versions: z.array(SubscriptionSchema),
+  })
+  .openapi('BillingStatementContractGroup');
+
+const StudentStatementSchema = z
+  .object({
+    userId: z.string(),
+    currency: ReportCurrencySchema,
+    studentSince: IsoDate.nullable(),
+    currentMembershipSince: IsoDate.nullable(),
+    outstandingMinor: MinorUnits,
+    contractGroups: z.array(StatementContractGroupSchema),
+    invoices: z.array(StatementInvoiceSchema),
+  })
+  .openapi('BillingStudentStatement');
+
 const json = <S extends z.ZodTypeAny>(description: string, schema: S) => ({
   description,
   content: { 'application/json': { schema } },
@@ -407,11 +489,77 @@ export const reversePaymentRoute = createRoute({
 });
 
 // ---------------------------------------------------------------------------
+// Reports — read-only (RFC 0013 §5)
+// ---------------------------------------------------------------------------
+
+/**
+ * `409` on every report is the two-currency refusal: a total that would span
+ * two currencies is refused rather than rate-converted, because ArenaQuest
+ * holds no exchange rate and an invented one corrupts the total silently.
+ */
+const REPORT_RESPONSES = {
+  400: { description: 'Validation failed — a malformed month or asOf' },
+  403: { description: 'Forbidden — admin only' },
+  409: { description: 'The report would span two currencies; totals are never converted' },
+};
+
+export const movementReportRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/reports/movement',
+  summary: 'Monthly Movement',
+  description:
+    "Billed, received and outstanding for one month, recomputed from the ledger rows. Billed is keyed off the invoice's issue date and the adjustment's applied date; received is keyed off the payment's paid date — a payment in September against an August invoice is September's received and August's billed.",
+  request: {
+    query: z.object({
+      month: z
+        .string()
+        .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+        .openapi({ param: { name: 'month', in: 'query' }, example: '2026-08' }),
+    }),
+  },
+  responses: { 200: json('Monthly movement', MovementReportSchema), ...REPORT_RESPONSES },
+});
+
+export const agingReportRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/reports/aging',
+  summary: 'Receivables Aging',
+  description:
+    "Open balances bucketed 0-30 / 31-60 / 61-90 / 90+ by days past each invoice's own due date. Boundaries are exclusive: 30 days past due and 31 days past due land in different buckets.",
+  request: {
+    query: z.object({
+      asOf: IsoDate.optional().openapi({ param: { name: 'asOf', in: 'query' } }),
+    }),
+  },
+  responses: { 200: json('Receivables aging', AgingReportSchema), ...REPORT_RESPONSES },
+});
+
+export const studentStatementRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/students/{userId}/statement',
+  summary: "A Student's Statement",
+  description:
+    'The student\'s contracts with their chains, invoices with their adjustments and payments, the outstanding total, and the two derived membership dates: "student since" spans every contract group, "current membership since" is the root of the group now active.',
+  request: { params: UserIdParamSchema },
+  responses: {
+    200: json('Student statement', StudentStatementSchema),
+    404: { description: 'Student not found' },
+    ...REPORT_RESPONSES,
+  },
+});
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
 export function buildAdminBillingRouter(container: AppContainer) {
-  const controller = new AdminBillingController(container.billing.billingService);
+  const controller = new AdminBillingController(
+    container.billing.billingService,
+    container.billing.accountingService,
+  );
 
   const router = new OpenAPIHono({
     defaultHook: (result, c) => {
@@ -507,6 +655,27 @@ export function buildAdminBillingRouter(container: AppContainer) {
     const { id } = c.req.valid('param');
     const result = await controller.reversePayment(id, c.req.valid('json'), c.get('user').sub);
     return respondCreated(c, result);
+  });
+
+  // Reports. Read-only: none of the three writes a row, and none repairs a
+  // drifted `invoices.status` cache — that divergence is reported elsewhere.
+
+  router.openapi(movementReportRoute, async (c) => {
+    const result = await controller.getMonthlyMovement(c.req.valid('query'));
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(agingReportRoute, async (c) => {
+    const result = await controller.getReceivablesAging(c.req.valid('query'));
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(studentStatementRoute, async (c) => {
+    const result = await controller.getStudentStatement(c.req.valid('param'));
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
   });
 
   return router;

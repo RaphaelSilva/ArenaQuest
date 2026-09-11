@@ -29,6 +29,7 @@ import { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-eva
 import { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
 import { AuthService } from '@api/core/auth/auth-service';
 import { BillingService } from '@api/core/billing/billing-service';
+import { AccountingService } from '@api/core/billing/accounting-service';
 import { buildRegistrationMailHandler } from '@api/core/registration/registration-mail-handler';
 import { PasswordController } from '@api/controllers/password.controller';
 import { AccountController } from '@api/controllers/account.controller';
@@ -114,6 +115,8 @@ export interface GamificationContext {
 export interface BillingContext {
   billingRepo: IBillingRepository;
   billingService: BillingService;
+  /** Read-only reporting over the same repository (RFC 0013 §5). */
+  accountingService: AccountingService;
 }
 
 export interface InfraContext {
@@ -218,6 +221,11 @@ export function buildContainer(env: Env): AppContainer {
   // Billing repo + service
   const billingRepo = new D1BillingRepository(env.DB);
   const billingService = new BillingService(billingRepo);
+  // The statement 404s an unknown student, which is all billing needs from
+  // identity — a probe rather than the repository, as `StreakEngine` does.
+  const accountingService = new AccountingService(billingRepo, (userId) =>
+    users.findById(userId).then((user) => user !== null),
+  );
 
   // Infra: mail
   const mailer: IMailer = env.MAIL_DRIVER === 'resend'
@@ -284,7 +292,7 @@ export function buildContainer(env: Env): AppContainer {
     engagement: { taskRepo, taskStages, taskLinks, commentRepo },
     progress: { progressRepo, enrollmentRepo },
     gamification: { questRepo, badgeRepo, gamificationRepo, missionRepo, xpEngine, streakEngine, questEvaluator, badgeEngine },
-    billing: { billingRepo, billingService },
+    billing: { billingRepo, billingService, accountingService },
     infra: {
       auth,
       mailer,

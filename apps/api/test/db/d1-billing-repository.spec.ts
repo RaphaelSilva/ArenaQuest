@@ -65,6 +65,38 @@ describe('D1BillingRepository', () => {
   // Plans
   // -------------------------------------------------------------------------
 
+  describe('currencies', () => {
+    it("reads migration 0026's seed rows with their own exponents", async () => {
+      expect(await repo.getCurrency('BRL')).toEqual({
+        code: 'BRL',
+        exponent: 2,
+        symbol: 'R$',
+        name: 'Brazilian real',
+        active: true,
+      });
+      // The non-decimal codes exist precisely so this path is exercised.
+      expect((await repo.getCurrency('JPY'))?.exponent).toBe(0);
+      expect((await repo.getCurrency('BTC'))?.exponent).toBe(8);
+    });
+
+    it('returns null for a code with no row', async () => {
+      expect(await repo.getCurrency('XYZ')).toBeNull();
+    });
+
+    it('lists the active currency first, and sees one inserted at runtime', async () => {
+      await env.DB
+        .prepare('INSERT INTO currencies (code, exponent, symbol, name, active) VALUES (?, ?, ?, ?, 0)')
+        .bind('GBP', 2, '\u00a3', 'Pound sterling')
+        .run();
+
+      const currencies = await repo.listCurrencies();
+
+      expect(currencies[0]).toMatchObject({ code: 'BRL', active: true });
+      expect(currencies.map((c) => c.code)).toContain('GBP');
+      expect(currencies.filter((c) => c.active)).toHaveLength(1);
+    });
+  });
+
   describe('plans', () => {
     it('round trips a plan and defaults its optional columns', async () => {
       const plan = await repo.getPlan(planId);

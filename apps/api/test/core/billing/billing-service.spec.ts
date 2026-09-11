@@ -87,6 +87,33 @@ describe('BillingService', () => {
       expect(result).toMatchObject({ ok: false, status: 400, error: 'ValidationError' });
     });
 
+    it('accepts a currency added to the table after deploy', async () => {
+      // The service asks `currencies` rather than a constant, so the documented
+      // workflow — a `wrangler d1 execute` insert, not a deploy (RFC 0013 #13) —
+      // works without touching this file.
+      repo.currencies.set('GBP', {
+        code: 'GBP',
+        exponent: 2,
+        symbol: '\u00a3',
+        name: 'Pound sterling',
+        active: false,
+      });
+
+      const plan = ok(
+        await service.createPlan(
+          {
+            name: 'London seminar',
+            amountMinor: 4200,
+            currency: 'GBP',
+            cycle: BillingCycle.MONTHLY,
+            graceDays: 0,
+          },
+          ADMIN,
+        ),
+      );
+      expect(plan.currency).toBe('GBP');
+    });
+
     it('404s an edit of an unknown plan', async () => {
       const result = await service.updatePlan('nope', { amountMinor: 1 }, ADMIN);
       expect(result).toMatchObject({ ok: false, status: 404, error: 'NotFound' });

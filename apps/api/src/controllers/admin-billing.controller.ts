@@ -10,6 +10,12 @@ import type {
 } from '@arenaquest/shared/ports';
 import type { ControllerResult } from '@api/core/result';
 import type { BillingService } from '@api/core/billing/billing-service';
+import type {
+  AccountingService,
+  AgingReport,
+  MovementReport,
+  StudentStatement,
+} from '@api/core/billing/accounting-service';
 
 /**
  * AdminBillingController — the admin billing lifecycle as `ControllerResult<T>`.
@@ -153,6 +159,21 @@ const ListInvoicesQuerySchema = z.object({
   to: IsoDateSchema.optional(),
 });
 
+/**
+ * Report queries. A malformed `month` is a `400` and never an empty report:
+ * silently returning zeroes for `2026-13` would read as "nothing happened".
+ */
+const MovementQuerySchema = z.object({
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'expected a month as YYYY-MM'),
+});
+
+const AgingQuerySchema = z.object({
+  /** The day the aging is measured at; defaults to today in the service. */
+  asOf: IsoDateSchema.optional(),
+});
+
+const StudentParamSchema = z.object({ userId: z.string().min(1) });
+
 function invalid(error: z.ZodError): ControllerResult<never> {
   return {
     ok: false,
@@ -167,7 +188,11 @@ function invalid(error: z.ZodError): ControllerResult<never> {
 // ---------------------------------------------------------------------------
 
 export class AdminBillingController {
-  constructor(private readonly service: BillingService) {}
+  constructor(
+    private readonly service: BillingService,
+    /** Read-only; the three report handlers are the only callers. */
+    private readonly accounting: AccountingService,
+  ) {}
 
   // Plans ---------------------------------------------------------------
 
@@ -283,5 +308,25 @@ export class AdminBillingController {
     const parsed = ReversePaymentSchema.safeParse(body ?? {});
     if (!parsed.success) return invalid(parsed.error);
     return this.service.reversePayment(paymentId, parsed.data, actorId);
+  }
+
+  // Reports — read-only ---------------------------------------------------
+
+  async getMonthlyMovement(query: unknown): Promise<ControllerResult<MovementReport>> {
+    const parsed = MovementQuerySchema.safeParse(query ?? {});
+    if (!parsed.success) return invalid(parsed.error);
+    return this.accounting.getMonthlyMovement(parsed.data.month);
+  }
+
+  async getReceivablesAging(query: unknown): Promise<ControllerResult<AgingReport>> {
+    const parsed = AgingQuerySchema.safeParse(query ?? {});
+    if (!parsed.success) return invalid(parsed.error);
+    return this.accounting.getReceivablesAging(parsed.data.asOf);
+  }
+
+  async getStudentStatement(params: unknown): Promise<ControllerResult<StudentStatement>> {
+    const parsed = StudentParamSchema.safeParse(params ?? {});
+    if (!parsed.success) return invalid(parsed.error);
+    return this.accounting.getStudentStatement(parsed.data.userId);
   }
 }
