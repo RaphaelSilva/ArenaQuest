@@ -1,6 +1,6 @@
 # Task 05 — Backend: Standing roster, holds and the student billing endpoint (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Backend API
@@ -91,32 +91,32 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] With a seeded student sitting `delinquent`, every pre-existing API test passes
+- [x] With a seeded student sitting `delinquent`, every pre-existing API test passes
       unchanged and `/v1/topics`, `/v1/me/progress` and the comments routes all return
       `200` for that student.
-- [ ] `git diff` over `apps/api/src/middleware/`, `apps/api/src/routes/index.ts` and
+- [x] `git diff` over `apps/api/src/middleware/`, `apps/api/src/routes/index.ts` and
       `apps/api/src/adapters/db/d1-enrollment-repository.ts` is empty.
-- [ ] The roster lists that student under `standing=delinquent`, with the outstanding
+- [x] The roster lists that student under `standing=delinquent`, with the outstanding
       balance and oldest overdue date the statement reports for them.
-- [ ] Setting a hold removes the student from the `standing=delinquent` listing and marks
+- [x] Setting a hold removes the student from the `standing=delinquent` listing and marks
       them `exempt`, while their outstanding balance is unchanged in the movement report,
       the aging report and their statement.
-- [ ] An expired hold stops taking effect without anything having run — the same request
+- [x] An expired hold stops taking effect without anything having run — the same request
       the day after expiry reports the underlying standing again.
-- [ ] A hold records its reason and the admin who set it; a request without a reason is
+- [x] A hold records its reason and the admin who set it; a request without a reason is
       refused.
-- [ ] The roster resolves every student in one query — asserted by a test that fails on
+- [x] The roster resolves every student in one query — asserted by a test that fails on
       a per-student query count.
-- [ ] `GET /v1/me/billing` returns only the caller's own statement; no parameter,
+- [x] `GET /v1/me/billing` returns only the caller's own statement; no parameter,
       header or body field makes it return another student's, and a request for a student
       with no contract returns an empty statement with standing `good` rather than `404`.
-- [ ] A `content_creator` and a `tutor` each receive `403` from every
+- [x] A `content_creator` and a `tutor` each receive `403` from every
       `/v1/admin/billing/*` route; a student receives `403` from all of them while
       `GET /v1/me/billing` returns their own statement.
-- [ ] Setting and clearing a hold each emit their `billing.*` audit event with the acting
+- [x] Setting and clearing a hold each emit their `billing.*` audit event with the acting
       admin.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
