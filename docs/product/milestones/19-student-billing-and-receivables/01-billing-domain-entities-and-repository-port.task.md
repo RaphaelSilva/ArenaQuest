@@ -1,6 +1,6 @@
 # Task 01 — Backend: Billing domain, entities and repository port (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Backend API
@@ -93,31 +93,31 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `formatMoney` renders `100000` minor units as `R$ 1.000,00` at exponent 2,
+- [x] `formatMoney` renders `100000` minor units as `R$ 1.000,00` at exponent 2,
       `JP¥ 100000` at exponent 0, and `₿ 0,00100000` at exponent 8 — the last being the
       case `Intl.NumberFormat`'s currency style rounds to `BTC 0,00`.
-- [ ] `resolveStanding` returns `exempt` for an unexpired hold, and the same input with
+- [x] `resolveStanding` returns `exempt` for an unexpired hold, and the same input with
       an expired hold returns what it would have returned with no hold at all.
-- [ ] `resolveStanding` covers both grace boundaries explicitly: `today = dueDate + graceDays`
+- [x] `resolveStanding` covers both grace boundaries explicitly: `today = dueDate + graceDays`
       is still `due`, and `today = dueDate + graceDays + 1` is `delinquent`, each read from
       the **invoice's** snapshotted `graceDays` and not from any plan value.
-- [ ] A held student's `outstandingMinor` is unchanged by the hold — the debt is still
+- [x] A held student's `outstandingMinor` is unchanged by the hold — the debt is still
       reported in full while the standing reads `exempt`.
-- [ ] An input with no open invoices, and one whose only open invoice has a zero or
+- [x] An input with no open invoices, and one whose only open invoice has a zero or
       negative balance, both return `good` with `oldestOverdueDate` null.
-- [ ] A discount that brings a balance to zero, and a reversal that puts it back above
+- [x] A discount that brings a balance to zero, and a reversal that puts it back above
       zero, move the returned standing accordingly through the same arithmetic.
-- [ ] `billing-cycle.ts` produces contiguous, non-overlapping periods across a year for
+- [x] `billing-cycle.ts` produces contiguous, non-overlapping periods across a year for
       each of `monthly`, `quarterly` and `yearly`, and resolves a `due_day` of 28 in
       February without rolling into March.
-- [ ] No import of a Cloudflare, D1, Hono or Zod symbol appears anywhere under
+- [x] No import of a Cloudflare, D1, Hono or Zod symbol appears anywhere under
       `packages/shared/domain/billing/` or in `i-billing-repository.ts`.
-- [ ] No entity in `Entities.Billing` carries a stored standing field.
-- [ ] `Entities.Config.PaymentMethod` includes `gateway` and `AdjustmentKind` includes
+- [x] No entity in `Entities.Billing` carries a stored standing field.
+- [x] `Entities.Config.PaymentMethod` includes `gateway` and `AdjustmentKind` includes
       `surcharge`, with no code in this task producing either.
-- [ ] Changed files lint clean; `make test` green for the shared package, with the
+- [x] Changed files lint clean; `make test` green for the shared package, with the
       billing domain specs running without a Worker.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
