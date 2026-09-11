@@ -1,6 +1,6 @@
 # Task 03 — Backend: Billing service and the admin lifecycle API (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Backend API
@@ -97,36 +97,36 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] An admin can create a plan, sign both a standard and a negotiated contract, and
+- [x] An admin can create a plan, sign both a standard and a negotiated contract, and
       issue, adjust, void, pay and reverse — entirely over the API, with no screen and no
       report in existence.
-- [ ] Signing snapshots the plan's `amount_minor`, `currency`, `cycle` and `grace_days`
+- [x] Signing snapshots the plan's `amount_minor`, `currency`, `cycle` and `grace_days`
       onto the subscription; editing the plan afterwards leaves that subscription and
       every invoice issued from it byte-identical.
-- [ ] A negotiated contract stores `terms_source = 'negotiated'` and rejects a request
+- [x] A negotiated contract stores `terms_source = 'negotiated'` and rejects a request
       that omits the reason.
-- [ ] Amending closes the live version to `superseded` with its `end_date` set and opens
+- [x] Amending closes the live version to `superseded` with its `end_date` set and opens
       one new `active` row carrying `supersedes_id` and the same `contract_group_id`; a
       second amendment of the superseded version is refused with a conflict.
-- [ ] `PATCH /subscriptions/{id}` accepts only pause, resume and cancel — an attempt to
+- [x] `PATCH /subscriptions/{id}` accepts only pause, resume and cancel — an attempt to
       change terms through it is refused, directing the caller to `/amend`.
-- [ ] A void without a reason is refused; a recorded payment against a voided invoice is
+- [x] A void without a reason is refused; a recorded payment against a voided invoice is
       refused.
-- [ ] A reversal appends a row rather than deleting the original, and the invoice's
+- [x] A reversal appends a row rather than deleting the original, and the invoice's
       balance moves back accordingly; no code path issues an `UPDATE` or `DELETE` against
       `payments` or `invoice_adjustments`.
-- [ ] Every mutation emits its `billing.*` structured audit event carrying the acting
+- [x] Every mutation emits its `billing.*` structured audit event carrying the acting
       admin's id.
-- [ ] A `content_creator`, a `tutor` and a student each receive `403` from every route in
+- [x] A `content_creator`, a `tutor` and a student each receive `403` from every route in
       this router — asserted per route, not once.
-- [ ] Validation, auth, not-found and conflict branches each return the correct
+- [x] Validation, auth, not-found and conflict branches each return the correct
       `ControllerResult` status and are covered by a test.
-- [ ] No provider-specific (D1/R2) import leaks into the controller or the service.
-- [ ] `apps/api/src/routes/index.ts`, `apps/api/src/middleware/**` and
+- [x] No provider-specific (D1/R2) import leaks into the controller or the service.
+- [x] `apps/api/src/routes/index.ts`, `apps/api/src/middleware/**` and
       `d1-enrollment-repository.ts` are unchanged, and every pre-existing API test still
       passes.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
