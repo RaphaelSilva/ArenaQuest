@@ -3,6 +3,7 @@ import type {
   BillingPlanRecord,
   BillingPlanFilter,
   UpdateBillingPlanInput,
+  BillingStandingHoldRecord,
   SubscriptionRecord,
   SubscriptionFilter,
   InvoiceRecord,
@@ -12,7 +13,11 @@ import type {
   PaymentRecord,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
-import { computePeriod } from '@arenaquest/shared/domain/billing/billing-cycle';
+import { computePeriod, nextPeriod } from '@arenaquest/shared/domain/billing/billing-cycle';
+import {
+  resolveStanding,
+  type StandingInvoice,
+} from '@arenaquest/shared/domain/billing/standing-resolver';
 import type { ControllerResult } from '@api/core/result';
 
 /**
@@ -131,6 +136,66 @@ export interface ReversePaymentCommand {
   paidAt?: string;
 }
 
+/**
+ * A student's standing, resolved rather than read (RFC 0013 §2).
+ *
+ * `asOf` travels with the answer because the answer is only true for that day:
+ * a hold that expires tonight reports `exempt` today and the underlying
+ * standing tomorrow, with nothing having run in between.
+ */
+export interface StandingSummary {
+  userId: string;
+  standing: Entities.Config.BillingStanding;
+  /** Due date of the oldest unpaid invoice already past due; null if none is. */
+  oldestOverdueDate: string | null;
+  /** What is still owed. A hold never changes this. */
+  outstandingMinor: number;
+  /** The day the standing was resolved against — `YYYY-MM-DD`. */
+  asOf: string;
+}
+
+/**
+ * One line of the admin roster: a student with a contract, their standing and
+ * what the front desk needs to act on it.
+ *
+ * `hold` is the stored row, expired or not; whether it is still in force is
+ * `standing === 'exempt'` and nothing else — there is no second copy of that
+ * decision here.
+ */
+export interface RosterEntry extends StandingSummary {
+  /** The contract the other fields describe: the active one, else the newest. */
+  contractId: string;
+  contractGroupId: string;
+  contractStatus: Entities.Config.ContractStatus;
+  currency: string;
+  /** The next due date of an active contract; null once it is not active. */
+  nextDueDate: string | null;
+  /** True when the contract's terms were negotiated rather than taken from the plan. */
+  negotiatedTerms: boolean;
+  hold: BillingStandingHoldRecord | null;
+}
+
+export interface RosterFilter {
+  /** `exempt` is the held filter: a hold is the only way to reach it. */
+  standing?: Entities.Config.BillingStanding;
+  /** The day to resolve against; defaults to today. */
+  asOf?: string;
+}
+
+export interface SetHoldCommand {
+  /** Mandatory: a hold with no reason quietly becomes permanent. */
+  reason: string;
+  /** YYYY-MM-DD; omitted or null never expires. */
+  expiresAt?: string | null;
+}
+
+/**
+ * "Does this user exist?", injected rather than imported, in the shape
+ * `AccountingService` already established. Setting a hold on an unknown id is
+ * the only place billing needs to ask identity anything.
+ */
+export type StudentExistsProbe = (userId: string) => Promise<boolean>;
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -151,8 +216,87 @@ function conflict(message: string): ControllerResult<never> {
   return { ok: false, status: 409, error: 'Conflict', meta: { message } };
 }
 
+function push<T>(map: Map<string, T[]>, key: string, value: T): void {
+  const bucket = map.get(key);
+  if (bucket) bucket.push(value);
+  else map.set(key, [value]);
+}
+
+/**
+ * Every invoice that still counts.
+ *
+ * A voided invoice is excluded — voiding is a decision rather than an
+ * arithmetic outcome — and a settled one is left in, because `resolveStanding`
+ * drops a non-positive balance itself. Filtering on `invoices.status = 'open'`
+ * instead would make standing depend on a *cache* of the balance rather than on
+ * the balance, which is the one thing this bounded context never does.
+ */
+function unvoided(invoices: InvoiceWithBalanceRecord[]): InvoiceWithBalanceRecord[] {
+  return invoices.filter((invoice) => invoice.status !== InvoiceStatus.VOID);
+}
+
+/** The invoice reduced to the three columns standing depends on. */
+function toStandingInvoice(invoice: InvoiceWithBalanceRecord): StandingInvoice {
+  return {
+    dueDate: invoice.dueDate,
+    // The invoice's own snapshot — never the contract's or the plan's.
+    graceDays: invoice.graceDays,
+    balanceMinor: invoice.balanceMinor,
+  };
+}
+
+/**
+ * The version of a student's contract the roster describes: the active one, or
+ * the newest version when the chain is paused, cancelled or superseded. A
+ * student who cancelled last month still owes what they owe, so they stay on
+ * the roster with their last contract's currency beside the balance.
+ */
+function currentContract(contracts: SubscriptionRecord[]): SubscriptionRecord {
+  const active = contracts.find((contract) => contract.status === ContractStatus.ACTIVE);
+  if (active) return active;
+
+  return contracts.reduce((newest, contract) =>
+    contract.startDate > newest.startDate ||
+    (contract.startDate === newest.startDate && contract.signedAt > newest.signedAt)
+      ? contract
+      : newest,
+  );
+}
+
+/**
+ * The next date this contract falls due, derived from the cycle rather than
+ * from a stored column.
+ *
+ * Only an active contract has one: a paused or cancelled contract bills
+ * nothing, and answering with a date would put a demand on the roster for money
+ * that will never be invoiced.
+ *
+ * A contract row carrying a date or a `dueDay` the calendar cannot honour makes
+ * `computePeriod` throw. That is one bad row, and it must not take the whole
+ * roster down with it — the entry is reported with no next due date instead.
+ */
+function nextDueDateOf(contract: SubscriptionRecord, asOf: string): string | null {
+  if (contract.status !== ContractStatus.ACTIVE) return null;
+
+  try {
+    const period = computePeriod(contract.cycle, contract.startDate, contract.dueDay, asOf);
+    if (period.dueDate >= asOf) return period.dueDate;
+    return nextPeriod(contract.cycle, contract.startDate, contract.dueDay, period).dueDate;
+  } catch {
+    return null;
+  }
+}
+
 export class BillingService {
-  constructor(private readonly repo: IBillingRepository) {}
+  constructor(
+    private readonly repo: IBillingRepository,
+    /**
+     * Only `setHold` asks. It defaults to "yes" so every existing caller and
+     * every spec that constructs the service with a repository alone keeps
+     * working; the container passes the real probe.
+     */
+    private readonly studentExists: StudentExistsProbe = async () => true,
+  ) {}
 
   // -------------------------------------------------------------------------
   // Plans — the catalogue
@@ -647,6 +791,163 @@ export class BillingService {
     });
 
     return { ok: true, data: reversal };
+  }
+
+  // -------------------------------------------------------------------------
+  // Standing, the roster and holds (RFC 0013 §2)
+  //
+  // Standing is **resolved, never stored**: there is no standing column, no
+  // cached value and no job that writes one. It is also **reported, never
+  // enforced** — nothing below reads or writes an enrollment grant, and no
+  // caller of these methods is a guard. A student sitting `delinquent` keeps
+  // exactly the access they had the day before.
+  // -------------------------------------------------------------------------
+
+  /** One student's standing, resolved from their rows and a calendar date. */
+  async getStanding(userId: string, asOf?: string): Promise<ControllerResult<StandingSummary>> {
+    const day = asOf ?? today();
+
+    const [invoices, hold] = await Promise.all([
+      this.repo.listInvoices({ userId }),
+      this.repo.getHold(userId),
+    ]);
+
+    return {
+      ok: true,
+      data: {
+        userId,
+        asOf: day,
+        ...resolveStanding({
+          openInvoices: unvoided(invoices).map(toStandingInvoice),
+          hold: hold ? { expiresAt: hold.expiresAt } : null,
+          today: day,
+        }),
+      },
+    };
+  }
+
+  /**
+   * Every student with a contract, with their standing resolved.
+   *
+   * **Three aggregate reads, not three per student.** This is the everyday
+   * admin screen and it lists the whole dojo, so the invoices, the contracts
+   * and the holds are each fetched **once** and joined in memory. Calling
+   * `getStanding` in a loop here would issue two queries per student and is
+   * exactly the regression the roster's query-count test exists to catch.
+   */
+  async listStudentRoster(filter: RosterFilter = {}): Promise<ControllerResult<RosterEntry[]>> {
+    const asOf = filter.asOf ?? today();
+
+    const [subscriptions, invoices, holds] = await Promise.all([
+      this.repo.listSubscriptions({}),
+      this.repo.listInvoices({}),
+      this.repo.listHolds(),
+    ]);
+
+    const invoicesByUser = new Map<string, InvoiceWithBalanceRecord[]>();
+    for (const invoice of unvoided(invoices)) push(invoicesByUser, invoice.userId, invoice);
+
+    const contractsByUser = new Map<string, SubscriptionRecord[]>();
+    for (const contract of subscriptions) push(contractsByUser, contract.userId, contract);
+
+    const holdByUser = new Map(holds.map((hold) => [hold.userId, hold]));
+
+    const entries: RosterEntry[] = [];
+    for (const [userId, contracts] of contractsByUser) {
+      const contract = currentContract(contracts);
+      const hold = holdByUser.get(userId) ?? null;
+
+      // The same pure function the statement and the reminder run call. An
+      // expired hold is dropped here by comparing it against `asOf` — no
+      // cleanup job ever deletes the row, and none needs to.
+      const resolved = resolveStanding({
+        openInvoices: (invoicesByUser.get(userId) ?? []).map(toStandingInvoice),
+        hold: hold ? { expiresAt: hold.expiresAt } : null,
+        today: asOf,
+      });
+
+      entries.push({
+        userId,
+        asOf,
+        ...resolved,
+        contractId: contract.id,
+        contractGroupId: contract.contractGroupId,
+        contractStatus: contract.status,
+        currency: contract.currency,
+        nextDueDate: nextDueDateOf(contract, asOf),
+        negotiatedTerms: contract.termsSource === ContractTermsSource.NEGOTIATED,
+        hold,
+      });
+    }
+
+    const filtered =
+      filter.standing === undefined
+        ? entries
+        : entries.filter((entry) => entry.standing === filter.standing);
+
+    // Largest debt first — the order the screen is read in — and by id inside a
+    // tie so the listing is stable between two identical requests.
+    filtered.sort(
+      (a, b) =>
+        b.outstandingMinor - a.outstandingMinor || (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0),
+    );
+
+    return { ok: true, data: filtered };
+  }
+
+  /**
+   * "Stop chasing this one."
+   *
+   * A hold suppresses an alert, never a permission and never a total: it moves
+   * the *reported* standing to `exempt` and takes the student out of the
+   * delinquency listing and the reminder mail. Their balance is untouched, and
+   * still appears in the movement report, the aging report and their statement.
+   *
+   * The reason and the acting admin are mandatory so a hold meant for a month
+   * cannot quietly become permanent, and `expiresAt` needs nothing to run: the
+   * day after it passes, `resolveStanding` reports the underlying standing
+   * again from the same unchanged row.
+   */
+  async setHold(
+    userId: string,
+    command: SetHoldCommand,
+    actorId: string,
+  ): Promise<ControllerResult<BillingStandingHoldRecord>> {
+    if (isBlank(command.reason)) {
+      return badRequest('a standing hold requires a reason');
+    }
+    if (!(await this.studentExists(userId))) return notFound('student not found');
+
+    const hold = await this.repo.setHold({
+      userId,
+      reason: command.reason.trim(),
+      expiresAt: command.expiresAt ?? null,
+      setBy: actorId,
+    });
+
+    this.audit('billing.set_hold', actorId, {
+      userId: hold.userId,
+      reason: hold.reason,
+      expiresAt: hold.expiresAt,
+    });
+
+    return { ok: true, data: hold };
+  }
+
+  /** Removes the hold. The debt it was hiding from the listing was never touched. */
+  async clearHold(userId: string, actorId: string): Promise<ControllerResult<null>> {
+    const existing = await this.repo.getHold(userId);
+    if (!existing) return notFound('no standing hold is set for this student');
+
+    await this.repo.clearHold(userId);
+
+    this.audit('billing.clear_hold', actorId, {
+      userId,
+      reason: existing.reason,
+      expiresAt: existing.expiresAt,
+    });
+
+    return { ok: true, data: null };
   }
 
   // -------------------------------------------------------------------------

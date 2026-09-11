@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { Entities } from '@arenaquest/shared/types/entities';
 import type {
   BillingPlanRecord,
+  BillingStandingHoldRecord,
   InvoiceAdjustmentRecord,
   InvoiceRecord,
   InvoiceWithBalanceRecord,
@@ -9,7 +10,7 @@ import type {
   SubscriptionRecord,
 } from '@arenaquest/shared/ports';
 import type { ControllerResult } from '@api/core/result';
-import type { BillingService } from '@api/core/billing/billing-service';
+import type { BillingService, RosterEntry } from '@api/core/billing/billing-service';
 import type {
   AccountingService,
   AgingReport,
@@ -38,8 +39,14 @@ import type {
  * No provider-specific (D1 / R2) symbol appears in this file.
  */
 
-const { BillingCycle, ContractTermsSource, InvoiceStatus, AdjustmentKind, PaymentMethod } =
-  Entities.Config;
+const {
+  BillingCycle,
+  BillingStanding,
+  ContractTermsSource,
+  InvoiceStatus,
+  AdjustmentKind,
+  PaymentMethod,
+} = Entities.Config;
 
 // ---------------------------------------------------------------------------
 // Schemas — money is always an integer count of the currency's minor unit
@@ -173,6 +180,26 @@ const AgingQuerySchema = z.object({
 });
 
 const StudentParamSchema = z.object({ userId: z.string().min(1) });
+
+/**
+ * The roster query. `standing=exempt` **is** the held filter: a hold is the
+ * only way a student reaches `exempt`, so a second `held` flag would be a
+ * second spelling of the same predicate, free to disagree with the first.
+ */
+const RosterQuerySchema = z.object({
+  standing: z.nativeEnum(BillingStanding).optional(),
+  /** The day to resolve standing against; defaults to today in the service. */
+  asOf: IsoDateSchema.optional(),
+});
+
+/**
+ * `reason` carries no `.min(1)` on purpose: whitespace is refused by the
+ * service alongside the empty string, in the one place that rule lives.
+ */
+const SetHoldSchema = z.object({
+  reason: z.string(),
+  expiresAt: IsoDateSchema.nullable().optional(),
+});
 
 function invalid(error: z.ZodError): ControllerResult<never> {
   return {
@@ -328,5 +355,32 @@ export class AdminBillingController {
     const parsed = StudentParamSchema.safeParse(params ?? {});
     if (!parsed.success) return invalid(parsed.error);
     return this.accounting.getStudentStatement(parsed.data.userId);
+  }
+
+  // Roster and holds — reported, never enforced ---------------------------
+
+  /**
+   * The everyday admin screen: every student with a contract and their
+   * resolved standing. Nothing here gates anything — the roster is a listing,
+   * and a `delinquent` row changes no permission.
+   */
+  async listStudentRoster(query: unknown): Promise<ControllerResult<RosterEntry[]>> {
+    const parsed = RosterQuerySchema.safeParse(query ?? {});
+    if (!parsed.success) return invalid(parsed.error);
+    return this.service.listStudentRoster(parsed.data);
+  }
+
+  async setHold(
+    userId: string,
+    body: unknown,
+    actorId: string,
+  ): Promise<ControllerResult<BillingStandingHoldRecord>> {
+    const parsed = SetHoldSchema.safeParse(body ?? {});
+    if (!parsed.success) return invalid(parsed.error);
+    return this.service.setHold(userId, parsed.data, actorId);
+  }
+
+  async clearHold(userId: string, actorId: string): Promise<ControllerResult<null>> {
+    return this.service.clearHold(userId, actorId);
   }
 }
