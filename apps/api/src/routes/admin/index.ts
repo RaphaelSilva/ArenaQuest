@@ -12,6 +12,7 @@ import { buildAdminLevelsRouter } from './levels';
 import { buildAdminProgressionRouter } from './progression';
 import { buildAdminEnrollmentsRouter } from './enrollments';
 import { buildAdminGroupsRouter } from './groups';
+import { buildAdminBillingRouter } from './billing';
 import type { AppContainer } from '@api/container';
 
 export function buildAdminRouter(container: AppContainer) {
@@ -29,6 +30,8 @@ export function buildAdminRouter(container: AppContainer) {
   app.route('/levels', buildAdminLevelsRouter(container));
   app.route('/players', buildAdminProgressionRouter(container));
   app.route('/groups', buildAdminGroupsRouter(container));
+  // Carries its own requireRole(ROLES.ADMIN) — the umbrella above admits CONTENT_CREATOR.
+  app.route('/billing', buildAdminBillingRouter(container));
   // Mounted at '/' to match legacy paths '/admin/users/:userId/enrollments' and '/admin/groups/:groupId/enrollments' exactly
   app.route('/', buildAdminEnrollmentsRouter(container));
 
