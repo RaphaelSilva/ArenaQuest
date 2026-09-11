@@ -453,6 +453,11 @@ const ROUTES: Array<{ method: string; path: string; body?: unknown }> = [
   { method: 'POST', path: '/invoices/some-id/adjustments', body: {} },
   { method: 'POST', path: '/invoices/some-id/payments', body: {} },
   { method: 'POST', path: '/payments/some-id/reverse', body: {} },
+  // Task 04's read-only reports. They carry no body and still sit behind the
+  // same guard — the whole point of enumerating every route here.
+  { method: 'GET', path: '/reports/movement?month=2026-08' },
+  { method: 'GET', path: '/reports/aging' },
+  { method: 'GET', path: '/students/some-id/statement' },
 ];
 
 describe('/v1/admin/billing — ADMIN-only on every route', () => {

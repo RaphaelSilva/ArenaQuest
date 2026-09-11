@@ -1,5 +1,6 @@
 import type {
   IBillingRepository,
+  CurrencyRecord,
   BillingPlanRecord,
   BillingPlanFilter,
   CreateBillingPlanInput,
@@ -39,13 +40,45 @@ const { ContractStatus, InvoiceStatus } = Entities.Config;
 let counter = 0;
 const nextId = (prefix: string): string => `${prefix}-${++counter}`;
 
+/** Migration 0026's seed rows, so the fake starts where a migrated D1 does. */
+const SEEDED_CURRENCIES: CurrencyRecord[] = [
+  { code: 'BRL', exponent: 2, symbol: 'R$', name: 'Brazilian real', active: true },
+  { code: 'USD', exponent: 2, symbol: 'US$', name: 'US dollar', active: false },
+  { code: 'EUR', exponent: 2, symbol: '\u20ac', name: 'Euro', active: false },
+  { code: 'JPY', exponent: 0, symbol: '\u00a5', name: 'Japanese yen', active: false },
+  { code: 'BTC', exponent: 8, symbol: '\u20bf', name: 'Bitcoin', active: false },
+];
+
+/** Normalises `YYYY-MM-DD` and `YYYY-MM-DD HH:MM:SS` to a comparable day. */
+const dayOf = (timestamp: string): string => timestamp.slice(0, 10);
+
 export class FakeBillingRepository implements IBillingRepository {
+  /**
+   * Seeded exactly as migration 0026 seeds the table, and writable by a spec:
+   * "a currency added at runtime is accepted" is a rule the service now enforces
+   * by reading this map rather than a constant.
+   */
+  readonly currencies = new Map<string, CurrencyRecord>(
+    SEEDED_CURRENCIES.map((currency) => [currency.code, { ...currency }]),
+  );
   readonly plans = new Map<string, BillingPlanRecord>();
   readonly subscriptions = new Map<string, SubscriptionRecord>();
   readonly invoices = new Map<string, InvoiceRecord>();
   readonly adjustments: InvoiceAdjustmentRecord[] = [];
   readonly payments: PaymentRecord[] = [];
   readonly holds = new Map<string, BillingStandingHoldRecord>();
+
+  // Currencies --------------------------------------------------------------
+
+  async getCurrency(code: string): Promise<CurrencyRecord | null> {
+    return this.currencies.get(code) ?? null;
+  }
+
+  async listCurrencies(): Promise<CurrencyRecord[]> {
+    return [...this.currencies.values()].sort(
+      (a, b) => Number(b.active) - Number(a.active) || a.code.localeCompare(b.code),
+    );
+  }
 
   // Plans -------------------------------------------------------------------
 
@@ -320,13 +353,28 @@ export class FakeBillingRepository implements IBillingRepository {
     return adjustment;
   }
 
+  /**
+   * Mirrors the adapter's filtering, including the detail that matters to the
+   * reports: a payment is windowed on `paid_at` and an adjustment on
+   * `applied_at`, and both bounds are inclusive whole days.
+   */
   async listLedger(filter: LedgerFilter): Promise<LedgerEntryRecord[]> {
+    const matches = (invoiceId: string, occurredAt: string): boolean => {
+      if (filter.invoiceId !== undefined && invoiceId !== filter.invoiceId) return false;
+      if (filter.userId !== undefined && this.invoices.get(invoiceId)?.userId !== filter.userId) {
+        return false;
+      }
+      if (filter.from !== undefined && dayOf(occurredAt) < dayOf(filter.from)) return false;
+      if (filter.to !== undefined && dayOf(occurredAt) > dayOf(filter.to)) return false;
+      return true;
+    };
+
     const entries: LedgerEntryRecord[] = [
       ...this.payments
-        .filter((p) => filter.invoiceId === undefined || p.invoiceId === filter.invoiceId)
+        .filter((p) => matches(p.invoiceId, p.paidAt))
         .map((payment) => ({ entry: 'payment' as const, payment, occurredAt: payment.paidAt })),
       ...this.adjustments
-        .filter((a) => filter.invoiceId === undefined || a.invoiceId === filter.invoiceId)
+        .filter((a) => matches(a.invoiceId, a.appliedAt))
         .map((adjustment) => ({
           entry: 'adjustment' as const,
           adjustment,

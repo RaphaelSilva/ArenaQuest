@@ -1,6 +1,6 @@
 # Task 04 — Backend: Accounting reports and per-student statement (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Backend API
@@ -89,31 +89,31 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `GET /reports/movement?month=…` reconciles to the sum of the ledger rows in that
+- [x] `GET /reports/movement?month=…` reconciles to the sum of the ledger rows in that
       month, adjustments included, asserted against a fixture with a discount and a
       reversal in the same month.
-- [ ] A payment recorded in September against an invoice issued in August appears in
+- [x] A payment recorded in September against an invoice issued in August appears in
       September's *received* and August's *billed* — the two are not conflated.
-- [ ] An amended student counts **once** in the active-students report; a fixture with a
+- [x] An amended student counts **once** in the active-students report; a fixture with a
       three-version contract chain proves it.
-- [ ] A student with a cancelled contract and a later new one reports "student since" as
+- [x] A student with a cancelled contract and a later new one reports "student since" as
       the earlier date and "current membership since" as the later one.
-- [ ] The aging buckets are exclusive at their boundaries: an invoice exactly 30 days
+- [x] The aging buckets are exclusive at their boundaries: an invoice exactly 30 days
       past due and one exactly 31 days past due land in different buckets, each measured
       from its own `due_date`.
-- [ ] A voided invoice contributes to no bucket and to no outstanding total.
-- [ ] The statement's outstanding total equals the sum of its listed invoice balances,
+- [x] A voided invoice contributes to no bucket and to no outstanding total.
+- [x] The statement's outstanding total equals the sum of its listed invoice balances,
       each computed from the signed rows.
-- [ ] An invoice whose cached `status` disagrees with its recomputed balance does not
+- [x] An invoice whose cached `status` disagrees with its recomputed balance does not
       change any reported total — the report is computed from the rows.
-- [ ] A request that would sum across two currencies is refused rather than converted.
-- [ ] A malformed `month` returns `400`; a statement for an unknown user returns `404`.
-- [ ] A `content_creator`, a `tutor` and a student each receive `403` from all three
+- [x] A request that would sum across two currencies is refused rather than converted.
+- [x] A malformed `month` returns `400`; a statement for an unknown user returns `404`.
+- [x] A `content_creator`, a `tutor` and a student each receive `403` from all three
       routes.
-- [ ] No report path writes a row — asserted by a test that snapshots the tables before
+- [x] No report path writes a row — asserted by a test that snapshots the tables before
       and after a full report sweep.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

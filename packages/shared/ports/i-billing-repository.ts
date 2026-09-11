@@ -286,6 +286,18 @@ export interface SetHoldInput {
 // ---------------------------------------------------------------------------
 
 export interface IBillingRepository {
+  // Currencies — reference data, seeded by migration and extended by SQL.
+  //
+  // RFC 0013 §1 and decision #13: an unknown code is rejected by the
+  // *database*, and adding a currency is a `wrangler d1 execute` rather than a
+  // deploy. These two readers are what let the service honour that — it asks
+  // the table whether a code exists instead of consulting a hardcoded list —
+  // and they are also where a report gets the `exponent` and `symbol` it
+  // returns alongside every minor-unit amount.
+  getCurrency(code: string): Promise<CurrencyRecord | null>;
+  /** Every row, active or not; at most one is ever `active`. */
+  listCurrencies(): Promise<CurrencyRecord[]>;
+
   // Plans — the catalogue. Freely editable; nothing here is read once a
   // subscription has copied it.
   listPlans(filter?: BillingPlanFilter): Promise<BillingPlanRecord[]>;
