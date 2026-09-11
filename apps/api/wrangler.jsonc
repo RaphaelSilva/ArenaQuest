@@ -11,6 +11,25 @@
 		"enabled": true
 	},	
 	"upload_source_maps": true,
+	/**
+	 * Scheduled triggers
+	 * https://developers.cloudflare.com/workers/configuration/cron-triggers/
+	 *
+	 * The daily billing run (RFC 0013 §6) at 06:00 UTC: it issues the period's
+	 * invoices, sends the two student notices, digests the admins and asserts
+	 * each open invoice's cached status. It writes no money — no
+	 * `invoice_adjustments` row of any kind, `surcharge` included.
+	 *
+	 * `triggers` is an **inheritable** key in wrangler (`cli.js`:
+	 * `triggers: inheritable(...)`), so this single top-level block covers every
+	 * `env.*` below and none of them repeats it. An environment that should NOT
+	 * bill would have to opt out with its own `"triggers": { "crons": [] }`.
+	 */
+	"triggers": {
+		"crons": [
+			"0 6 * * *"
+		]
+	},
 	"compatibility_flags": [
 		"nodejs_compat"
 	],

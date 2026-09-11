@@ -10,7 +10,13 @@ import type {
   SubscriptionRecord,
 } from '@arenaquest/shared/ports';
 import type { ControllerResult } from '@api/core/result';
-import type { BillingService, RosterEntry } from '@api/core/billing/billing-service';
+import {
+  silentBillingRunDeps,
+  type BillingRunDeps,
+  type BillingRunReport,
+  type BillingService,
+  type RosterEntry,
+} from '@api/core/billing/billing-service';
 import type {
   AccountingService,
   AgingReport,
@@ -125,6 +131,17 @@ const VoidInvoiceSchema = z.object({
   reason: z.string(),
 });
 
+/**
+ * The manual twin of the cron. Both dates are optional and both default in the
+ * service: `asOf` to today, `since` to the day before it — the window a daily
+ * firing covers. An operator re-running a day that already ran passes
+ * `since = asOf`, which is an empty window and therefore no mail.
+ */
+const RunInvoiceCycleSchema = z.object({
+  asOf: IsoDateSchema.optional(),
+  since: IsoDateSchema.optional(),
+});
+
 const ApplyAdjustmentSchema = z.object({
   kind: z.nativeEnum(AdjustmentKind),
   amountMinor: z.number().int(),
@@ -219,6 +236,13 @@ export class AdminBillingController {
     private readonly service: BillingService,
     /** Read-only; the three report handlers are the only callers. */
     private readonly accounting: AccountingService,
+    /**
+     * Mail and the address book for the run. Defaulted to a silent pair so a
+     * spec constructing the controller with a service alone still works; the
+     * router passes the container's real `IMailer` and user repository, and the
+     * cron passes the same two through `runScheduledBilling`.
+     */
+    private readonly runDeps: BillingRunDeps = silentBillingRunDeps(),
   ) {}
 
   // Plans ---------------------------------------------------------------
@@ -293,6 +317,24 @@ export class AdminBillingController {
     const parsed = IssueInvoiceSchema.safeParse(body);
     if (!parsed.success) return invalid(parsed.error);
     return this.service.issueAdHocInvoice(parsed.data, actorId);
+  }
+
+  /**
+   * The manual twin of the daily cron.
+   *
+   * It calls `BillingService.runBillingCycle` — the *identical* routine
+   * `scheduled` calls — so a missed firing is recoverable by hand and the whole
+   * job is testable without a cron. It writes no adjustment of any kind and
+   * repairs no drifted status; both are properties of the routine, not of this
+   * caller.
+   */
+  async runInvoiceCycle(
+    body: unknown,
+    actorId: string,
+  ): Promise<ControllerResult<BillingRunReport>> {
+    const parsed = RunInvoiceCycleSchema.safeParse(body ?? {});
+    if (!parsed.success) return invalid(parsed.error);
+    return this.service.runBillingCycle(this.runDeps, parsed.data, actorId);
   }
 
   async voidInvoice(

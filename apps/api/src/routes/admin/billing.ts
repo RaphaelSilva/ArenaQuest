@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { AdminBillingController } from '@api/controllers/admin-billing.controller';
+import { billingRunDeps } from '@api/core/billing/billing-service';
 import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
 import type { AppContainer } from '@api/container';
 
@@ -247,6 +248,73 @@ const RosterEntrySchema = z
   })
   .openapi('BillingRosterEntry');
 
+/**
+ * What one daily run did (RFC 0013 §6).
+ *
+ * Everything here is *reported*: the run persists an `invoices` row for a
+ * period that had none and nothing else. `absorbed` is the retry's answer — a
+ * second run for one period creates nothing and counts every existing invoice
+ * here — and `divergences` is logged rather than repaired.
+ */
+const BillingRunReportSchema = z
+  .object({
+    asOf: IsoDate,
+    /** The previous run's day; the window is `(since, asOf]`. */
+    since: IsoDate,
+    eligibleContracts: z.number().int(),
+    issued: z.array(
+      z.object({
+        invoiceId: z.string(),
+        subscriptionId: z.string(),
+        userId: z.string(),
+        periodStart: IsoDate,
+        dueDate: IsoDate,
+        amountMinor: MinorUnits,
+        currency: z.string(),
+        status: InvoiceStatusSchema,
+      }),
+    ),
+    absorbed: z.number().int(),
+    reminders: z.array(
+      z.object({
+        invoiceId: z.string(),
+        userId: z.string(),
+        kind: z.enum(['due_date', 'grace_lapsed']),
+        dueDate: IsoDate,
+        triggerOn: IsoDate,
+        balanceMinor: MinorUnits,
+        currency: z.string(),
+        sent: z.boolean(),
+        suppressedByHold: z.boolean(),
+      }),
+    ),
+    crossings: z.array(
+      z.object({
+        userId: z.string(),
+        from: StandingSchema,
+        to: StandingSchema,
+        oldestOverdueDate: IsoDate.nullable(),
+        outstandingMinor: MinorUnits,
+        currency: z.string(),
+      }),
+    ),
+    suppressedByHold: z.array(
+      z.object({ userId: z.string(), outstandingMinor: MinorUnits }),
+    ),
+    divergences: z.array(
+      z.object({
+        invoiceId: z.string(),
+        userId: z.string(),
+        cachedStatus: InvoiceStatusSchema,
+        expectedStatus: InvoiceStatusSchema,
+        balanceMinor: MinorUnits,
+      }),
+    ),
+    mailsSent: z.number().int(),
+    adminsNotified: z.number().int(),
+  })
+  .openapi('BillingRunReport');
+
 const json = <S extends z.ZodTypeAny>(description: string, schema: S) => ({
   description,
   content: { 'application/json': { schema } },
@@ -344,6 +412,15 @@ const IssueInvoiceBodySchema = z
 const VoidInvoiceBodySchema = z
   .object({ reason: z.string().openapi({ example: 'Issued to the wrong student.' }) })
   .openapi('VoidInvoiceBody');
+
+const RunInvoiceCycleBodySchema = z
+  .object({
+    /** The day to bill and resolve against; defaults to today. */
+    asOf: IsoDate.optional(),
+    /** The previous run's day; defaults to the day before `asOf`. */
+    since: IsoDate.optional(),
+  })
+  .openapi('RunInvoiceCycleBody');
 
 const ApplyAdjustmentBodySchema = z
   .object({
@@ -496,6 +573,30 @@ export const issueInvoiceRoute = createRoute({
   description: "Snapshots the contract's terms — never the plan's. A zero amount settles at issue.",
   request: body(IssueInvoiceBodySchema),
   responses: { 201: json('Invoice issued', InvoiceSchema), ...ERROR_RESPONSES },
+});
+
+/**
+ * The manual twin of the daily cron (RFC 0013 §6).
+ *
+ * It runs the **identical** routine `scheduled` runs, so a missed firing is
+ * recoverable by hand and the job is testable without a cron. Idempotent by
+ * construction: `UNIQUE (subscription_id, period_start)` absorbs a second run
+ * for one period, which is reported as `absorbed` rather than refused.
+ */
+export const runInvoiceCycleRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/invoices/run',
+  summary: 'Run the Billing Cycle',
+  description:
+    'Issues the period\'s invoices, sends the two student notices, digests the admins on standing crossings and asserts each open invoice\'s cached status. It writes no adjustment of any kind and repairs no status.',
+  request: {
+    body: {
+      required: false,
+      content: { 'application/json': { schema: RunInvoiceCycleBodySchema } },
+    },
+  },
+  responses: { 200: json('The run report', BillingRunReportSchema), ...ERROR_RESPONSES },
 });
 
 export const voidInvoiceRoute = createRoute({
@@ -653,6 +754,9 @@ export function buildAdminBillingRouter(container: AppContainer) {
   const controller = new AdminBillingController(
     container.billing.billingService,
     container.billing.accountingService,
+    // The same two ports `runScheduledBilling` hands the cron, assembled the
+    // same way, so the manual twin and the cron mail through one code path.
+    billingRunDeps(container.infra.mailer, container.identity.users),
   );
 
   const router = new OpenAPIHono({
@@ -724,6 +828,15 @@ export function buildAdminBillingRouter(container: AppContainer) {
   router.openapi(issueInvoiceRoute, async (c) => {
     const result = await controller.issueInvoice(c.req.valid('json'), c.get('user').sub);
     return respondCreated(c, result);
+  });
+
+  // The manual twin. `runBillingCycle` is the one routine; the cron in
+  // `src/index.ts` reaches it through `runScheduledBilling` and this route
+  // reaches it through the controller — never a second implementation.
+  router.openapi(runInvoiceCycleRoute, async (c) => {
+    const result = await controller.runInvoiceCycle(c.req.valid('json'), c.get('user').sub);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
   });
 
   router.openapi(voidInvoiceRoute, async (c) => {

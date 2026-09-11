@@ -1,6 +1,6 @@
 # Task 06 — Backend: Scheduled invoice run and billing alerts (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Backend API
@@ -92,29 +92,29 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Running the job twice for one period issues each invoice exactly once; the second
+- [x] Running the job twice for one period issues each invoice exactly once; the second
       run reports the duplicates as absorbed rather than failing.
-- [ ] A `paused` contract is issued nothing, while its already-open invoices keep their
+- [x] A `paused` contract is issued nothing, while its already-open invoices keep their
       due dates and still appear in the roster, the totals and the aging report.
-- [ ] A free contract's period invoice is issued, lands `paid` with no payment row, and
+- [x] A free contract's period invoice is issued, lands `paid` with no payment row, and
       sends no mail.
-- [ ] No `invoice_adjustments` row of any kind exists after a run — asserted by a test
+- [x] No `invoice_adjustments` row of any kind exists after a run — asserted by a test
       that counts the table before and after, `surcharge` included.
-- [ ] The student's due-date reminder and grace-lapsed notice each fire exactly once per
+- [x] The student's due-date reminder and grace-lapsed notice each fire exactly once per
       invoice across repeated runs.
-- [ ] A held student receives neither mail and appears in no digest, while their
+- [x] A held student receives neither mail and appears in no digest, while their
       outstanding balance is unchanged in every report.
-- [ ] The admin digest names only students who crossed a boundary since the previous run;
+- [x] The admin digest names only students who crossed a boundary since the previous run;
       a second run the same day reports nobody.
-- [ ] An invoice whose cached `status` disagrees with its recomputed balance produces a
+- [x] An invoice whose cached `status` disagrees with its recomputed balance produces a
       structured divergence log and **no** write — the row is byte-identical after the
       run.
-- [ ] `POST /v1/admin/billing/invoices/run` performs the identical work and is refused
+- [x] `POST /v1/admin/billing/invoices/run` performs the identical work and is refused
       with `403` for a `content_creator`, a `tutor` and a student.
-- [ ] `apps/api/src/index.ts` gains only the `scheduled` delegation; `middleware/**` and
+- [x] `apps/api/src/index.ts` gains only the `scheduled` delegation; `middleware/**` and
       `routes/index.ts` are unchanged and the pre-existing suite passes.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
