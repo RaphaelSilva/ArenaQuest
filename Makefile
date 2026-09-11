@@ -179,9 +179,11 @@ db-migrate-local: ## Apply all D1 migrations to the local replica
 	pnpm --filter api exec wrangler d1 migrations apply arenaquest-db --local
 
 # WARNING: LOCAL DEVELOPMENT ONLY — never run against staging or production.
-db-seed-local: ## Seed the local D1 with test accounts (Admin, Student, Professor)
+db-seed-local: ## Seed the local D1 with test accounts (Admin, Student, Professor) and a billing ledger
 	pnpm --filter api exec wrangler d1 execute arenaquest-db --local \
 		--file ./migrations/seed/0001_test_users.sql
+	pnpm --filter api exec wrangler d1 execute arenaquest-db --local \
+		--file ./migrations/seed/0002_billing_local.sql
 
 db-reset-local: ## Delete the local D1 replica, re-migrate and re-seed
 	@printf "$(YELLOW)  ⚠  Deleting apps/api/.wrangler/state/v3/d1 ...$(RESET)\n"
