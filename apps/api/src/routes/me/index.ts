@@ -4,7 +4,9 @@ import { buildMeAccountRouter } from '@api/routes/me/account';
 import { buildMeProgressRouter } from '@api/routes/me/progress';
 import { buildMeGamificationRouter } from '@api/routes/me/gamification';
 import { buildMeCommentsRouter } from '@api/routes/me/comments';
+import { buildMeBillingRouter } from '@api/routes/me/billing';
 import type {
+  BillingContext,
   IdentityContext,
   InfraContext,
   ControllersContext,
@@ -22,6 +24,7 @@ export function buildMeRouter(slice: {
   progress: ProgressContext;
   engagement: EngagementContext;
   content: ContentContext;
+  billing: BillingContext;
 }): OpenAPIHono {
   const { accountController } = slice.controllers;
 
@@ -41,6 +44,10 @@ export function buildMeRouter(slice: {
 
   // 4. Comments authored writes router
   meRouter.route('/', buildMeCommentsRouter({ engagement: slice.engagement }));
+
+  // 5. The caller's own billing statement. It rides the sub-app `authGuard`
+  //    above and adds no guard of its own — billing reports, it never gates.
+  meRouter.route('/', buildMeBillingRouter({ billing: slice.billing }));
 
   return meRouter;
 }

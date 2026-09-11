@@ -458,6 +458,12 @@ const ROUTES: Array<{ method: string; path: string; body?: unknown }> = [
   { method: 'GET', path: '/reports/movement?month=2026-08' },
   { method: 'GET', path: '/reports/aging' },
   { method: 'GET', path: '/students/some-id/statement' },
+  // Task 05's roster and holds. The roster is a listing and a hold is a label;
+  // neither gates anything, and both are still ADMIN-only because they are the
+  // dojo's money.
+  { method: 'GET', path: '/students' },
+  { method: 'POST', path: '/holds/some-id', body: {} },
+  { method: 'DELETE', path: '/holds/some-id' },
 ];
 
 describe('/v1/admin/billing — ADMIN-only on every route', () => {
@@ -489,5 +495,23 @@ describe('/v1/admin/billing — ADMIN-only on every route', () => {
     expect((await billing('GET', '/plans')).status).toBe(200);
     expect((await billing('GET', '/subscriptions')).status).toBe(200);
     expect((await billing('GET', '/invoices')).status).toBe(200);
+    expect((await billing('GET', '/students')).status).toBe(200);
+  });
+
+  /**
+   * The other half of the matrix. A student is refused every admin billing
+   * route above and is *not* refused their own statement — the two live behind
+   * different guards on purpose, and neither is a guard on anything else.
+   */
+  it('still lets the same student read their own statement', async () => {
+    const request = new IncomingRequest(`http://example.com${v1('/me/billing')}`, {
+      headers: { Authorization: `Bearer ${studentToken}` },
+    });
+    const ctx = createExecutionContext();
+    const res = await worker.fetch(request, env as AppEnv, ctx);
+    await waitOnExecutionContext(ctx);
+
+    expect(res.status).toBe(200);
+    expect((await res.json<{ userId: string }>()).userId).toBe(STUDENT_ID);
   });
 });

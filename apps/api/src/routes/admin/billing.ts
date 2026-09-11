@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { AdminBillingController } from '@api/controllers/admin-billing.controller';
-import { respondWith, respondCreated } from '@api/routes/_shared/envelope';
+import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
 import type { AppContainer } from '@api/container';
 
 /**
@@ -193,7 +193,12 @@ const StatementContractGroupSchema = z
   })
   .openapi('BillingStatementContractGroup');
 
-const StudentStatementSchema = z
+/**
+ * Exported so `/v1/me/billing` returns the **same** shape rather than a second
+ * declaration of it. Reusing the instance also keeps the OpenAPI registry
+ * holding one `BillingStudentStatement` component instead of two rival ones.
+ */
+export const StudentStatementSchema = z
   .object({
     userId: z.string(),
     currency: ReportCurrencySchema,
@@ -204,6 +209,43 @@ const StudentStatementSchema = z
     invoices: z.array(StatementInvoiceSchema),
   })
   .openapi('BillingStudentStatement');
+
+export const StandingSchema = z
+  .enum(['good', 'due', 'delinquent', 'exempt'])
+  .openapi({ example: 'delinquent' });
+
+const HoldSchema = z
+  .object({
+    userId: z.string(),
+    reason: z.string(),
+    expiresAt: IsoDate.nullable(),
+    setBy: z.string(),
+    setAt: z.string(),
+  })
+  .openapi('BillingStandingHold');
+
+/**
+ * One roster line. `standing` is resolved on every read from the invoices, the
+ * hold and `asOf` — there is no standing column behind it, and nothing here
+ * gates anything: a `delinquent` row changes no permission.
+ */
+const RosterEntrySchema = z
+  .object({
+    userId: z.string(),
+    asOf: IsoDate,
+    standing: StandingSchema,
+    oldestOverdueDate: IsoDate.nullable(),
+    outstandingMinor: MinorUnits,
+    contractId: z.string(),
+    contractGroupId: z.string(),
+    contractStatus: ContractStatusSchema,
+    currency: z.string().openapi({ example: 'BRL' }),
+    nextDueDate: IsoDate.nullable(),
+    negotiatedTerms: z.boolean(),
+    /** The stored row, expired or not; `standing === 'exempt'` says whether it bites. */
+    hold: HoldSchema.nullable(),
+  })
+  .openapi('BillingRosterEntry');
 
 const json = <S extends z.ZodTypeAny>(description: string, schema: S) => ({
   description,
@@ -329,6 +371,13 @@ const ReversePaymentBodySchema = z
     paidAt: IsoDate.optional(),
   })
   .openapi('ReversePaymentBody');
+
+const SetHoldBodySchema = z
+  .object({
+    reason: z.string().openapi({ example: 'Injured; agreed to pause chasing until March.' }),
+    expiresAt: IsoDate.nullable().optional(),
+  })
+  .openapi('SetBillingHoldBody');
 
 // ---------------------------------------------------------------------------
 // Routes
@@ -552,6 +601,51 @@ export const studentStatementRoute = createRoute({
 });
 
 // ---------------------------------------------------------------------------
+// Roster and holds (RFC 0013 §2)
+//
+// Standing is reported here and enforced nowhere. No route below adds a guard,
+// returns a `402` or touches an enrollment grant — a student sitting
+// `delinquent` keeps exactly the access they had the day before.
+// ---------------------------------------------------------------------------
+
+export const studentRosterRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/students',
+  summary: 'The Student Billing Roster',
+  description:
+    "Every student with a contract, with their standing resolved from their invoices rather than read from a column: outstanding balance, oldest overdue date, next due date and whether the terms were negotiated. `standing=exempt` is the held filter — a hold is the only way to reach it. Reporting only: nothing here gates a student's access.",
+  request: {
+    query: z.object({
+      standing: StandingSchema.optional().openapi({ param: { name: 'standing', in: 'query' } }),
+      asOf: IsoDate.optional().openapi({ param: { name: 'asOf', in: 'query' } }),
+    }),
+  },
+  responses: { 200: json('The roster', z.array(RosterEntrySchema)), ...ERROR_RESPONSES },
+});
+
+export const setHoldRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/holds/{userId}',
+  summary: 'Hold a Student Standing',
+  description:
+    'Suppresses an alert, never a permission and never a total: the reported standing becomes `exempt` and the student leaves the delinquency listing and the reminder mail, while their balance stays in the movement report, the aging report and their statement. The reason is mandatory and the acting admin is recorded, so a temporary hold cannot quietly become permanent. An `expiresAt` needs nothing to run — the day after it passes the underlying standing is reported again.',
+  request: { params: UserIdParamSchema, ...body(SetHoldBodySchema) },
+  responses: { 201: json('Hold set', HoldSchema), ...ERROR_RESPONSES },
+});
+
+export const clearHoldRoute = createRoute({
+  ...common,
+  method: 'delete',
+  path: '/holds/{userId}',
+  summary: 'Clear a Standing Hold',
+  description: 'Removes the hold. The debt it kept out of the listing was never touched.',
+  request: { params: UserIdParamSchema },
+  responses: { 204: { description: 'Hold cleared' }, ...ERROR_RESPONSES },
+});
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -676,6 +770,27 @@ export function buildAdminBillingRouter(container: AppContainer) {
     const result = await controller.getStudentStatement(c.req.valid('param'));
     if (!result.ok) return respondWith(c, result);
     return c.json(result.data, 200);
+  });
+
+  // Roster and holds. Read-and-label: the roster issues three aggregate reads
+  // and resolves in memory, and a hold writes one row that no guard ever reads.
+
+  router.openapi(studentRosterRoute, async (c) => {
+    const result = await controller.listStudentRoster(c.req.valid('query'));
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(setHoldRoute, async (c) => {
+    const { userId } = c.req.valid('param');
+    const result = await controller.setHold(userId, c.req.valid('json'), c.get('user').sub);
+    return respondCreated(c, result);
+  });
+
+  router.openapi(clearHoldRoute, async (c) => {
+    const { userId } = c.req.valid('param');
+    const result = await controller.clearHold(userId, c.get('user').sub);
+    return respondNoContent(c, result);
   });
 
   return router;
