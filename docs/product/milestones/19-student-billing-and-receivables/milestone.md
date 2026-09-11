@@ -128,7 +128,7 @@ contract it consumes. Phases map to RFC 0013's Implementation Plan.
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [Billing domain, entities and repository port](./01-billing-domain-entities-and-repository-port.task.md) | 0 | Backend | ☐ Open |
+| 01 | [Billing domain, entities and repository port](./01-billing-domain-entities-and-repository-port.task.md) | 0 | Backend | ✅ Done |
 | 02 | [Billing schema, D1 repository and local seed](./02-billing-schema-d1-repository-and-local-seed.task.md) | 1 | Backend | ☐ Open |
 | 03 | [Billing service and the admin lifecycle API](./03-billing-service-and-the-admin-lifecycle-api.task.md) | 2 | Backend | ☐ Open |
 | 04 | [Accounting reports and per-student statement](./04-accounting-reports-and-per-student-statement.task.md) | 2 | Backend | ☐ Open |
