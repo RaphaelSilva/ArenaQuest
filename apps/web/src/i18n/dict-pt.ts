@@ -905,6 +905,136 @@ export const dictPt = {
           balanceMinor: 'Saldo (unidades menores)',
           issuedAt: 'Emitida em',
         },
+        actionsHeading: 'Registrar um lançamento',
+        correctionNote:
+          'Não existe Excluir, porque aqui uma correção é um lançamento e não uma edição. O estorno desfaz um pagamento acrescentando o seu espelho, a anulação encerra uma fatura que não deveria ter sido emitida, e um novo ajuste com sinal altera o que é devido. Todos são acrescentados ao histórico com o motivo e o autor, e nada do que já foi escrito é alterado.',
+        voidedNote:
+          'Esta fatura está anulada. Não recebe mais pagamento nem ajuste, e permanece nos lançamentos com o motivo da anulação.',
+        payment: {
+          button: 'Registrar pagamento',
+          buttonAriaLabel: (reference: string) => `Registrar um pagamento na fatura ${reference}`,
+          dialogTitle: 'Registrar um pagamento',
+          explainer:
+            'Dinheiro que já chegou — em espécie, por transferência, por Pix ou no cartão — lançado nesta fatura. O registro é um lançamento contábil: carrega o seu nome e só pode ser desfeito por um estorno.',
+          noGateNote:
+            'Registrar um pagamento não altera nada do que o aluno pode ver, e deixar de registrar também não.',
+          invoiceLabel: 'Fatura',
+          balanceLabel: 'Saldo devedor',
+          amountLabel: (code: string) => `Valor recebido (${code})`,
+          amountHelp: (exponent: number) =>
+            exponent === 0
+              ? 'Esta moeda não tem casas decimais, então informe um número inteiro.'
+              : `Até ${exponent} casa(s) decimal(is), usando ponto como separador.`,
+          methodLabel: 'Como foi recebido',
+          paidAtLabel: 'Data do recebimento',
+          paidAtHelp: 'Deixe em branco para registrar como recebido hoje.',
+          referenceLabel: 'Referência externa (opcional)',
+          referenceHelp:
+            'Um identificador do banco ou do provedor, se houver. Dinheiro recebido em mãos não tem nenhum, então deixe em branco.',
+          submit: 'Registrar pagamento',
+          cancel: 'Cancelar',
+          validation: {
+            amountZero:
+              'Um pagamento precisa ser maior que zero. Para desfazer um pagamento já registrado, estorne-o.',
+          },
+          success: 'Pagamento registrado. A fatura agora mostra o que o servidor resolveu.',
+          error: 'Falha ao registrar o pagamento.',
+        },
+        adjustment: {
+          button: 'Aplicar ajuste',
+          buttonAriaLabel: (reference: string) => `Aplicar um ajuste na fatura ${reference}`,
+          dialogTitle: 'Aplicar um ajuste',
+          explainer:
+            'Um ajuste altera o que esta fatura cobra, sem tocar no valor originalmente faturado. É acrescentado com o seu nome e o motivo informado, e é corrigido por outro ajuste, nunca por uma edição.',
+          manualOnlyNote:
+            'Todo ajuste é aplicado à mão, um valor por vez. Nada aqui nem em qualquer outro lugar cobra percentual, se repete ou acrescenta multa por atraso por conta própria — um acréscimo existe apenas porque um administrador o digitou.',
+          kindLabel: 'Tipo de ajuste',
+          kindEffect: {
+            discount: 'Reduz o que é devido — uma redução acordada desta cobrança.',
+            credit: 'Reduz o que é devido — valor que o dojo já deve ao aluno.',
+            waiver: 'Reduz o que é devido — parte desta cobrança é perdoada.',
+            surcharge: 'Aumenta o que é devido — um valor extra acrescentado à mão.',
+          },
+          amountLabel: (code: string) => `Valor do ajuste (${code})`,
+          amountHelp: (exponent: number) =>
+            exponent === 0
+              ? 'Informe um número inteiro positivo; o tipo acima decide a direção.'
+              : `Informe um número positivo com até ${exponent} casa(s) decimal(is); o tipo acima decide a direção.`,
+          magnitudeHelp: 'Informe um valor positivo; o tipo acima decide a direção.',
+          directionReduces: 'reduzir o que é devido',
+          directionIncreases: 'aumentar o que é devido',
+          directionPending: (direction: string) =>
+            `Informe um valor. Este tipo de ajuste vai ${direction}.`,
+          signedPreview: (value: string) => `Será registrado como ${value}.`,
+          reasonLabel: 'Motivo (obrigatório)',
+          reasonPlaceholder: 'Por que esta fatura está sendo ajustada?',
+          reasonRequired: 'É obrigatório informar um motivo para aplicar um ajuste.',
+          validation: {
+            amountZero: 'Um ajuste de zero não muda nada, então informe um valor.',
+          },
+          submit: 'Aplicar ajuste',
+          cancel: 'Cancelar',
+          success: 'Ajuste aplicado. A fatura agora mostra o que o servidor resolveu.',
+          error: 'Falha ao aplicar o ajuste.',
+        },
+        voidInvoice: {
+          button: 'Anular fatura',
+          buttonAriaLabel: (reference: string) => `Anular a fatura ${reference}`,
+          dialogTitle: 'Anular uma fatura',
+          explainer:
+            'A anulação encerra uma fatura que nunca deveria ter sido cobrada. Nada é apagado: a fatura permanece nos lançamentos marcada como anulada, com o seu nome e o motivo informado aqui. Depois disso ela não recebe pagamento nem ajuste.',
+          invoiceLine: (reference: string) => `Fatura ${reference}`,
+          reasonLabel: 'Motivo (obrigatório)',
+          reasonPlaceholder: 'Por que esta fatura não deveria ter sido emitida?',
+          reasonRequired: 'É obrigatório informar um motivo para anular uma fatura.',
+          submit: 'Anular fatura',
+          cancel: 'Cancelar',
+          success: 'Fatura anulada. Ela permanece nos lançamentos com o motivo registrado.',
+          error: 'Falha ao anular a fatura.',
+        },
+        issue: {
+          button: 'Emitir fatura',
+          buttonAriaLabel: 'Emitir uma fatura para um período de contrato',
+          dialogTitle: 'Emitir uma fatura',
+          explainer:
+            'Emite um período de um contrato existente, pelo valor que aquele contrato registrou quando foi assinado. É o que a rotina diária faz por conta própria; fazer aqui serve para o período que a rotina ainda não alcançou ou não gravou.',
+          notASaleNote:
+            'Isto não é uma forma de cobrar um seminário, uma aula pontual ou qualquer coisa fora de um contrato. Uma fatura sempre pertence a um contrato e a um de seus períodos, e não existe outro tipo de cobrança a fazer aqui.',
+          uniquenessNote:
+            'Uma fatura por contrato por período. Um período já faturado é recusado em vez de cobrado duas vezes — é essa regra que torna a rotina diária segura de repetir.',
+          contractHeading: 'Contrato a faturar',
+          searchLabel: 'Buscar pelo nome do aluno',
+          searchPlaceholder: 'Nome do aluno',
+          contractsLoadError: 'Falha ao carregar os contratos.',
+          contractsEmpty:
+            'Nenhum contrato corresponde a esta busca. Uma fatura precisa de um contrato assinado, então assine um na aba Alunos primeiro.',
+          contractStatus: {
+            active: 'Ativo',
+            paused: 'Pausado',
+            cancelled: 'Cancelado',
+            superseded: 'Substituído',
+          },
+          contractMeta: (cycle: string, status: string, startDate: string) =>
+            `${cycle} · ${status} · desde ${startDate}`,
+          contractRequired: 'Escolha o contrato que esta fatura cobra.',
+          referenceDateLabel: 'Período que contém esta data',
+          referenceDateHelp:
+            'O período faturado é o período do próprio contrato que contém esta data. Altere-a para faturar um período anterior ou posterior.',
+          periodHeading: 'Período a ser faturado',
+          periodNote:
+            'Resolvido pela mesma regra com que o servidor fatura, a partir da data acima e da data de início, do ciclo e do dia de cobrança do próprio contrato — e enviado exatamente como exibido, para que a fatura não caia em outro período.',
+          periodPending: 'Escolha um contrato para ver o período que seria faturado.',
+          periodLabel: 'Período',
+          periodValue: (start: string, end: string) => `${start} até ${end}`,
+          dueLabel: 'Vencimento',
+          amountLabel: 'Valor a faturar',
+          periodError:
+            'Não foi possível resolver o período para este contrato e data. Verifique a data acima.',
+          submit: 'Emitir fatura',
+          cancel: 'Cancelar',
+          success: (reference: string) => `Fatura ${reference} emitida.`,
+          error: 'Falha ao emitir a fatura.',
+        },
       },
       reports: {
         heading: 'Relatórios contábeis',

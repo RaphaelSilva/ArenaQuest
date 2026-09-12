@@ -124,6 +124,8 @@ describe('LedgerTab', () => {
     http = makeTransport((method, path) => {
       if (path.startsWith('/admin/billing/invoices')) return [invoice];
       if (path.includes('/statement')) return statementWith(payments);
+      // The issue form reads the contracts it can bill; none is needed here.
+      if (path.startsWith('/admin/billing/subscriptions')) return [];
       return {};
     });
     client = { adminBilling: createAdminBillingApi(http as unknown as HttpTransport) };
@@ -223,6 +225,115 @@ describe('LedgerTab', () => {
     fireEvent.click(screen.getByRole('button', { name: d.exportAriaLabel }));
 
     expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(http).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The four write actions this tab owns. Each opens its own form; the request
+   * payloads are asserted in that form's own spec.
+   */
+  it('opens the three per-invoice write actions from the expanded invoice', async () => {
+    renderTab();
+    await expandInvoice();
+
+    fireEvent.click(screen.getByRole('button', { name: d.payment.buttonAriaLabel('inv-1111') }));
+    expect(await screen.findByRole('dialog', { name: d.payment.dialogTitle })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: d.payment.cancel }));
+
+    fireEvent.click(screen.getByRole('button', { name: d.adjustment.buttonAriaLabel('inv-1111') }));
+    expect(
+      await screen.findByRole('dialog', { name: d.adjustment.dialogTitle }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: d.adjustment.cancel }));
+
+    fireEvent.click(
+      screen.getByRole('button', { name: d.voidInvoice.buttonAriaLabel('inv-1111') }),
+    );
+    expect(
+      await screen.findByRole('dialog', { name: d.voidInvoice.dialogTitle }),
+    ).toBeInTheDocument();
+  });
+
+  it('opens the issue form from the tab header', async () => {
+    renderTab();
+    await screen.findByText('Alice Doe');
+
+    fireEvent.click(screen.getByRole('button', { name: d.issue.buttonAriaLabel }));
+    expect(await screen.findByRole('dialog', { name: d.issue.dialogTitle })).toBeInTheDocument();
+  });
+
+  it('explains that a correction is an entry rather than an edit', async () => {
+    renderTab();
+    expect(await screen.findByText(d.correctionNote)).toBeInTheDocument();
+  });
+
+  /**
+   * A recorded payment renders beneath its invoice with its method and its
+   * author — the criterion this tab satisfies on its own.
+   */
+  it('renders a recorded payment beneath its invoice with its method and author', async () => {
+    payments = [original];
+    renderTab();
+    await expandInvoice();
+
+    expect(screen.getByText(`${d.method.cash} · R$ 500.00`)).toBeInTheDocument();
+    expect(screen.getByText(`2026-08-09 · ${d.recordedBy('admin-1')}`)).toBeInTheDocument();
+  });
+
+  /**
+   * A void invoice takes no further entry; the tab says so rather than offering
+   * three controls the server would refuse.
+   */
+  it('offers no write action on a void invoice', async () => {
+    http = makeTransport((method, path) => {
+      if (path.startsWith('/admin/billing/invoices')) return [{ ...invoice, status: 'void' }];
+      if (path.includes('/statement')) return statementWith([]);
+      if (path.startsWith('/admin/billing/subscriptions')) return [];
+      return {};
+    });
+    client = { adminBilling: createAdminBillingApi(http as unknown as HttpTransport) };
+
+    renderTab();
+    await expandInvoice();
+
+    expect(screen.getByText(d.voidedNote)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: d.payment.buttonAriaLabel('inv-1111') }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: d.voidInvoice.buttonAriaLabel('inv-1111') }),
+    ).not.toBeInTheDocument();
+  });
+
+  /**
+   * After a write the list is re-read — so the invoice's status is the server's
+   * and never a local recomputation — and the CSV export still serialises the
+   * rows in memory without a request of its own.
+   */
+  it('re-reads the list after a write and keeps the CSV export request-free', async () => {
+    const createObjectURL = vi.fn(() => 'blob:ledger');
+    Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, writable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), writable: true });
+
+    renderTab();
+    await expandInvoice();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: d.voidInvoice.buttonAriaLabel('inv-1111') }),
+    );
+    fireEvent.change(await screen.findByPlaceholderText(d.voidInvoice.reasonPlaceholder), {
+      target: { value: 'Issued to the wrong student.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: d.voidInvoice.submit }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(d.voidInvoice.success),
+    );
+    expect(http).toHaveBeenCalledWith('GET', '/admin/billing/invoices');
+
+    http.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: d.exportAriaLabel }));
+    expect(createObjectURL).toHaveBeenCalled();
     expect(http).not.toHaveBeenCalled();
   });
 

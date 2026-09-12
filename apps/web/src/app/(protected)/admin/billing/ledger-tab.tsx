@@ -23,12 +23,22 @@ import type {
 } from '@web/lib/admin-billing-api';
 import { Money, useMoneyFormatter } from './money';
 import { downloadCsv, toCsv } from './ledger-csv';
+import { PaymentForm } from './payment-form';
+import { AdjustmentForm } from './adjustment-form';
+import { VoidInvoiceForm } from './void-invoice-form';
+import { IssueInvoiceForm } from './issue-invoice-form';
 
 const STATUSES: readonly InvoiceStatus[] = ['open', 'paid', 'void'];
 
 type Entries = { adjustments: BillingAdjustment[]; payments: BillingPayment[] };
 
 type ReverseDraft = { payment: BillingPayment; invoiceId: string };
+
+/** Which write dialog is open, and on which invoice. */
+type WriteDraft = {
+  action: 'payment' | 'adjustment' | 'void';
+  invoice: BillingInvoiceWithBalance;
+};
 
 /** A short, stable handle for an id in the UI and in an aria-label. */
 function shortRef(id: string): string {
@@ -71,6 +81,19 @@ export function LedgerTab({
   const [reverseError, setReverseError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // The four write actions and the confirmation they leave behind.
+  const [writeDraft, setWriteDraft] = useState<WriteDraft | null>(null);
+  const [issueOpen, setIssueOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  /**
+   * Bumped after every write. The list is re-fetched rather than patched in
+   * place, because an invoice's status is the server's cache of "balance
+   * reached zero" and is never recomputed here. It is also the only request a
+   * write adds — the CSV export keeps serialising the rows already in memory.
+   */
+  const [refreshToken, setRefreshToken] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -91,7 +114,7 @@ export function LedgerTab({
     return () => {
       cancelled = true;
     };
-  }, [client, query, d.loadError]);
+  }, [client, query, refreshToken, d.loadError]);
 
   /**
    * An invoice's adjustments and payments come from its student's statement —
@@ -126,6 +149,22 @@ export function LedgerTab({
     void loadEntries(invoice);
   };
 
+  /**
+   * What every write does once the server accepted it: state what happened,
+   * re-read the list so the invoice's status is the server's, and re-read the
+   * open invoice's entries so the new row appears beneath it.
+   */
+  const afterWrite = useCallback(
+    (invoice: BillingInvoiceWithBalance | null, message: string) => {
+      setNotice(message);
+      setWriteDraft(null);
+      setIssueOpen(false);
+      setRefreshToken((token) => token + 1);
+      if (invoice && expanded === invoice.id) void loadEntries(invoice);
+    },
+    [expanded, loadEntries],
+  );
+
   const submitReverse = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!reverseDraft) return;
@@ -143,6 +182,9 @@ export function LedgerTab({
       setReverseDraft(null);
       setReverseReason('');
       setReverseError(null);
+      // The mirror entry moves the balance, so the list is re-read for the
+      // server's own status rather than adjusted here.
+      setRefreshToken((token) => token + 1);
       if (invoice) await loadEntries(invoice);
     } catch {
       setReverseError(d.reverseError);
@@ -183,10 +225,38 @@ export function LedgerTab({
 
   return (
     <section className="space-y-4">
-      <div className="space-y-2">
-        <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{d.heading}</h2>
-        <p className="max-w-3xl text-sm text-zinc-600 dark:text-zinc-400">{d.appendOnlyNote}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-2">
+          <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{d.heading}</h2>
+          <p className="max-w-3xl text-sm text-zinc-600 dark:text-zinc-400">{d.appendOnlyNote}</p>
+          {/*
+            Spelled out for the administrator who is looking for a Delete: the
+            three corrections are an *entry*, never an edit of what was written.
+          */}
+          <p className="max-w-3xl text-sm text-zinc-600 dark:text-zinc-400">{d.correctionNote}</p>
+        </div>
+        <Button
+          type="button"
+          variant="primary"
+          size="md"
+          onClick={() => {
+            setNotice(null);
+            setIssueOpen(true);
+          }}
+          aria-label={d.issue.buttonAriaLabel}
+        >
+          {d.issue.button}
+        </Button>
       </div>
+
+      {notice && (
+        <p
+          role="status"
+          className="rounded-md bg-emerald-100 px-4 py-2 text-sm text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200"
+        >
+          {notice}
+        </p>
+      )}
 
       <form
         className="flex flex-wrap items-end gap-3"
@@ -356,7 +426,60 @@ export function LedgerTab({
                           {entriesError}
                         </p>
                       ) : (
-                        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                        <div className="space-y-5">
+                          {/* -----------------------------------------------
+                              The write actions for this invoice. No delete
+                              control exists here or anywhere else on the tab.
+                              ----------------------------------------------- */}
+                          <div className="space-y-2">
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                              {d.actionsHeading}
+                            </h3>
+                            {invoice.status === 'void' ? (
+                              <p className="text-sm text-zinc-500">{d.voidedNote}</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  variant="primary"
+                                  size="sm"
+                                  onClick={() => {
+                                    setNotice(null);
+                                    setWriteDraft({ action: 'payment', invoice });
+                                  }}
+                                  aria-label={d.payment.buttonAriaLabel(reference)}
+                                >
+                                  {d.payment.button}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => {
+                                    setNotice(null);
+                                    setWriteDraft({ action: 'adjustment', invoice });
+                                  }}
+                                  aria-label={d.adjustment.buttonAriaLabel(reference)}
+                                >
+                                  {d.adjustment.button}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() => {
+                                    setNotice(null);
+                                    setWriteDraft({ action: 'void', invoice });
+                                  }}
+                                  aria-label={d.voidInvoice.buttonAriaLabel(reference)}
+                                >
+                                  {d.voidInvoice.button}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                           <div>
                             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
                               {d.adjustmentsHeading}
@@ -457,6 +580,7 @@ export function LedgerTab({
                               </ul>
                             )}
                           </div>
+                          </div>
                         </div>
                       )}
                     </td>
@@ -518,6 +642,41 @@ export function LedgerTab({
             </div>
           </form>
         </div>
+      )}
+
+      {writeDraft?.action === 'payment' && (
+        <PaymentForm
+          invoice={writeDraft.invoice}
+          currency={currency}
+          onClose={() => setWriteDraft(null)}
+          onRecorded={() => afterWrite(writeDraft.invoice, d.payment.success)}
+        />
+      )}
+
+      {writeDraft?.action === 'adjustment' && (
+        <AdjustmentForm
+          invoice={writeDraft.invoice}
+          currency={currency}
+          onClose={() => setWriteDraft(null)}
+          onApplied={() => afterWrite(writeDraft.invoice, d.adjustment.success)}
+        />
+      )}
+
+      {writeDraft?.action === 'void' && (
+        <VoidInvoiceForm
+          invoice={writeDraft.invoice}
+          onClose={() => setWriteDraft(null)}
+          onVoided={() => afterWrite(writeDraft.invoice, d.voidInvoice.success)}
+        />
+      )}
+
+      {issueOpen && (
+        <IssueInvoiceForm
+          currency={currency}
+          nameOf={nameOf}
+          onClose={() => setIssueOpen(false)}
+          onIssued={(reference) => afterWrite(null, d.issue.success(reference))}
+        />
       )}
     </section>
   );
