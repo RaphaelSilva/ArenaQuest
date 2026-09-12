@@ -5,8 +5,37 @@ import { Button, Table, TableBody, TableCell, TableHeader, TableRow } from '@web
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
 import { Spinner } from '@web/components/spinner';
-import type { BillingStudentStatement } from '@web/lib/admin-billing-api';
+import type {
+  BillingStatementContractGroup,
+  BillingStudentStatement,
+  BillingSubscription,
+} from '@web/lib/admin-billing-api';
 import { Money } from './money';
+
+/**
+ * The version of a contract group that is in force now.
+ *
+ * `supersedesId` is the reliable signal: an amendment points at the version it
+ * replaces, so the current version is the one no sibling supersedes. That is
+ * order-independent and survives any change to how the list is serialised.
+ *
+ * When no sibling supersedes anything — a group of one, the ordinary case — the
+ * last element is taken instead. That is not a guess: `groupContracts` in
+ * `apps/api/src/core/billing/accounting-service.ts` sorts `versions` ascending
+ * by `startDate` then `signedAt` and derives the group's own `status` and
+ * `endDate` from exactly that element, so the terms shown here agree with the
+ * status rendered beside them.
+ */
+function currentVersion(group: BillingStatementContractGroup): BillingSubscription | null {
+  if (group.versions.length === 0) return null;
+  const superseded = new Set(
+    group.versions
+      .map((version) => version.supersedesId)
+      .filter((id): id is string => id !== null),
+  );
+  const live = group.versions.filter((version) => !superseded.has(version.id));
+  return live.length === 1 ? live[0] : group.versions[group.versions.length - 1];
+}
 
 /**
  * The per-student drill-down from the Students tab.
@@ -19,14 +48,24 @@ export function StudentStatementPanel({
   userId,
   studentName,
   onClose,
+  onSignContract,
 }: {
   userId: string;
   studentName: string;
   onClose: () => void;
+  /**
+   * The second entry point into signing (RFC 0013 §7). Optional: the panel is
+   * readable on its own, and a caller that offers no signing surface simply
+   * omits it.
+   */
+  onSignContract?: (userId: string) => void;
 }) {
   const dict = useDict();
   const d = dict.admin.billing.statement;
   const ledgerDict = dict.admin.billing.ledger;
+  // The cycle and grace-day spellings already in the dictionary — this panel
+  // adds no second wording for either.
+  const planDict = dict.admin.billing.plans;
   const client = useApiClient();
 
   const [statement, setStatement] = useState<BillingStudentStatement | null>(null);
@@ -67,9 +106,22 @@ export function StudentStatementPanel({
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             {d.heading(studentName)}
           </h2>
-          <Button type="button" variant="secondary" size="sm" onClick={onClose}>
-            {d.close}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {onSignContract && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => onSignContract(userId)}
+                aria-label={dict.admin.billing.sign.statementAriaLabel(studentName)}
+              >
+                {dict.admin.billing.sign.statementButton}
+              </Button>
+            )}
+            <Button type="button" variant="secondary" size="sm" onClick={onClose}>
+              {d.close}
+            </Button>
+          </div>
         </div>
 
         {loading ? (
@@ -117,19 +169,93 @@ export function StudentStatementPanel({
                 <p className="text-sm text-zinc-500">{d.contractsEmpty}</p>
               ) : (
                 <ul className="space-y-2">
-                  {statement.contractGroups.map((group) => (
-                    <li
-                      key={group.contractGroupId}
-                      className="rounded-md border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
-                    >
-                      <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                        {group.startDate}
-                      </span>
-                      <span className="text-zinc-500">
-                        {` · ${group.endDate ?? d.none} · ${d.contractVersions(group.versions.length)}`}
-                      </span>
-                    </li>
-                  ))}
+                  {statement.contractGroups.map((group) => {
+                    const version = currentVersion(group);
+                    return (
+                      <li
+                        key={group.contractGroupId}
+                        className="rounded-md border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
+                      >
+                        <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                          {group.startDate}
+                        </span>
+                        <span className="text-zinc-500">
+                          {` · ${group.endDate ?? d.none} · ${d.contractVersions(group.versions.length)}`}
+                        </span>
+
+                        {/*
+                          The terms the contract records now — this is what makes
+                          "why does this student pay a different amount?"
+                          answerable from the product rather than from a database
+                          query. The version chain and the amendment history are
+                          deliberately not rendered here; that is Task 11's.
+
+                          `dueDay` and `graceDays` are shown as the data they are.
+                          Nothing is derived from either: a due date's consequence
+                          and a grace outcome are resolved on the server, where a
+                          hold can reach them.
+                        */}
+                        {version && (
+                          <div className="mt-2 border-t border-zinc-200 pt-2 dark:border-zinc-800">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                              {d.currentTermsHeading}
+                            </p>
+                            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                              {d.currentTermsNote}
+                            </p>
+                            <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                              <div>
+                                <dt className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                  {d.termsAmount}
+                                </dt>
+                                <dd className="font-medium text-zinc-900 dark:text-zinc-50">
+                                  <Money
+                                    amountMinor={version.amountMinor}
+                                    currency={statement.currency}
+                                    code={version.currency}
+                                  />
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                  {d.termsCycle}
+                                </dt>
+                                <dd className="font-medium text-zinc-900 dark:text-zinc-50">
+                                  {planDict.cycle[version.cycle]}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                  {d.termsDueDay}
+                                </dt>
+                                <dd className="font-medium text-zinc-900 dark:text-zinc-50">
+                                  {version.dueDay}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                                  {d.termsGraceDays}
+                                </dt>
+                                <dd className="font-medium text-zinc-900 dark:text-zinc-50">
+                                  {planDict.graceDaysValue(version.graceDays)}
+                                </dd>
+                              </div>
+                            </dl>
+                            {version.termsSource === 'negotiated' && (
+                              <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+                                {d.termsNegotiated}
+                              </p>
+                            )}
+                            {version.termsNote !== '' && (
+                              <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                                {`${d.termsNoteLabel}: ${version.termsNote}`}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </section>

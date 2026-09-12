@@ -13,6 +13,7 @@ import { StudentsTab } from './students-tab';
 import { LedgerTab } from './ledger-tab';
 import { ReportsTab } from './reports-tab';
 import { PlansTab } from './plans-tab';
+import type { SignableStudent } from './sign-contract-dialog';
 
 const TABS = ['students', 'ledger', 'reports', 'plans'] as const;
 type Tab = (typeof TABS)[number];
@@ -53,7 +54,14 @@ export default function AdminBillingPage() {
   const [currency, setCurrency] = useState<BillingReportCurrency | null>(null);
   const [currencyError, setCurrencyError] = useState<string | null>(null);
 
-  const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
+  /**
+   * The console's people. `email` and `status` ride along because the signing
+   * picker needs both — it filters on name and email, and marks an account
+   * that is not active — and this is the same fetch the name lookup already
+   * performs. A second read of a list already in hand would be the only other
+   * way to get them.
+   */
+  const [students, setStudents] = useState<SignableStudent[]>([]);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -92,7 +100,14 @@ export default function AdminBillingPage() {
       try {
         const page = await client.adminUsers.list(1, 100);
         if (!cancelled) {
-          setStudents(page.data.map((user) => ({ id: user.id, name: user.name })));
+          setStudents(
+            page.data.map((user) => ({
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              status: user.status,
+            })),
+          );
         }
       } catch {
         if (!cancelled) setStudents([]);
@@ -193,6 +208,7 @@ export default function AdminBillingPage() {
             currency={currency}
             nameOf={nameOf}
             onRosterChanged={notifyBillingRosterChanged}
+            students={students}
           />
         )}
       </div>
