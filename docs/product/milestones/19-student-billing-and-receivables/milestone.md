@@ -172,7 +172,7 @@ contract it consumes. Phases map to RFC 0013's Implementation Plan.
 | 10 | [Contract signing, standard and negotiated](./10-contract-signing-standard-and-negotiated.task.md) | 5 | Frontend | ✅ Done |
 | 11 | [Contract lifecycle and amendment](./11-contract-lifecycle-and-amendment.task.md) | 5 | Frontend | ✅ Done |
 | 12 | [Ledger write actions](./12-ledger-write-actions.task.md) | 5 | Frontend | ✅ Done |
-| 13 | [Manual invoice cycle run](./13-manual-invoice-cycle-run.task.md) | 5 | Frontend | ☐ Open |
+| 13 | [Manual invoice cycle run](./13-manual-invoice-cycle-run.task.md) | 5 | Frontend | ✅ Done |
 
 Tasks **09–13 were added on 2026-09-12** with the RFC 0013 §7 amendment. They are the
 admin **write** surface: tasks 07–08 delivered §7's read surface as it was written, and
