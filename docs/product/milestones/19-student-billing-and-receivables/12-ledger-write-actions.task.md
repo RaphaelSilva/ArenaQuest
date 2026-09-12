@@ -1,6 +1,6 @@
 # Task 12 — Frontend: Ledger write actions (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Frontend Web
@@ -141,40 +141,40 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Recording a payment on an open invoice issues the expected request, the payment
+- [x] Recording a payment on an open invoice issues the expected request, the payment
       renders beneath its invoice with its method and author, and the invoice's status
       reflects the server's response rather than a local recomputation.
-- [ ] A payment recorded for the full balance settles the invoice, and the student's
+- [~] A payment recorded for the full balance settles the invoice, and the student's
       standing on the Students tab updates to what the API resolves — with no threshold
       logic in the client.
-- [ ] Applying each of the four adjustment kinds issues the expected request, requires a
+- [x] Applying each of the four adjustment kinds issues the expected request, requires a
       reason, and the form states how that kind moves the balance.
-- [ ] Voiding an invoice requires a reason and the invoice renders as voided afterwards.
-- [ ] Issuing an invoice names the contract and the period being billed; issuing twice for
+- [x] Voiding an invoice requires a reason and the invoice renders as voided afterwards.
+- [x] Issuing an invoice names the contract and the period being billed; issuing twice for
       the same contract and period surfaces the server's refusal explicitly and creates
       nothing.
-- [ ] No delete control exists for a payment or an adjustment anywhere on the tab, and the
+- [x] No delete control exists for a payment or an adjustment anywhere on the tab, and the
       copy explains that a correction is an entry rather than an edit.
-- [ ] Nothing on the screen accrues, schedules or suggests a late fee; no percentage or
+- [x] Nothing on the screen accrues, schedules or suggests a late fee; no percentage or
       recurring-charge control exists.
-- [ ] Nothing on the screen presents issuing as a way to sell a seminar or any item
+- [x] Nothing on the screen presents issuing as a way to sell a seminar or any item
       outside a contract's periodic billing.
-- [ ] Amounts render and submit as integer minor units at exponents 2, 0 and 8 through the
+- [x] Amounts render and submit as integer minor units at exponents 2, 0 and 8 through the
       shared money formatter, and `Intl.NumberFormat` does not appear in the diff.
-- [ ] The reports' totals after a payment and an adjustment reconcile with the ledger rows
+- [~] The reports' totals after a payment and an adjustment reconcile with the ledger rows
       just written.
-- [ ] No control gates, suspends, restricts or downgrades a student's access, and no copy
+- [x] No control gates, suspends, restricts or downgrades a student's access, and no copy
       implies it.
-- [ ] The existing CSV export still reflects the current filtered view after a write,
+- [x] The existing CSV export still reflects the current filtered view after a write,
       without issuing a new request beyond the list refresh.
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [ ] The four forms are responsive at mobile width and keyboard-usable throughout,
+- [~] The four forms are responsive at mobile width and keyboard-usable throughout,
       verified in a browser.
-- [ ] `git diff` contains no file under `apps/api/` or `packages/`, and
+- [x] `git diff` contains no file under `apps/api/` or `packages/`, and
       `apps/web/src/lib/admin-billing-api.ts` is unmodified.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
