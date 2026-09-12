@@ -907,6 +907,136 @@ export const dictEn = {
           balanceMinor: 'Balance (minor units)',
           issuedAt: 'Issued at',
         },
+        actionsHeading: 'Record an entry',
+        correctionNote:
+          'There is no Delete, because a correction here is an entry rather than an edit. Reverse undoes a payment by appending its mirror image, voiding closes an invoice that should never have been issued, and a further signed adjustment changes what is owed. Every one of them is added to the history with its reason and its author, and nothing already written is altered.',
+        voidedNote:
+          'This invoice is void. It takes no further payment and no further adjustment, and it stays on the ledger with the reason it was voided for.',
+        payment: {
+          button: 'Record payment',
+          buttonAriaLabel: (reference: string) => `Record a payment on invoice ${reference}`,
+          dialogTitle: 'Record a payment',
+          explainer:
+            'Money that has already arrived — as cash, a transfer, a Pix or a card charge — entered against this invoice. Recording it is a bookkeeping entry: it carries your name and it can only be undone by a reversal.',
+          noGateNote:
+            'Recording a payment changes nothing about what the student can see, and nor does not recording one.',
+          invoiceLabel: 'Invoice',
+          balanceLabel: 'Balance owed',
+          amountLabel: (code: string) => `Amount received (${code})`,
+          amountHelp: (exponent: number) =>
+            exponent === 0
+              ? 'This currency has no decimal places, so enter a whole number.'
+              : `Up to ${exponent} decimal place(s), using a dot as the separator.`,
+          methodLabel: 'How it was received',
+          paidAtLabel: 'Date received',
+          paidAtHelp: 'Leave empty to record it as received today.',
+          referenceLabel: 'External reference (optional)',
+          referenceHelp:
+            'A bank or provider identifier, if there is one. Cash received in person has none, so leave it empty.',
+          submit: 'Record payment',
+          cancel: 'Cancel',
+          validation: {
+            amountZero:
+              'A payment has to be more than zero. To undo a payment already recorded, reverse it.',
+          },
+          success: 'Payment recorded. The invoice now shows what the server resolved.',
+          error: 'Failed to record the payment.',
+        },
+        adjustment: {
+          button: 'Apply adjustment',
+          buttonAriaLabel: (reference: string) => `Apply an adjustment to invoice ${reference}`,
+          dialogTitle: 'Apply an adjustment',
+          explainer:
+            'An adjustment changes what this invoice asks for, without touching the amount that was originally billed. It is appended with your name and the reason you give, and it is corrected by another adjustment rather than by an edit.',
+          manualOnlyNote:
+            'Every adjustment is applied by hand, one amount at a time. Nothing here or anywhere else charges a percentage, repeats itself, or adds a late fee on its own — a surcharge exists only because an administrator typed it.',
+          kindLabel: 'Kind of adjustment',
+          kindEffect: {
+            discount: 'Reduces what is owed — an agreed reduction of this charge.',
+            credit: 'Reduces what is owed — value the dojo already owes the student.',
+            waiver: 'Reduces what is owed — part of this charge is forgiven.',
+            surcharge: 'Increases what is owed — an extra amount added by hand.',
+          },
+          amountLabel: (code: string) => `Amount of the adjustment (${code})`,
+          amountHelp: (exponent: number) =>
+            exponent === 0
+              ? 'Enter it as a positive whole number; the kind above decides the direction.'
+              : `Enter it as a positive number with up to ${exponent} decimal place(s); the kind above decides the direction.`,
+          magnitudeHelp: 'Enter a positive amount; the kind above decides the direction.',
+          directionReduces: 'reduce what is owed',
+          directionIncreases: 'increase what is owed',
+          directionPending: (direction: string) =>
+            `Enter an amount. This kind of adjustment will ${direction}.`,
+          signedPreview: (value: string) => `Will be recorded as ${value}.`,
+          reasonLabel: 'Reason (required)',
+          reasonPlaceholder: 'Why is this invoice being adjusted?',
+          reasonRequired: 'A reason is required to apply an adjustment.',
+          validation: {
+            amountZero: 'An adjustment of zero changes nothing, so enter an amount.',
+          },
+          submit: 'Apply adjustment',
+          cancel: 'Cancel',
+          success: 'Adjustment applied. The invoice now shows what the server resolved.',
+          error: 'Failed to apply the adjustment.',
+        },
+        voidInvoice: {
+          button: 'Void invoice',
+          buttonAriaLabel: (reference: string) => `Void invoice ${reference}`,
+          dialogTitle: 'Void an invoice',
+          explainer:
+            'Voiding closes an invoice that should never have been asked for. Nothing is erased: the invoice stays on the ledger marked as void, with your name and the reason you give here. It takes no payment and no adjustment afterwards.',
+          invoiceLine: (reference: string) => `Invoice ${reference}`,
+          reasonLabel: 'Reason (required)',
+          reasonPlaceholder: 'Why should this invoice never have been issued?',
+          reasonRequired: 'A reason is required to void an invoice.',
+          submit: 'Void invoice',
+          cancel: 'Cancel',
+          success: 'Invoice voided. It stays on the ledger with the reason you recorded.',
+          error: 'Failed to void the invoice.',
+        },
+        issue: {
+          button: 'Issue an invoice',
+          buttonAriaLabel: 'Issue an invoice for a contract period',
+          dialogTitle: 'Issue an invoice',
+          explainer:
+            "Issues one period of one existing contract, at the amount that contract recorded when it was signed. This is what the daily run does on its own; doing it here is for the period the run has not reached or did not write.",
+          notASaleNote:
+            'This is not a way to charge for a seminar, a one-off class or anything else outside a contract. An invoice always belongs to a contract and to one of its periods, and there is no other kind of charge to make here.',
+          uniquenessNote:
+            'One invoice per contract per period. A period already invoiced is refused rather than billed twice — that rule is what makes the daily run safe to repeat.',
+          contractHeading: 'Contract to bill',
+          searchLabel: 'Search by student name',
+          searchPlaceholder: 'Student name',
+          contractsLoadError: 'Failed to load the contracts.',
+          contractsEmpty:
+            'No contract matches this search. An invoice needs a signed contract, so sign one on the Students tab first.',
+          contractStatus: {
+            active: 'Active',
+            paused: 'Paused',
+            cancelled: 'Cancelled',
+            superseded: 'Superseded',
+          },
+          contractMeta: (cycle: string, status: string, startDate: string) =>
+            `${cycle} · ${status} · since ${startDate}`,
+          contractRequired: 'Choose the contract this invoice bills.',
+          referenceDateLabel: 'Period containing this date',
+          referenceDateHelp:
+            "The period billed is the contract's own period that contains this date. Change it to bill an earlier or a later period.",
+          periodHeading: 'Period to be billed',
+          periodNote:
+            'Resolved by the same rule the server bills with, from the date above and the contract’s own start date, cycle and billing day — and sent exactly as shown, so the invoice cannot land on a different period.',
+          periodPending: 'Choose a contract to see the period that would be billed.',
+          periodLabel: 'Period',
+          periodValue: (start: string, end: string) => `${start} up to ${end}`,
+          dueLabel: 'Due date',
+          amountLabel: 'Amount to bill',
+          periodError:
+            'The period could not be resolved for this contract and date. Check the date above.',
+          submit: 'Issue invoice',
+          cancel: 'Cancel',
+          success: (reference: string) => `Invoice ${reference} issued.`,
+          error: 'Failed to issue the invoice.',
+        },
       },
       reports: {
         heading: 'Accounting reports',
