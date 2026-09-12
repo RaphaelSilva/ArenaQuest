@@ -68,7 +68,7 @@ describe('AdminBillingPage', () => {
     };
   });
 
-  it('renders the three tabs as a tablist', async () => {
+  it('renders the four tabs as a tablist', async () => {
     renderPage();
     const tablist = await screen.findByRole('tablist', { name: d.tabsLabel });
     expect(tablist).toBeInTheDocument();
@@ -78,6 +78,13 @@ describe('AdminBillingPage', () => {
     );
     expect(screen.getByRole('tab', { name: d.tabs.ledger })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: d.tabs.reports })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: d.tabs.plans })).toBeInTheDocument();
+  });
+
+  it('opens the plan catalogue on the Plans tab', async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole('tab', { name: d.tabs.plans }));
+    expect(await screen.findByText(d.plans.recurringNote)).toBeInTheDocument();
   });
 
   it('switches tabs on click', async () => {

@@ -730,6 +730,7 @@ export const dictEn = {
         students: 'Students',
         ledger: 'Ledger',
         reports: 'Reports',
+        plans: 'Plans',
       },
       money: {
         locale: 'en-US',
@@ -937,6 +938,98 @@ export const dictEn = {
           },
           totalRow: 'Total',
         },
+      },
+      plans: {
+        heading: 'Plan catalogue',
+        recurringNote:
+          'A plan is the recurring shelf: every contract signed against it is re-invoiced each period by the daily run. Nothing here sells a single item — a plan created for one seminar would be billed again every period, indefinitely.',
+        editSafeNote:
+          'Repricing a plan is safe. A signed contract and an issued invoice keep the terms they snapshotted at signature, so nothing already billed is restated. To give one student different terms, sign a negotiated contract; to change one charge, apply an adjustment on the ledger.',
+        archiveNote:
+          'Nothing here is deleted. Archiving hides a plan from future signature and leaves every contract that already references it exactly as it stands.',
+        noGateNote:
+          'A plan is a price, not a permission. Nothing on this tab suspends, downgrades or withholds a student access.',
+        filterLabel: 'Filter by state',
+        filterActive: 'Active plans',
+        filterArchived: 'Archived plans',
+        filterAll: 'All plans',
+        loading: 'Loading the catalogue…',
+        loadError: 'Failed to load the plan catalogue.',
+        empty:
+          'No plan has been created yet. A plan is the prerequisite for signing a contract: create one here, then sign a student against it.',
+        emptyArchived: 'No plan has been archived.',
+        count: (total: number) => `${total} plan(s) listed`,
+        none: '—',
+        columns: {
+          name: 'Plan',
+          amount: 'Amount per cycle',
+          cycle: 'Cycle',
+          graceDays: 'Grace period',
+          state: 'State',
+          actions: 'Actions',
+        },
+        cycle: {
+          monthly: 'Monthly',
+          quarterly: 'Quarterly',
+          yearly: 'Yearly',
+        },
+        graceDaysValue: (days: number) => `${days} day(s)`,
+        state: {
+          active: 'Active',
+          archived: 'Archived',
+        },
+        createButton: 'New plan',
+        editButton: 'Edit',
+        editAriaLabel: (name: string) => `Edit the plan ${name}`,
+        editUnavailable: (code: string) =>
+          `This plan is priced in ${code}, which is not the currency this console resolved, so its amount cannot be edited here.`,
+        archiveButton: 'Archive',
+        archiveAriaLabel: (name: string) => `Archive the plan ${name}`,
+        unarchiveButton: 'Restore',
+        unarchiveAriaLabel: (name: string) => `Restore the plan ${name} to the catalogue`,
+        createDialogTitle: 'Create a plan',
+        editDialogTitle: (name: string) => `Edit the plan ${name}`,
+        submitCreate: 'Create plan',
+        submitEdit: 'Save plan',
+        cancel: 'Cancel',
+        form: {
+          nameLabel: 'Name',
+          namePlaceholder: 'Monthly membership',
+          descriptionLabel: 'Description (optional)',
+          descriptionPlaceholder: 'What this plan covers.',
+          currencyLabel: 'Currency',
+          currencyHelp:
+            'The currency this console resolved. It is fixed when the plan is created and is never changed by an edit.',
+          amountLabel: (code: string) => `Amount per cycle (${code})`,
+          amountHelp: (exponent: number) =>
+            exponent === 0
+              ? 'This currency has no decimal places, so enter a whole number.'
+              : `Up to ${exponent} decimal place(s), using a dot as the separator.`,
+          cycleLabel: 'Cycle',
+          cycleHelp: 'How often a contract on this plan is re-invoiced by the daily run.',
+          graceDaysLabel: 'Grace period (days)',
+          graceDaysHelp: 'Days after the due date before an invoice counts as overdue.',
+        },
+        validation: {
+          nameRequired: 'A plan needs a name.',
+          amountEmpty: 'Enter the amount charged each cycle.',
+          amountNotANumber: 'Enter the amount in digits, using a dot as the decimal separator.',
+          amountNegative: 'The amount cannot be negative.',
+          amountTooPrecise: (exponent: number) =>
+            exponent === 0
+              ? 'This currency has no decimal places, so the amount must be a whole number.'
+              : `This currency holds ${exponent} decimal place(s), so the amount cannot be more precise than that.`,
+          graceDaysInvalid: 'The grace period must be a whole number of days, zero or more.',
+        },
+        createSuccess: (name: string) => `Plan ${name} created.`,
+        updateSuccess: (name: string) => `Plan ${name} saved. Signed contracts keep their terms.`,
+        archiveSuccess: (name: string) =>
+          `Plan ${name} archived. Contracts already signed against it are unchanged.`,
+        unarchiveSuccess: (name: string) => `Plan ${name} is back in the catalogue.`,
+        createError: 'Failed to create the plan.',
+        updateError: 'Failed to save the plan.',
+        archiveError: 'Failed to archive the plan.',
+        unarchiveError: 'Failed to restore the plan.',
       },
     },
   },
