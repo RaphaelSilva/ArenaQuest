@@ -1,7 +1,8 @@
 # RFC 0013: Student billing, contracts and receivables accounting
 
 **Date:** 2026-09-10
-**Status:** Approved
+**Status:** Accepted
+**Revised:** 2026-09-12
 **Author:** raphaelsilva
 **Affected:**
 - `apps/api/migrations/0026_create_billing_tables.sql` (new) — `currencies`, `billing_plans`, `subscriptions`, `invoices`, `invoice_adjustments`, `payments`, `billing_standing_holds`. Money is integer minor units; `payments` and `invoice_adjustments` are append-only.
@@ -18,6 +19,20 @@
 - `apps/api/src/routes/index.ts`, `apps/api/src/middleware/*`, `apps/api/src/adapters/db/d1-enrollment-repository.ts` — **all unchanged**, deliberately. No route gains a billing guard and no access query learns about money: billing is a reporting context, not an authorization one.
 
 ---
+
+> **Revision note (2026-09-12).** §7 as originally written specified only the three read
+> tabs, the nav badge, the student statement and the banner — and Milestone 19's tasks
+> 07–08 implemented it faithfully. That was incomplete against this document's own plan:
+> Phase 6 makes the `budo` backfill "an admin task **through the UI**, not a script", the
+> Motivation promises an administrator who has retired a spreadsheet, and
+> `terms_source = 'negotiated'` existed on the API with no way in from the product. In
+> practice an admin could not create a plan, sign a contract, issue an invoice or record a
+> payment without a hand-written `curl` and an admin bearer token. This revision extends §7
+> with the admin write surface and adds the matching Success Criteria, so the gap becomes
+> measurable. **No API change follows from it** — every screen added calls an endpoint §5
+> already defines. Also corrected: the §5 sentence on body validation, which named a
+> decorator pair deleted from the codebase on 2026-05-26 (tracked in
+> `docs/product/backlog/refactoring/07-validatebody-documentation-drift.task.md`).
 
 ## Summary
 
@@ -567,8 +582,9 @@ adapter (Workers share no memory between requests).
 
 Every one of these is an admin or self surface; **no existing route changes, and none
 gains a billing guard**. All business logic sits in controllers returning
-`ControllerResult<T>`; routers only parse, guard and shape. Bodies validate through
-`@ValidateBody(schema)` + `@Body()`.
+`ControllerResult<T>`; routers only parse, guard and shape. Request bodies are declared on
+the route with `@hono/zod-openapi`'s `createRoute` and read through `c.req.valid('json')`,
+with the router's `defaultHook` returning the `400` envelope.
 
 **The billing sub-router carries its own `requireRole(ROLES.ADMIN)`.** This is not
 decoration: `buildAdminRouter` guards all of `/v1/admin/*` with
@@ -613,6 +629,53 @@ so a missed firing is recoverable by hand and so the job is testable without a c
   silently mis-renders a non-2-decimal currency.
   All copy goes in `dict-en.ts` / `dict-pt.ts` (identical keys — `check-i18n-coverage.js`
   enforces it); no hardcoded strings.
+
+**The admin write surface.** The tabs above *report*; the administrator must also be able
+to **operate** the dojo from them. Phase 6 makes the `budo` backfill "an admin task through
+the UI, not a script", and the Motivation promises someone who has retired a spreadsheet —
+neither is true of an admin who has to write `curl` by hand. Every screen below calls an
+endpoint §5 already defines: **no route, controller or schema is added for any of them.**
+
+- **Plans** — a fourth tab: the catalogue listed with amount, cycle, grace days and
+  archived state, plus create, edit and archive. Editing is safe by construction (§1 — a
+  signed contract snapshots its terms) and the screen says so, because an administrator who
+  believes a price change restates signed history will not touch it. This catalogue is the
+  **recurring** shelf: `cycle` admits only `monthly | quarterly | yearly`, so the form
+  offers no one-off item. A plan created to sell a single seminar would be re-invoiced by
+  the daily run every month forever, and the copy states that rather than leaving it to be
+  discovered.
+- **Sign a contract** — reachable from the Students tab and from a student's statement:
+  choose the student, choose the plan, set `due_day` and the start date. The **negotiated**
+  path is a deliberate second mode of the same form, overriding amount, cycle and grace
+  days and requiring `terms_note` — this is what closes the Motivation case "this student
+  negotiated a different fee in March", which until now existed only on the API. A student
+  holding no contract has no roster line at all, so the picker reads the admin user list
+  rather than the roster. `idx_subscriptions_one_active` remains the authority on
+  duplicates; the form's filtering is a courtesy, not the guarantee.
+- **Contract lifecycle** — pause, resume and cancel the active contract, each labelled with
+  its real effect: pausing stops the *next* issue and nothing else (#3), cancelling closes
+  the chain with an `end_date`, and neither forgives an open invoice — that is a `waiver`
+  adjustment. Neither is a hold, and none of the three touches access.
+- **Amend a contract** — renegotiation as a superseding version (#7) with its mandatory
+  reason, rendering the resulting chain so the administrator can see that history was
+  *added* and not overwritten. No screen offers an in-place edit of signed terms.
+- **Ledger write actions** — on the Ledger tab: issue an invoice, void one with its
+  mandatory reason, apply a `discount | credit | waiver | surcharge` adjustment, and record
+  a payment with its method and optional external reference. `surcharge` is hand-applied
+  only (#8) and nothing on screen accrues one. Issuing is bound to a contract **and** a
+  period by `UNIQUE (subscription_id, period_start)`, so the form names which contract and
+  which period it writes; it is a way to bill a period, never a way to sell anything.
+- **Run the cycle by hand** — `POST /invoices/run` surfaced with its report (issued,
+  absorbed, reminders, crossings), so a missed cron firing is recovered by a person who can
+  see what the run actually did. It is idempotent and the screen says a second run is safe.
+- **Delete appears nowhere.** Reverse on a payment, void on an invoice and a signed
+  adjustment are the only corrections offered, matching the append-only ledger.
+
+Every constraint stated earlier in this section binds these screens unchanged: money only
+through the shared `format-money.ts` and never `Intl.NumberFormat`'s currency style; all
+copy in `dict-en.ts` and `dict-pt.ts` with identical keys; no standing rule re-derived in
+the client. And the surface stays inside Non-Goals — nothing here gates, suspends, degrades
+or paywalls access, and no control implies a capability the API does not have.
 
 ## Alternatives Considered
 
@@ -787,6 +850,16 @@ then an admin task through the UI, not a script.
 - **Phase 5** — `check-i18n-coverage.js` passes; the student banner renders from
   `/v1/me/billing` with no standing rule duplicated in the client, and no route or screen
   is withheld behind it.
+- **Phase 5, admin write surface** — an administrator completes the whole lifecycle from
+  the product, with no `curl` and no bearer token pasted anywhere: create a plan; sign one
+  standard and one negotiated contract; pause, resume, cancel and amend it; issue, void,
+  adjust and pay an invoice; reverse a payment; and run the cycle by hand and read its
+  report. A student who holds no contract — and therefore has no roster line — is still
+  reachable by the signing form. A negotiated fee and its reason read back from the
+  contract afterwards, so the March renegotiation is answerable from the product. `git
+  diff` for these screens touches no file under `apps/api/` or `packages/`: the whole
+  surface is UI over the Phase 2–4 API. No screen offers Delete on a payment or an
+  adjustment, and none offers a control that suspends, restricts or downgrades access.
 - **Rollout** — On a tenant with zero plans the existing suite is unchanged. Stronger,
   and checkable by inspection: `git diff` for the whole RFC touches no file under
   `apps/api/src/middleware/`, does not modify `apps/api/src/routes/index.ts`, and does

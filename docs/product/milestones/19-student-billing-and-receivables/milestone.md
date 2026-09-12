@@ -1,9 +1,27 @@
 # Milestone 19 — Student billing, contracts and receivables accounting
 
-**Status:** 📝 Draft
+**Status:** 🚧 In Progress
 **Scope:** `packages/shared` (`types/entities.ts`, `ports/i-billing-repository.ts`, `domain/billing/`), `apps/api` (migration `0026`, `adapters/db/d1-billing-repository.ts`, `core/billing/`, `controllers/admin-billing.controller.ts` + `me-billing.controller.ts`, `routes/admin/billing.ts` + `routes/me/billing.ts`, `container.ts`, `index.ts` `scheduled` handler, `wrangler.jsonc`), `apps/web` (`admin/billing`, `settings/billing`, `lib/*-billing-api.ts`, both dictionaries). Derived from [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md).
 
-> **Hard scope guardrail — read before opening any task.** This milestone may only touch the **billing bounded context** and its wiring: `packages/shared/types/entities.ts` (new `Entities.Billing` namespace + the seven new `Entities.Config` enums — no existing entity changes shape), `packages/shared/ports/i-billing-repository.ts` and `ports/index.ts`, the new pure `packages/shared/domain/billing/` (`billing-cycle.ts`, `standing-resolver.ts`, `format-money.ts`), `apps/api/migrations/0026_create_billing_tables.sql` (additive only — it alters no existing table) plus `apps/api/migrations/seed/`, `apps/api/src/adapters/db/d1-billing-repository.ts`, `apps/api/src/core/billing/{billing-service,accounting-service}.ts`, `apps/api/src/controllers/{admin-billing,me-billing}.controller.ts`, `apps/api/src/routes/admin/billing.ts` + `routes/me/billing.ts` and their mount lines, `apps/api/src/container.ts` (a new `billing` group only), the `scheduled` handler in `apps/api/src/index.ts` and `triggers.crons` in `apps/api/wrangler.jsonc`, `apps/web/src/app/(protected)/admin/billing/**` + `(protected)/settings/billing/**`, `apps/web/src/lib/{admin-billing-api,me-billing-api}.ts`, `apps/web/src/i18n/dict-en.ts` + `dict-pt.ts`, and tests for the above. It **must not touch**: `apps/api/src/middleware/**`, `apps/api/src/routes/index.ts`, and `apps/api/src/adapters/db/d1-enrollment-repository.ts` — these three are the negative assertion of the whole RFC and a `git diff` over them must come back empty. It is explicitly **not** an opportunity to: gate, suspend, degrade or paywall access on payment in any form (RFC Non-Goal — no middleware, no `402`, no read-only mode, and not "phase 2"); declare or implement a payment-gateway port, adapter, webhook or card flow (#9); build the user anonymisation endpoint or remove `IUserRepository.delete()` (backlog, `docs/product/backlog/user-management/`); emit fiscal or tax documents; build a double-entry general ledger; implement per-topic pricing (`billing_plans.scope_topic_id` is written by the migration and read by nothing); implement proration; accrue late fees or interest automatically (`surcharge` is hand-applied only, #8); build a multi-step dunning sequence; convert between currencies; or build a currency admin screen. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
+> **Hard scope guardrail — read before opening any task.** This milestone may only touch the **billing bounded context** and its wiring: `packages/shared/types/entities.ts` (new `Entities.Billing` namespace + the seven new `Entities.Config` enums — no existing entity changes shape), `packages/shared/ports/i-billing-repository.ts` and `ports/index.ts`, the new pure `packages/shared/domain/billing/` (`billing-cycle.ts`, `standing-resolver.ts`, `format-money.ts`), `apps/api/migrations/0026_create_billing_tables.sql` (additive only — it alters no existing table) plus `apps/api/migrations/seed/`, `apps/api/src/adapters/db/d1-billing-repository.ts`, `apps/api/src/core/billing/{billing-service,accounting-service}.ts`, `apps/api/src/controllers/{admin-billing,me-billing}.controller.ts`, `apps/api/src/routes/admin/billing.ts` + `routes/me/billing.ts` and their mount lines, `apps/api/src/container.ts` (a new `billing` group only), the `scheduled` handler in `apps/api/src/index.ts` and `triggers.crons` in `apps/api/wrangler.jsonc`, `apps/web/src/app/(protected)/admin/billing/**` + `(protected)/settings/billing/**`, `apps/web/src/lib/{admin-billing-api,me-billing-api}.ts`, `apps/web/src/i18n/dict-en.ts` + `dict-pt.ts`, and tests for the above. **Extended 2026-09-12 for the admin write surface (tasks 09–13), by exactly three additions:** `apps/web/src/components/**` and `apps/web/src/hooks/**` — restricted to the pieces those screens introduce, which is what tasks 07–08 already did in practice — and `apps/web/src/i18n/types.ts` when a key is typed. `apps/web/src/lib/admin-users-api.ts` is **consumed unmodified** (the contract-signing picker needs the user list, which `admin/billing/page.tsx` already reads); adding to it is out of scope. Nothing in the extension reaches `apps/api/**` or `packages/**` at all. It **must not touch**: `apps/api/src/middleware/**`, `apps/api/src/routes/index.ts`, and `apps/api/src/adapters/db/d1-enrollment-repository.ts` — these three are the negative assertion of the whole RFC and a `git diff` over them must come back empty. It is explicitly **not** an opportunity to: gate, suspend, degrade or paywall access on payment in any form (RFC Non-Goal — no middleware, no `402`, no read-only mode, and not "phase 2"); declare or implement a payment-gateway port, adapter, webhook or card flow (#9); build the user anonymisation endpoint or remove `IUserRepository.delete()` (backlog, `docs/product/backlog/user-management/`); emit fiscal or tax documents; build a double-entry general ledger; implement per-topic pricing (`billing_plans.scope_topic_id` is written by the migration and read by nothing); implement proration; accrue late fees or interest automatically (`surcharge` is hand-applied only, #8); build a multi-step dunning sequence; convert between currencies; or build a currency admin screen. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
+
+> **Why this milestone is `🚧 In Progress` with all of tasks 01–08 `✅ Done` (2026-09-12).**
+> Local acceptance testing found that the admin billing console is **read-only**: the only
+> write calls in the whole feature are set/clear hold and reverse payment. An administrator
+> cannot create a plan, sign a contract, issue an invoice, record a payment or apply an
+> adjustment from the product — each needs a hand-written `curl` with an admin bearer token
+> — and a student with no contract does not even appear on the roster, since
+> `billing-service.ts:173` defines a roster line as "a student with a contract".
+> **This is not an implementation failure of tasks 07–08.** RFC 0013 §7 listed only the
+> three read tabs, the nav badge, the student statement and the banner, and task 07
+> implemented §7 as written. The defect was in §7 itself, incomplete against the rest of
+> its own document — Phase 6 plans the `budo` backfill as "an admin task through the UI,
+> not a script", and the Motivation promises an administrator who has retired a
+> spreadsheet. §3's criterion "entirely over the API" (below) inherited the same gap: it
+> measured the API, and nobody wrote the criterion that measured the administrator. That
+> criterion stays true — it is now insufficient, not wrong. RFC 0013 §7 was amended on
+> 2026-09-12 and tasks 09–13 close the gap; the milestone cannot be `✅ Implemented` until
+> they land, along with task 07's still-owed `[~]` responsive/keyboard verification.
 
 ---
 
@@ -19,6 +37,7 @@
 - **The period run is idempotent and hand-recoverable.** A daily Workers cron issues each `active` contract's due period once — `UNIQUE (subscription_id, period_start)` absorbs a retry — and `POST /v1/admin/billing/invoices/run` is its manual twin, so a missed firing is recovered without a deploy.
 - **Money is integer minor units against a recorded exponent.** No floating point touches an amount, and no currency is formatted by assuming two decimal places: `currencies` carries the exponent (0 for JPY, 8 for BTC) and a shared `format-money.ts` renders it — never `Intl.NumberFormat`'s currency style, which accepts `BTC` and silently rounds it to `BTC 0,00`.
 - **Every mutation is attributable.** Acting admin on the row (`recorded_by`, `signed_by`, `created_by`) plus the structured `billing.*` `console.info` event this codebase already emits in `EnrollmentService`.
+- **The administrator operates the whole lifecycle from the product, not from `curl`.** The plan catalogue, contract signature including the negotiated path, the contract lifecycle and its amendment, and the ledger's write actions are all reachable from `/admin/billing`. This is what makes RFC 0013's Phase 6 rollout executable — the `budo` backfill is an admin task through the UI, not a script — and what makes the Motivation's retired spreadsheet true. It adds **no** API: every screen calls an endpoint Phases 2–4 already shipped and tested.
 
 Out of scope (explicit, from RFC 0013 Non-Goals):
 - **Suspending, degrading or gating access on payment** — a product decision, not a sequencing one. The rejected design is recorded as RFC 0013 Alternative 5 and §3 names the seam it would use, so reversing it is a deliberate RFC rather than a patch.
@@ -107,6 +126,19 @@ Out of scope (explicit, from RFC 0013 Non-Goals):
 - [ ] **No diff outside scope:** `git diff` for the whole milestone touches no file under `apps/api/src/middleware/`, does not modify `apps/api/src/routes/index.ts`, and does not modify `apps/api/src/adapters/db/d1-enrollment-repository.ts`.
 - [ ] `make lint`, `make test-api` and `make test-web` pass green.
 
+**Admin write surface (added 2026-09-12 with tasks 09–13).** The criterion above — "entirely over the API" — stays true and is no longer sufficient; these measure the administrator rather than the endpoint.
+
+- [ ] An administrator completes the whole lifecycle from `/admin/billing` with **no `curl` and no bearer token pasted anywhere**: create a plan; sign one standard and one negotiated contract; pause, resume, cancel and amend a contract; issue, void, adjust and pay an invoice; reverse a payment; run the cycle by hand and read its report.
+- [ ] A student who holds **no contract** — and therefore has no roster line — is reachable by the contract-signing form, which lists students from the admin user list rather than the roster.
+- [ ] A negotiated contract's amount and its `terms_note` read back from the product afterwards, so "this student negotiated a different fee in March" is answerable without a database query.
+- [ ] The plan form offers no non-recurring option, and its copy states that a plan is re-invoiced every period — a plan created to sell a one-off seminar would be billed monthly forever, since `cycle` admits only `monthly | quarterly | yearly`.
+- [ ] Issuing an invoice names the contract and the period it writes; a second issue for the same `(subscription_id, period_start)` is reported, not silently duplicated or silently swallowed.
+- [ ] Amending renders the resulting supersede chain, so the administrator sees that history was added rather than overwritten; no screen offers an in-place edit of signed terms.
+- [ ] No screen offers Delete on a payment or an adjustment, and no screen offers any control that suspends, restricts, downgrades or paywalls a student's access.
+- [ ] `git diff` for tasks 09–13 touches **no file** under `apps/api/` or `packages/` — the entire write surface is UI over the Phase 2–4 API, and `apps/web/src/lib/admin-users-api.ts` is unmodified.
+- [ ] Every new amount renders through `format-money.ts`; `Intl.NumberFormat` appears in no new diff; `node apps/web/scripts/check-i18n-coverage.js` passes with the new keys in both dictionaries.
+- [ ] Task 07's outstanding `[~]` criterion is discharged: the console — including the new screens — is verified responsive at mobile width and keyboard-usable in a real browser.
+
 ---
 
 ## 4. Specific Stack
@@ -136,6 +168,18 @@ contract it consumes. Phases map to RFC 0013's Implementation Plan.
 | 06 | [Scheduled invoice run and billing alerts](./06-scheduled-invoice-run-and-billing-alerts.task.md) | 4 | Backend | ✅ Done |
 | 07 | [Admin billing console](./07-admin-billing-console.task.md) | 5 | Frontend | ✅ Done |
 | 08 | [Student statement and standing banner](./08-student-statement-and-standing-banner.task.md) | 5 | Frontend | ✅ Done |
+| 09 | [Billing plan catalogue](./09-billing-plan-catalogue.task.md) | 5 | Frontend | ☐ Open |
+| 10 | [Contract signing, standard and negotiated](./10-contract-signing-standard-and-negotiated.task.md) | 5 | Frontend | ☐ Open |
+| 11 | [Contract lifecycle and amendment](./11-contract-lifecycle-and-amendment.task.md) | 5 | Frontend | ☐ Open |
+| 12 | [Ledger write actions](./12-ledger-write-actions.task.md) | 5 | Frontend | ☐ Open |
+| 13 | [Manual invoice cycle run](./13-manual-invoice-cycle-run.task.md) | 5 | Frontend | ☐ Open |
+
+Tasks **09–13 were added on 2026-09-12** with the RFC 0013 §7 amendment. They are the
+admin **write** surface: tasks 07–08 delivered §7's read surface as it was written, and
+§7 did not specify the screens through which an administrator creates a plan, signs a
+contract, issues an invoice or records a payment. All five are frontend-only over the
+Phase 2–4 API — **none of them needs a backend change**, and each states why in its own
+"Does this need a backend change?" section.
 
 Dependency graph:
 
@@ -144,15 +188,27 @@ Dependency graph:
  │
  ▼
 02 ──► 03 ──► 04 ──► 05 ──► 06
-                      │
-                      ├──────────► 07  (also needs 04)
-                      │
-                      └──────────► 08
+        │      │      │      │
+        │      │      ├────► 07  (also needs 04)
+        │      │      └────► 08
+        │      │
+        │      │        ── admin write surface ──
+        ├──────┴───────► 09 ──► 10 ──┬──► 11  (also needs 04)
+                                     │
+                                     └──► 12 ──► 13  (also needs 06)
 ```
 
 **Recommended execution order:** `01` → `02` → `03` → `04` → `05` → `06`, with `07` and
 `08` runnable in parallel once `05` has landed (`07` additionally needs `04`'s reports).
 `06` and the two frontend tasks share no files, so they can also overlap.
+
+For the write surface: `09` → `10`, then `11` and `12` in parallel, then `13`. `09` comes
+first because a contract cannot be signed against an empty catalogue, and `10` before both
+of its successors because there is nothing to amend, pause or invoice before a contract
+exists. `11` and `12` touch different files — the statement panel and the Ledger tab — so
+they genuinely parallelise. `13` follows `12` for a file reason rather than a functional
+one: both extend the Ledger tab and `admin-billing-api.ts`, and serialising them avoids a
+conflict on files neither owns exclusively.
 
 Phase 6 of RFC 0013 (rollout) is not a task: it is a deploy with no plans and no
 contracts, and it is tracked in §7's Definition of Done.
