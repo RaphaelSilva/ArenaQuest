@@ -1,6 +1,6 @@
 # Task 10 — Frontend: Contract signing, standard and negotiated (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Frontend Web
@@ -139,36 +139,36 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A student who holds **no contract**, and therefore appears on no roster line, is
+- [x] A student who holds **no contract**, and therefore appears on no roster line, is
       selectable in the picker and can be put under contract end to end.
-- [ ] The picker filters by name and email, marks students who already hold an active
+- [x] The picker filters by name and email, marks students who already hold an active
       contract, and states that it lists the first page of users.
-- [ ] A standard signature submits the selected plan's amount, cycle and grace days
+- [x] A standard signature submits the selected plan's amount, cycle and grace days
       unchanged, and the resulting contract appears with terms matching the plan.
-- [ ] A negotiated signature refuses to submit without a reason, and on success the
+- [x] A negotiated signature refuses to submit without a reason, and on success the
       contract records the overridden terms, the negotiated source and the note.
-- [ ] After signing a negotiated contract, its amount and reason are readable back from
+- [x] After signing a negotiated contract, its amount and reason are readable back from
       the product — the Motivation's March renegotiation is answerable without a database
       query.
-- [ ] A newly signed student appears on the Students tab, where they had no row before.
-- [ ] Attempting a second active contract for one student surfaces the server's refusal
+- [x] A newly signed student appears on the Students tab, where they had no row before.
+- [x] Attempting a second active contract for one student surfaces the server's refusal
       as an explained error; no client-side check is presented as the authority.
-- [ ] Amounts render at exponents 2, 0 and 8 through the shared money formatter, are
+- [x] Amounts render at exponents 2, 0 and 8 through the shared money formatter, are
       submitted as integer minor units, and `Intl.NumberFormat` does not appear in the
       diff.
-- [ ] No standing, due-date consequence or grace outcome is computed anywhere on the
+- [x] No standing, due-date consequence or grace outcome is computed anywhere on the
       screen.
-- [ ] Nothing on the screen suggests that signing or not signing changes a student's
+- [x] Nothing on the screen suggests that signing or not signing changes a student's
       access.
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [ ] The form is responsive at mobile width and keyboard-usable throughout, with
+- [~] The form is responsive at mobile width and keyboard-usable throughout, with
       labelled fields and field-associated validation, verified in a browser.
-- [ ] `git diff` contains no file under `apps/api/` or `packages/`, and
+- [x] `git diff` contains no file under `apps/api/` or `packages/`, and
       `apps/web/src/lib/admin-users-api.ts` and `admin-billing-api.ts` are both
       unmodified.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
