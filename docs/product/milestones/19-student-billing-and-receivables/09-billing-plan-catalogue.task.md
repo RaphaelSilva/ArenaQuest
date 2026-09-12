@@ -1,6 +1,6 @@
 # Task 09 — Frontend: Billing plan catalogue (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Frontend Web
@@ -120,33 +120,33 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The Plans tab appears in the `/admin/billing` tab set, is reachable by keyboard
+- [x] The Plans tab appears in the `/admin/billing` tab set, is reachable by keyboard
       alongside the existing three, and lists every plan the API returns.
-- [ ] Creating a plan issues the expected request and the new plan appears in the list
+- [x] Creating a plan issues the expected request and the new plan appears in the list
       without a full page reload.
-- [ ] Editing a plan persists, and the form states that signed contracts and issued
+- [x] Editing a plan persists, and the form states that signed contracts and issued
       invoices keep their snapshotted terms.
-- [ ] Archiving a plan removes it from the default list, it is recoverable through the
+- [x] Archiving a plan removes it from the default list, it is recoverable through the
       archived filter, and no delete control exists anywhere on the tab.
-- [ ] The cycle control offers exactly monthly, quarterly and yearly, and the tab's copy
+- [x] The cycle control offers exactly monthly, quarterly and yearly, and the tab's copy
       states that a plan is re-invoiced every period.
-- [ ] Amounts render at exponents 2, 0 and 8 through the shared money formatter, and the
+- [x] Amounts render at exponents 2, 0 and 8 through the shared money formatter, and the
       string `Intl.NumberFormat` does not appear in the diff.
-- [ ] Submitted amounts are integer minor units derived from the active currency's
+- [x] Submitted amounts are integer minor units derived from the active currency's
       exponent; no floating-point amount reaches the API.
-- [ ] A server-rejected write shows the server's explanation, and the list is not left
+- [x] A server-rejected write shows the server's explanation, and the list is not left
       showing a plan that was not created.
-- [ ] On a tenant with no plans, the empty state explains that a plan is required before
+- [x] On a tenant with no plans, the empty state explains that a plan is required before
       a contract can be signed.
-- [ ] No control on the tab suspends, restricts, downgrades or paywalls access.
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
+- [x] No control on the tab suspends, restricts, downgrades or paywalls access.
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [ ] The tab is responsive at mobile width and keyboard-usable throughout, verified in a
+- [~] The tab is responsive at mobile width and keyboard-usable throughout, verified in a
       browser and not only under RTL.
-- [ ] `git diff` contains no file under `apps/api/` or `packages/`, and
+- [x] `git diff` contains no file under `apps/api/` or `packages/`, and
       `apps/web/src/lib/admin-billing-api.ts` is unmodified.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
