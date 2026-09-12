@@ -170,7 +170,7 @@ contract it consumes. Phases map to RFC 0013's Implementation Plan.
 | 08 | [Student statement and standing banner](./08-student-statement-and-standing-banner.task.md) | 5 | Frontend | ✅ Done |
 | 09 | [Billing plan catalogue](./09-billing-plan-catalogue.task.md) | 5 | Frontend | ✅ Done |
 | 10 | [Contract signing, standard and negotiated](./10-contract-signing-standard-and-negotiated.task.md) | 5 | Frontend | ✅ Done |
-| 11 | [Contract lifecycle and amendment](./11-contract-lifecycle-and-amendment.task.md) | 5 | Frontend | ☐ Open |
+| 11 | [Contract lifecycle and amendment](./11-contract-lifecycle-and-amendment.task.md) | 5 | Frontend | ✅ Done |
 | 12 | [Ledger write actions](./12-ledger-write-actions.task.md) | 5 | Frontend | ☐ Open |
 | 13 | [Manual invoice cycle run](./13-manual-invoice-cycle-run.task.md) | 5 | Frontend | ☐ Open |
 

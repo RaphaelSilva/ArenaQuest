@@ -1,6 +1,6 @@
 # Task 11 — Frontend: Contract lifecycle and amendment (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Frontend Web
@@ -127,37 +127,37 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A student's statement panel renders each contract group with its versions in order,
+- [x] A student's statement panel renders each contract group with its versions in order,
       marking the active one, and showing the terms each version carried.
-- [ ] Pausing the active contract succeeds, and its confirmation states that open invoices
+- [x] Pausing the active contract succeeds, and its confirmation states that open invoices
       keep their due dates and keep counting toward the outstanding total and the aging
       report.
-- [ ] A paused contract can be resumed, and the screen reflects the change without a full
+- [x] A paused contract can be resumed, and the screen reflects the change without a full
       page reload.
-- [ ] Cancelling closes the contract with an end date, and its confirmation states that no
+- [x] Cancelling closes the contract with an end date, and its confirmation states that no
       debt is forgiven and points at the waiver adjustment for that.
-- [ ] The copy distinguishes pause, cancel, hold and waiver clearly enough that an
+- [x] The copy distinguishes pause, cancel, hold and waiver clearly enough that an
       administrator looking to stop reminders is directed to a hold and one looking to
       forgive a charge is directed to a waiver.
-- [ ] Amending requires a reason, creates a new active version, and leaves the previous
+- [x] Amending requires a reason, creates a new active version, and leaves the previous
       version visible as superseded with its original terms intact.
-- [ ] After two amendments the panel shows a chain of three versions with exactly one
+- [x] After two amendments the panel shows a chain of three versions with exactly one
       active, read from the statement response rather than reconstructed client-side.
-- [ ] No screen offers an in-place edit of a signed contract's terms.
-- [ ] Amounts render at exponents 2, 0 and 8 through the shared money formatter, amended
+- [x] No screen offers an in-place edit of a signed contract's terms.
+- [x] Amounts render at exponents 2, 0 and 8 through the shared money formatter, amended
       amounts submit as integer minor units, and `Intl.NumberFormat` does not appear in
       the diff.
-- [ ] No standing, due-date or aging consequence is computed or previewed anywhere on the
+- [x] No standing, due-date or aging consequence is computed or previewed anywhere on the
       screen.
-- [ ] Nothing on the screen implies that a paused or cancelled student loses access.
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
+- [x] Nothing on the screen implies that a paused or cancelled student loses access.
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [ ] The section is responsive at mobile width and keyboard-usable throughout, verified
+- [~] The section is responsive at mobile width and keyboard-usable throughout, verified
       in a browser.
-- [ ] `git diff` contains no file under `apps/api/` or `packages/`, and
+- [x] `git diff` contains no file under `apps/api/` or `packages/`, and
       `apps/web/src/lib/admin-billing-api.ts` is unmodified.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
