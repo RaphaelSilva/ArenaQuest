@@ -27,6 +27,7 @@ import { PaymentForm } from './payment-form';
 import { AdjustmentForm } from './adjustment-form';
 import { VoidInvoiceForm } from './void-invoice-form';
 import { IssueInvoiceForm } from './issue-invoice-form';
+import { RunCyclePanel } from './run-cycle-panel';
 
 const STATUSES: readonly InvoiceStatus[] = ['open', 'paid', 'void'];
 
@@ -248,6 +249,17 @@ export function LedgerTab({
           {d.issue.button}
         </Button>
       </div>
+
+      {/*
+        The manual twin of the daily cron. It lives on this tab because the
+        invoices it issues land in the list below, which is re-read whenever the
+        run actually issued something.
+      */}
+      <RunCyclePanel
+        currency={currency}
+        nameOf={nameOf}
+        onIssued={() => setRefreshToken((token) => token + 1)}
+      />
 
       {notice && (
         <p

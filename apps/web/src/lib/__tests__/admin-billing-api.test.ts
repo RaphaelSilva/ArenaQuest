@@ -48,6 +48,55 @@ describe('createAdminBillingApi — invoices', () => {
   });
 });
 
+describe('createAdminBillingApi — the manual invoice cycle run', () => {
+  it('posts to the run endpoint with no body at all when no window is given', async () => {
+    const { http, api } = apiWith(makeResponse({ jsonData: {} }));
+    await api.invoices.run();
+    expect(http).toHaveBeenCalledWith('POST', '/admin/billing/invoices/run', undefined);
+  });
+
+  it('posts the optional window when the screen supplied one', async () => {
+    const { http, api } = apiWith(makeResponse({ jsonData: {} }));
+    await api.invoices.run({ asOf: '2026-09-01', since: '2026-08-25' });
+    expect(http).toHaveBeenCalledWith('POST', '/admin/billing/invoices/run', {
+      body: JSON.stringify({ asOf: '2026-09-01', since: '2026-08-25' }),
+    });
+  });
+
+  it('sends only the half of the window that was supplied', async () => {
+    const { http, api } = apiWith(makeResponse({ jsonData: {} }));
+    await api.invoices.run({ asOf: '2026-09-01' });
+    expect(http).toHaveBeenCalledWith('POST', '/admin/billing/invoices/run', {
+      body: JSON.stringify({ asOf: '2026-09-01' }),
+    });
+  });
+
+  it('returns the report the server sent, unaltered', async () => {
+    const report = {
+      asOf: '2026-09-01',
+      since: '2026-08-31',
+      eligibleContracts: 3,
+      issued: [],
+      absorbed: 2,
+      reminders: [],
+      crossings: [],
+      suppressedByHold: [],
+      divergences: [],
+      mailsSent: 0,
+      adminsNotified: 0,
+    };
+    const { api } = apiWith(makeResponse({ jsonData: report }));
+    await expect(api.invoices.run()).resolves.toEqual(report);
+  });
+
+  it('offers no control for repairing a divergence — the run repairs nothing', () => {
+    const { api } = apiWith(makeResponse());
+    expect(api.invoices).not.toHaveProperty('repair');
+    expect(api.invoices).not.toHaveProperty('repairStatus');
+    expect(api.invoices).not.toHaveProperty('reconcile');
+  });
+});
+
 describe('createAdminBillingApi — the append-only ledger', () => {
   it('exposes no delete operation for a payment or an adjustment', () => {
     const { api } = apiWith(makeResponse());

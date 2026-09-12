@@ -1,6 +1,6 @@
 # Task 13 — Frontend: Manual invoice cycle run (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Frontend Web
@@ -129,37 +129,37 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The Ledger tab offers a run control behind a confirmation that names what the run
+- [x] The Ledger tab offers a run control behind a confirmation that names what the run
       does, including the mails it sends, and states that a second run is safe.
-- [ ] Running the cycle issues the due period's invoices and the report lists each one
+- [x] Running the cycle issues the due period's invoices and the report lists each one
       with its student, period, due date and amount.
-- [ ] A second run the same day issues nothing, reports the absorbed count, and names no
+- [x] A second run the same day issues nothing, reports the absorbed count, and names no
       crossings — distinguishable on screen from both a failure and a first run.
-- [ ] A run with nothing to issue renders as "nothing to issue", not as an error and not
+- [x] A run with nothing to issue renders as "nothing to issue", not as an error and not
       as an ambiguous success.
-- [ ] The report shows reminders sent and the students who crossed into due or delinquent,
+- [x] The report shows reminders sent and the students who crossed into due or delinquent,
       read from the response with no standing logic in the client.
-- [ ] Nothing on screen suggests the run applies a fee, interest, an adjustment or a
+- [x] Nothing on screen suggests the run applies a fee, interest, an adjustment or a
       correction.
-- [ ] Where skipped reminders are shown, the copy keeps the distinction that a hold stops
+- [x] Where skipped reminders are shown, the copy keeps the distinction that a hold stops
       the chasing and not the debt.
-- [ ] Double-clicking the control does not trigger two concurrent runs, and the pending
+- [x] Double-clicking the control does not trigger two concurrent runs, and the pending
       state is announced accessibly rather than by colour alone.
-- [ ] A server error surfaces the server's explanation, and the ledger list afterwards
+- [x] A server error surfaces the server's explanation, and the ledger list afterwards
       matches what actually persisted.
-- [ ] Amounts render at exponents 2, 0 and 8 through the shared money formatter, and
+- [x] Amounts render at exponents 2, 0 and 8 through the shared money formatter, and
       `Intl.NumberFormat` does not appear in the diff.
-- [ ] Nothing on the screen gates, suspends, restricts or downgrades access, and a student
+- [x] Nothing on the screen gates, suspends, restricts or downgrades access, and a student
       who becomes delinquent from the run keeps the access they had.
-- [ ] `apps/web/src/lib/admin-billing-api.ts` gains exactly one method, for the existing
+- [x] `apps/web/src/lib/admin-billing-api.ts` gains exactly one method, for the existing
       run endpoint, and no existing method changes shape.
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [ ] The control and report are responsive at mobile width and keyboard-usable, verified
+- [~] The control and report are responsive at mobile width and keyboard-usable, verified
       in a browser.
-- [ ] `git diff` contains no file under `apps/api/` or `packages/`.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] `git diff` contains no file under `apps/api/` or `packages/`.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -1038,6 +1038,118 @@ export const dictEn = {
           error: 'Failed to issue the invoice.',
         },
       },
+      run: {
+        heading: 'Run the billing cycle by hand',
+        purpose:
+          "The same routine the daily run performs, triggered now — for the day it did not fire. It issues the period's invoices, sends the students' two notices, emails the administrators their digest, and checks each open invoice's cached status against its balance.",
+        idempotentNote:
+          'Running it twice is safe. One invoice per contract per period is a database rule, so a second run creates nothing and counts what already existed as absorbed.',
+        noFeeNote:
+          'The run writes no adjustment of any kind: no late fee, no interest, no surcharge and no correction. It issues, it notifies, it digests and it checks.',
+        noGateNote:
+          'Nothing here changes what anyone can see. A student who becomes delinquent because of this run keeps exactly the access they had.',
+        holdNote:
+          'A hold stops the chasing, not the debt: a held student is skipped by the notices while their balance stays in every total and in the aging report.',
+        button: 'Run the cycle',
+        buttonAriaLabel: 'Run the billing cycle now',
+        confirm: {
+          dialogTitle: 'Run the billing cycle now?',
+          lead: 'This is not a preview. Confirming performs the run, and the run sends email:',
+          effects: {
+            issue:
+              'It issues an invoice for every active contract whose period has started and has none yet.',
+            notices:
+              'It emails each student their due-date reminder and their grace-period-lapsed notice.',
+            digest:
+              'It emails the administrators a digest of the students who crossed into due or delinquent.',
+            assert:
+              "It checks each open invoice's cached status against its recomputed balance and reports any divergence — it repairs none of them.",
+          },
+          safeAgain:
+            'If you are unsure whether the scheduled run fired, run it. A second run for the same period issues nothing, because one invoice per contract per period is enforced by the database, and the duplicate is reported as absorbed.',
+          windowHeading: 'Window to run (optional)',
+          windowHelp:
+            'Leave both empty to run for today against yesterday. The window covered is everything after the first date, up to and including the second.',
+          sinceLabel: 'Since',
+          asOfLabel: 'As of',
+          submit: 'Run the cycle now',
+          cancel: 'Cancel',
+        },
+        pending: 'Running the billing cycle…',
+        pendingHint:
+          'This can take a moment. Only one run is in flight, and the button stays unavailable until it answers.',
+        error: 'The billing cycle run failed.',
+        errorNoReport:
+          'No report is shown, because the run did not complete. Whatever it had already written stayed written, and running it again is safe.',
+        outcome: {
+          issuedTitle: (count: number) => `${count} invoice(s) issued`,
+          issuedBody: 'Each invoice the run created is listed below, with its student, its period, its due date and its amount.',
+          alreadyBilledTitle: 'Already billed — nothing new was issued',
+          alreadyBilledBody: (absorbed: number) =>
+            `The run created no invoice: ${absorbed} already existed for the period and were absorbed by the one-invoice-per-period rule. This is the expected result of a second run.`,
+          nothingToIssueTitle: 'Nothing to issue',
+          nothingToIssueBody:
+            'No contract was in scope for this window, so there was nothing to bill. The run completed — this is not a failure.',
+          noneDueTitle: 'Nothing was due to be issued',
+          noneDueBody: (eligible: number) =>
+            `${eligible} contract(s) were in scope and none of them had a period waiting to be billed in this window. The run completed — this is not a failure.`,
+        },
+        report: {
+          heading: 'What the run did',
+          window: (since: string, asOf: string) =>
+            `Window: everything after ${since}, up to and including ${asOf}.`,
+          counters: {
+            eligibleContracts: 'Contracts in scope',
+            issued: 'Invoices issued',
+            absorbed: 'Already billed (absorbed)',
+            mailsSent: 'Emails sent',
+            adminsNotified: 'Administrators notified',
+          },
+          issuedHeading: 'Invoices this run issued',
+          issuedEmpty: 'This run issued no invoice.',
+          issuedColumns: {
+            invoice: 'Invoice',
+            student: 'Student',
+            period: 'Period start',
+            due: 'Due date',
+            amount: 'Amount',
+            status: 'Status',
+          },
+          remindersHeading: 'Student notices',
+          remindersEmpty: 'No student notice was due in this window.',
+          reminderKind: {
+            due_date: 'Due-date reminder',
+            grace_lapsed: 'Grace period lapsed',
+          },
+          reminderSent: 'Sent',
+          reminderNotSent: 'Not sent',
+          reminderSuppressed: 'Skipped — on hold',
+          reminderDates: (dueDate: string, triggerOn: string) =>
+            `Due ${dueDate} · notice due on ${triggerOn}`,
+          reminderBalance: 'Balance owed:',
+          reminderHoldLine:
+            'The notice was skipped because the student is on hold. The balance above is still owed.',
+          crossingsHeading: 'Standing crossings',
+          crossingsEmpty: 'No student crossed into due or delinquent in this window.',
+          crossingsNote:
+            'Read from the run report. Standing is resolved by the server and never recomputed here, and crossing into due or delinquent restricts nothing a student can reach.',
+          crossingArrow: '→',
+          crossingBecame: 'became',
+          oldestOverdue: (date: string) => `Oldest overdue invoice: ${date}`,
+          noOldestOverdue: 'No overdue invoice recorded.',
+          outstanding: 'Outstanding:',
+          heldHeading: 'Students on hold',
+          heldEmpty: 'No student was on hold during this run.',
+          heldOutstanding: 'Outstanding, still owed:',
+          divergencesHeading: 'Cached-status findings',
+          divergencesEmpty: "Every open invoice's cached status matched its balance.",
+          divergencesNote:
+            'Reported, never repaired: the run writes no adjustment and changes no status. These invoices are listed so that somebody can look at them.',
+          divergenceLine: (cached: string, expected: string) =>
+            `Cached as ${cached}, while the balance says ${expected}.`,
+          divergenceBalance: 'Balance:',
+        },
+      },
       reports: {
         heading: 'Accounting reports',
         holdNote:
