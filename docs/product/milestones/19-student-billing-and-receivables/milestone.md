@@ -168,7 +168,7 @@ contract it consumes. Phases map to RFC 0013's Implementation Plan.
 | 06 | [Scheduled invoice run and billing alerts](./06-scheduled-invoice-run-and-billing-alerts.task.md) | 4 | Backend | ✅ Done |
 | 07 | [Admin billing console](./07-admin-billing-console.task.md) | 5 | Frontend | ✅ Done |
 | 08 | [Student statement and standing banner](./08-student-statement-and-standing-banner.task.md) | 5 | Frontend | ✅ Done |
-| 09 | [Billing plan catalogue](./09-billing-plan-catalogue.task.md) | 5 | Frontend | ☐ Open |
+| 09 | [Billing plan catalogue](./09-billing-plan-catalogue.task.md) | 5 | Frontend | ✅ Done |
 | 10 | [Contract signing, standard and negotiated](./10-contract-signing-standard-and-negotiated.task.md) | 5 | Frontend | ☐ Open |
 | 11 | [Contract lifecycle and amendment](./11-contract-lifecycle-and-amendment.task.md) | 5 | Frontend | ☐ Open |
 | 12 | [Ledger write actions](./12-ledger-write-actions.task.md) | 5 | Frontend | ☐ Open |

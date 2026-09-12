@@ -12,8 +12,9 @@ import type { BillingReportCurrency } from '@web/lib/admin-billing-api';
 import { StudentsTab } from './students-tab';
 import { LedgerTab } from './ledger-tab';
 import { ReportsTab } from './reports-tab';
+import { PlansTab } from './plans-tab';
 
-const TABS = ['students', 'ledger', 'reports'] as const;
+const TABS = ['students', 'ledger', 'reports', 'plans'] as const;
 type Tab = (typeof TABS)[number];
 
 /**
@@ -40,6 +41,7 @@ export default function AdminBillingPage() {
     students: null,
     ledger: null,
     reports: null,
+    plans: null,
   });
 
   /**
@@ -213,6 +215,15 @@ export default function AdminBillingPage() {
         hidden={tab !== 'reports'}
       >
         {tab === 'reports' && <ReportsTab />}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="billing-panel-plans"
+        aria-labelledby="billing-tab-plans"
+        hidden={tab !== 'plans'}
+      >
+        {tab === 'plans' && <PlansTab currency={currency} />}
       </div>
     </main>
   );

@@ -728,6 +728,7 @@ export const dictPt = {
         students: 'Alunos',
         ledger: 'Lançamentos',
         reports: 'Relatórios',
+        plans: 'Planos',
       },
       money: {
         locale: 'pt-BR',
@@ -935,6 +936,99 @@ export const dictPt = {
           },
           totalRow: 'Total',
         },
+      },
+      plans: {
+        heading: 'Catálogo de planos',
+        recurringNote:
+          'Um plano é a prateleira recorrente: todo contrato assinado com base nele é faturado novamente a cada período pela rotina diária. Nada aqui vende um item único — um plano criado para um seminário seria cobrado de novo a cada período, indefinidamente.',
+        editSafeNote:
+          'Reajustar um plano é seguro. Um contrato assinado e uma fatura emitida mantêm as condições que registraram na assinatura, então nada já cobrado é refeito. Para dar condições diferentes a um aluno, assine um contrato negociado; para alterar uma cobrança, aplique um ajuste nos lançamentos.',
+        archiveNote:
+          'Nada aqui é excluído. Arquivar oculta o plano de novas assinaturas e mantém intacto todo contrato que já o referencia.',
+        noGateNote:
+          'Um plano é um preço, não uma permissão. Nada nesta aba suspende, rebaixa ou retira o acesso de um aluno.',
+        filterLabel: 'Filtrar por situação',
+        filterActive: 'Planos ativos',
+        filterArchived: 'Planos arquivados',
+        filterAll: 'Todos os planos',
+        loading: 'Carregando o catálogo…',
+        loadError: 'Falha ao carregar o catálogo de planos.',
+        empty:
+          'Nenhum plano foi criado ainda. Um plano é o pré-requisito para assinar um contrato: crie um aqui e depois vincule um aluno a ele.',
+        emptyArchived: 'Nenhum plano foi arquivado.',
+        count: (total: number) => `${total} plano(s) listado(s)`,
+        none: '—',
+        columns: {
+          name: 'Plano',
+          amount: 'Valor por ciclo',
+          cycle: 'Ciclo',
+          graceDays: 'Carência',
+          state: 'Situação',
+          actions: 'Ações',
+        },
+        cycle: {
+          monthly: 'Mensal',
+          quarterly: 'Trimestral',
+          yearly: 'Anual',
+        },
+        graceDaysValue: (days: number) => `${days} dia(s)`,
+        state: {
+          active: 'Ativo',
+          archived: 'Arquivado',
+        },
+        createButton: 'Novo plano',
+        editButton: 'Editar',
+        editAriaLabel: (name: string) => `Editar o plano ${name}`,
+        editUnavailable: (code: string) =>
+          `Este plano é precificado em ${code}, que não é a moeda determinada por este console, então o valor dele não pode ser editado aqui.`,
+        archiveButton: 'Arquivar',
+        archiveAriaLabel: (name: string) => `Arquivar o plano ${name}`,
+        unarchiveButton: 'Restaurar',
+        unarchiveAriaLabel: (name: string) => `Restaurar o plano ${name} para o catálogo`,
+        createDialogTitle: 'Criar um plano',
+        editDialogTitle: (name: string) => `Editar o plano ${name}`,
+        submitCreate: 'Criar plano',
+        submitEdit: 'Salvar plano',
+        cancel: 'Cancelar',
+        form: {
+          nameLabel: 'Nome',
+          namePlaceholder: 'Mensalidade',
+          descriptionLabel: 'Descrição (opcional)',
+          descriptionPlaceholder: 'O que este plano cobre.',
+          currencyLabel: 'Moeda',
+          currencyHelp:
+            'A moeda determinada por este console. Ela é fixada na criação do plano e nunca muda em uma edição.',
+          amountLabel: (code: string) => `Valor por ciclo (${code})`,
+          amountHelp: (exponent: number) =>
+            exponent === 0
+              ? 'Esta moeda não tem casas decimais, então informe um número inteiro.'
+              : `Até ${exponent} casa(s) decimal(is), usando ponto como separador.`,
+          cycleLabel: 'Ciclo',
+          cycleHelp: 'Com que frequência um contrato neste plano é faturado pela rotina diária.',
+          graceDaysLabel: 'Carência (dias)',
+          graceDaysHelp: 'Dias após o vencimento antes de a fatura contar como atrasada.',
+        },
+        validation: {
+          nameRequired: 'Um plano precisa de um nome.',
+          amountEmpty: 'Informe o valor cobrado em cada ciclo.',
+          amountNotANumber: 'Informe o valor em dígitos, usando ponto como separador decimal.',
+          amountNegative: 'O valor não pode ser negativo.',
+          amountTooPrecise: (exponent: number) =>
+            exponent === 0
+              ? 'Esta moeda não tem casas decimais, então o valor precisa ser um número inteiro.'
+              : `Esta moeda tem ${exponent} casa(s) decimal(is), então o valor não pode ser mais preciso que isso.`,
+          graceDaysInvalid: 'A carência precisa ser um número inteiro de dias, zero ou mais.',
+        },
+        createSuccess: (name: string) => `Plano ${name} criado.`,
+        updateSuccess: (name: string) =>
+          `Plano ${name} salvo. Os contratos assinados mantêm suas condições.`,
+        archiveSuccess: (name: string) =>
+          `Plano ${name} arquivado. Os contratos já assinados com base nele seguem inalterados.`,
+        unarchiveSuccess: (name: string) => `Plano ${name} está de volta ao catálogo.`,
+        createError: 'Falha ao criar o plano.',
+        updateError: 'Falha ao salvar o plano.',
+        archiveError: 'Falha ao arquivar o plano.',
+        unarchiveError: 'Falha ao restaurar o plano.',
       },
     },
   },
