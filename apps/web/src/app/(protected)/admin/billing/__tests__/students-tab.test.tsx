@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Entities } from '@arenaquest/shared/types/entities';
 import { DictProvider } from '@web/context/dict-context';
 import { dictEn } from '@web/i18n/dict-en';
 import { createAdminBillingApi } from '@web/lib/admin-billing-api';
@@ -7,6 +8,7 @@ import type { BillingReportCurrency, BillingRosterEntry } from '@web/lib/admin-b
 import type { HttpTransport } from '@web/lib/api-client';
 import { makeTransport } from './test-transport';
 import { StudentsTab } from '../students-tab';
+import type { SignableStudent } from '../sign-contract-dialog';
 
 const BRL: BillingReportCurrency = { code: 'BRL', exponent: 2, symbol: 'R$' };
 
@@ -48,6 +50,17 @@ const held: BillingRosterEntry = {
 
 const NAMES: Record<string, string> = { u1: 'Alice Doe', u2: 'Bruno Lima' };
 
+/**
+ * The signing picker's candidates come from the admin user list, so `u3` — who
+ * holds no contract and therefore has no roster line above — is present here
+ * and nowhere else.
+ */
+const STUDENTS: SignableStudent[] = [
+  { id: 'u1', name: 'Alice Doe', email: 'alice@dojo.test', status: Entities.Config.UserStatus.ACTIVE },
+  { id: 'u2', name: 'Bruno Lima', email: 'bruno@dojo.test', status: Entities.Config.UserStatus.ACTIVE },
+  { id: 'u3', name: 'Carla Souza', email: 'carla@dojo.test', status: Entities.Config.UserStatus.ACTIVE },
+];
+
 let http: ReturnType<typeof makeTransport>;
 // One stable client per test: `useApiClient` returns a stable instance in the
 // app, and a fresh object here would re-fire every effect that depends on it.
@@ -67,6 +80,7 @@ function renderTab() {
         currency={BRL}
         nameOf={(userId) => NAMES[userId] ?? userId}
         onRosterChanged={onRosterChanged}
+        students={STUDENTS}
       />
     </DictProvider>,
   );
@@ -77,7 +91,11 @@ const d = dictEn.admin.billing.students;
 describe('StudentsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    http = makeTransport(() => [delinquent, held]);
+    // Path-aware: the signing dialog reads the plan catalogue and the active
+    // contracts from the same client, and roster rows are not plans.
+    http = makeTransport((_method, path) =>
+      path.includes('/students') ? [delinquent, held] : [],
+    );
     client = { adminBilling: createAdminBillingApi(http as unknown as HttpTransport) };
   });
 
@@ -168,6 +186,24 @@ describe('StudentsTab', () => {
     await waitFor(() =>
       expect(http).toHaveBeenCalledWith('DELETE', '/admin/billing/holds/u2'),
     );
+  });
+
+  /**
+   * A student with no contract has no roster line, so the tab header is the
+   * only place the first contract can be signed from.
+   */
+  it('opens the signing dialog from the tab header with no student pre-selected', async () => {
+    renderTab();
+    fireEvent.click(
+      await screen.findByRole('button', { name: dictEn.admin.billing.sign.buttonAriaLabel }),
+    );
+
+    const dialog = await screen.findByRole('dialog', {
+      name: dictEn.admin.billing.sign.dialogTitle,
+    });
+    // Carla is on no roster line above and is still reachable in the picker.
+    expect(within(dialog).getByRole('radio', { name: /Carla Souza/ })).toBeInTheDocument();
+    expect(within(dialog).getByRole('radio', { name: /Alice Doe/ })).not.toBeChecked();
   });
 
   /**

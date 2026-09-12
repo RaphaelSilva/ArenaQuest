@@ -19,10 +19,17 @@ export function StudentStatementPanel({
   userId,
   studentName,
   onClose,
+  onSignContract,
 }: {
   userId: string;
   studentName: string;
   onClose: () => void;
+  /**
+   * The second entry point into signing (RFC 0013 §7). Optional: the panel is
+   * readable on its own, and a caller that offers no signing surface simply
+   * omits it.
+   */
+  onSignContract?: (userId: string) => void;
 }) {
   const dict = useDict();
   const d = dict.admin.billing.statement;
@@ -67,9 +74,22 @@ export function StudentStatementPanel({
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             {d.heading(studentName)}
           </h2>
-          <Button type="button" variant="secondary" size="sm" onClick={onClose}>
-            {d.close}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {onSignContract && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => onSignContract(userId)}
+                aria-label={dict.admin.billing.sign.statementAriaLabel(studentName)}
+              >
+                {dict.admin.billing.sign.statementButton}
+              </Button>
+            )}
+            <Button type="button" variant="secondary" size="sm" onClick={onClose}>
+              {d.close}
+            </Button>
+          </div>
         </div>
 
         {loading ? (

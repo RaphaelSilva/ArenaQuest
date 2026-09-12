@@ -14,13 +14,13 @@ import {
 import { Spinner } from '@web/components/spinner';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
-import { AdminBillingApiError } from '@web/lib/admin-billing-api';
 import type {
   BillingCycle,
   BillingPlan,
   BillingReportCurrency,
 } from '@web/lib/admin-billing-api';
 import { Money } from './money';
+import { explain } from './explain-error';
 import { fromMinorUnits, toMinorUnits } from './minor-units';
 
 /**
@@ -134,10 +134,6 @@ export function PlansTab({ currency }: { currency: BillingReportCurrency | null 
     (plan: BillingPlan) => currency !== null && plan.currency === currency.code,
     [currency],
   );
-
-  /** The server's own explanation when it sent one — never a generic failure. */
-  const explain = (thrown: unknown, fallback: string): string =>
-    thrown instanceof AdminBillingApiError ? (thrown.detailMessage ?? fallback) : fallback;
 
   const openCreate = () => {
     setDraft({ mode: 'create' });

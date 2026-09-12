@@ -21,6 +21,8 @@ import type {
 import { Money } from './money';
 import { StandingBadge } from './standing-badge';
 import { StudentStatementPanel } from './student-statement-panel';
+import { SignContractDialog } from './sign-contract-dialog';
+import type { SignableStudent } from './sign-contract-dialog';
 
 /**
  * `standing=exempt` is the held filter — Task 05 decided against a second
@@ -30,14 +32,29 @@ const STANDINGS: readonly Standing[] = ['good', 'due', 'delinquent', 'exempt'];
 
 type HoldDraft = { entry: BillingRosterEntry; name: string };
 
+/**
+ * The signing dialog's open state. `fromStatement` records the entry point:
+ * on success the statement panel is closed as well, so the administrator lands
+ * on the refreshed roster — which is where the newly signed student is now
+ * visible, and where they had no row before.
+ */
+type SignDraft = { userId: string | null; fromStatement: boolean };
+
 export function StudentsTab({
   currency,
   nameOf,
   onRosterChanged,
+  students,
 }: {
   currency: BillingReportCurrency | null;
   nameOf: (userId: string) => string;
   onRosterChanged: () => void;
+  /**
+   * Candidates for the signing picker, from the **admin user list**. A student
+   * holding no contract has no roster line at all, so the roster below could
+   * never supply them.
+   */
+  students: readonly SignableStudent[];
 }) {
   const dict = useDict();
   const d = dict.admin.billing.students;
@@ -57,6 +74,9 @@ export function StudentsTab({
   const [holdFormError, setHoldFormError] = useState<string | null>(null);
 
   const [statementFor, setStatementFor] = useState<{ userId: string; name: string } | null>(null);
+
+  const [signDraft, setSignDraft] = useState<SignDraft | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   /**
    * The standing filter is a **server** parameter. Filtering a cached list
@@ -133,6 +153,20 @@ export function StudentsTab({
     }
   };
 
+  /**
+   * A signature ends in a re-read roster: the whole point is that a student who
+   * had no row now has one, and the delinquency badge is told so it can follow.
+   */
+  const onSigned = async (studentName: string) => {
+    const fromStatement = signDraft?.fromStatement ?? false;
+    setSignDraft(null);
+    if (fromStatement) setStatementFor(null);
+    setActionError(null);
+    setNotice(dict.admin.billing.sign.success(studentName));
+    await load();
+    onRosterChanged();
+  };
+
   const clearHold = async (entry: BillingRosterEntry) => {
     setBusy(true);
     setActionError(null);
@@ -191,8 +225,28 @@ export function StudentsTab({
           </p>
         </div>
 
+        <Button
+          type="button"
+          variant="primary"
+          size="md"
+          onClick={() => {
+            setNotice(null);
+            setActionError(null);
+            setSignDraft({ userId: null, fromStatement: false });
+          }}
+          aria-label={dict.admin.billing.sign.buttonAriaLabel}
+        >
+          {dict.admin.billing.sign.button}
+        </Button>
+
         <p className="text-xs text-zinc-500">{d.count(rows.length)}</p>
       </div>
+
+      {notice && (
+        <p role="status" className="text-sm text-emerald-700 dark:text-emerald-400">
+          {notice}
+        </p>
+      )}
 
       {actionError && (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">
@@ -350,6 +404,17 @@ export function StudentsTab({
           userId={statementFor.userId}
           studentName={statementFor.name}
           onClose={() => setStatementFor(null)}
+          onSignContract={(userId) => setSignDraft({ userId, fromStatement: true })}
+        />
+      )}
+
+      {signDraft && (
+        <SignContractDialog
+          students={students}
+          currency={currency}
+          initialUserId={signDraft.userId}
+          onClose={() => setSignDraft(null)}
+          onSigned={(studentName) => void onSigned(studentName)}
         />
       )}
     </section>

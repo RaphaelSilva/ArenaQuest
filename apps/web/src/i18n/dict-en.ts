@@ -1031,6 +1031,73 @@ export const dictEn = {
         archiveError: 'Failed to archive the plan.',
         unarchiveError: 'Failed to restore the plan.',
       },
+      sign: {
+        button: 'Sign a contract',
+        buttonAriaLabel: 'Sign a contract for a student',
+        statementButton: 'Sign a contract',
+        statementAriaLabel: (name: string) => `Sign a contract for ${name}`,
+        dialogTitle: 'Sign a contract',
+        dialogExplainer:
+          'Signing records what was agreed with the student: the plan, the amount, the billing day and the date the contract starts. It is a financial record and nothing more.',
+        noAccessNote:
+          'Signing changes nothing about what a student can see, and nor does failing to sign. Access comes from enrollment; this form records money only.',
+        studentHeading: 'Student',
+        searchLabel: 'Search by name or email',
+        searchPlaceholder: 'Name or email',
+        pickerLabel: 'Choose the student this contract is for',
+        studentEmpty: 'No user in this list matches the search.',
+        firstPageNotice:
+          'This picker lists the first page of user accounts, because the user list endpoint caps a page at 100 accounts. A student who is not in the list is not necessarily absent from the dojo.',
+        alreadyContracted: 'Already under contract',
+        alreadyContractedNote:
+          'A student already holding an active contract is marked here to save you a pointless attempt. The mark is a courtesy, not the rule: the database allows one active contract per student, and it is the database that refuses a second one.',
+        notActive: 'Account is not active',
+        notActiveNote:
+          'An account that is not active is marked rather than hidden. The API does not forbid signing for one, so the decision stays yours.',
+        planLabel: 'Plan',
+        planPlaceholder: 'Choose a plan',
+        planLoadError: 'Failed to load the plan catalogue.',
+        planEmpty:
+          'No active plan is available. Create one on the Plans tab, then sign a student against it. An archived plan cannot be signed.',
+        termsHeading: 'Terms to be recorded',
+        termsSnapshotNote:
+          'The contract keeps these terms exactly as they stand at signature. Repricing the plan afterwards does not restate them.',
+        termsAmount: 'Amount per cycle',
+        termsCycle: 'Cycle',
+        termsGraceDays: 'Grace period',
+        dueDayLabel: 'Billing day of the month',
+        dueDayHelp: 'A whole number from 1 to 28, so that every month has that day.',
+        startDateLabel: 'Start date',
+        startDateHelp: 'The date this contract starts, as YYYY-MM-DD.',
+        modeLabel: 'Terms',
+        modeStandard: "The plan's terms, unchanged",
+        modeNegotiated: 'Negotiated terms for this student',
+        standardNote:
+          "A standard signature sends no amount, no cycle and no grace period at all: the server records the plan's own values, so the contract cannot drift from the catalogue.",
+        negotiatedNote:
+          'Negotiated terms override the amount, the cycle and the grace period for this student alone, against a written reason. That reason is what a future administrator reads to answer why this student pays a different amount, so it is required.',
+        currencyNotNegotiableNote:
+          "The currency is not negotiable. Re-denominating is not a negotiation, it is a different contract, so the amount below stays in the plan's own currency.",
+        amountLabel: (code: string) => `Negotiated amount per cycle (${code})`,
+        cycleLabel: 'Negotiated cycle',
+        graceDaysLabel: 'Negotiated grace period (days)',
+        termsNoteLabel: 'Reason (required)',
+        termsNotePlaceholder: 'What was agreed, and why it departs from the plan.',
+        planValue: (value: string) => `Plan: ${value}`,
+        submit: 'Sign contract',
+        cancel: 'Cancel',
+        validation: {
+          studentRequired: 'Choose the student this contract is for.',
+          planRequired: 'Choose the plan this contract is signed against.',
+          dueDayInvalid: 'The billing day must be a whole number from 1 to 28.',
+          startDateInvalid: 'Enter the start date as YYYY-MM-DD.',
+          graceDaysInvalid: 'The grace period must be a whole number of days, zero or more.',
+          termsNoteRequired:
+            'A negotiated contract needs a written reason for the terms it departs from.',
+        },
+        success: (name: string) => `${name} is now under contract.`,
+        error: 'Failed to sign the contract.',
+      },
     },
   },
   catalog: {

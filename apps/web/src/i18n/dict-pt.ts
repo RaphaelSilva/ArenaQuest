@@ -1030,6 +1030,73 @@ export const dictPt = {
         archiveError: 'Falha ao arquivar o plano.',
         unarchiveError: 'Falha ao restaurar o plano.',
       },
+      sign: {
+        button: 'Assinar contrato',
+        buttonAriaLabel: 'Assinar um contrato para um aluno',
+        statementButton: 'Assinar contrato',
+        statementAriaLabel: (name: string) => `Assinar um contrato para ${name}`,
+        dialogTitle: 'Assinar contrato',
+        dialogExplainer:
+          'A assinatura registra o que foi combinado com o aluno: o plano, o valor, o dia de cobrança e a data em que o contrato começa. É um registro financeiro e nada além disso.',
+        noAccessNote:
+          'Assinar não altera nada do que o aluno consegue ver, e deixar de assinar também não. O acesso vem da matrícula; este formulário registra apenas dinheiro.',
+        studentHeading: 'Aluno',
+        searchLabel: 'Buscar por nome ou e-mail',
+        searchPlaceholder: 'Nome ou e-mail',
+        pickerLabel: 'Escolha o aluno deste contrato',
+        studentEmpty: 'Nenhum usuário desta lista corresponde à busca.',
+        firstPageNotice:
+          'Este seletor lista a primeira página de contas de usuário, porque o endpoint de usuários limita a página a 100 contas. Um aluno que não aparece na lista não está necessariamente fora do dojo.',
+        alreadyContracted: 'Já possui contrato',
+        alreadyContractedNote:
+          'O aluno que já tem contrato ativo é marcado aqui para poupar uma tentativa inútil. A marca é uma cortesia, não a regra: o banco permite um único contrato ativo por aluno e é ele que recusa o segundo.',
+        notActive: 'Conta não está ativa',
+        notActiveNote:
+          'Uma conta que não está ativa é marcada, nunca escondida. A API não proíbe assinar por causa disso, então a decisão continua sendo sua.',
+        planLabel: 'Plano',
+        planPlaceholder: 'Escolha um plano',
+        planLoadError: 'Falha ao carregar o catálogo de planos.',
+        planEmpty:
+          'Nenhum plano ativo disponível. Crie um na aba Planos e depois assine um aluno com base nele. Um plano arquivado não pode ser assinado.',
+        termsHeading: 'Condições a registrar',
+        termsSnapshotNote:
+          'O contrato guarda estas condições como estão no momento da assinatura. Reprecificar o plano depois não altera o que já foi registrado.',
+        termsAmount: 'Valor por ciclo',
+        termsCycle: 'Ciclo',
+        termsGraceDays: 'Carência',
+        dueDayLabel: 'Dia de cobrança no mês',
+        dueDayHelp: 'Um número inteiro de 1 a 28, para que todo mês tenha esse dia.',
+        startDateLabel: 'Data de início',
+        startDateHelp: 'A data em que este contrato começa, no formato AAAA-MM-DD.',
+        modeLabel: 'Condições',
+        modeStandard: 'As condições do plano, sem alteração',
+        modeNegotiated: 'Condições negociadas para este aluno',
+        standardNote:
+          'A assinatura padrão não envia valor, ciclo nem carência: o servidor registra os próprios valores do plano, então o contrato não pode divergir do catálogo.',
+        negotiatedNote:
+          'As condições negociadas substituem o valor, o ciclo e a carência apenas para este aluno, sempre acompanhadas de um motivo escrito. Esse motivo é o que um futuro administrador lê para responder por que este aluno paga um valor diferente, por isso é obrigatório.',
+        currencyNotNegotiableNote:
+          'A moeda não é negociável. Redenominar não é uma negociação, é outro contrato, então o valor abaixo permanece na moeda do próprio plano.',
+        amountLabel: (code: string) => `Valor negociado por ciclo (${code})`,
+        cycleLabel: 'Ciclo negociado',
+        graceDaysLabel: 'Carência negociada (dias)',
+        termsNoteLabel: 'Motivo (obrigatório)',
+        termsNotePlaceholder: 'O que foi combinado e por que difere do plano.',
+        planValue: (value: string) => `Plano: ${value}`,
+        submit: 'Assinar contrato',
+        cancel: 'Cancelar',
+        validation: {
+          studentRequired: 'Escolha o aluno deste contrato.',
+          planRequired: 'Escolha o plano com base no qual o contrato é assinado.',
+          dueDayInvalid: 'O dia de cobrança precisa ser um número inteiro de 1 a 28.',
+          startDateInvalid: 'Informe a data de início no formato AAAA-MM-DD.',
+          graceDaysInvalid: 'A carência precisa ser um número inteiro de dias, zero ou mais.',
+          termsNoteRequired:
+            'Um contrato negociado precisa de um motivo escrito para as condições que se afastam do plano.',
+        },
+        success: (name: string) => `${name} agora está sob contrato.`,
+        error: 'Falha ao assinar o contrato.',
+      },
     },
   },
   catalog: {

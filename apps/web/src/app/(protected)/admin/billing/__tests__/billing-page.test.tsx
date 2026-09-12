@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Entities } from '@arenaquest/shared/types/entities';
 import { DictProvider } from '@web/context/dict-context';
 import { dictEn } from '@web/i18n/dict-en';
 import { createAdminBillingApi } from '@web/lib/admin-billing-api';
@@ -12,7 +13,9 @@ let isAdmin = true;
 let http: ReturnType<typeof makeTransport>;
 let client: {
   adminBilling: ReturnType<typeof createAdminBillingApi>;
-  adminUsers: { list: () => Promise<{ data: { id: string; name: string }[]; total: number }> };
+  adminUsers: {
+    list: () => Promise<{ data: Entities.Identity.User[]; total: number }>;
+  };
 };
 
 vi.mock('next/navigation', () => ({
@@ -63,7 +66,24 @@ describe('AdminBillingPage', () => {
     client = {
       adminBilling: createAdminBillingApi(http as unknown as HttpTransport),
       adminUsers: {
-        list: async () => ({ data: [{ id: 'u1', name: 'Alice Doe' }], total: 1 }),
+        // `email` and `status` ride along on the console's existing user read
+        // because the signing picker filters on the email and marks an account
+        // that is not active.
+        list: async () => ({
+          data: [
+            {
+              id: 'u1',
+              name: 'Alice Doe',
+              email: 'alice@dojo.test',
+              status: Entities.Config.UserStatus.ACTIVE,
+              roles: [],
+              groups: [],
+              createdAt: new Date('2026-01-01T00:00:00Z'),
+              timezone: 'UTC',
+            },
+          ],
+          total: 1,
+        }),
       },
     };
   });
