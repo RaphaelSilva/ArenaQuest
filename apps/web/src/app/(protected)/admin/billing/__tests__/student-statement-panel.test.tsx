@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DictProvider } from '@web/context/dict-context';
 import { dictEn } from '@web/i18n/dict-en';
@@ -83,6 +83,7 @@ function renderPanel(onSignContract?: (userId: string) => void) {
 
 const d = dictEn.admin.billing.statement;
 const planDict = dictEn.admin.billing.plans;
+const contractDict = dictEn.admin.billing.contract;
 
 describe('StudentStatementPanel', () => {
   beforeEach(() => {
@@ -132,13 +133,18 @@ describe('StudentStatementPanel', () => {
   });
 
   /**
-   * The current version is the one no sibling supersedes. Rendering the chain
-   * so an administrator can see that history was *added* and not overwritten is
-   * Task 11's job, so the superseded terms are deliberately absent here.
+   * The current version is the one no sibling supersedes, and an amendment adds
+   * a version rather than overwriting one — so the superseded terms stay on
+   * screen, fully readable, beside the version in force.
    */
-  it('shows the current version terms only, never the superseded ones', async () => {
+  it('renders the whole version chain, marking exactly one version as current', async () => {
     payload = statement([
-      version({ id: 'v1', amountMinor: 150000, termsNote: 'Original standard terms.' }),
+      version({
+        id: 'v1',
+        status: 'superseded',
+        amountMinor: 150000,
+        termsNote: 'Original standard terms.',
+      }),
       version({
         id: 'v2',
         supersedesId: 'v1',
@@ -154,15 +160,19 @@ describe('StudentStatementPanel', () => {
     expect(await screen.findByText('R$ 1,200.50')).toBeInTheDocument();
     expect(screen.getByText(`${d.termsNoteLabel}: Renegotiated in March.`)).toBeInTheDocument();
 
-    expect(screen.queryByText('R$ 1,500.00')).not.toBeInTheDocument();
+    // The superseded version keeps its original terms.
+    expect(screen.getByText('R$ 1,500.00')).toBeInTheDocument();
     expect(
-      screen.queryByText(`${d.termsNoteLabel}: Original standard terms.`),
-    ).not.toBeInTheDocument();
+      screen.getByText(`${d.termsNoteLabel}: Original standard terms.`),
+    ).toBeInTheDocument();
+
+    expect(screen.getAllByText(contractDict.currentVersion)).toHaveLength(1);
   });
 
   /**
-   * `supersedesId` is order-independent, so the current version is found even
-   * when the newest row arrives first.
+   * `supersedesId` is order-independent, so the version in force is found even
+   * when the newest row arrives first — and it is the one that carries both the
+   * current marker and the actions.
    */
   it('finds the current version regardless of the order the versions arrive in', async () => {
     payload = statement([
@@ -178,8 +188,38 @@ describe('StudentStatementPanel', () => {
 
     renderPanel();
 
-    expect(await screen.findByText('R$ 1,200.50')).toBeInTheDocument();
-    expect(screen.queryByText('R$ 1,500.00')).not.toBeInTheDocument();
+    // The chain is the ordered list inside the group's card.
+    const chain = (await screen.findAllByRole('list')).find((list) => list.tagName === 'OL');
+    expect(chain).toBeDefined();
+
+    const cards = within(chain as HTMLElement).getAllByRole('listitem');
+    const current = cards.find((card) => card.textContent?.includes(contractDict.currentVersion));
+    expect(current).toBeDefined();
+    expect(current).toHaveTextContent('R$ 1,200.50');
+    expect(current).not.toHaveTextContent('R$ 1,500.00');
+  });
+
+  /**
+   * The chain and its actions come out of this one statement read: pausing
+   * re-reads it rather than editing what is on screen, and the panel never
+   * reloads the page.
+   */
+  it('applies a lifecycle change by re-reading the statement', async () => {
+    renderPanel();
+    await screen.findByText(d.currentTermsHeading);
+
+    fireEvent.click(screen.getByRole('button', { name: contractDict.pauseButton }));
+    fireEvent.click(screen.getByRole('button', { name: contractDict.pauseConfirm }));
+
+    await waitFor(() =>
+      expect(http).toHaveBeenCalledWith('PATCH', '/admin/billing/subscriptions/v1', {
+        body: JSON.stringify({ action: 'pause' }),
+      }),
+    );
+
+    expect(await screen.findByText(contractDict.pauseSuccess)).toBeInTheDocument();
+    const reads = http.mock.calls.filter(([method]) => method === 'GET');
+    expect(reads.length).toBeGreaterThan(1);
   });
 
   it('offers the second signing entry point when the caller supplies one', async () => {
@@ -203,10 +243,12 @@ describe('StudentStatementPanel', () => {
   });
 
   /**
-   * Pause, resume, cancel and amend are Task 11's, and no control here may
-   * imply a capability this panel does not have. Nor may anything gate access.
+   * The lifecycle is offered, and nothing beside it gates access: pausing or
+   * cancelling a contract is a financial record, and the student keeps every
+   * screen they had. No control deletes anything either — the corrections this
+   * console offers are a supersession, a void and a reversal.
    */
-  it('offers no lifecycle or access control', async () => {
+  it('offers the lifecycle without offering any access control', async () => {
     const { container } = renderPanel();
     await screen.findByText(d.currentTermsHeading);
 
@@ -214,11 +256,13 @@ describe('StudentStatementPanel', () => {
       .getAllByRole('button')
       .map((button) => button.getAttribute('aria-label') ?? button.textContent ?? '');
 
-    expect(names.length).toBeGreaterThan(0);
+    expect(names).toContain(contractDict.pauseButton);
+    expect(names).toContain(contractDict.amendButton);
     for (const name of names) {
-      expect(name).not.toMatch(/pause|resume|cancel|amend|delete|remove/i);
+      expect(name).not.toMatch(/delete|remove/i);
       expect(name).not.toMatch(/suspend|block|lock|revoke|restrict|disable|paywall/i);
     }
+    expect(screen.getByText(contractDict.noAccessNote)).toBeInTheDocument();
   });
 
   it('reports a failed statement read rather than an empty contract', async () => {

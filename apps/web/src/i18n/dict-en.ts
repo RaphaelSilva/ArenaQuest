@@ -1107,6 +1107,95 @@ export const dictEn = {
         success: (name: string) => `${name} is now under contract.`,
         error: 'Failed to sign the contract.',
       },
+      /**
+       * A signed contract's life after signature — Task 11, RFC 0013 section 7.
+       *
+       * The wording carries the four distinctions an administrator confuses by
+       * default: pausing stops the next issue and nothing else, cancelling ends
+       * a membership and forgives nothing, a hold stops the chasing, and a
+       * waiver forgives a charge. None of the four touches access.
+       */
+      contract: {
+        chainNote:
+          'A renegotiation adds a version; it never rewrites one. Every version below keeps the terms it was signed with, so an invoice issued under older terms still explains itself.',
+        versionLabel: (position: number) => `Version ${position}`,
+        currentVersion: 'Current version',
+        supersededNote: 'Superseded, and kept exactly as it was signed.',
+        status: {
+          active: 'Active',
+          paused: 'Paused',
+          cancelled: 'Cancelled',
+          superseded: 'Superseded',
+        },
+        versionPeriodOpen: (start: string) => `From ${start}`,
+        versionPeriod: (start: string, end: string) => `From ${start} to ${end}`,
+        signedOn: (date: string) => `Recorded on ${date}`,
+        actionsHeading: 'Manage this contract',
+        noAccessNote:
+          'None of these actions changes what the student can see. A contract records money; access comes from enrollment and is left exactly as it is.',
+        holdPointer:
+          'To stop the reminder emails while a student sorts something out, set a hold on the Students tab. A hold stops the chasing, not the debt, and it leaves the contract running.',
+        waiverPointer:
+          'To forgive a charge, record a waiver adjustment against the invoice on the Ledger tab. Nothing here forgives anything.',
+        closedNote:
+          'This contract is closed, so there is nothing left on it to pause, resume or amend. Taking the student back is a new signature.',
+        pauseButton: 'Pause',
+        resumeButton: 'Resume',
+        cancelButton: 'Cancel contract',
+        amendButton: 'Amend terms',
+        keepButton: 'Go back',
+        pauseTitle: 'Pause this contract?',
+        pauseBody:
+          "Pausing stops the next invoice being issued, and nothing else. Every invoice already open keeps its amount and its due date, keeps counting toward the outstanding total and keeps its place in the aging report, and the student's standing goes on moving on schedule. Nothing is erased, and the contract can be resumed whenever the student comes back.",
+        pauseConfirm: 'Pause the contract',
+        pauseSuccess:
+          'The contract is paused. No further invoice is issued for it until it is resumed, and every open invoice is untouched.',
+        pauseError: 'Failed to pause the contract.',
+        resumeTitle: 'Resume this contract?',
+        resumeBody:
+          'Resuming puts the contract back in the run, so the next period is invoiced again on its billing day. It changes nothing about the invoices already issued.',
+        resumeConfirm: 'Resume the contract',
+        resumeSuccess: 'The contract is active again.',
+        resumeError: 'Failed to resume the contract.',
+        cancelTitle: 'Cancel this contract?',
+        cancelBody:
+          'Cancelling ends this membership: the contract closes on the end date below and no further invoice is issued for it. It forgives nothing — every open invoice keeps its balance and its due date, and goes on counting in the reports. A cancelled contract is not resumed.',
+        cancelConfirm: 'Cancel the contract',
+        cancelEndDateLabel: 'End date',
+        cancelEndDateHelp:
+          'The date the contract closes, as YYYY-MM-DD. Left blank, the server records today.',
+        cancelSuccess:
+          'The contract is cancelled and its end date is recorded. Whatever was outstanding is still outstanding.',
+        cancelError: 'Failed to cancel the contract.',
+        amendTitle: 'Record an amendment',
+        amendBody:
+          'An amendment records renegotiated terms as a new version. The version in force now is kept and marked superseded with its original terms intact, so the invoices issued under them still explain themselves. Nothing is edited in place.',
+        amendPeriodNote:
+          'The new terms are recorded from the start date below and apply to the periods invoiced from then on. A period already invoiced is not repriced.',
+        amendCurrencyNote:
+          'The currency is not amendable: re-denominating a live contract would restate every invoice already issued under it.',
+        amendStartDateLabel: 'The new terms start on',
+        amendStartDateHelp: 'As YYYY-MM-DD. The current version closes on this date.',
+        amendAmountLabel: (code: string) => `Amount per cycle (${code})`,
+        amendCycleLabel: 'Cycle',
+        amendDueDayLabel: 'Billing day of the month',
+        amendDueDayHelp: 'A whole number from 1 to 28, so that every month has that day.',
+        amendGraceDaysLabel: 'Grace period (days)',
+        amendNoteLabel: 'Reason (required)',
+        amendNotePlaceholder: 'What was renegotiated, and why.',
+        currentValue: (value: string) => `Currently: ${value}`,
+        amendSubmit: 'Record the amendment',
+        amendSuccess:
+          'The amendment is recorded as a new version. The previous one is kept as superseded, with its original terms.',
+        amendError: 'Failed to record the amendment.',
+        validation: {
+          startDateInvalid: 'Enter the start date as YYYY-MM-DD.',
+          endDateInvalid: 'Enter the end date as YYYY-MM-DD, or leave it blank.',
+          dueDayInvalid: 'The billing day must be a whole number from 1 to 28.',
+          graceDaysInvalid: 'The grace period must be a whole number of days, zero or more.',
+          termsNoteRequired: 'An amendment needs a written reason for the terms it replaces.',
+        },
+      },
     },
   },
   catalog: {
