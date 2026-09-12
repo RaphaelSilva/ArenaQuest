@@ -138,6 +138,96 @@ export type IssueInvoiceInput = {
   referenceDate?: string;
 };
 
+/**
+ * The manual twin of the daily cron — `POST /invoices/run`. Both fields are
+ * optional: `asOf` defaults to today and `since` to the day before it, and the
+ * window the run covers is `(since, asOf]`.
+ */
+export type RunInvoiceCycleInput = {
+  asOf?: string;
+  since?: string;
+};
+
+/** One invoice the run created. A second run for the period creates none. */
+export type BillingRunIssuedInvoice = {
+  invoiceId: string;
+  subscriptionId: string;
+  userId: string;
+  periodStart: string;
+  dueDate: string;
+  amountMinor: number;
+  currency: string;
+  status: InvoiceStatus;
+};
+
+export type BillingRunReminderKind = 'due_date' | 'grace_lapsed';
+
+/**
+ * One student notice the run considered. `suppressedByHold` is the hold
+ * skipping the chasing — the balance it names is still owed.
+ */
+export type BillingRunReminder = {
+  invoiceId: string;
+  userId: string;
+  kind: BillingRunReminderKind;
+  dueDate: string;
+  triggerOn: string;
+  balanceMinor: number;
+  currency: string;
+  sent: boolean;
+  suppressedByHold: boolean;
+};
+
+/**
+ * A standing crossing the run observed. `from` and `to` are resolved by the
+ * server; nothing in this client derives either of them.
+ */
+export type BillingRunCrossing = {
+  userId: string;
+  from: Standing;
+  to: Standing;
+  oldestOverdueDate: string | null;
+  outstandingMinor: number;
+  currency: string;
+};
+
+/** A held student whose chasing was skipped while the debt stayed. */
+export type BillingRunHoldSuppression = {
+  userId: string;
+  outstandingMinor: number;
+};
+
+/**
+ * A cached-invoice-status finding. The run "writes no adjustment of any kind
+ * and repairs no status", so a divergence is reported and never fixed.
+ */
+export type BillingRunDivergence = {
+  invoiceId: string;
+  userId: string;
+  cachedStatus: InvoiceStatus;
+  expectedStatus: InvoiceStatus;
+  balanceMinor: number;
+};
+
+/**
+ * What the run actually did. `eligibleContracts` is what separates "nothing was
+ * in scope" from "nothing was left to bill", and `absorbed` is the idempotency
+ * count a repeated run reports instead of a refusal.
+ */
+export type BillingRunReport = {
+  asOf: string;
+  since: string;
+  eligibleContracts: number;
+  issued: BillingRunIssuedInvoice[];
+  absorbed: number;
+  reminders: BillingRunReminder[];
+  crossings: BillingRunCrossing[];
+  suppressedByHold: BillingRunHoldSuppression[];
+  divergences: BillingRunDivergence[];
+  mailsSent: number;
+  adminsNotified: number;
+};
+
 export type BillingAdjustment = {
   id: string;
   invoiceId: string;
@@ -418,6 +508,21 @@ export function createAdminBillingApi(http: HttpTransport) {
 
       create(input: IssueInvoiceInput): Promise<BillingInvoice> {
         return send<BillingInvoice>('POST', `${BASE}/invoices`, 'BILLING_INVOICE_ISSUE_FAILED', input);
+      },
+
+      /**
+       * Runs the billing cycle by hand. The body is optional on the server, so
+       * an absent `input` posts no body at all and the run uses its own
+       * defaults. Idempotent by construction: a second run for one period
+       * creates nothing and reports it as `absorbed`.
+       */
+      run(input?: RunInvoiceCycleInput): Promise<BillingRunReport> {
+        return send<BillingRunReport>(
+          'POST',
+          `${BASE}/invoices/run`,
+          'BILLING_INVOICE_RUN_FAILED',
+          input,
+        );
       },
 
       void(id: string, reason: string): Promise<BillingInvoice> {

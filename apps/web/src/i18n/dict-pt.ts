@@ -1036,6 +1036,118 @@ export const dictPt = {
           error: 'Falha ao emitir a fatura.',
         },
       },
+      run: {
+        heading: 'Rodar o ciclo de cobrança manualmente',
+        purpose:
+          'A mesma rotina que a execução diária faz, disparada agora — para o dia em que ela não rodou. Emite as faturas do período, envia os dois avisos aos alunos, manda o resumo por e-mail para os administradores e confere o status em cache de cada fatura aberta contra o saldo dela.',
+        idempotentNote:
+          'Rodar duas vezes é seguro. Uma fatura por contrato por período é uma regra do banco de dados, então uma segunda execução não cria nada e conta o que já existia como absorvido.',
+        noFeeNote:
+          'A execução não registra ajuste de nenhum tipo: nenhuma multa por atraso, nenhum juro, nenhuma sobretaxa e nenhuma correção. Ela emite, notifica, resume e confere.',
+        noGateNote:
+          'Nada aqui muda o que alguém pode ver. Um aluno que se torna inadimplente por causa desta execução mantém exatamente o acesso que tinha.',
+        holdNote:
+          'Uma suspensão de cobrança interrompe a cobrança, não a dívida: um aluno com suspensão fica de fora dos avisos enquanto o saldo dele permanece em todos os totais e no relatório de aging.',
+        button: 'Rodar o ciclo',
+        buttonAriaLabel: 'Rodar o ciclo de cobrança agora',
+        confirm: {
+          dialogTitle: 'Rodar o ciclo de cobrança agora?',
+          lead: 'Isto não é uma prévia. Confirmar executa a rotina, e a rotina envia e-mails:',
+          effects: {
+            issue:
+              'Emite uma fatura para cada contrato ativo cujo período já começou e ainda não tem fatura.',
+            notices:
+              'Envia a cada aluno o lembrete da data de vencimento e o aviso de fim do prazo de tolerância.',
+            digest:
+              'Envia aos administradores um resumo dos alunos que passaram para vencido ou inadimplente.',
+            assert:
+              'Confere o status em cache de cada fatura aberta contra o saldo recalculado e reporta qualquer divergência — não corrige nenhuma delas.',
+          },
+          safeAgain:
+            'Se você não tem certeza de que a execução agendada rodou, rode. Uma segunda execução do mesmo período não emite nada, porque uma fatura por contrato por período é garantida pelo banco de dados, e a duplicata é reportada como absorvida.',
+          windowHeading: 'Janela a executar (opcional)',
+          windowHelp:
+            'Deixe as duas vazias para rodar para hoje contra ontem. A janela coberta é tudo depois da primeira data, até a segunda inclusive.',
+          sinceLabel: 'Desde',
+          asOfLabel: 'Na data de',
+          submit: 'Rodar o ciclo agora',
+          cancel: 'Cancelar',
+        },
+        pending: 'Rodando o ciclo de cobrança…',
+        pendingHint:
+          'Isso pode levar um momento. Apenas uma execução está em andamento, e o botão fica indisponível até ela responder.',
+        error: 'A execução do ciclo de cobrança falhou.',
+        errorNoReport:
+          'Nenhum relatório é exibido, porque a execução não foi concluída. O que ela já havia gravado permanece gravado, e rodar de novo é seguro.',
+        outcome: {
+          issuedTitle: (count: number) => `${count} fatura(s) emitida(s)`,
+          issuedBody: 'Cada fatura criada pela execução está listada abaixo, com o aluno, o período, a data de vencimento e o valor.',
+          alreadyBilledTitle: 'Já faturado — nada novo foi emitido',
+          alreadyBilledBody: (absorbed: number) =>
+            `A execução não criou nenhuma fatura: ${absorbed} já existia(m) para o período e foi(ram) absorvida(s) pela regra de uma fatura por período. Este é o resultado esperado de uma segunda execução.`,
+          nothingToIssueTitle: 'Nada a emitir',
+          nothingToIssueBody:
+            'Nenhum contrato estava no escopo desta janela, então não havia nada a faturar. A execução foi concluída — isto não é uma falha.',
+          noneDueTitle: 'Nada estava previsto para ser emitido',
+          noneDueBody: (eligible: number) =>
+            `${eligible} contrato(s) estava(m) no escopo e nenhum deles tinha período aguardando faturamento nesta janela. A execução foi concluída — isto não é uma falha.`,
+        },
+        report: {
+          heading: 'O que a execução fez',
+          window: (since: string, asOf: string) =>
+            `Janela: tudo depois de ${since}, até ${asOf} inclusive.`,
+          counters: {
+            eligibleContracts: 'Contratos no escopo',
+            issued: 'Faturas emitidas',
+            absorbed: 'Já faturadas (absorvidas)',
+            mailsSent: 'E-mails enviados',
+            adminsNotified: 'Administradores notificados',
+          },
+          issuedHeading: 'Faturas que esta execução emitiu',
+          issuedEmpty: 'Esta execução não emitiu nenhuma fatura.',
+          issuedColumns: {
+            invoice: 'Fatura',
+            student: 'Aluno',
+            period: 'Início do período',
+            due: 'Data de vencimento',
+            amount: 'Valor',
+            status: 'Status',
+          },
+          remindersHeading: 'Avisos aos alunos',
+          remindersEmpty: 'Nenhum aviso a aluno estava previsto nesta janela.',
+          reminderKind: {
+            due_date: 'Lembrete de vencimento',
+            grace_lapsed: 'Prazo de tolerância encerrado',
+          },
+          reminderSent: 'Enviado',
+          reminderNotSent: 'Não enviado',
+          reminderSuppressed: 'Ignorado — com suspensão de cobrança',
+          reminderDates: (dueDate: string, triggerOn: string) =>
+            `Vence em ${dueDate} · aviso previsto para ${triggerOn}`,
+          reminderBalance: 'Saldo devido:',
+          reminderHoldLine:
+            'O aviso foi ignorado porque o aluno está com suspensão de cobrança. O saldo acima continua devido.',
+          crossingsHeading: 'Mudanças de situação',
+          crossingsEmpty: 'Nenhum aluno passou para vencido ou inadimplente nesta janela.',
+          crossingsNote:
+            'Lido do relatório da execução. A situação é resolvida pelo servidor e nunca recalculada aqui, e passar para vencido ou inadimplente não restringe nada que o aluno acessa.',
+          crossingArrow: '→',
+          crossingBecame: 'passou para',
+          oldestOverdue: (date: string) => `Fatura vencida mais antiga: ${date}`,
+          noOldestOverdue: 'Nenhuma fatura vencida registrada.',
+          outstanding: 'Em aberto:',
+          heldHeading: 'Alunos com suspensão de cobrança',
+          heldEmpty: 'Nenhum aluno estava com suspensão de cobrança nesta execução.',
+          heldOutstanding: 'Em aberto, ainda devido:',
+          divergencesHeading: 'Achados de status em cache',
+          divergencesEmpty: 'O status em cache de todas as faturas abertas conferiu com o saldo.',
+          divergencesNote:
+            'Reportado, nunca corrigido: a execução não registra ajuste e não altera status. Estas faturas são listadas para que alguém possa olhá-las.',
+          divergenceLine: (cached: string, expected: string) =>
+            `Em cache como ${cached}, enquanto o saldo indica ${expected}.`,
+          divergenceBalance: 'Saldo:',
+        },
+      },
       reports: {
         heading: 'Relatórios contábeis',
         holdNote:
