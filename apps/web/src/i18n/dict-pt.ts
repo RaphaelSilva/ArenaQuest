@@ -1106,6 +1106,97 @@ export const dictPt = {
         success: (name: string) => `${name} agora está sob contrato.`,
         error: 'Falha ao assinar o contrato.',
       },
+      /**
+       * A vida do contrato depois da assinatura — Tarefa 11, RFC 0013 seção 7.
+       *
+       * O texto carrega as quatro distinções que um administrador confunde por
+       * padrão: pausar interrompe a próxima emissão e nada mais, cancelar
+       * encerra a matrícula e não perdoa nada, uma retenção interrompe a
+       * cobrança e uma isenção perdoa um lançamento. Nenhuma das quatro mexe
+       * no acesso.
+       */
+      contract: {
+        chainNote:
+          'Uma renegociação acrescenta uma versão; nunca reescreve a anterior. Cada versão abaixo conserva as condições com que foi assinada, então uma fatura emitida sob condições antigas continua se explicando.',
+        versionLabel: (position: number) => `Versão ${position}`,
+        currentVersion: 'Versão vigente',
+        supersededNote: 'Substituída, e preservada exatamente como foi assinada.',
+        status: {
+          active: 'Ativo',
+          paused: 'Pausado',
+          cancelled: 'Cancelado',
+          superseded: 'Substituído',
+        },
+        versionPeriodOpen: (start: string) => `A partir de ${start}`,
+        versionPeriod: (start: string, end: string) => `De ${start} a ${end}`,
+        signedOn: (date: string) => `Registrada em ${date}`,
+        actionsHeading: 'Gerenciar este contrato',
+        noAccessNote:
+          'Nenhuma destas ações altera o que o aluno consegue ver. O contrato registra dinheiro; o acesso vem da matrícula e permanece exatamente como está.',
+        holdPointer:
+          'Para interromper os e-mails de cobrança enquanto o aluno se organiza, registre uma retenção na aba Alunos. A retenção interrompe a cobrança, não a dívida, e deixa o contrato em andamento.',
+        waiverPointer:
+          'Para perdoar um lançamento, registre um ajuste de isenção sobre a fatura na aba Lançamentos. Nada aqui perdoa qualquer valor.',
+        closedNote:
+          'Este contrato está encerrado, então não há mais nada nele para pausar, retomar ou alterar. Receber o aluno de volta é uma nova assinatura.',
+        pauseButton: 'Pausar',
+        resumeButton: 'Retomar',
+        cancelButton: 'Cancelar contrato',
+        amendButton: 'Alterar condições',
+        keepButton: 'Voltar',
+        pauseTitle: 'Pausar este contrato?',
+        pauseBody:
+          'Pausar interrompe a emissão da próxima fatura e nada mais. Toda fatura já aberta conserva o valor e o vencimento, continua somando no total em aberto e continua aparecendo no relatório de vencidos, e a situação do aluno segue evoluindo no mesmo ritmo. Nada é apagado, e o contrato pode ser retomado quando o aluno voltar.',
+        pauseConfirm: 'Pausar o contrato',
+        pauseSuccess:
+          'O contrato está pausado. Nenhuma fatura nova é emitida para ele até ser retomado, e nenhuma fatura aberta foi tocada.',
+        pauseError: 'Falha ao pausar o contrato.',
+        resumeTitle: 'Retomar este contrato?',
+        resumeBody:
+          'Retomar coloca o contrato de volta no ciclo, então o próximo período volta a ser faturado no dia de cobrança. Não altera nada nas faturas já emitidas.',
+        resumeConfirm: 'Retomar o contrato',
+        resumeSuccess: 'O contrato está ativo novamente.',
+        resumeError: 'Falha ao retomar o contrato.',
+        cancelTitle: 'Cancelar este contrato?',
+        cancelBody:
+          'Cancelar encerra esta matrícula: o contrato se fecha na data de término abaixo e nenhuma fatura nova é emitida para ele. Não perdoa nada — toda fatura aberta conserva o saldo e o vencimento, e continua contando nos relatórios. Um contrato cancelado não é retomado.',
+        cancelConfirm: 'Cancelar o contrato',
+        cancelEndDateLabel: 'Data de término',
+        cancelEndDateHelp:
+          'A data em que o contrato se fecha, no formato AAAA-MM-DD. Em branco, o servidor registra hoje.',
+        cancelSuccess:
+          'O contrato está cancelado e a data de término foi registrada. O que estava em aberto continua em aberto.',
+        cancelError: 'Falha ao cancelar o contrato.',
+        amendTitle: 'Registrar uma alteração',
+        amendBody:
+          'A alteração registra as condições renegociadas como uma nova versão. A versão vigente é preservada e marcada como substituída, com as condições originais intactas, então as faturas emitidas sob elas continuam se explicando. Nada é editado no lugar.',
+        amendPeriodNote:
+          'As novas condições passam a valer a partir da data de início abaixo e se aplicam aos períodos faturados dali em diante. Um período já faturado não é reprecificado.',
+        amendCurrencyNote:
+          'A moeda não é alterável: redenominar um contrato em andamento reescreveria toda fatura já emitida sob ele.',
+        amendStartDateLabel: 'As novas condições começam em',
+        amendStartDateHelp: 'No formato AAAA-MM-DD. A versão vigente se fecha nesta data.',
+        amendAmountLabel: (code: string) => `Valor por ciclo (${code})`,
+        amendCycleLabel: 'Ciclo',
+        amendDueDayLabel: 'Dia de cobrança no mês',
+        amendDueDayHelp: 'Um número inteiro de 1 a 28, para que todo mês tenha esse dia.',
+        amendGraceDaysLabel: 'Carência (dias)',
+        amendNoteLabel: 'Motivo (obrigatório)',
+        amendNotePlaceholder: 'O que foi renegociado e por quê.',
+        currentValue: (value: string) => `Hoje: ${value}`,
+        amendSubmit: 'Registrar a alteração',
+        amendSuccess:
+          'A alteração foi registrada como uma nova versão. A anterior é preservada como substituída, com as condições originais.',
+        amendError: 'Falha ao registrar a alteração.',
+        validation: {
+          startDateInvalid: 'Informe a data de início no formato AAAA-MM-DD.',
+          endDateInvalid: 'Informe a data de término no formato AAAA-MM-DD, ou deixe em branco.',
+          dueDayInvalid: 'O dia de cobrança precisa ser um número inteiro de 1 a 28.',
+          graceDaysInvalid: 'A carência precisa ser um número inteiro de dias, zero ou mais.',
+          termsNoteRequired:
+            'Uma alteração precisa de um motivo escrito para as condições que substitui.',
+        },
+      },
     },
   },
   catalog: {

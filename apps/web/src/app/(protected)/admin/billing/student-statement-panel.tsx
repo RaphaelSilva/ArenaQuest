@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Table, TableBody, TableCell, TableHeader, TableRow } from '@web/components/design-system';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
@@ -10,6 +10,8 @@ import type {
   BillingStudentStatement,
   BillingSubscription,
 } from '@web/lib/admin-billing-api';
+import { ContractActions } from './contract-actions';
+import { ContractChain } from './contract-chain';
 import { Money } from './money';
 
 /**
@@ -63,23 +65,41 @@ export function StudentStatementPanel({
   const dict = useDict();
   const d = dict.admin.billing.statement;
   const ledgerDict = dict.admin.billing.ledger;
-  // The cycle and grace-day spellings already in the dictionary — this panel
-  // adds no second wording for either.
-  const planDict = dict.admin.billing.plans;
   const client = useApiClient();
 
   const [statement, setStatement] = useState<BillingStudentStatement | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Bumped after a lifecycle change or an amendment so the statement is read
+   * again. The chain, the status and the terms then come from the server's
+   * answer rather than from a client-side edit of what was already on screen —
+   * which is also why nothing here reloads the page.
+   */
+  const [reloadToken, setReloadToken] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  /**
+   * The student whose statement is currently rendered. A *reload* keeps the
+   * panel on screen; only the first read of a student blanks it to a spinner.
+   */
+  const rendered = useRef<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    if (rendered.current !== userId) {
+      setStatement(null);
+      setLoading(true);
+    }
     setError(null);
     void (async () => {
       try {
         const data = await client.adminBilling.students.statement(userId);
-        if (!cancelled) setStatement(data);
+        if (!cancelled) {
+          rendered.current = userId;
+          setStatement(data);
+        }
       } catch {
         if (!cancelled) {
           setStatement(null);
@@ -92,7 +112,12 @@ export function StudentStatementPanel({
     return () => {
       cancelled = true;
     };
-  }, [client, userId, d.loadError]);
+  }, [client, userId, d.loadError, reloadToken]);
+
+  const applied = (successMessage: string) => {
+    setNotice(successMessage);
+    setReloadToken((token) => token + 1);
+  };
 
   return (
     <div
@@ -123,6 +148,15 @@ export function StudentStatementPanel({
             </Button>
           </div>
         </div>
+
+        {notice && (
+          <p
+            role="status"
+            className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200"
+          >
+            {notice}
+          </p>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-10">
@@ -184,74 +218,29 @@ export function StudentStatementPanel({
                         </span>
 
                         {/*
-                          The terms the contract records now — this is what makes
-                          "why does this student pay a different amount?"
-                          answerable from the product rather than from a database
-                          query. The version chain and the amendment history are
-                          deliberately not rendered here; that is Task 11's.
+                          The version chain, and the actions the version in
+                          force allows. Both are read from this statement: the
+                          order is the order the API delivered and the current
+                          version comes from `supersedesId`, so no second query
+                          and no date arithmetic reconstructs the history.
 
-                          `dueDay` and `graceDays` are shown as the data they are.
-                          Nothing is derived from either: a due date's consequence
-                          and a grace outcome are resolved on the server, where a
-                          hold can reach them.
+                          Nothing here derives a standing, a due date's
+                          consequence or an aging bucket. That resolution lives
+                          on the server, where a hold can reach it, and this
+                          panel shows what it resolved.
                         */}
+                        <ContractChain
+                          group={group}
+                          currency={statement.currency}
+                          currentVersionId={version?.id ?? null}
+                        />
+
                         {version && (
-                          <div className="mt-2 border-t border-zinc-200 pt-2 dark:border-zinc-800">
-                            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                              {d.currentTermsHeading}
-                            </p>
-                            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                              {d.currentTermsNote}
-                            </p>
-                            <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                              <div>
-                                <dt className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                                  {d.termsAmount}
-                                </dt>
-                                <dd className="font-medium text-zinc-900 dark:text-zinc-50">
-                                  <Money
-                                    amountMinor={version.amountMinor}
-                                    currency={statement.currency}
-                                    code={version.currency}
-                                  />
-                                </dd>
-                              </div>
-                              <div>
-                                <dt className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                                  {d.termsCycle}
-                                </dt>
-                                <dd className="font-medium text-zinc-900 dark:text-zinc-50">
-                                  {planDict.cycle[version.cycle]}
-                                </dd>
-                              </div>
-                              <div>
-                                <dt className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                                  {d.termsDueDay}
-                                </dt>
-                                <dd className="font-medium text-zinc-900 dark:text-zinc-50">
-                                  {version.dueDay}
-                                </dd>
-                              </div>
-                              <div>
-                                <dt className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                                  {d.termsGraceDays}
-                                </dt>
-                                <dd className="font-medium text-zinc-900 dark:text-zinc-50">
-                                  {planDict.graceDaysValue(version.graceDays)}
-                                </dd>
-                              </div>
-                            </dl>
-                            {version.termsSource === 'negotiated' && (
-                              <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">
-                                {d.termsNegotiated}
-                              </p>
-                            )}
-                            {version.termsNote !== '' && (
-                              <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-                                {`${d.termsNoteLabel}: ${version.termsNote}`}
-                              </p>
-                            )}
-                          </div>
+                          <ContractActions
+                            version={version}
+                            currency={statement.currency}
+                            onChanged={applied}
+                          />
                         )}
                       </li>
                     );
