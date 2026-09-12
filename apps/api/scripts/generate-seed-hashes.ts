@@ -4,8 +4,14 @@
  * Usage (from apps/api/):
  *   npx tsx scripts/generate-seed-hashes.ts
  *
- * Copy the output into migrations/seed/0001_test_users.sql.
+ * Copy each account's output into its seed file: admin/student/professor go
+ * into migrations/seed/0001_test_users.sql, student2 into
+ * migrations/seed/0002_billing_local.sql.
  * Never commit plain-text passwords — only the hashes go into the migration.
+ *
+ * check-no-dev-seed.ts derives its matcher from the seed files at run time
+ * (see docs/product/backlog/security/03-dev-seed-guard-hash-drift.task.md), so
+ * pasting a freshly regenerated hash in does not require touching the guard.
  */
 
 import { webcrypto } from 'node:crypto';
@@ -18,6 +24,7 @@ const ACCOUNTS: Array<{ label: string; password: string }> = [
   { label: 'admin@arenaquest.dev', password: 'Admin1234!' },
   { label: 'student@arenaquest.dev', password: 'Student1234!' },
   { label: 'professor@arenaquest.dev', password: 'Professor1234!' },
+  { label: 'student2@arenaquest.dev', password: 'Student1234!' },
 ];
 
 function uint8ToHex(arr: Uint8Array): string {

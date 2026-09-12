@@ -755,7 +755,8 @@ with nothing consuming it.
 ### Phase 1 — Persistence (~1.5 d)
 Migration `0026`; `D1BillingRepository`; seed extension adding one paid plan, one free
 plan, and a student subscribed to each, to `migrations/seed` (local only — `check-no-dev-seed.ts`
-guards the deployed path). Vitest against the Workers pool.
+guards the deployed path, matching accounts derived at run time from those same seed files).
+Vitest against the Workers pool.
 
 ### Phase 2 — Services and admin API (~3 d)
 `BillingService`, `AccountingService`, `AdminBillingController`, the `/v1/admin/billing`

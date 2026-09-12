@@ -59,7 +59,8 @@ every later task and every reviewer has a working ledger on `make db-reset-local
   cache of "balance reached zero"; the balance itself is
   charge plus signed adjustments minus payments, from the rows.
 - **The seed is local-only.** It lands under `apps/api/migrations/seed/`, guarded off
-  every deployed path by the existing `apps/api/scripts/check-no-dev-seed.ts`.
+  every deployed path by `apps/api/scripts/check-no-dev-seed.ts`, whose id and hash
+  matchers are derived at run time from those seed files.
 - **Cloud-agnostic elsewhere.** No provider SDK call outside `apps/api/src/adapters/`.
 
 ## Scope
@@ -114,17 +115,11 @@ Out:
       subscription and invoice row byte-identical.
 - [x] The adapter computes an invoice's balance as charge plus signed adjustments minus
       payments, and a test proves a reversal moves it back above zero.
-- [~] `make db-reset-local` leaves a paid plan, a free plan and a student subscribed to
-      each; `apps/api/scripts/check-no-dev-seed.ts` still refuses the seed on a deployed
-      target.
-      **First half done. Second half is not satisfiable and was not before this task:**
-      the guard's `DEV_PASSWORD_HASH_PREFIX`
-      (`pbkdf2:100000:e83835066ab015b5...`) matches none of the three salts in
-      `migrations/seed/0001_test_users.sql`, so it reports
-      `OK - no dev-seed hashes found` against a freshly seeded replica. This seed
-      changes nothing about that - it guards on `users` and the new account carries
-      the same known hash shape as the existing student. Pre-existing defect in the
-      deploy guard; tracked as a follow-up, out of scope here.
+- [x] `make db-reset-local` leaves a paid plan, a free plan and a student subscribed to
+      each; `apps/api/scripts/check-no-dev-seed.ts` refuses all four seed accounts on a
+      seeded local replica. The pre-existing matcher drift is resolved by
+      [backlog/security/03 — Pre-Deploy Seed Guard](../../backlog/security/03-dev-seed-guard-hash-drift.task.md):
+      its id and hash matchers are now derived from the seed files at run time.
 - [x] No D1 symbol appears outside `d1-billing-repository.ts`; no port method was added
       in this task.
 - [x] Changed files lint clean; `make test-api` green for the affected specs.
