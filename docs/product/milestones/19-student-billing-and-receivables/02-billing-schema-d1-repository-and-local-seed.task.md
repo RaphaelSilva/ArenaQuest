@@ -1,6 +1,6 @@
 # Task 02 — Backend: Billing schema, D1 repository and local seed (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Backend API
@@ -59,7 +59,8 @@ every later task and every reviewer has a working ledger on `make db-reset-local
   cache of "balance reached zero"; the balance itself is
   charge plus signed adjustments minus payments, from the rows.
 - **The seed is local-only.** It lands under `apps/api/migrations/seed/`, guarded off
-  every deployed path by the existing `apps/api/scripts/check-no-dev-seed.ts`.
+  every deployed path by `apps/api/scripts/check-no-dev-seed.ts`, whose id and hash
+  matchers are derived at run time from those seed files.
 - **Cloud-agnostic elsewhere.** No provider SDK call outside `apps/api/src/adapters/`.
 
 ## Scope
@@ -94,33 +95,35 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make db-migrate-local` applies `0026` to a fresh local D1 cleanly, and applying
+- [x] `make db-migrate-local` applies `0026` to a fresh local D1 cleanly, and applying
       it a second time is a no-op.
-- [ ] `git diff` on the migration shows only `CREATE` and the `currencies` seed — no
+- [x] `git diff` on the migration shows only `CREATE` and the `currencies` seed — no
       `ALTER` against any table that existed before `0026`.
-- [ ] Inserting the same `(subscription_id, period_start)` twice raises a constraint
+- [x] Inserting the same `(subscription_id, period_start)` twice raises a constraint
       error.
-- [ ] A second `active` subscription for one user is rejected by
+- [x] A second `active` subscription for one user is rejected by
       `idx_subscriptions_one_active`; a second successor for one version is rejected by
       `idx_subscriptions_one_successor`.
-- [ ] Inserting a plan with an unknown currency code is rejected by the foreign key, and
+- [x] Inserting a plan with an unknown currency code is rejected by the foreign key, and
       a second `active` currency by `idx_currencies_one_active`.
-- [ ] `DELETE FROM users` for a student holding any invoice is rejected by
+- [x] `DELETE FROM users` for a student holding any invoice is rejected by
       `ON DELETE RESTRICT`, while updating that same row to an anonymised name and email
       succeeds with every billing row intact and still joined by `user_id`.
-- [ ] Two amendments through the adapter leave a chain of three subscription rows
+- [x] Two amendments through the adapter leave a chain of three subscription rows
       sharing one `contract_group_id` with exactly one `active`.
-- [ ] Editing a plan's `amount_minor` and `grace_days` afterwards leaves every existing
+- [x] Editing a plan's `amount_minor` and `grace_days` afterwards leaves every existing
       subscription and invoice row byte-identical.
-- [ ] The adapter computes an invoice's balance as charge plus signed adjustments minus
+- [x] The adapter computes an invoice's balance as charge plus signed adjustments minus
       payments, and a test proves a reversal moves it back above zero.
-- [ ] `make db-reset-local` leaves a paid plan, a free plan and a student subscribed to
-      each; `apps/api/scripts/check-no-dev-seed.ts` still refuses the seed on a deployed
-      target.
-- [ ] No D1 symbol appears outside `d1-billing-repository.ts`; no port method was added
+- [x] `make db-reset-local` leaves a paid plan, a free plan and a student subscribed to
+      each; `apps/api/scripts/check-no-dev-seed.ts` refuses all four seed accounts on a
+      seeded local replica. The pre-existing matcher drift is resolved by
+      [backlog/security/03 — Pre-Deploy Seed Guard](../../backlog/security/03-dev-seed-guard-hash-drift.task.md):
+      its id and hash matchers are now derived from the seed files at run time.
+- [x] No D1 symbol appears outside `d1-billing-repository.ts`; no port method was added
       in this task.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail — in particular
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail — in particular
       `apps/api/src/adapters/db/d1-enrollment-repository.ts` is unchanged.
 
 ## Verification Plan

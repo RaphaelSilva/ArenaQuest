@@ -18,6 +18,7 @@ import { D1BadgeRepository } from '@api/adapters/db/d1-badge-repository';
 import { D1GamificationRepository } from '@api/adapters/db/d1-gamification-repository';
 import { D1MissionRepository } from '@api/adapters/db/d1-mission-repository';
 import { D1CommentRepository } from '@api/adapters/db/d1-comment-repository';
+import { D1BillingRepository } from '@api/adapters/db/d1-billing-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
 import { ConsoleMailAdapter } from '@api/adapters/mail/console-mail-adapter';
@@ -27,6 +28,8 @@ import { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engi
 import { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
 import { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
 import { AuthService } from '@api/core/auth/auth-service';
+import { BillingService } from '@api/core/billing/billing-service';
+import { AccountingService } from '@api/core/billing/accounting-service';
 import { buildRegistrationMailHandler } from '@api/core/registration/registration-mail-handler';
 import { PasswordController } from '@api/controllers/password.controller';
 import { AccountController } from '@api/controllers/account.controller';
@@ -58,6 +61,7 @@ import type {
   IPasswordResetTokenRepository,
   IOAuthAccountRepository,
   IMailer,
+  IBillingRepository,
 } from '@arenaquest/shared/ports';
 
 // ---------------------------------------------------------------------------
@@ -104,6 +108,17 @@ export interface GamificationContext {
   badgeEngine?: BadgeEngine;
 }
 
+/**
+ * Billing (RFC 0013 §4). Built per request like every other group — Workers
+ * share no memory between requests, so no instance may reach module scope.
+ */
+export interface BillingContext {
+  billingRepo: IBillingRepository;
+  billingService: BillingService;
+  /** Read-only reporting over the same repository (RFC 0013 §5). */
+  accountingService: AccountingService;
+}
+
 export interface InfraContext {
   auth: IAuthAdapter;
   mailer: IMailer;
@@ -136,6 +151,7 @@ export interface AppContainer {
   engagement: EngagementContext;
   progress: ProgressContext;
   gamification: GamificationContext;
+  billing: BillingContext;
   infra: InfraContext;
   controllers: ControllersContext;
 }
@@ -202,6 +218,17 @@ export function buildContainer(env: Env): AppContainer {
   const questEvaluator = new QuestEvaluator(questRepo, missionRepo, xpEngine);
   const badgeEngine = new BadgeEngine(badgeRepo, gamificationRepo, missionRepo, xpEngine);
 
+  // Billing repo + service
+  const billingRepo = new D1BillingRepository(env.DB);
+  // The probe is the only thing billing asks identity: `setHold` refuses an
+  // unknown student with a 404 rather than letting the hold table's foreign key
+  // surface as a 500.
+  const userExists = (userId: string) => users.findById(userId).then((user) => user !== null);
+  const billingService = new BillingService(billingRepo, userExists);
+  // The statement 404s an unknown student, which is all billing needs from
+  // identity — a probe rather than the repository, as `StreakEngine` does.
+  const accountingService = new AccountingService(billingRepo, userExists);
+
   // Infra: mail
   const mailer: IMailer = env.MAIL_DRIVER === 'resend'
     ? new ResendMailAdapter({ apiKey: env.RESEND_API_KEY, from: env.MAIL_FROM })
@@ -267,6 +294,7 @@ export function buildContainer(env: Env): AppContainer {
     engagement: { taskRepo, taskStages, taskLinks, commentRepo },
     progress: { progressRepo, enrollmentRepo },
     gamification: { questRepo, badgeRepo, gamificationRepo, missionRepo, xpEngine, streakEngine, questEvaluator, badgeEngine },
+    billing: { billingRepo, billingService, accountingService },
     infra: {
       auth,
       mailer,

@@ -719,6 +719,727 @@ export const dictPt = {
       savingButton: 'Salvando…',
       saveError: 'Falha ao salvar a curva de níveis.',
     },
+    billing: {
+      title: 'Financeiro',
+      subtitle:
+        'Contratos, recebíveis e o livro-caixa do dojo. Este console informa e alerta — ele nunca restringe o acesso de um aluno.',
+      tabsLabel: 'Seções do financeiro',
+      tabs: {
+        students: 'Alunos',
+        ledger: 'Lançamentos',
+        reports: 'Relatórios',
+        plans: 'Planos',
+      },
+      money: {
+        locale: 'pt-BR',
+        unavailable: (code: string) => `Não exibido (${code})`,
+        resolveError:
+          'Não foi possível determinar a moeda de exibição, então os valores não são mostrados. Um total é declarado em uma única moeda e nunca convertido entre moedas.',
+      },
+      standing: {
+        good: 'Em dia',
+        due: 'A vencer',
+        delinquent: 'Inadimplente',
+        exempt: 'Em suspensão',
+      },
+      students: {
+        heading: 'Alunos com contrato',
+        holdExplainer:
+          'A suspensão interrompe a cobrança, não a dívida: o aluno suspenso sai da lista de inadimplência e dos e-mails de lembrete, e o saldo dele continua em todos os totais desta tela.',
+        noGateNote:
+          'A situação é apenas informada aqui e não é aplicada em lugar nenhum. Nada nesta tela suspende, bloqueia ou restringe o acesso de um aluno.',
+        filterLabel: 'Filtrar por situação',
+        filterAll: 'Todas as situações',
+        loading: 'Carregando a lista…',
+        loadError: 'Falha ao carregar a lista de alunos.',
+        empty: 'Nenhum aluno corresponde a este filtro.',
+        count: (total: number) => `${total} aluno(s) listado(s)`,
+        totalOutstanding: 'Em aberto nesta tela',
+        columns: {
+          student: 'Aluno',
+          standing: 'Situação',
+          outstanding: 'Em aberto',
+          nextDue: 'Próximo vencimento',
+          oldestOverdue: 'Vencido mais antigo',
+          terms: 'Condições',
+          actions: 'Ações',
+        },
+        negotiated: 'Negociadas',
+        standardTerms: 'Padrão',
+        none: '—',
+        heldBy: (reason: string, admin: string) => `Em suspensão: ${reason} — definida por ${admin}`,
+        heldUntil: (date: string) => `Suspensão expira em ${date}`,
+        holdButton: 'Suspender',
+        holdAriaLabel: (name: string) => `Suspender a situação de ${name}`,
+        clearHoldButton: 'Remover suspensão',
+        clearHoldAriaLabel: (name: string) => `Remover a suspensão de ${name}`,
+        statementButton: 'Extrato',
+        statementAriaLabel: (name: string) => `Abrir o extrato de ${name}`,
+        holdDialogTitle: 'Suspender uma situação',
+        holdDialogExplainer:
+          'A suspensão silencia o alerta, nunca a dívida. O saldo permanece nos relatórios e o motivo fica registrado com o seu nome.',
+        holdReasonLabel: 'Motivo (obrigatório)',
+        holdReasonPlaceholder: 'Por que a cobrança está sendo pausada?',
+        holdReasonRequired: 'É obrigatório informar um motivo para suspender a situação.',
+        holdExpiresLabel: 'Expira em (opcional)',
+        holdExpiresHelp: 'Deixe vazio para manter a suspensão até ser removida manualmente.',
+        holdSubmit: 'Suspender',
+        holdCancel: 'Cancelar',
+        holdError: 'Falha ao registrar a suspensão.',
+        clearHoldError: 'Falha ao remover a suspensão.',
+      },
+      statement: {
+        heading: (name: string) => `Extrato — ${name}`,
+        close: 'Fechar extrato',
+        loading: 'Carregando o extrato…',
+        loadError: 'Falha ao carregar o extrato.',
+        outstanding: 'Em aberto',
+        studentSince: 'Aluno desde',
+        currentMembershipSince: 'Vínculo atual desde',
+        contractsHeading: 'Contratos',
+        contractsEmpty: 'Este aluno não possui contrato.',
+        contractVersions: (total: number) => `${total} versão(ões)`,
+        currentTermsHeading: 'Condições registradas',
+        currentTermsNote:
+          'As condições que este contrato registra agora. Elas foram capturadas na assinatura, então uma alteração posterior no plano não as modifica.',
+        termsAmount: 'Valor por ciclo',
+        termsCycle: 'Ciclo',
+        termsDueDay: 'Dia de cobrança',
+        termsGraceDays: 'Carência',
+        termsNegotiated: 'Condições negociadas',
+        termsNoteLabel: 'Motivo',
+        invoicesHeading: 'Faturas',
+        invoicesEmpty: 'Nenhuma fatura foi emitida para este aluno.',
+        none: '—',
+        columns: {
+          period: 'Período',
+          due: 'Vencimento',
+          status: 'Situação',
+          amount: 'Valor',
+          balance: 'Saldo',
+        },
+      },
+      ledger: {
+        heading: 'Faturas, ajustes e pagamentos',
+        appendOnlyNote:
+          'O livro é apenas de acréscimo: nada aqui é editado ou excluído. Um erro é corrigido por um estorno, que é acrescentado abaixo do lançamento espelhado e carrega o motivo e o autor.',
+        filters: {
+          status: 'Situação da fatura',
+          statusAll: 'Qualquer situação',
+          from: 'Vencimento de',
+          to: 'Vencimento até',
+          student: 'Aluno',
+          studentAll: 'Todos os alunos',
+          apply: 'Aplicar filtros',
+        },
+        invoiceStatus: {
+          open: 'Em aberto',
+          paid: 'Paga',
+          void: 'Anulada',
+        },
+        loading: 'Carregando os lançamentos…',
+        loadError: 'Falha ao carregar os lançamentos.',
+        empty: 'Nenhuma fatura corresponde a estes filtros.',
+        count: (total: number) => `${total} fatura(s) listada(s)`,
+        columns: {
+          invoice: 'Fatura',
+          student: 'Aluno',
+          period: 'Período',
+          due: 'Vencimento',
+          status: 'Situação',
+          amount: 'Valor',
+          balance: 'Saldo',
+          details: 'Detalhes',
+        },
+        expandButton: 'Lançamentos',
+        expandAriaLabel: (reference: string) => `Mostrar os lançamentos da fatura ${reference}`,
+        collapseAriaLabel: (reference: string) => `Ocultar os lançamentos da fatura ${reference}`,
+        detailsLoading: 'Carregando os lançamentos…',
+        detailsError: 'Falha ao carregar os lançamentos desta fatura.',
+        adjustmentsHeading: 'Ajustes',
+        adjustmentsEmpty: 'Nenhum ajuste nesta fatura.',
+        adjustmentKind: {
+          discount: 'Desconto',
+          credit: 'Crédito',
+          waiver: 'Isenção',
+          surcharge: 'Acréscimo',
+        },
+        paymentsHeading: 'Pagamentos',
+        paymentsEmpty: 'Nenhum pagamento nesta fatura.',
+        method: {
+          cash: 'Dinheiro',
+          pix: 'Pix',
+          bank_transfer: 'Transferência bancária',
+          card: 'Cartão',
+          gateway: 'Gateway',
+          other: 'Outro',
+        },
+        recordedBy: (author: string) => `registrado por ${author}`,
+        reasonLine: (reason: string) => `Motivo: ${reason}`,
+        reverseButton: 'Estornar',
+        reverseAriaLabel: (reference: string) => `Estornar o pagamento ${reference}`,
+        reversalOf: (reference: string) => `Estorno do pagamento ${reference}`,
+        alreadyReversed: 'Estornado',
+        reverseDialogTitle: 'Estornar um pagamento',
+        reverseExplainer:
+          'Nada é excluído. O estorno acrescenta um lançamento espelhado abaixo do original, com o seu nome e o motivo informado aqui, e o original permanece exatamente como foi registrado.',
+        reverseReasonLabel: 'Motivo (obrigatório)',
+        reverseReasonPlaceholder: 'Por que este pagamento está sendo estornado?',
+        reverseReasonRequired: 'É obrigatório informar um motivo para estornar um pagamento.',
+        reverseSubmit: 'Estornar pagamento',
+        reverseCancel: 'Cancelar',
+        reverseError: 'Falha ao estornar o pagamento.',
+        exportButton: 'Exportar CSV',
+        exportAriaLabel: 'Exportar em CSV as faturas listadas no momento',
+        exportFilename: 'financeiro-lancamentos',
+        csv: {
+          invoiceId: 'ID da fatura',
+          studentId: 'ID do aluno',
+          student: 'Aluno',
+          periodStart: 'Início do período',
+          periodEnd: 'Fim do período',
+          dueDate: 'Vencimento',
+          status: 'Situação',
+          currency: 'Moeda',
+          amountMinor: 'Valor (unidades menores)',
+          balanceMinor: 'Saldo (unidades menores)',
+          issuedAt: 'Emitida em',
+        },
+        actionsHeading: 'Registrar um lançamento',
+        correctionNote:
+          'Não existe Excluir, porque aqui uma correção é um lançamento e não uma edição. O estorno desfaz um pagamento acrescentando o seu espelho, a anulação encerra uma fatura que não deveria ter sido emitida, e um novo ajuste com sinal altera o que é devido. Todos são acrescentados ao histórico com o motivo e o autor, e nada do que já foi escrito é alterado.',
+        voidedNote:
+          'Esta fatura está anulada. Não recebe mais pagamento nem ajuste, e permanece nos lançamentos com o motivo da anulação.',
+        payment: {
+          button: 'Registrar pagamento',
+          buttonAriaLabel: (reference: string) => `Registrar um pagamento na fatura ${reference}`,
+          dialogTitle: 'Registrar um pagamento',
+          explainer:
+            'Dinheiro que já chegou — em espécie, por transferência, por Pix ou no cartão — lançado nesta fatura. O registro é um lançamento contábil: carrega o seu nome e só pode ser desfeito por um estorno.',
+          noGateNote:
+            'Registrar um pagamento não altera nada do que o aluno pode ver, e deixar de registrar também não.',
+          invoiceLabel: 'Fatura',
+          balanceLabel: 'Saldo devedor',
+          amountLabel: (code: string) => `Valor recebido (${code})`,
+          amountHelp: (exponent: number) =>
+            exponent === 0
+              ? 'Esta moeda não tem casas decimais, então informe um número inteiro.'
+              : `Até ${exponent} casa(s) decimal(is), usando ponto como separador.`,
+          methodLabel: 'Como foi recebido',
+          paidAtLabel: 'Data do recebimento',
+          paidAtHelp: 'Deixe em branco para registrar como recebido hoje.',
+          referenceLabel: 'Referência externa (opcional)',
+          referenceHelp:
+            'Um identificador do banco ou do provedor, se houver. Dinheiro recebido em mãos não tem nenhum, então deixe em branco.',
+          submit: 'Registrar pagamento',
+          cancel: 'Cancelar',
+          validation: {
+            amountZero:
+              'Um pagamento precisa ser maior que zero. Para desfazer um pagamento já registrado, estorne-o.',
+          },
+          success: 'Pagamento registrado. A fatura agora mostra o que o servidor resolveu.',
+          error: 'Falha ao registrar o pagamento.',
+        },
+        adjustment: {
+          button: 'Aplicar ajuste',
+          buttonAriaLabel: (reference: string) => `Aplicar um ajuste na fatura ${reference}`,
+          dialogTitle: 'Aplicar um ajuste',
+          explainer:
+            'Um ajuste altera o que esta fatura cobra, sem tocar no valor originalmente faturado. É acrescentado com o seu nome e o motivo informado, e é corrigido por outro ajuste, nunca por uma edição.',
+          manualOnlyNote:
+            'Todo ajuste é aplicado à mão, um valor por vez. Nada aqui nem em qualquer outro lugar cobra percentual, se repete ou acrescenta multa por atraso por conta própria — um acréscimo existe apenas porque um administrador o digitou.',
+          kindLabel: 'Tipo de ajuste',
+          kindEffect: {
+            discount: 'Reduz o que é devido — uma redução acordada desta cobrança.',
+            credit: 'Reduz o que é devido — valor que o dojo já deve ao aluno.',
+            waiver: 'Reduz o que é devido — parte desta cobrança é perdoada.',
+            surcharge: 'Aumenta o que é devido — um valor extra acrescentado à mão.',
+          },
+          amountLabel: (code: string) => `Valor do ajuste (${code})`,
+          amountHelp: (exponent: number) =>
+            exponent === 0
+              ? 'Informe um número inteiro positivo; o tipo acima decide a direção.'
+              : `Informe um número positivo com até ${exponent} casa(s) decimal(is); o tipo acima decide a direção.`,
+          magnitudeHelp: 'Informe um valor positivo; o tipo acima decide a direção.',
+          directionReduces: 'reduzir o que é devido',
+          directionIncreases: 'aumentar o que é devido',
+          directionPending: (direction: string) =>
+            `Informe um valor. Este tipo de ajuste vai ${direction}.`,
+          signedPreview: (value: string) => `Será registrado como ${value}.`,
+          reasonLabel: 'Motivo (obrigatório)',
+          reasonPlaceholder: 'Por que esta fatura está sendo ajustada?',
+          reasonRequired: 'É obrigatório informar um motivo para aplicar um ajuste.',
+          validation: {
+            amountZero: 'Um ajuste de zero não muda nada, então informe um valor.',
+          },
+          submit: 'Aplicar ajuste',
+          cancel: 'Cancelar',
+          success: 'Ajuste aplicado. A fatura agora mostra o que o servidor resolveu.',
+          error: 'Falha ao aplicar o ajuste.',
+        },
+        voidInvoice: {
+          button: 'Anular fatura',
+          buttonAriaLabel: (reference: string) => `Anular a fatura ${reference}`,
+          dialogTitle: 'Anular uma fatura',
+          explainer:
+            'A anulação encerra uma fatura que nunca deveria ter sido cobrada. Nada é apagado: a fatura permanece nos lançamentos marcada como anulada, com o seu nome e o motivo informado aqui. Depois disso ela não recebe pagamento nem ajuste.',
+          invoiceLine: (reference: string) => `Fatura ${reference}`,
+          reasonLabel: 'Motivo (obrigatório)',
+          reasonPlaceholder: 'Por que esta fatura não deveria ter sido emitida?',
+          reasonRequired: 'É obrigatório informar um motivo para anular uma fatura.',
+          submit: 'Anular fatura',
+          cancel: 'Cancelar',
+          success: 'Fatura anulada. Ela permanece nos lançamentos com o motivo registrado.',
+          error: 'Falha ao anular a fatura.',
+        },
+        issue: {
+          button: 'Emitir fatura',
+          buttonAriaLabel: 'Emitir uma fatura para um período de contrato',
+          dialogTitle: 'Emitir uma fatura',
+          explainer:
+            'Emite um período de um contrato existente, pelo valor que aquele contrato registrou quando foi assinado. É o que a rotina diária faz por conta própria; fazer aqui serve para o período que a rotina ainda não alcançou ou não gravou.',
+          notASaleNote:
+            'Isto não é uma forma de cobrar um seminário, uma aula pontual ou qualquer coisa fora de um contrato. Uma fatura sempre pertence a um contrato e a um de seus períodos, e não existe outro tipo de cobrança a fazer aqui.',
+          uniquenessNote:
+            'Uma fatura por contrato por período. Um período já faturado é recusado em vez de cobrado duas vezes — é essa regra que torna a rotina diária segura de repetir.',
+          contractHeading: 'Contrato a faturar',
+          searchLabel: 'Buscar pelo nome do aluno',
+          searchPlaceholder: 'Nome do aluno',
+          contractsLoadError: 'Falha ao carregar os contratos.',
+          contractsEmpty:
+            'Nenhum contrato corresponde a esta busca. Uma fatura precisa de um contrato assinado, então assine um na aba Alunos primeiro.',
+          contractStatus: {
+            active: 'Ativo',
+            paused: 'Pausado',
+            cancelled: 'Cancelado',
+            superseded: 'Substituído',
+          },
+          contractMeta: (cycle: string, status: string, startDate: string) =>
+            `${cycle} · ${status} · desde ${startDate}`,
+          contractRequired: 'Escolha o contrato que esta fatura cobra.',
+          referenceDateLabel: 'Período que contém esta data',
+          referenceDateHelp:
+            'O período faturado é o período do próprio contrato que contém esta data. Altere-a para faturar um período anterior ou posterior.',
+          periodHeading: 'Período a ser faturado',
+          periodNote:
+            'Resolvido pela mesma regra com que o servidor fatura, a partir da data acima e da data de início, do ciclo e do dia de cobrança do próprio contrato — e enviado exatamente como exibido, para que a fatura não caia em outro período.',
+          periodPending: 'Escolha um contrato para ver o período que seria faturado.',
+          periodLabel: 'Período',
+          periodValue: (start: string, end: string) => `${start} até ${end}`,
+          dueLabel: 'Vencimento',
+          amountLabel: 'Valor a faturar',
+          periodError:
+            'Não foi possível resolver o período para este contrato e data. Verifique a data acima.',
+          submit: 'Emitir fatura',
+          cancel: 'Cancelar',
+          success: (reference: string) => `Fatura ${reference} emitida.`,
+          error: 'Falha ao emitir a fatura.',
+        },
+      },
+      run: {
+        heading: 'Rodar o ciclo de cobrança manualmente',
+        purpose:
+          'A mesma rotina que a execução diária faz, disparada agora — para o dia em que ela não rodou. Emite as faturas do período, envia os dois avisos aos alunos, manda o resumo por e-mail para os administradores e confere o status em cache de cada fatura aberta contra o saldo dela.',
+        idempotentNote:
+          'Rodar duas vezes é seguro. Uma fatura por contrato por período é uma regra do banco de dados, então uma segunda execução não cria nada e conta o que já existia como absorvido.',
+        noFeeNote:
+          'A execução não registra ajuste de nenhum tipo: nenhuma multa por atraso, nenhum juro, nenhuma sobretaxa e nenhuma correção. Ela emite, notifica, resume e confere.',
+        noGateNote:
+          'Nada aqui muda o que alguém pode ver. Um aluno que se torna inadimplente por causa desta execução mantém exatamente o acesso que tinha.',
+        holdNote:
+          'Uma suspensão de cobrança interrompe a cobrança, não a dívida: um aluno com suspensão fica de fora dos avisos enquanto o saldo dele permanece em todos os totais e no relatório de aging.',
+        button: 'Rodar o ciclo',
+        buttonAriaLabel: 'Rodar o ciclo de cobrança agora',
+        confirm: {
+          dialogTitle: 'Rodar o ciclo de cobrança agora?',
+          lead: 'Isto não é uma prévia. Confirmar executa a rotina, e a rotina envia e-mails:',
+          effects: {
+            issue:
+              'Emite uma fatura para cada contrato ativo cujo período já começou e ainda não tem fatura.',
+            notices:
+              'Envia a cada aluno o lembrete da data de vencimento e o aviso de fim do prazo de tolerância.',
+            digest:
+              'Envia aos administradores um resumo dos alunos que passaram para vencido ou inadimplente.',
+            assert:
+              'Confere o status em cache de cada fatura aberta contra o saldo recalculado e reporta qualquer divergência — não corrige nenhuma delas.',
+          },
+          safeAgain:
+            'Se você não tem certeza de que a execução agendada rodou, rode. Uma segunda execução do mesmo período não emite nada, porque uma fatura por contrato por período é garantida pelo banco de dados, e a duplicata é reportada como absorvida.',
+          windowHeading: 'Janela a executar (opcional)',
+          windowHelp:
+            'Deixe as duas vazias para rodar para hoje contra ontem. A janela coberta é tudo depois da primeira data, até a segunda inclusive.',
+          sinceLabel: 'Desde',
+          asOfLabel: 'Na data de',
+          submit: 'Rodar o ciclo agora',
+          cancel: 'Cancelar',
+        },
+        pending: 'Rodando o ciclo de cobrança…',
+        pendingHint:
+          'Isso pode levar um momento. Apenas uma execução está em andamento, e o botão fica indisponível até ela responder.',
+        error: 'A execução do ciclo de cobrança falhou.',
+        errorNoReport:
+          'Nenhum relatório é exibido, porque a execução não foi concluída. O que ela já havia gravado permanece gravado, e rodar de novo é seguro.',
+        outcome: {
+          issuedTitle: (count: number) => `${count} fatura(s) emitida(s)`,
+          issuedBody: 'Cada fatura criada pela execução está listada abaixo, com o aluno, o período, a data de vencimento e o valor.',
+          alreadyBilledTitle: 'Já faturado — nada novo foi emitido',
+          alreadyBilledBody: (absorbed: number) =>
+            `A execução não criou nenhuma fatura: ${absorbed} já existia(m) para o período e foi(ram) absorvida(s) pela regra de uma fatura por período. Este é o resultado esperado de uma segunda execução.`,
+          nothingToIssueTitle: 'Nada a emitir',
+          nothingToIssueBody:
+            'Nenhum contrato estava no escopo desta janela, então não havia nada a faturar. A execução foi concluída — isto não é uma falha.',
+          noneDueTitle: 'Nada estava previsto para ser emitido',
+          noneDueBody: (eligible: number) =>
+            `${eligible} contrato(s) estava(m) no escopo e nenhum deles tinha período aguardando faturamento nesta janela. A execução foi concluída — isto não é uma falha.`,
+        },
+        report: {
+          heading: 'O que a execução fez',
+          window: (since: string, asOf: string) =>
+            `Janela: tudo depois de ${since}, até ${asOf} inclusive.`,
+          counters: {
+            eligibleContracts: 'Contratos no escopo',
+            issued: 'Faturas emitidas',
+            absorbed: 'Já faturadas (absorvidas)',
+            mailsSent: 'E-mails enviados',
+            adminsNotified: 'Administradores notificados',
+          },
+          issuedHeading: 'Faturas que esta execução emitiu',
+          issuedEmpty: 'Esta execução não emitiu nenhuma fatura.',
+          issuedColumns: {
+            invoice: 'Fatura',
+            student: 'Aluno',
+            period: 'Início do período',
+            due: 'Data de vencimento',
+            amount: 'Valor',
+            status: 'Status',
+          },
+          remindersHeading: 'Avisos aos alunos',
+          remindersEmpty: 'Nenhum aviso a aluno estava previsto nesta janela.',
+          reminderKind: {
+            due_date: 'Lembrete de vencimento',
+            grace_lapsed: 'Prazo de tolerância encerrado',
+          },
+          reminderSent: 'Enviado',
+          reminderNotSent: 'Não enviado',
+          reminderSuppressed: 'Ignorado — com suspensão de cobrança',
+          reminderDates: (dueDate: string, triggerOn: string) =>
+            `Vence em ${dueDate} · aviso previsto para ${triggerOn}`,
+          reminderBalance: 'Saldo devido:',
+          reminderHoldLine:
+            'O aviso foi ignorado porque o aluno está com suspensão de cobrança. O saldo acima continua devido.',
+          crossingsHeading: 'Mudanças de situação',
+          crossingsEmpty: 'Nenhum aluno passou para vencido ou inadimplente nesta janela.',
+          crossingsNote:
+            'Lido do relatório da execução. A situação é resolvida pelo servidor e nunca recalculada aqui, e passar para vencido ou inadimplente não restringe nada que o aluno acessa.',
+          crossingArrow: '→',
+          crossingBecame: 'passou para',
+          oldestOverdue: (date: string) => `Fatura vencida mais antiga: ${date}`,
+          noOldestOverdue: 'Nenhuma fatura vencida registrada.',
+          outstanding: 'Em aberto:',
+          heldHeading: 'Alunos com suspensão de cobrança',
+          heldEmpty: 'Nenhum aluno estava com suspensão de cobrança nesta execução.',
+          heldOutstanding: 'Em aberto, ainda devido:',
+          divergencesHeading: 'Achados de status em cache',
+          divergencesEmpty: 'O status em cache de todas as faturas abertas conferiu com o saldo.',
+          divergencesNote:
+            'Reportado, nunca corrigido: a execução não registra ajuste e não altera status. Estas faturas são listadas para que alguém possa olhá-las.',
+          divergenceLine: (cached: string, expected: string) =>
+            `Em cache como ${cached}, enquanto o saldo indica ${expected}.`,
+          divergenceBalance: 'Saldo:',
+        },
+      },
+      reports: {
+        heading: 'Relatórios contábeis',
+        holdNote:
+          'Os saldos mantidos fora da lista de inadimplência continuam contabilizados nos dois relatórios abaixo.',
+        conflictNote:
+          'Um total é declarado em uma única moeda e nunca é convertido entre moedas, então um relatório que abrange duas moedas é recusado em vez de convertido por uma taxa.',
+        movement: {
+          heading: 'Movimento mensal',
+          monthLabel: 'Mês',
+          loading: 'Carregando o relatório de movimento…',
+          loadError: 'Falha ao carregar o relatório de movimento.',
+          period: (start: string, end: string) => `${start} a ${end}`,
+          billed: 'Faturado',
+          received: 'Recebido',
+          outstanding: 'Em aberto',
+          invoiced: 'Emitido',
+          adjustments: 'Ajustes',
+          invoicesIssued: 'Faturas emitidas',
+          activeStudents: 'Alunos ativos',
+        },
+        aging: {
+          heading: 'Aging de recebíveis',
+          asOfLabel: 'Na data de',
+          loading: 'Carregando o relatório de aging…',
+          loadError: 'Falha ao carregar o relatório de aging.',
+          columns: {
+            bucket: 'Dias em atraso',
+            invoices: 'Faturas',
+            students: 'Alunos',
+            total: 'Total',
+          },
+          buckets: {
+            '0-30': '0 a 30 dias',
+            '31-60': '31 a 60 dias',
+            '61-90': '61 a 90 dias',
+            '90+': 'Mais de 90 dias',
+          },
+          totalRow: 'Total',
+        },
+      },
+      plans: {
+        heading: 'Catálogo de planos',
+        recurringNote:
+          'Um plano é a prateleira recorrente: todo contrato assinado com base nele é faturado novamente a cada período pela rotina diária. Nada aqui vende um item único — um plano criado para um seminário seria cobrado de novo a cada período, indefinidamente.',
+        editSafeNote:
+          'Reajustar um plano é seguro. Um contrato assinado e uma fatura emitida mantêm as condições que registraram na assinatura, então nada já cobrado é refeito. Para dar condições diferentes a um aluno, assine um contrato negociado; para alterar uma cobrança, aplique um ajuste nos lançamentos.',
+        archiveNote:
+          'Nada aqui é excluído. Arquivar oculta o plano de novas assinaturas e mantém intacto todo contrato que já o referencia.',
+        noGateNote:
+          'Um plano é um preço, não uma permissão. Nada nesta aba suspende, rebaixa ou retira o acesso de um aluno.',
+        filterLabel: 'Filtrar por situação',
+        filterActive: 'Planos ativos',
+        filterArchived: 'Planos arquivados',
+        filterAll: 'Todos os planos',
+        loading: 'Carregando o catálogo…',
+        loadError: 'Falha ao carregar o catálogo de planos.',
+        empty:
+          'Nenhum plano foi criado ainda. Um plano é o pré-requisito para assinar um contrato: crie um aqui e depois vincule um aluno a ele.',
+        emptyArchived: 'Nenhum plano foi arquivado.',
+        count: (total: number) => `${total} plano(s) listado(s)`,
+        none: '—',
+        columns: {
+          name: 'Plano',
+          amount: 'Valor por ciclo',
+          cycle: 'Ciclo',
+          graceDays: 'Carência',
+          state: 'Situação',
+          actions: 'Ações',
+        },
+        cycle: {
+          monthly: 'Mensal',
+          quarterly: 'Trimestral',
+          yearly: 'Anual',
+        },
+        graceDaysValue: (days: number) => `${days} dia(s)`,
+        state: {
+          active: 'Ativo',
+          archived: 'Arquivado',
+        },
+        createButton: 'Novo plano',
+        editButton: 'Editar',
+        editAriaLabel: (name: string) => `Editar o plano ${name}`,
+        editUnavailable: (code: string) =>
+          `Este plano é precificado em ${code}, que não é a moeda determinada por este console, então o valor dele não pode ser editado aqui.`,
+        archiveButton: 'Arquivar',
+        archiveAriaLabel: (name: string) => `Arquivar o plano ${name}`,
+        unarchiveButton: 'Restaurar',
+        unarchiveAriaLabel: (name: string) => `Restaurar o plano ${name} para o catálogo`,
+        createDialogTitle: 'Criar um plano',
+        editDialogTitle: (name: string) => `Editar o plano ${name}`,
+        submitCreate: 'Criar plano',
+        submitEdit: 'Salvar plano',
+        cancel: 'Cancelar',
+        form: {
+          nameLabel: 'Nome',
+          namePlaceholder: 'Mensalidade',
+          descriptionLabel: 'Descrição (opcional)',
+          descriptionPlaceholder: 'O que este plano cobre.',
+          currencyLabel: 'Moeda',
+          currencyHelp:
+            'A moeda determinada por este console. Ela é fixada na criação do plano e nunca muda em uma edição.',
+          amountLabel: (code: string) => `Valor por ciclo (${code})`,
+          amountHelp: (exponent: number) =>
+            exponent === 0
+              ? 'Esta moeda não tem casas decimais, então informe um número inteiro.'
+              : `Até ${exponent} casa(s) decimal(is), usando ponto como separador.`,
+          cycleLabel: 'Ciclo',
+          cycleHelp: 'Com que frequência um contrato neste plano é faturado pela rotina diária.',
+          graceDaysLabel: 'Carência (dias)',
+          graceDaysHelp: 'Dias após o vencimento antes de a fatura contar como atrasada.',
+        },
+        validation: {
+          nameRequired: 'Um plano precisa de um nome.',
+          amountEmpty: 'Informe o valor cobrado em cada ciclo.',
+          amountNotANumber: 'Informe o valor em dígitos, usando ponto como separador decimal.',
+          amountNegative: 'O valor não pode ser negativo.',
+          amountTooPrecise: (exponent: number) =>
+            exponent === 0
+              ? 'Esta moeda não tem casas decimais, então o valor precisa ser um número inteiro.'
+              : `Esta moeda tem ${exponent} casa(s) decimal(is), então o valor não pode ser mais preciso que isso.`,
+          graceDaysInvalid: 'A carência precisa ser um número inteiro de dias, zero ou mais.',
+        },
+        createSuccess: (name: string) => `Plano ${name} criado.`,
+        updateSuccess: (name: string) =>
+          `Plano ${name} salvo. Os contratos assinados mantêm suas condições.`,
+        archiveSuccess: (name: string) =>
+          `Plano ${name} arquivado. Os contratos já assinados com base nele seguem inalterados.`,
+        unarchiveSuccess: (name: string) => `Plano ${name} está de volta ao catálogo.`,
+        createError: 'Falha ao criar o plano.',
+        updateError: 'Falha ao salvar o plano.',
+        archiveError: 'Falha ao arquivar o plano.',
+        unarchiveError: 'Falha ao restaurar o plano.',
+      },
+      sign: {
+        button: 'Assinar contrato',
+        buttonAriaLabel: 'Assinar um contrato para um aluno',
+        statementButton: 'Assinar contrato',
+        statementAriaLabel: (name: string) => `Assinar um contrato para ${name}`,
+        dialogTitle: 'Assinar contrato',
+        dialogExplainer:
+          'A assinatura registra o que foi combinado com o aluno: o plano, o valor, o dia de cobrança e a data em que o contrato começa. É um registro financeiro e nada além disso.',
+        noAccessNote:
+          'Assinar não altera nada do que o aluno consegue ver, e deixar de assinar também não. O acesso vem da matrícula; este formulário registra apenas dinheiro.',
+        studentHeading: 'Aluno',
+        searchLabel: 'Buscar por nome ou e-mail',
+        searchPlaceholder: 'Nome ou e-mail',
+        pickerLabel: 'Escolha o aluno deste contrato',
+        studentEmpty: 'Nenhum usuário desta lista corresponde à busca.',
+        firstPageNotice:
+          'Este seletor lista a primeira página de contas de usuário, porque o endpoint de usuários limita a página a 100 contas. Um aluno que não aparece na lista não está necessariamente fora do dojo.',
+        alreadyContracted: 'Já possui contrato',
+        alreadyContractedNote:
+          'O aluno que já tem contrato ativo é marcado aqui para poupar uma tentativa inútil. A marca é uma cortesia, não a regra: o banco permite um único contrato ativo por aluno e é ele que recusa o segundo.',
+        notActive: 'Conta não está ativa',
+        notActiveNote:
+          'Uma conta que não está ativa é marcada, nunca escondida. A API não proíbe assinar por causa disso, então a decisão continua sendo sua.',
+        planLabel: 'Plano',
+        planPlaceholder: 'Escolha um plano',
+        planLoadError: 'Falha ao carregar o catálogo de planos.',
+        planEmpty:
+          'Nenhum plano ativo disponível. Crie um na aba Planos e depois assine um aluno com base nele. Um plano arquivado não pode ser assinado.',
+        termsHeading: 'Condições a registrar',
+        termsSnapshotNote:
+          'O contrato guarda estas condições como estão no momento da assinatura. Reprecificar o plano depois não altera o que já foi registrado.',
+        termsAmount: 'Valor por ciclo',
+        termsCycle: 'Ciclo',
+        termsGraceDays: 'Carência',
+        dueDayLabel: 'Dia de cobrança no mês',
+        dueDayHelp: 'Um número inteiro de 1 a 28, para que todo mês tenha esse dia.',
+        startDateLabel: 'Data de início',
+        startDateHelp: 'A data em que este contrato começa, no formato AAAA-MM-DD.',
+        modeLabel: 'Condições',
+        modeStandard: 'As condições do plano, sem alteração',
+        modeNegotiated: 'Condições negociadas para este aluno',
+        standardNote:
+          'A assinatura padrão não envia valor, ciclo nem carência: o servidor registra os próprios valores do plano, então o contrato não pode divergir do catálogo.',
+        negotiatedNote:
+          'As condições negociadas substituem o valor, o ciclo e a carência apenas para este aluno, sempre acompanhadas de um motivo escrito. Esse motivo é o que um futuro administrador lê para responder por que este aluno paga um valor diferente, por isso é obrigatório.',
+        currencyNotNegotiableNote:
+          'A moeda não é negociável. Redenominar não é uma negociação, é outro contrato, então o valor abaixo permanece na moeda do próprio plano.',
+        amountLabel: (code: string) => `Valor negociado por ciclo (${code})`,
+        cycleLabel: 'Ciclo negociado',
+        graceDaysLabel: 'Carência negociada (dias)',
+        termsNoteLabel: 'Motivo (obrigatório)',
+        termsNotePlaceholder: 'O que foi combinado e por que difere do plano.',
+        planValue: (value: string) => `Plano: ${value}`,
+        submit: 'Assinar contrato',
+        cancel: 'Cancelar',
+        validation: {
+          studentRequired: 'Escolha o aluno deste contrato.',
+          planRequired: 'Escolha o plano com base no qual o contrato é assinado.',
+          dueDayInvalid: 'O dia de cobrança precisa ser um número inteiro de 1 a 28.',
+          startDateInvalid: 'Informe a data de início no formato AAAA-MM-DD.',
+          graceDaysInvalid: 'A carência precisa ser um número inteiro de dias, zero ou mais.',
+          termsNoteRequired:
+            'Um contrato negociado precisa de um motivo escrito para as condições que se afastam do plano.',
+        },
+        success: (name: string) => `${name} agora está sob contrato.`,
+        error: 'Falha ao assinar o contrato.',
+      },
+      /**
+       * A vida do contrato depois da assinatura — Tarefa 11, RFC 0013 seção 7.
+       *
+       * O texto carrega as quatro distinções que um administrador confunde por
+       * padrão: pausar interrompe a próxima emissão e nada mais, cancelar
+       * encerra a matrícula e não perdoa nada, uma retenção interrompe a
+       * cobrança e uma isenção perdoa um lançamento. Nenhuma das quatro mexe
+       * no acesso.
+       */
+      contract: {
+        chainNote:
+          'Uma renegociação acrescenta uma versão; nunca reescreve a anterior. Cada versão abaixo conserva as condições com que foi assinada, então uma fatura emitida sob condições antigas continua se explicando.',
+        versionLabel: (position: number) => `Versão ${position}`,
+        currentVersion: 'Versão vigente',
+        supersededNote: 'Substituída, e preservada exatamente como foi assinada.',
+        status: {
+          active: 'Ativo',
+          paused: 'Pausado',
+          cancelled: 'Cancelado',
+          superseded: 'Substituído',
+        },
+        versionPeriodOpen: (start: string) => `A partir de ${start}`,
+        versionPeriod: (start: string, end: string) => `De ${start} a ${end}`,
+        signedOn: (date: string) => `Registrada em ${date}`,
+        actionsHeading: 'Gerenciar este contrato',
+        noAccessNote:
+          'Nenhuma destas ações altera o que o aluno consegue ver. O contrato registra dinheiro; o acesso vem da matrícula e permanece exatamente como está.',
+        holdPointer:
+          'Para interromper os e-mails de cobrança enquanto o aluno se organiza, registre uma retenção na aba Alunos. A retenção interrompe a cobrança, não a dívida, e deixa o contrato em andamento.',
+        waiverPointer:
+          'Para perdoar um lançamento, registre um ajuste de isenção sobre a fatura na aba Lançamentos. Nada aqui perdoa qualquer valor.',
+        closedNote:
+          'Este contrato está encerrado, então não há mais nada nele para pausar, retomar ou alterar. Receber o aluno de volta é uma nova assinatura.',
+        pauseButton: 'Pausar',
+        resumeButton: 'Retomar',
+        cancelButton: 'Cancelar contrato',
+        amendButton: 'Alterar condições',
+        keepButton: 'Voltar',
+        pauseTitle: 'Pausar este contrato?',
+        pauseBody:
+          'Pausar interrompe a emissão da próxima fatura e nada mais. Toda fatura já aberta conserva o valor e o vencimento, continua somando no total em aberto e continua aparecendo no relatório de vencidos, e a situação do aluno segue evoluindo no mesmo ritmo. Nada é apagado, e o contrato pode ser retomado quando o aluno voltar.',
+        pauseConfirm: 'Pausar o contrato',
+        pauseSuccess:
+          'O contrato está pausado. Nenhuma fatura nova é emitida para ele até ser retomado, e nenhuma fatura aberta foi tocada.',
+        pauseError: 'Falha ao pausar o contrato.',
+        resumeTitle: 'Retomar este contrato?',
+        resumeBody:
+          'Retomar coloca o contrato de volta no ciclo, então o próximo período volta a ser faturado no dia de cobrança. Não altera nada nas faturas já emitidas.',
+        resumeConfirm: 'Retomar o contrato',
+        resumeSuccess: 'O contrato está ativo novamente.',
+        resumeError: 'Falha ao retomar o contrato.',
+        cancelTitle: 'Cancelar este contrato?',
+        cancelBody:
+          'Cancelar encerra esta matrícula: o contrato se fecha na data de término abaixo e nenhuma fatura nova é emitida para ele. Não perdoa nada — toda fatura aberta conserva o saldo e o vencimento, e continua contando nos relatórios. Um contrato cancelado não é retomado.',
+        cancelConfirm: 'Cancelar o contrato',
+        cancelEndDateLabel: 'Data de término',
+        cancelEndDateHelp:
+          'A data em que o contrato se fecha, no formato AAAA-MM-DD. Em branco, o servidor registra hoje.',
+        cancelSuccess:
+          'O contrato está cancelado e a data de término foi registrada. O que estava em aberto continua em aberto.',
+        cancelError: 'Falha ao cancelar o contrato.',
+        amendTitle: 'Registrar uma alteração',
+        amendBody:
+          'A alteração registra as condições renegociadas como uma nova versão. A versão vigente é preservada e marcada como substituída, com as condições originais intactas, então as faturas emitidas sob elas continuam se explicando. Nada é editado no lugar.',
+        amendPeriodNote:
+          'As novas condições passam a valer a partir da data de início abaixo e se aplicam aos períodos faturados dali em diante. Um período já faturado não é reprecificado.',
+        amendCurrencyNote:
+          'A moeda não é alterável: redenominar um contrato em andamento reescreveria toda fatura já emitida sob ele.',
+        amendStartDateLabel: 'As novas condições começam em',
+        amendStartDateHelp: 'No formato AAAA-MM-DD. A versão vigente se fecha nesta data.',
+        amendAmountLabel: (code: string) => `Valor por ciclo (${code})`,
+        amendCycleLabel: 'Ciclo',
+        amendDueDayLabel: 'Dia de cobrança no mês',
+        amendDueDayHelp: 'Um número inteiro de 1 a 28, para que todo mês tenha esse dia.',
+        amendGraceDaysLabel: 'Carência (dias)',
+        amendNoteLabel: 'Motivo (obrigatório)',
+        amendNotePlaceholder: 'O que foi renegociado e por quê.',
+        currentValue: (value: string) => `Hoje: ${value}`,
+        amendSubmit: 'Registrar a alteração',
+        amendSuccess:
+          'A alteração foi registrada como uma nova versão. A anterior é preservada como substituída, com as condições originais.',
+        amendError: 'Falha ao registrar a alteração.',
+        validation: {
+          startDateInvalid: 'Informe a data de início no formato AAAA-MM-DD.',
+          endDateInvalid: 'Informe a data de término no formato AAAA-MM-DD, ou deixe em branco.',
+          dueDayInvalid: 'O dia de cobrança precisa ser um número inteiro de 1 a 28.',
+          graceDaysInvalid: 'A carência precisa ser um número inteiro de dias, zero ou mais.',
+          termsNoteRequired:
+            'Uma alteração precisa de um motivo escrito para as condições que substitui.',
+        },
+      },
+    },
   },
   catalog: {
     redesign: {
@@ -988,8 +1709,93 @@ export const dictPt = {
       errorCurrentInvalid: 'Senha atual incorreta',
       errorGeneral: 'Não foi possível alterar a senha. Tente novamente.',
     },
+    billing: {
+      title: 'Financeiro',
+      subtitle: 'Seu contrato, suas faturas e o que está em aberto.',
+      locale: 'pt-BR',
+      asOf: (date: string) => `Valores em ${date}`,
+      loading: 'Carregando seu extrato…',
+      loadError: 'Não foi possível carregar seu extrato. Tente novamente.',
+      retry: 'Tentar novamente',
+      backLink: 'Voltar para configurações',
+      none: '—',
+      outstandingLabel: 'Em aberto',
+      studentSinceLabel: 'Aluno desde',
+      membershipSinceLabel: 'Matrícula atual desde',
+      paymentNote:
+        'Os pagamentos são registrados pela academia quando recebidos, então não há nada a pagar nesta página. Se algo aqui parecer errado, fale com seu professor.',
+      emptyStatement:
+        'Ainda não há nada na sua conta. Assim que um contrato for assinado para você, suas faturas e pagamentos aparecem aqui.',
+      contracts: {
+        heading: 'Contrato',
+        empty: 'Nenhum contrato registrado ainda.',
+        openEnded: (start: string) => `A partir de ${start}`,
+        period: (start: string, end: string) => `De ${start} até ${end}`,
+        versions: (total: number) => `${total} versão(ões) destes termos`,
+        amountLabel: 'Valor por ciclo',
+        cycleLabel: 'Ciclo',
+        dueDayLabel: 'Dia de vencimento',
+        graceDaysLabel: 'Carência',
+        graceDaysValue: (days: number) => `${days} dia(s)`,
+        termsNoteLabel: 'Observação',
+        negotiated: 'Termos negociados',
+      },
+      contractStatus: {
+        active: 'Ativo',
+        paused: 'Pausado',
+        cancelled: 'Cancelado',
+        superseded: 'Substituído',
+      },
+      cycle: {
+        monthly: 'Mensal',
+        quarterly: 'Trimestral',
+        yearly: 'Anual',
+      },
+      invoices: {
+        heading: 'Faturas',
+        empty: 'Nenhuma fatura foi emitida para você ainda.',
+        periodLabel: 'Período',
+        periodValue: (start: string, end: string) => `${start} — ${end}`,
+        dueLabel: 'Vencimento',
+        amountLabel: 'Valor',
+        balanceLabel: 'Saldo',
+        paymentsHeading: 'Pagamentos',
+        adjustmentsHeading: 'Ajustes',
+        noPayments: 'Nenhum pagamento registrado.',
+        noAdjustments: 'Nenhum ajuste aplicado.',
+        reversal: 'Estorno',
+      },
+      invoiceStatus: {
+        open: 'Em aberto',
+        paid: 'Paga',
+        void: 'Cancelada',
+      },
+      paymentMethod: {
+        cash: 'Dinheiro',
+        pix: 'Pix',
+        bank_transfer: 'Transferência bancária',
+        card: 'Cartão',
+        gateway: 'Pagamento online',
+        other: 'Outro',
+      },
+      adjustmentKind: {
+        discount: 'Desconto',
+        credit: 'Crédito',
+        waiver: 'Isenção',
+        surcharge: 'Acréscimo',
+      },
+    },
   },
   layout: {
+    standingBanner: {
+      locale: 'pt-BR',
+      label: 'Aviso financeiro',
+      due: (amount: string) => `Você tem ${amount} em aberto na sua mensalidade.`,
+      delinquent: (amount: string) =>
+        `Você tem ${amount} em aberto na sua mensalidade, e parte disso já passou do vencimento.`,
+      link: 'Ver seu extrato',
+      dismiss: 'Dispensar este aviso',
+    },
     nav: {
       dashboard: 'Dashboard',
       catalog: 'Catálogo',
@@ -1018,6 +1824,8 @@ export const dictPt = {
       players: 'Jogadores',
       groups: 'Grupos',
       access: 'Acesso',
+      billing: 'Financeiro',
+      billingBadgeLabel: (total: number) => `${total} aluno(s) inadimplente(s)`,
     },
   },
   common: {

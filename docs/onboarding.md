@@ -77,7 +77,8 @@ idempotent — running it twice produces no duplicates.
 
 > **Local only.** These accounts must never reach staging or production. The
 > deploy targets run `apps/api/scripts/check-no-dev-seed.ts` against the target
-> database first and abort if the dev-seed password hash is found there.
+> database first and abort if any dev-seed account (matched by id or password
+> hash, derived at run time from `apps/api/migrations/seed/*.sql`) is found there.
 
 To create a *real* admin (on any environment, including remote), use the
 interactive `make bootstrap-admin` instead — but see Known Issues below first.

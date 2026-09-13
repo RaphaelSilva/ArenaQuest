@@ -1,6 +1,6 @@
 # Task 08 — Frontend: Student statement and standing banner (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Frontend Web
@@ -89,28 +89,33 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `/settings/billing` renders the caller's own statement from `/v1/me/billing`, and
+- [x] `/settings/billing` renders the caller's own statement from `/v1/me/billing`, and
       its outstanding total matches what the admin console shows for that student.
-- [ ] The banner renders for `due` and for `delinquent`, and does not render for `good` or
+- [x] The banner renders for `due` and for `delinquent`, and does not render for `good` or
       `exempt` — the `exempt` case proving a hold suppresses it with no client-side rule.
-- [ ] No route or screen is withheld behind the banner: with a `delinquent` student
+- [x] No route or screen is withheld behind the banner: with a `delinquent` student
       signed in, every page and control available at `good` is still available, asserted
       by a test as well as by inspection.
-- [ ] No standing threshold, grace-day arithmetic or due-date comparison appears anywhere
+- [x] No standing threshold, grace-day arithmetic or due-date comparison appears anywhere
       in the diff.
-- [ ] Dismissing the banner issues no request and changes nothing beyond the current
+- [x] Dismissing the banner issues no request and changes nothing beyond the current
       view.
-- [ ] A student with no contract sees an empty statement and no banner, with no error
+- [x] A student with no contract sees an empty statement and no banner, with no error
       state.
-- [ ] Amounts render through `format-money.ts` at exponents 2, 0 and 8; the string
+- [x] Amounts render through `format-money.ts` at exponents 2, 0 and 8; the string
       `Intl.NumberFormat` does not appear in the diff.
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [ ] The banner is announced as a status message and its dismiss control is
+- [x] The banner is announced as a status message and its dismiss control is
       keyboard-reachable; the statement is readable at mobile width.
-- [ ] `git diff` contains no file under `apps/api/src/`.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+      *Announcement and the keyboard-reachable control are verified in code
+      (`role="status"`, `aria-live="polite"`, a real `<button type="button">`) and
+      by RTL. Mobile width is built for (card-per-invoice, no fixed-width table)
+      but not confirmed in a browser - see the note on Task 07; one walkthrough
+      covers both and is owed before the milestone closes.*
+- [x] `git diff` contains no file under `apps/api/src/`.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

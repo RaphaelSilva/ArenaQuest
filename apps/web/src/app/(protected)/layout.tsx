@@ -6,6 +6,7 @@ import { useAuth } from '@web/hooks/use-auth';
 import { Spinner } from '@web/components/spinner';
 import { Nav } from '@web/components/layout/nav';
 import { SidebarProvider } from '@web/context/sidebar-context';
+import { StandingBanner } from '@web/components/billing/standing-banner';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -31,6 +32,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     <SidebarProvider>
       <div className="flex h-dvh flex-col overflow-hidden">
         <Nav />
+        {/* An informational notice only: it wraps nothing, guards nothing and
+            withholds nothing below it. `{children}` renders unchanged either
+            way — see `standing-banner.tsx`. */}
+        <StandingBanner />
         <div className="flex flex-1 flex-col overflow-hidden">{children}</div>
       </div>
     </SidebarProvider>

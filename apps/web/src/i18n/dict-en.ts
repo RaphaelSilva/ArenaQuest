@@ -721,6 +721,724 @@ export const dictEn = {
       savingButton: 'Saving…',
       saveError: 'Failed to save the level curve.',
     },
+    billing: {
+      title: 'Billing',
+      subtitle:
+        'Contracts, receivables and the dojo ledger. This console reports and alerts — it never restricts a student access.',
+      tabsLabel: 'Billing sections',
+      tabs: {
+        students: 'Students',
+        ledger: 'Ledger',
+        reports: 'Reports',
+        plans: 'Plans',
+      },
+      money: {
+        locale: 'en-US',
+        unavailable: (code: string) => `Not shown (${code})`,
+        resolveError:
+          'The display currency could not be resolved, so amounts are not shown. Totals are stated in one currency and never converted between them.',
+      },
+      standing: {
+        good: 'Good standing',
+        due: 'Due',
+        delinquent: 'Delinquent',
+        exempt: 'On hold',
+      },
+      students: {
+        heading: 'Students with a contract',
+        holdExplainer:
+          'A hold stops the chasing, not the debt: a held student leaves the delinquency listing and the reminder emails, and their balance stays in every total on this screen.',
+        noGateNote:
+          'Standing is reported here and enforced nowhere. Nothing on this screen suspends, locks or restricts a student access.',
+        filterLabel: 'Filter by standing',
+        filterAll: 'All standings',
+        loading: 'Loading the roster…',
+        loadError: 'Failed to load the student roster.',
+        empty: 'No student matches this filter.',
+        count: (total: number) => `${total} student(s) listed`,
+        totalOutstanding: 'Outstanding on screen',
+        columns: {
+          student: 'Student',
+          standing: 'Standing',
+          outstanding: 'Outstanding',
+          nextDue: 'Next due',
+          oldestOverdue: 'Oldest overdue',
+          terms: 'Terms',
+          actions: 'Actions',
+        },
+        negotiated: 'Negotiated',
+        standardTerms: 'Standard',
+        none: '—',
+        heldBy: (reason: string, admin: string) => `On hold: ${reason} — set by ${admin}`,
+        heldUntil: (date: string) => `Hold expires on ${date}`,
+        holdButton: 'Hold',
+        holdAriaLabel: (name: string) => `Hold the standing of ${name}`,
+        clearHoldButton: 'Clear hold',
+        clearHoldAriaLabel: (name: string) => `Clear the standing hold on ${name}`,
+        statementButton: 'Statement',
+        statementAriaLabel: (name: string) => `Open the statement of ${name}`,
+        holdDialogTitle: 'Hold a standing',
+        holdDialogExplainer:
+          'The hold suppresses the alert, never the debt. The balance stays in the reports and the reason is recorded with your name.',
+        holdReasonLabel: 'Reason (required)',
+        holdReasonPlaceholder: 'Why is the chasing being paused?',
+        holdReasonRequired: 'A reason is required to hold a standing.',
+        holdExpiresLabel: 'Expires on (optional)',
+        holdExpiresHelp: 'Leave empty to hold until it is cleared by hand.',
+        holdSubmit: 'Set hold',
+        holdCancel: 'Cancel',
+        holdError: 'Failed to set the hold.',
+        clearHoldError: 'Failed to clear the hold.',
+      },
+      statement: {
+        heading: (name: string) => `Statement — ${name}`,
+        close: 'Close statement',
+        loading: 'Loading the statement…',
+        loadError: 'Failed to load the statement.',
+        outstanding: 'Outstanding',
+        studentSince: 'Student since',
+        currentMembershipSince: 'Current membership since',
+        contractsHeading: 'Contracts',
+        contractsEmpty: 'This student has no contract.',
+        contractVersions: (total: number) => `${total} version(s)`,
+        currentTermsHeading: 'Recorded terms',
+        currentTermsNote:
+          'The terms this contract records right now. They were snapshotted at signature, so a later change to the plan does not restate them.',
+        termsAmount: 'Amount per cycle',
+        termsCycle: 'Cycle',
+        termsDueDay: 'Billing day',
+        termsGraceDays: 'Grace period',
+        termsNegotiated: 'Negotiated terms',
+        termsNoteLabel: 'Reason',
+        invoicesHeading: 'Invoices',
+        invoicesEmpty: 'No invoice has been issued for this student.',
+        none: '—',
+        columns: {
+          period: 'Period',
+          due: 'Due',
+          status: 'Status',
+          amount: 'Amount',
+          balance: 'Balance',
+        },
+      },
+      ledger: {
+        heading: 'Invoices, adjustments and payments',
+        appendOnlyNote:
+          'The ledger is append-only: nothing here is edited or deleted. A mistake is corrected by a reversal, which is appended under the entry it mirrors and carries its reason and its author.',
+        filters: {
+          status: 'Invoice status',
+          statusAll: 'Any status',
+          from: 'Due from',
+          to: 'Due to',
+          student: 'Student',
+          studentAll: 'All students',
+          apply: 'Apply filters',
+        },
+        invoiceStatus: {
+          open: 'Open',
+          paid: 'Paid',
+          void: 'Void',
+        },
+        loading: 'Loading the ledger…',
+        loadError: 'Failed to load the ledger.',
+        empty: 'No invoice matches these filters.',
+        count: (total: number) => `${total} invoice(s) listed`,
+        columns: {
+          invoice: 'Invoice',
+          student: 'Student',
+          period: 'Period',
+          due: 'Due',
+          status: 'Status',
+          amount: 'Amount',
+          balance: 'Balance',
+          details: 'Details',
+        },
+        expandButton: 'Entries',
+        expandAriaLabel: (reference: string) => `Show the entries of invoice ${reference}`,
+        collapseAriaLabel: (reference: string) => `Hide the entries of invoice ${reference}`,
+        detailsLoading: 'Loading the entries…',
+        detailsError: 'Failed to load the entries of this invoice.',
+        adjustmentsHeading: 'Adjustments',
+        adjustmentsEmpty: 'No adjustment on this invoice.',
+        adjustmentKind: {
+          discount: 'Discount',
+          credit: 'Credit',
+          waiver: 'Waiver',
+          surcharge: 'Surcharge',
+        },
+        paymentsHeading: 'Payments',
+        paymentsEmpty: 'No payment on this invoice.',
+        method: {
+          cash: 'Cash',
+          pix: 'Pix',
+          bank_transfer: 'Bank transfer',
+          card: 'Card',
+          gateway: 'Gateway',
+          other: 'Other',
+        },
+        recordedBy: (author: string) => `recorded by ${author}`,
+        reasonLine: (reason: string) => `Reason: ${reason}`,
+        reverseButton: 'Reverse',
+        reverseAriaLabel: (reference: string) => `Reverse payment ${reference}`,
+        reversalOf: (reference: string) => `Reversal of payment ${reference}`,
+        alreadyReversed: 'Reversed',
+        reverseDialogTitle: 'Reverse a payment',
+        reverseExplainer:
+          'Nothing is deleted. Reversing appends a mirror-image entry under the original, with your name and the reason you give here, and the original stays exactly as it was recorded.',
+        reverseReasonLabel: 'Reason (required)',
+        reverseReasonPlaceholder: 'Why is this payment being reversed?',
+        reverseReasonRequired: 'A reason is required to reverse a payment.',
+        reverseSubmit: 'Reverse payment',
+        reverseCancel: 'Cancel',
+        reverseError: 'Failed to reverse the payment.',
+        exportButton: 'Export CSV',
+        exportAriaLabel: 'Export the invoices currently listed to CSV',
+        exportFilename: 'billing-ledger',
+        csv: {
+          invoiceId: 'Invoice id',
+          studentId: 'Student id',
+          student: 'Student',
+          periodStart: 'Period start',
+          periodEnd: 'Period end',
+          dueDate: 'Due date',
+          status: 'Status',
+          currency: 'Currency',
+          amountMinor: 'Amount (minor units)',
+          balanceMinor: 'Balance (minor units)',
+          issuedAt: 'Issued at',
+        },
+        actionsHeading: 'Record an entry',
+        correctionNote:
+          'There is no Delete, because a correction here is an entry rather than an edit. Reverse undoes a payment by appending its mirror image, voiding closes an invoice that should never have been issued, and a further signed adjustment changes what is owed. Every one of them is added to the history with its reason and its author, and nothing already written is altered.',
+        voidedNote:
+          'This invoice is void. It takes no further payment and no further adjustment, and it stays on the ledger with the reason it was voided for.',
+        payment: {
+          button: 'Record payment',
+          buttonAriaLabel: (reference: string) => `Record a payment on invoice ${reference}`,
+          dialogTitle: 'Record a payment',
+          explainer:
+            'Money that has already arrived — as cash, a transfer, a Pix or a card charge — entered against this invoice. Recording it is a bookkeeping entry: it carries your name and it can only be undone by a reversal.',
+          noGateNote:
+            'Recording a payment changes nothing about what the student can see, and nor does not recording one.',
+          invoiceLabel: 'Invoice',
+          balanceLabel: 'Balance owed',
+          amountLabel: (code: string) => `Amount received (${code})`,
+          amountHelp: (exponent: number) =>
+            exponent === 0
+              ? 'This currency has no decimal places, so enter a whole number.'
+              : `Up to ${exponent} decimal place(s), using a dot as the separator.`,
+          methodLabel: 'How it was received',
+          paidAtLabel: 'Date received',
+          paidAtHelp: 'Leave empty to record it as received today.',
+          referenceLabel: 'External reference (optional)',
+          referenceHelp:
+            'A bank or provider identifier, if there is one. Cash received in person has none, so leave it empty.',
+          submit: 'Record payment',
+          cancel: 'Cancel',
+          validation: {
+            amountZero:
+              'A payment has to be more than zero. To undo a payment already recorded, reverse it.',
+          },
+          success: 'Payment recorded. The invoice now shows what the server resolved.',
+          error: 'Failed to record the payment.',
+        },
+        adjustment: {
+          button: 'Apply adjustment',
+          buttonAriaLabel: (reference: string) => `Apply an adjustment to invoice ${reference}`,
+          dialogTitle: 'Apply an adjustment',
+          explainer:
+            'An adjustment changes what this invoice asks for, without touching the amount that was originally billed. It is appended with your name and the reason you give, and it is corrected by another adjustment rather than by an edit.',
+          manualOnlyNote:
+            'Every adjustment is applied by hand, one amount at a time. Nothing here or anywhere else charges a percentage, repeats itself, or adds a late fee on its own — a surcharge exists only because an administrator typed it.',
+          kindLabel: 'Kind of adjustment',
+          kindEffect: {
+            discount: 'Reduces what is owed — an agreed reduction of this charge.',
+            credit: 'Reduces what is owed — value the dojo already owes the student.',
+            waiver: 'Reduces what is owed — part of this charge is forgiven.',
+            surcharge: 'Increases what is owed — an extra amount added by hand.',
+          },
+          amountLabel: (code: string) => `Amount of the adjustment (${code})`,
+          amountHelp: (exponent: number) =>
+            exponent === 0
+              ? 'Enter it as a positive whole number; the kind above decides the direction.'
+              : `Enter it as a positive number with up to ${exponent} decimal place(s); the kind above decides the direction.`,
+          magnitudeHelp: 'Enter a positive amount; the kind above decides the direction.',
+          directionReduces: 'reduce what is owed',
+          directionIncreases: 'increase what is owed',
+          directionPending: (direction: string) =>
+            `Enter an amount. This kind of adjustment will ${direction}.`,
+          signedPreview: (value: string) => `Will be recorded as ${value}.`,
+          reasonLabel: 'Reason (required)',
+          reasonPlaceholder: 'Why is this invoice being adjusted?',
+          reasonRequired: 'A reason is required to apply an adjustment.',
+          validation: {
+            amountZero: 'An adjustment of zero changes nothing, so enter an amount.',
+          },
+          submit: 'Apply adjustment',
+          cancel: 'Cancel',
+          success: 'Adjustment applied. The invoice now shows what the server resolved.',
+          error: 'Failed to apply the adjustment.',
+        },
+        voidInvoice: {
+          button: 'Void invoice',
+          buttonAriaLabel: (reference: string) => `Void invoice ${reference}`,
+          dialogTitle: 'Void an invoice',
+          explainer:
+            'Voiding closes an invoice that should never have been asked for. Nothing is erased: the invoice stays on the ledger marked as void, with your name and the reason you give here. It takes no payment and no adjustment afterwards.',
+          invoiceLine: (reference: string) => `Invoice ${reference}`,
+          reasonLabel: 'Reason (required)',
+          reasonPlaceholder: 'Why should this invoice never have been issued?',
+          reasonRequired: 'A reason is required to void an invoice.',
+          submit: 'Void invoice',
+          cancel: 'Cancel',
+          success: 'Invoice voided. It stays on the ledger with the reason you recorded.',
+          error: 'Failed to void the invoice.',
+        },
+        issue: {
+          button: 'Issue an invoice',
+          buttonAriaLabel: 'Issue an invoice for a contract period',
+          dialogTitle: 'Issue an invoice',
+          explainer:
+            "Issues one period of one existing contract, at the amount that contract recorded when it was signed. This is what the daily run does on its own; doing it here is for the period the run has not reached or did not write.",
+          notASaleNote:
+            'This is not a way to charge for a seminar, a one-off class or anything else outside a contract. An invoice always belongs to a contract and to one of its periods, and there is no other kind of charge to make here.',
+          uniquenessNote:
+            'One invoice per contract per period. A period already invoiced is refused rather than billed twice — that rule is what makes the daily run safe to repeat.',
+          contractHeading: 'Contract to bill',
+          searchLabel: 'Search by student name',
+          searchPlaceholder: 'Student name',
+          contractsLoadError: 'Failed to load the contracts.',
+          contractsEmpty:
+            'No contract matches this search. An invoice needs a signed contract, so sign one on the Students tab first.',
+          contractStatus: {
+            active: 'Active',
+            paused: 'Paused',
+            cancelled: 'Cancelled',
+            superseded: 'Superseded',
+          },
+          contractMeta: (cycle: string, status: string, startDate: string) =>
+            `${cycle} · ${status} · since ${startDate}`,
+          contractRequired: 'Choose the contract this invoice bills.',
+          referenceDateLabel: 'Period containing this date',
+          referenceDateHelp:
+            "The period billed is the contract's own period that contains this date. Change it to bill an earlier or a later period.",
+          periodHeading: 'Period to be billed',
+          periodNote:
+            'Resolved by the same rule the server bills with, from the date above and the contract’s own start date, cycle and billing day — and sent exactly as shown, so the invoice cannot land on a different period.',
+          periodPending: 'Choose a contract to see the period that would be billed.',
+          periodLabel: 'Period',
+          periodValue: (start: string, end: string) => `${start} up to ${end}`,
+          dueLabel: 'Due date',
+          amountLabel: 'Amount to bill',
+          periodError:
+            'The period could not be resolved for this contract and date. Check the date above.',
+          submit: 'Issue invoice',
+          cancel: 'Cancel',
+          success: (reference: string) => `Invoice ${reference} issued.`,
+          error: 'Failed to issue the invoice.',
+        },
+      },
+      run: {
+        heading: 'Run the billing cycle by hand',
+        purpose:
+          "The same routine the daily run performs, triggered now — for the day it did not fire. It issues the period's invoices, sends the students' two notices, emails the administrators their digest, and checks each open invoice's cached status against its balance.",
+        idempotentNote:
+          'Running it twice is safe. One invoice per contract per period is a database rule, so a second run creates nothing and counts what already existed as absorbed.',
+        noFeeNote:
+          'The run writes no adjustment of any kind: no late fee, no interest, no surcharge and no correction. It issues, it notifies, it digests and it checks.',
+        noGateNote:
+          'Nothing here changes what anyone can see. A student who becomes delinquent because of this run keeps exactly the access they had.',
+        holdNote:
+          'A hold stops the chasing, not the debt: a held student is skipped by the notices while their balance stays in every total and in the aging report.',
+        button: 'Run the cycle',
+        buttonAriaLabel: 'Run the billing cycle now',
+        confirm: {
+          dialogTitle: 'Run the billing cycle now?',
+          lead: 'This is not a preview. Confirming performs the run, and the run sends email:',
+          effects: {
+            issue:
+              'It issues an invoice for every active contract whose period has started and has none yet.',
+            notices:
+              'It emails each student their due-date reminder and their grace-period-lapsed notice.',
+            digest:
+              'It emails the administrators a digest of the students who crossed into due or delinquent.',
+            assert:
+              "It checks each open invoice's cached status against its recomputed balance and reports any divergence — it repairs none of them.",
+          },
+          safeAgain:
+            'If you are unsure whether the scheduled run fired, run it. A second run for the same period issues nothing, because one invoice per contract per period is enforced by the database, and the duplicate is reported as absorbed.',
+          windowHeading: 'Window to run (optional)',
+          windowHelp:
+            'Leave both empty to run for today against yesterday. The window covered is everything after the first date, up to and including the second.',
+          sinceLabel: 'Since',
+          asOfLabel: 'As of',
+          submit: 'Run the cycle now',
+          cancel: 'Cancel',
+        },
+        pending: 'Running the billing cycle…',
+        pendingHint:
+          'This can take a moment. Only one run is in flight, and the button stays unavailable until it answers.',
+        error: 'The billing cycle run failed.',
+        errorNoReport:
+          'No report is shown, because the run did not complete. Whatever it had already written stayed written, and running it again is safe.',
+        outcome: {
+          issuedTitle: (count: number) => `${count} invoice(s) issued`,
+          issuedBody: 'Each invoice the run created is listed below, with its student, its period, its due date and its amount.',
+          alreadyBilledTitle: 'Already billed — nothing new was issued',
+          alreadyBilledBody: (absorbed: number) =>
+            `The run created no invoice: ${absorbed} already existed for the period and were absorbed by the one-invoice-per-period rule. This is the expected result of a second run.`,
+          nothingToIssueTitle: 'Nothing to issue',
+          nothingToIssueBody:
+            'No contract was in scope for this window, so there was nothing to bill. The run completed — this is not a failure.',
+          noneDueTitle: 'Nothing was due to be issued',
+          noneDueBody: (eligible: number) =>
+            `${eligible} contract(s) were in scope and none of them had a period waiting to be billed in this window. The run completed — this is not a failure.`,
+        },
+        report: {
+          heading: 'What the run did',
+          window: (since: string, asOf: string) =>
+            `Window: everything after ${since}, up to and including ${asOf}.`,
+          counters: {
+            eligibleContracts: 'Contracts in scope',
+            issued: 'Invoices issued',
+            absorbed: 'Already billed (absorbed)',
+            mailsSent: 'Emails sent',
+            adminsNotified: 'Administrators notified',
+          },
+          issuedHeading: 'Invoices this run issued',
+          issuedEmpty: 'This run issued no invoice.',
+          issuedColumns: {
+            invoice: 'Invoice',
+            student: 'Student',
+            period: 'Period start',
+            due: 'Due date',
+            amount: 'Amount',
+            status: 'Status',
+          },
+          remindersHeading: 'Student notices',
+          remindersEmpty: 'No student notice was due in this window.',
+          reminderKind: {
+            due_date: 'Due-date reminder',
+            grace_lapsed: 'Grace period lapsed',
+          },
+          reminderSent: 'Sent',
+          reminderNotSent: 'Not sent',
+          reminderSuppressed: 'Skipped — on hold',
+          reminderDates: (dueDate: string, triggerOn: string) =>
+            `Due ${dueDate} · notice due on ${triggerOn}`,
+          reminderBalance: 'Balance owed:',
+          reminderHoldLine:
+            'The notice was skipped because the student is on hold. The balance above is still owed.',
+          crossingsHeading: 'Standing crossings',
+          crossingsEmpty: 'No student crossed into due or delinquent in this window.',
+          crossingsNote:
+            'Read from the run report. Standing is resolved by the server and never recomputed here, and crossing into due or delinquent restricts nothing a student can reach.',
+          crossingArrow: '→',
+          crossingBecame: 'became',
+          oldestOverdue: (date: string) => `Oldest overdue invoice: ${date}`,
+          noOldestOverdue: 'No overdue invoice recorded.',
+          outstanding: 'Outstanding:',
+          heldHeading: 'Students on hold',
+          heldEmpty: 'No student was on hold during this run.',
+          heldOutstanding: 'Outstanding, still owed:',
+          divergencesHeading: 'Cached-status findings',
+          divergencesEmpty: "Every open invoice's cached status matched its balance.",
+          divergencesNote:
+            'Reported, never repaired: the run writes no adjustment and changes no status. These invoices are listed so that somebody can look at them.',
+          divergenceLine: (cached: string, expected: string) =>
+            `Cached as ${cached}, while the balance says ${expected}.`,
+          divergenceBalance: 'Balance:',
+        },
+      },
+      reports: {
+        heading: 'Accounting reports',
+        holdNote:
+          'Balances held out of the delinquency listing are still counted in both reports below.',
+        conflictNote:
+          'A total is stated in one currency and is never converted between them, so a report spanning two currencies is refused rather than rate-converted.',
+        movement: {
+          heading: 'Monthly movement',
+          monthLabel: 'Month',
+          loading: 'Loading the movement report…',
+          loadError: 'Failed to load the movement report.',
+          period: (start: string, end: string) => `${start} to ${end}`,
+          billed: 'Billed',
+          received: 'Received',
+          outstanding: 'Outstanding',
+          invoiced: 'Invoiced',
+          adjustments: 'Adjustments',
+          invoicesIssued: 'Invoices issued',
+          activeStudents: 'Active students',
+        },
+        aging: {
+          heading: 'Receivables aging',
+          asOfLabel: 'As of',
+          loading: 'Loading the aging report…',
+          loadError: 'Failed to load the aging report.',
+          columns: {
+            bucket: 'Days past due',
+            invoices: 'Invoices',
+            students: 'Students',
+            total: 'Total',
+          },
+          buckets: {
+            '0-30': '0 to 30 days',
+            '31-60': '31 to 60 days',
+            '61-90': '61 to 90 days',
+            '90+': 'Over 90 days',
+          },
+          totalRow: 'Total',
+        },
+      },
+      plans: {
+        heading: 'Plan catalogue',
+        recurringNote:
+          'A plan is the recurring shelf: every contract signed against it is re-invoiced each period by the daily run. Nothing here sells a single item — a plan created for one seminar would be billed again every period, indefinitely.',
+        editSafeNote:
+          'Repricing a plan is safe. A signed contract and an issued invoice keep the terms they snapshotted at signature, so nothing already billed is restated. To give one student different terms, sign a negotiated contract; to change one charge, apply an adjustment on the ledger.',
+        archiveNote:
+          'Nothing here is deleted. Archiving hides a plan from future signature and leaves every contract that already references it exactly as it stands.',
+        noGateNote:
+          'A plan is a price, not a permission. Nothing on this tab suspends, downgrades or withholds a student access.',
+        filterLabel: 'Filter by state',
+        filterActive: 'Active plans',
+        filterArchived: 'Archived plans',
+        filterAll: 'All plans',
+        loading: 'Loading the catalogue…',
+        loadError: 'Failed to load the plan catalogue.',
+        empty:
+          'No plan has been created yet. A plan is the prerequisite for signing a contract: create one here, then sign a student against it.',
+        emptyArchived: 'No plan has been archived.',
+        count: (total: number) => `${total} plan(s) listed`,
+        none: '—',
+        columns: {
+          name: 'Plan',
+          amount: 'Amount per cycle',
+          cycle: 'Cycle',
+          graceDays: 'Grace period',
+          state: 'State',
+          actions: 'Actions',
+        },
+        cycle: {
+          monthly: 'Monthly',
+          quarterly: 'Quarterly',
+          yearly: 'Yearly',
+        },
+        graceDaysValue: (days: number) => `${days} day(s)`,
+        state: {
+          active: 'Active',
+          archived: 'Archived',
+        },
+        createButton: 'New plan',
+        editButton: 'Edit',
+        editAriaLabel: (name: string) => `Edit the plan ${name}`,
+        editUnavailable: (code: string) =>
+          `This plan is priced in ${code}, which is not the currency this console resolved, so its amount cannot be edited here.`,
+        archiveButton: 'Archive',
+        archiveAriaLabel: (name: string) => `Archive the plan ${name}`,
+        unarchiveButton: 'Restore',
+        unarchiveAriaLabel: (name: string) => `Restore the plan ${name} to the catalogue`,
+        createDialogTitle: 'Create a plan',
+        editDialogTitle: (name: string) => `Edit the plan ${name}`,
+        submitCreate: 'Create plan',
+        submitEdit: 'Save plan',
+        cancel: 'Cancel',
+        form: {
+          nameLabel: 'Name',
+          namePlaceholder: 'Monthly membership',
+          descriptionLabel: 'Description (optional)',
+          descriptionPlaceholder: 'What this plan covers.',
+          currencyLabel: 'Currency',
+          currencyHelp:
+            'The currency this console resolved. It is fixed when the plan is created and is never changed by an edit.',
+          amountLabel: (code: string) => `Amount per cycle (${code})`,
+          amountHelp: (exponent: number) =>
+            exponent === 0
+              ? 'This currency has no decimal places, so enter a whole number.'
+              : `Up to ${exponent} decimal place(s), using a dot as the separator.`,
+          cycleLabel: 'Cycle',
+          cycleHelp: 'How often a contract on this plan is re-invoiced by the daily run.',
+          graceDaysLabel: 'Grace period (days)',
+          graceDaysHelp: 'Days after the due date before an invoice counts as overdue.',
+        },
+        validation: {
+          nameRequired: 'A plan needs a name.',
+          amountEmpty: 'Enter the amount charged each cycle.',
+          amountNotANumber: 'Enter the amount in digits, using a dot as the decimal separator.',
+          amountNegative: 'The amount cannot be negative.',
+          amountTooPrecise: (exponent: number) =>
+            exponent === 0
+              ? 'This currency has no decimal places, so the amount must be a whole number.'
+              : `This currency holds ${exponent} decimal place(s), so the amount cannot be more precise than that.`,
+          graceDaysInvalid: 'The grace period must be a whole number of days, zero or more.',
+        },
+        createSuccess: (name: string) => `Plan ${name} created.`,
+        updateSuccess: (name: string) => `Plan ${name} saved. Signed contracts keep their terms.`,
+        archiveSuccess: (name: string) =>
+          `Plan ${name} archived. Contracts already signed against it are unchanged.`,
+        unarchiveSuccess: (name: string) => `Plan ${name} is back in the catalogue.`,
+        createError: 'Failed to create the plan.',
+        updateError: 'Failed to save the plan.',
+        archiveError: 'Failed to archive the plan.',
+        unarchiveError: 'Failed to restore the plan.',
+      },
+      sign: {
+        button: 'Sign a contract',
+        buttonAriaLabel: 'Sign a contract for a student',
+        statementButton: 'Sign a contract',
+        statementAriaLabel: (name: string) => `Sign a contract for ${name}`,
+        dialogTitle: 'Sign a contract',
+        dialogExplainer:
+          'Signing records what was agreed with the student: the plan, the amount, the billing day and the date the contract starts. It is a financial record and nothing more.',
+        noAccessNote:
+          'Signing changes nothing about what a student can see, and nor does failing to sign. Access comes from enrollment; this form records money only.',
+        studentHeading: 'Student',
+        searchLabel: 'Search by name or email',
+        searchPlaceholder: 'Name or email',
+        pickerLabel: 'Choose the student this contract is for',
+        studentEmpty: 'No user in this list matches the search.',
+        firstPageNotice:
+          'This picker lists the first page of user accounts, because the user list endpoint caps a page at 100 accounts. A student who is not in the list is not necessarily absent from the dojo.',
+        alreadyContracted: 'Already under contract',
+        alreadyContractedNote:
+          'A student already holding an active contract is marked here to save you a pointless attempt. The mark is a courtesy, not the rule: the database allows one active contract per student, and it is the database that refuses a second one.',
+        notActive: 'Account is not active',
+        notActiveNote:
+          'An account that is not active is marked rather than hidden. The API does not forbid signing for one, so the decision stays yours.',
+        planLabel: 'Plan',
+        planPlaceholder: 'Choose a plan',
+        planLoadError: 'Failed to load the plan catalogue.',
+        planEmpty:
+          'No active plan is available. Create one on the Plans tab, then sign a student against it. An archived plan cannot be signed.',
+        termsHeading: 'Terms to be recorded',
+        termsSnapshotNote:
+          'The contract keeps these terms exactly as they stand at signature. Repricing the plan afterwards does not restate them.',
+        termsAmount: 'Amount per cycle',
+        termsCycle: 'Cycle',
+        termsGraceDays: 'Grace period',
+        dueDayLabel: 'Billing day of the month',
+        dueDayHelp: 'A whole number from 1 to 28, so that every month has that day.',
+        startDateLabel: 'Start date',
+        startDateHelp: 'The date this contract starts, as YYYY-MM-DD.',
+        modeLabel: 'Terms',
+        modeStandard: "The plan's terms, unchanged",
+        modeNegotiated: 'Negotiated terms for this student',
+        standardNote:
+          "A standard signature sends no amount, no cycle and no grace period at all: the server records the plan's own values, so the contract cannot drift from the catalogue.",
+        negotiatedNote:
+          'Negotiated terms override the amount, the cycle and the grace period for this student alone, against a written reason. That reason is what a future administrator reads to answer why this student pays a different amount, so it is required.',
+        currencyNotNegotiableNote:
+          "The currency is not negotiable. Re-denominating is not a negotiation, it is a different contract, so the amount below stays in the plan's own currency.",
+        amountLabel: (code: string) => `Negotiated amount per cycle (${code})`,
+        cycleLabel: 'Negotiated cycle',
+        graceDaysLabel: 'Negotiated grace period (days)',
+        termsNoteLabel: 'Reason (required)',
+        termsNotePlaceholder: 'What was agreed, and why it departs from the plan.',
+        planValue: (value: string) => `Plan: ${value}`,
+        submit: 'Sign contract',
+        cancel: 'Cancel',
+        validation: {
+          studentRequired: 'Choose the student this contract is for.',
+          planRequired: 'Choose the plan this contract is signed against.',
+          dueDayInvalid: 'The billing day must be a whole number from 1 to 28.',
+          startDateInvalid: 'Enter the start date as YYYY-MM-DD.',
+          graceDaysInvalid: 'The grace period must be a whole number of days, zero or more.',
+          termsNoteRequired:
+            'A negotiated contract needs a written reason for the terms it departs from.',
+        },
+        success: (name: string) => `${name} is now under contract.`,
+        error: 'Failed to sign the contract.',
+      },
+      /**
+       * A signed contract's life after signature — Task 11, RFC 0013 section 7.
+       *
+       * The wording carries the four distinctions an administrator confuses by
+       * default: pausing stops the next issue and nothing else, cancelling ends
+       * a membership and forgives nothing, a hold stops the chasing, and a
+       * waiver forgives a charge. None of the four touches access.
+       */
+      contract: {
+        chainNote:
+          'A renegotiation adds a version; it never rewrites one. Every version below keeps the terms it was signed with, so an invoice issued under older terms still explains itself.',
+        versionLabel: (position: number) => `Version ${position}`,
+        currentVersion: 'Current version',
+        supersededNote: 'Superseded, and kept exactly as it was signed.',
+        status: {
+          active: 'Active',
+          paused: 'Paused',
+          cancelled: 'Cancelled',
+          superseded: 'Superseded',
+        },
+        versionPeriodOpen: (start: string) => `From ${start}`,
+        versionPeriod: (start: string, end: string) => `From ${start} to ${end}`,
+        signedOn: (date: string) => `Recorded on ${date}`,
+        actionsHeading: 'Manage this contract',
+        noAccessNote:
+          'None of these actions changes what the student can see. A contract records money; access comes from enrollment and is left exactly as it is.',
+        holdPointer:
+          'To stop the reminder emails while a student sorts something out, set a hold on the Students tab. A hold stops the chasing, not the debt, and it leaves the contract running.',
+        waiverPointer:
+          'To forgive a charge, record a waiver adjustment against the invoice on the Ledger tab. Nothing here forgives anything.',
+        closedNote:
+          'This contract is closed, so there is nothing left on it to pause, resume or amend. Taking the student back is a new signature.',
+        pauseButton: 'Pause',
+        resumeButton: 'Resume',
+        cancelButton: 'Cancel contract',
+        amendButton: 'Amend terms',
+        keepButton: 'Go back',
+        pauseTitle: 'Pause this contract?',
+        pauseBody:
+          "Pausing stops the next invoice being issued, and nothing else. Every invoice already open keeps its amount and its due date, keeps counting toward the outstanding total and keeps its place in the aging report, and the student's standing goes on moving on schedule. Nothing is erased, and the contract can be resumed whenever the student comes back.",
+        pauseConfirm: 'Pause the contract',
+        pauseSuccess:
+          'The contract is paused. No further invoice is issued for it until it is resumed, and every open invoice is untouched.',
+        pauseError: 'Failed to pause the contract.',
+        resumeTitle: 'Resume this contract?',
+        resumeBody:
+          'Resuming puts the contract back in the run, so the next period is invoiced again on its billing day. It changes nothing about the invoices already issued.',
+        resumeConfirm: 'Resume the contract',
+        resumeSuccess: 'The contract is active again.',
+        resumeError: 'Failed to resume the contract.',
+        cancelTitle: 'Cancel this contract?',
+        cancelBody:
+          'Cancelling ends this membership: the contract closes on the end date below and no further invoice is issued for it. It forgives nothing — every open invoice keeps its balance and its due date, and goes on counting in the reports. A cancelled contract is not resumed.',
+        cancelConfirm: 'Cancel the contract',
+        cancelEndDateLabel: 'End date',
+        cancelEndDateHelp:
+          'The date the contract closes, as YYYY-MM-DD. Left blank, the server records today.',
+        cancelSuccess:
+          'The contract is cancelled and its end date is recorded. Whatever was outstanding is still outstanding.',
+        cancelError: 'Failed to cancel the contract.',
+        amendTitle: 'Record an amendment',
+        amendBody:
+          'An amendment records renegotiated terms as a new version. The version in force now is kept and marked superseded with its original terms intact, so the invoices issued under them still explain themselves. Nothing is edited in place.',
+        amendPeriodNote:
+          'The new terms are recorded from the start date below and apply to the periods invoiced from then on. A period already invoiced is not repriced.',
+        amendCurrencyNote:
+          'The currency is not amendable: re-denominating a live contract would restate every invoice already issued under it.',
+        amendStartDateLabel: 'The new terms start on',
+        amendStartDateHelp: 'As YYYY-MM-DD. The current version closes on this date.',
+        amendAmountLabel: (code: string) => `Amount per cycle (${code})`,
+        amendCycleLabel: 'Cycle',
+        amendDueDayLabel: 'Billing day of the month',
+        amendDueDayHelp: 'A whole number from 1 to 28, so that every month has that day.',
+        amendGraceDaysLabel: 'Grace period (days)',
+        amendNoteLabel: 'Reason (required)',
+        amendNotePlaceholder: 'What was renegotiated, and why.',
+        currentValue: (value: string) => `Currently: ${value}`,
+        amendSubmit: 'Record the amendment',
+        amendSuccess:
+          'The amendment is recorded as a new version. The previous one is kept as superseded, with its original terms.',
+        amendError: 'Failed to record the amendment.',
+        validation: {
+          startDateInvalid: 'Enter the start date as YYYY-MM-DD.',
+          endDateInvalid: 'Enter the end date as YYYY-MM-DD, or leave it blank.',
+          dueDayInvalid: 'The billing day must be a whole number from 1 to 28.',
+          graceDaysInvalid: 'The grace period must be a whole number of days, zero or more.',
+          termsNoteRequired: 'An amendment needs a written reason for the terms it replaces.',
+        },
+      },
+    },
   },
   catalog: {
     redesign: {
@@ -990,8 +1708,93 @@ export const dictEn = {
       errorCurrentInvalid: 'Current password is incorrect',
       errorGeneral: 'Could not change password. Please try again.',
     },
+    billing: {
+      title: 'Billing',
+      subtitle: 'Your contract, your invoices, and what is outstanding.',
+      locale: 'en-US',
+      asOf: (date: string) => `Figures as of ${date}`,
+      loading: 'Loading your statement…',
+      loadError: 'Your statement could not be loaded. Please try again.',
+      retry: 'Try again',
+      backLink: 'Back to settings',
+      none: '—',
+      outstandingLabel: 'Outstanding',
+      studentSinceLabel: 'Student since',
+      membershipSinceLabel: 'Current membership since',
+      paymentNote:
+        'Payments are recorded by the dojo once they are received, so there is nothing to pay on this page. If something here looks wrong, talk to your instructor.',
+      emptyStatement:
+        'There is nothing on your account yet. Once a contract is signed for you, your invoices and payments show up here.',
+      contracts: {
+        heading: 'Contract',
+        empty: 'No contract on file yet.',
+        openEnded: (start: string) => `From ${start}`,
+        period: (start: string, end: string) => `From ${start} to ${end}`,
+        versions: (total: number) => `${total} version(s) of these terms`,
+        amountLabel: 'Amount per cycle',
+        cycleLabel: 'Cycle',
+        dueDayLabel: 'Due day',
+        graceDaysLabel: 'Grace period',
+        graceDaysValue: (days: number) => `${days} day(s)`,
+        termsNoteLabel: 'Note',
+        negotiated: 'Negotiated terms',
+      },
+      contractStatus: {
+        active: 'Active',
+        paused: 'Paused',
+        cancelled: 'Cancelled',
+        superseded: 'Superseded',
+      },
+      cycle: {
+        monthly: 'Monthly',
+        quarterly: 'Quarterly',
+        yearly: 'Yearly',
+      },
+      invoices: {
+        heading: 'Invoices',
+        empty: 'No invoice has been issued to you yet.',
+        periodLabel: 'Period',
+        periodValue: (start: string, end: string) => `${start} — ${end}`,
+        dueLabel: 'Due date',
+        amountLabel: 'Amount',
+        balanceLabel: 'Balance',
+        paymentsHeading: 'Payments',
+        adjustmentsHeading: 'Adjustments',
+        noPayments: 'No payment recorded.',
+        noAdjustments: 'No adjustment applied.',
+        reversal: 'Reversal',
+      },
+      invoiceStatus: {
+        open: 'Open',
+        paid: 'Paid',
+        void: 'Void',
+      },
+      paymentMethod: {
+        cash: 'Cash',
+        pix: 'Pix',
+        bank_transfer: 'Bank transfer',
+        card: 'Card',
+        gateway: 'Online payment',
+        other: 'Other',
+      },
+      adjustmentKind: {
+        discount: 'Discount',
+        credit: 'Credit',
+        waiver: 'Waiver',
+        surcharge: 'Surcharge',
+      },
+    },
   },
   layout: {
+    standingBanner: {
+      locale: 'en-US',
+      label: 'Billing notice',
+      due: (amount: string) => `You have ${amount} outstanding on your tuition.`,
+      delinquent: (amount: string) =>
+        `You have ${amount} outstanding on your tuition, and part of it is past its due date.`,
+      link: 'See your statement',
+      dismiss: 'Dismiss this notice',
+    },
     nav: {
       dashboard: 'Dashboard',
       catalog: 'Catalogue',
@@ -1020,6 +1823,8 @@ export const dictEn = {
       players: 'Players',
       groups: 'Groups',
       access: 'Access',
+      billing: 'Billing',
+      billingBadgeLabel: (total: number) => `${total} delinquent student(s)`,
     },
   },
   common: {

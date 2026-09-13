@@ -20,22 +20,175 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
-
-// Full prefix of the known dev-seed password_hash.
-// Used for exact startsWith() filtering in JS after the DB query.
-const DEV_PASSWORD_HASH_PREFIX =
-  'pbkdf2:100000:e83835066ab015b5ed4449b68a349b38:8baf9add';
-
-// The LIKE pattern used in SQL is intentionally shorter than the full prefix.
-// The local D1 (miniflare/workerd SQLite) raises "LIKE or GLOB pattern too
-// complex" for long patterns, so we use the iteration count + salt prefix
-// (unique enough to the dev seed) and filter the exact prefix in JavaScript.
-const DEV_HASH_LIKE_PATTERN = 'pbkdf2:100000:e83835066ab015b5%';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 /** A newly provisioned D1 has no schema yet; migrations will create it. */
 export function isFreshDatabaseError(output: string): boolean {
   return /no such table:\s*users\b/i.test(output);
+}
+
+// ---------------------------------------------------------------------------
+// Seed matcher — derived at runtime from apps/api/migrations/seed/*.sql, so
+// the guard can never drift from the accounts the seed actually creates. See
+// docs/product/backlog/security/03-dev-seed-guard-hash-drift.task.md.
+// ---------------------------------------------------------------------------
+
+const SEED_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../migrations/seed',
+);
+
+// Chars of the derived key kept for the exact-prefix match done in JS.
+const HASH_PREFIX_KEY_CHARS = 8;
+// Chars of the salt kept in the SQL LIKE pattern. Short and deliberate: local
+// D1 (miniflare/workerd SQLite) raises "LIKE or GLOB pattern too complex" on
+// long patterns, so the SQL filter stays coarse and the exact match happens
+// in JS via matchesSeedRow.
+const SALT_LIKE_PREFIX_CHARS = 16;
+
+export interface SeedUserRow {
+  id: string;
+  email: string;
+  passwordHash: string;
+}
+
+export interface SeedMatcher {
+  hashPrefixes: string[];
+  likePatterns: string[];
+  seedIds: string[];
+}
+
+/** Reads every *.sql file in a seed directory. Fails closed: throws if the
+ * directory is missing/unreadable or holds no seed files, rather than let the
+ * caller silently build an empty matcher. */
+export function readSeedSqlFiles(seedDir: string = SEED_DIR): string[] {
+  let files: string[];
+  try {
+    files = readdirSync(seedDir).filter((f) => f.endsWith('.sql'));
+  } catch (err) {
+    throw new Error(`cannot read seed directory "${seedDir}": ${(err as Error).message}`);
+  }
+  if (files.length === 0) {
+    throw new Error(`no *.sql seed files found in "${seedDir}"`);
+  }
+  return files.map((file) => {
+    const filePath = path.join(seedDir, file);
+    let content: string;
+    try {
+      content = readFileSync(filePath, 'utf8');
+    } catch (err) {
+      throw new Error(`cannot read seed SQL file "${filePath}": ${(err as Error).message}`);
+    }
+    if (content.trim().length === 0) {
+      throw new Error(`empty seed SQL file "${filePath}"`);
+    }
+    return content;
+  });
+}
+
+function splitSqlTuple(tuple: string): string[] {
+  const values: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (const ch of tuple) {
+    if (ch === "'") {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (ch === ',' && !inQuotes) {
+      values.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  values.push(current.trim());
+  return values;
+}
+
+/** Parses id/email/password_hash out of every `INSERT INTO users (...) VALUES
+ * (...)` block in a seed SQL file. Column order is read from the statement
+ * itself rather than assumed, so it survives reordering. */
+export function extractSeedUsersFromSql(sql: string): SeedUserRow[] {
+  const rows: SeedUserRow[] = [];
+  const insertRe = /INSERT\s+(?:OR\s+IGNORE\s+)?INTO\s+users\s*\(([^)]+)\)\s*VALUES\s*([\s\S]*?);/gi;
+  let stmt: RegExpExecArray | null;
+  while ((stmt = insertRe.exec(sql))) {
+    const columns = stmt[1].split(',').map((c) => c.trim().toLowerCase());
+    const idIdx = columns.indexOf('id');
+    const emailIdx = columns.indexOf('email');
+    const hashIdx = columns.indexOf('password_hash');
+    if (idIdx === -1 || emailIdx === -1 || hashIdx === -1) continue;
+
+    const tupleRe = /\(([^()]*)\)/g;
+    let tuple: RegExpExecArray | null;
+    while ((tuple = tupleRe.exec(stmt[2]))) {
+      const values = splitSqlTuple(tuple[1]);
+      const id = values[idIdx];
+      const email = values[emailIdx];
+      const passwordHash = values[hashIdx];
+      if (id && email && passwordHash) {
+        rows.push({ id, email, passwordHash });
+      }
+    }
+  }
+  return rows;
+}
+
+/** Builds the id/hash matcher from one or more seed SQL file contents. */
+export function buildSeedMatcher(seedSqlFiles: string[]): SeedMatcher {
+  const hashPrefixes = new Set<string>();
+  const likePatterns = new Set<string>();
+  const seedIds = new Set<string>();
+
+  for (const sql of seedSqlFiles) {
+    for (const row of extractSeedUsersFromSql(sql)) {
+      if (!row.id.startsWith('seed-')) continue;
+      seedIds.add(row.id);
+
+      const parts = row.passwordHash.split(':');
+      if (parts.length !== 4 || parts[0] !== 'pbkdf2') continue;
+      const [, iterations, salt, key] = parts;
+      hashPrefixes.add(`pbkdf2:${iterations}:${salt}:${key.slice(0, HASH_PREFIX_KEY_CHARS)}`);
+      likePatterns.add(`pbkdf2:${iterations}:${salt.slice(0, SALT_LIKE_PREFIX_CHARS)}%`);
+    }
+  }
+
+  return {
+    hashPrefixes: [...hashPrefixes],
+    likePatterns: [...likePatterns],
+    seedIds: [...seedIds],
+  };
+}
+
+/** True if a users row was produced by the local dev seed — matched by its
+ * stable seed id (survives a hash regeneration) or by its password hash
+ * prefix (survives a change to the seeded id list). */
+export function matchesSeedRow(
+  row: { id: string; password_hash: string },
+  matcher: SeedMatcher,
+): boolean {
+  if (matcher.seedIds.includes(row.id)) return true;
+  return matcher.hashPrefixes.some((prefix) => row.password_hash.startsWith(prefix));
+}
+
+function sqlQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/** Builds the SQL WHERE clause used to pull candidate rows: an IN over the
+ * stable seed ids plus one short LIKE per distinct salt, OR-ed together. */
+export function buildSeedWhereClause(matcher: SeedMatcher): string {
+  const clauses: string[] = [];
+  if (matcher.seedIds.length > 0) {
+    clauses.push(`id IN (${matcher.seedIds.map(sqlQuote).join(', ')})`);
+  }
+  for (const pattern of matcher.likePatterns) {
+    clauses.push(`password_hash LIKE ${sqlQuote(pattern)}`);
+  }
+  return clauses.join(' OR ');
 }
 
 // ---------------------------------------------------------------------------
@@ -76,7 +229,24 @@ function main() {
     args.db = args.env === 'staging' ? 'arenaquest-db-staging' : 'arenaquest-db';
   }
 
-  const query = `SELECT email, password_hash FROM users WHERE password_hash LIKE '${DEV_HASH_LIKE_PATTERN}'`;
+  let matcher: SeedMatcher;
+  try {
+    matcher = buildSeedMatcher(readSeedSqlFiles());
+  } catch (err) {
+    process.stderr.write(
+      `[check-no-dev-seed] failed to build the seed matcher from migrations/seed/*.sql: ${(err as Error).message}\n`,
+    );
+    process.exit(2);
+  }
+
+  if (matcher.seedIds.length === 0 && matcher.hashPrefixes.length === 0) {
+    process.stderr.write(
+      '[check-no-dev-seed] no seed matcher could be derived from migrations/seed/*.sql — refusing to report OK on an empty matcher.\n',
+    );
+    process.exit(2);
+  }
+
+  const query = `SELECT id, email, password_hash FROM users WHERE ${buildSeedWhereClause(matcher)}`;
 
   // Build the wrangler argument list directly (avoids shell quoting issues
   // and lets spawnSync pipe stdout/stderr independently).
@@ -132,13 +302,14 @@ function main() {
   let rows: Array<{ email: string }>;
   try {
     // wrangler --json returns an array of result sets; each has a `results` array.
-    type Row = { email: string; password_hash: string };
+    type Row = { id: string; email: string; password_hash: string };
     const parsed = JSON.parse(result.stdout) as Array<{ results: Array<Row> }>;
-    // Exact-prefix filter in JS eliminates theoretical false positives from
-    // the intentionally shorter LIKE pattern used in the SQL query.
+    // Exact match in JS (by seed id or hash prefix) eliminates theoretical
+    // false positives from the intentionally coarse LIKE/IN filter used in
+    // the SQL query.
     rows = parsed
       .flatMap(r => r.results ?? [])
-      .filter(r => r.password_hash.startsWith(DEV_PASSWORD_HASH_PREFIX));
+      .filter(r => matchesSeedRow(r, matcher));
   } catch {
     process.stderr.write(
       `[check-no-dev-seed] failed to parse wrangler output:\n${result.stdout}\n`,

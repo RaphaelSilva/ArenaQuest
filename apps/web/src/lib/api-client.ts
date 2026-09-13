@@ -14,6 +14,8 @@ import * as adminMediaApiModule from './admin-media-api';
 import * as adminEnrollmentApiModule from './admin-enrollment-api';
 import * as adminGroupsApiModule from './admin-groups-api';
 import * as adminGamificationApiModule from './admin-gamification-api';
+import * as adminBillingApiModule from './admin-billing-api';
+import * as meBillingApiModule from './me-billing-api';
 import * as progressApiModule from './progress-api';
 import * as dashboardApiModule from './dashboard-api';
 import * as commentsApiModule from './comments-api';
@@ -102,6 +104,14 @@ export class ApiClient {
 
   get adminGamification() {
     return adminGamificationApiModule.createAdminGamificationApi(this.http);
+  }
+
+  get adminBilling() {
+    return adminBillingApiModule.createAdminBillingApi(this.http);
+  }
+
+  get meBilling() {
+    return meBillingApiModule.createMeBillingApi(this.http);
   }
 
   get progress() {

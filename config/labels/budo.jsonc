@@ -22,7 +22,7 @@
       "webOrigin":    "budo-web-staging.pages.dev",
       "worker":       "api-budo-staging",
       "pagesProject": "budo-web-staging",
-      "d1":   { "name": "budo-db-staging", "id": "314fa333-c39e-478b-90a9-c09625420744" },
+      "d1":   { "name": "budo-db-staging", "id": "c4884534-9070-42c6-bdb2-9bc2c843f41c" },
       "kv":   { "binding": "RATE_LIMIT_KV", "id": "c75ab14e35164e22b7c6eb3581969295" },
       "r2":   { "bucket": "budo-media-staging", "s3Endpoint": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com" },
       "cookieSameSite": "None",

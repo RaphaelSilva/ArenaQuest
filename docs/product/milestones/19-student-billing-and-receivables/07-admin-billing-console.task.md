@@ -1,6 +1,6 @@
 # Task 07 — Frontend: Admin billing console (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [19 — Student billing, contracts and receivables accounting](./milestone.md)
 **RFC:** [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md)
 **Team:** Frontend Web
@@ -102,29 +102,34 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `/admin/billing` renders all three tabs, and the Students tab lists a seeded
+- [x] `/admin/billing` renders all three tabs, and the Students tab lists a seeded
       `delinquent` student with the same standing, balance and oldest overdue date the API
       returns for them.
-- [ ] The standing filter round-trips to the API's `standing=` parameter rather than
+- [x] The standing filter round-trips to the API's `standing=` parameter rather than
       filtering client-side.
-- [ ] Setting a hold from the Students tab issues the expected request with its reason,
+- [x] Setting a hold from the Students tab issues the expected request with its reason,
       moves the student to the held filter, and leaves the outstanding total shown in
       Reports unchanged.
-- [ ] Amounts render at exponent 2, 0 and 8 through `format-money.ts`; the string
+- [x] Amounts render at exponent 2, 0 and 8 through `format-money.ts`; the string
       `Intl.NumberFormat` does not appear in the diff.
-- [ ] The Ledger tab offers no Delete control for a payment or an adjustment; Reverse
+- [x] The Ledger tab offers no Delete control for a payment or an adjustment; Reverse
       requires a reason and the resulting entry renders inline under its original with its
       author.
-- [ ] CSV export produces the current filtered view without issuing a new request.
-- [ ] The nav badge shows the delinquency count and updates after a hold is set.
-- [ ] No standing threshold, grace-day arithmetic or due-date comparison appears in any
+- [x] CSV export produces the current filtered view without issuing a new request.
+- [x] The nav badge shows the delinquency count and updates after a hold is set.
+- [x] No standing threshold, grace-day arithmetic or due-date comparison appears in any
       component — the client renders what the API resolved.
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [ ] The console is responsive at mobile width and keyboard-usable throughout.
-- [ ] `git diff` contains no file under `apps/api/src/`.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [~] The console is responsive at mobile width and keyboard-usable throughout.
+      **Built for it, not verified in a browser.** Semantic markup, a `role="tablist"`
+      tab set and responsive table containers are in place and covered by RTL, but
+      the live walkthrough in the Verification Plan (resize to mobile width, tab
+      through the filters and actions) has not been performed - this environment has
+      no running API with seeded billing data. Owed before the milestone closes.
+- [x] `git diff` contains no file under `apps/api/src/`.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
