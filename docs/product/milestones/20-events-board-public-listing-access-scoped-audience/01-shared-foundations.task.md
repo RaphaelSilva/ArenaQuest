@@ -19,9 +19,11 @@ digits or treat as unset" rule) so the API can reject at write time exactly what
 would refuse to render, and `domain/media/limits.ts`, which becomes the allowed-type and
 size table that `CLAUDE.md` already claims is a single source of truth — today it is a
 literal in `admin-media.controller.ts` and a second copy inside `import-media.mjs`'s
-`validateMediaFile`. Both existing copies are migrated to import the shared table in this
-task, with **no change to their behaviour or their numbers**, and `brand.ts` re-exports
-the moved helper so every current caller keeps working. Everything here is pure and
+`validateMediaFile`. The controller is migrated onto the shared table with **no change to
+its behaviour or its numbers**; the importer, a zero-dependency script that runs without a
+build step, keeps its copy under a parity test instead (see
+[the plan](./planing/01-shared-foundations.plan.md) §2). `brand.ts` re-exports the moved
+helper so every current caller keeps working. Everything here is pure and
 unit-testable without a Worker: no D1, no R2, no Cloudflare type crosses into
 `packages/shared`. Tasks 02–04 consume the port and the enums; Task 04 enforces the
 flyer ceiling from this limits table rather than a third literal.
@@ -45,8 +47,9 @@ flyer ceiling from this limits table rather than a third literal.
   - `apps/api/src/controllers/admin-media.controller.ts` — **only** to replace its
     allowed-type/size literal with an import from the shared limits module. No change to
     the values, the error shapes, or the upload lifecycle.
-  - `scripts/content/import-media.mjs` — **only** to rewrite `validateMediaFile` against
-    the same shared table.
+  - `scripts/content/import-media.test.mjs` — **only** to add the parity test. The
+    importer script itself is **not** modified (see the acceptance criteria and
+    [the plan](./planing/01-shared-foundations.plan.md) §2).
   - `packages/shared/**/__tests__/**` (or the workspace's existing test location) — unit
     tests for the two domain modules.
 - **No Cloudflare types in shared.** `packages/shared` stays cloud-agnostic: the port
@@ -64,10 +67,12 @@ flyer ceiling from this limits table rather than a third literal.
   writes Tasks 02–04 need — audience-scoped listing by scope, slug lookup, admin listing
   including drafts, create, update, the audience grant replacement, and the flyer column
   writes — without naming a store. Task 02 supplies the only implementation.
-- **`import-media.mjs` stays dependency-free.** The importer runs on stdlib Node with no
-  install step; importing the shared table must not require a build artifact the script
-  cannot resolve at run time. If the workspace resolution forces a choice, state it in the
-  PR rather than adding a bundler step.
+- **`import-media.mjs` stays dependency-free — and therefore keeps its own table.** The
+  importer is a documented stdlib-only ESM script with no install or build step, run
+  directly by `make import-media-*`, while `@arenaquest/shared` resolves only through an
+  untracked `dist/`. Importing the shared table would break its zero-dependency contract
+  (asserted by its own test) and fail at runtime on any checkout that has not built. The
+  duplication is instead locked down by a parity test; the script itself is not modified.
 - **No upload path changes.** This task does not touch presign, `PUT` or finalize
   behaviour anywhere — the declared-size hole in topic media stays open by design and
   belongs to its own backlog item (milestone guardrail).
@@ -83,7 +88,8 @@ In:
   `brand.ts` reduced to a re-export.
 - `domain/media/limits.ts` with the allowed types and ceilings, plus whatever shared
   validation helper the two existing call sites need in common.
-- `admin-media.controller.ts` and `import-media.mjs` migrated onto the shared table.
+- `admin-media.controller.ts` migrated onto the shared table, and a parity test pinning
+  `import-media.mjs`'s own table to it.
 - Unit tests for both domain modules: the normaliser's accept, reject and "treat as unset"
   branches across the digit range; the limits table's type and ceiling lookups.
 
@@ -106,10 +112,15 @@ Out:
 - [ ] `normalizeWhatsapp` lives only in `packages/shared/domain/contact/whatsapp.ts`;
       `brand.ts` re-exports it, its behaviour is unchanged, and every existing caller of
       `brand.whatsapp` resolves the same value it did before.
-- [ ] The allowed-type/size literal is gone from both
-      `apps/api/src/controllers/admin-media.controller.ts` and
-      `scripts/content/import-media.mjs`; both import `domain/media/limits.ts` and the
-      ceilings are numerically identical to today's.
+- [ ] The allowed-type/size literal is gone from
+      `apps/api/src/controllers/admin-media.controller.ts`, which imports
+      `domain/media/limits.ts`; the ceilings are numerically identical to today's.
+- [ ] `scripts/content/import-media.mjs` **keeps** its own table — it is a documented
+      zero-dependency stdlib script run without a build step, and `@arenaquest/shared`
+      resolves only through an untracked `dist/` (see
+      [the plan](./planing/01-shared-foundations.plan.md) §2). A **parity test** asserts
+      the importer's table equals the shared one, so a future divergence fails CI instead
+      of drifting silently.
 - [ ] A unit test covers the normaliser's accept / reject / unset branches and the limits
       lookup for each allowed type.
 - [ ] `make import-media-staging SOURCE=./content DRY_RUN=1` still preflights and reports
