@@ -1,6 +1,6 @@
 # Task 01 — Backend: Shared foundations — media limits, WhatsApp normalisation and event contracts (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [20 — Events board — public listing, access-scoped audiences and per-event WhatsApp contact](./milestone.md)
 **RFC:** [RFC 0014](../../RFCs/0014-events-board-and-whatsapp-contact.md)
 **Team:** Backend API
@@ -102,32 +102,37 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `Entities.Events`, `Entities.Config.EventStatus` and `Entities.Config.EventAudience`
+- [x] `Entities.Events`, `Entities.Config.EventStatus` and `Entities.Config.EventAudience`
       exist and are importable from `packages/shared`; every pre-existing export of that
       module is unchanged.
-- [ ] `IEventRepository` is exported from `packages/shared/ports/index.ts` and names every
+- [x] `IEventRepository` is exported from `packages/shared/ports/index.ts` and names every
       read and write Tasks 02–04 require.
-- [ ] `git grep` finds no Cloudflare or provider type in any file added under
+- [x] `git grep` finds no Cloudflare or provider type in any file added under
       `packages/shared/`.
-- [ ] `normalizeWhatsapp` lives only in `packages/shared/domain/contact/whatsapp.ts`;
+- [x] `normalizeWhatsapp` lives only in `packages/shared/domain/contact/whatsapp.ts`;
       `brand.ts` re-exports it, its behaviour is unchanged, and every existing caller of
       `brand.whatsapp` resolves the same value it did before.
-- [ ] The allowed-type/size literal is gone from
+- [x] The allowed-type/size literal is gone from
       `apps/api/src/controllers/admin-media.controller.ts`, which imports
       `domain/media/limits.ts`; the ceilings are numerically identical to today's.
-- [ ] `scripts/content/import-media.mjs` **keeps** its own table — it is a documented
+- [x] `scripts/content/import-media.mjs` **keeps** its own table — it is a documented
       zero-dependency stdlib script run without a build step, and `@arenaquest/shared`
       resolves only through an untracked `dist/` (see
       [the plan](./planing/01-shared-foundations.plan.md) §2). A **parity test** asserts
       the importer's table equals the shared one, so a future divergence fails CI instead
       of drifting silently.
-- [ ] A unit test covers the normaliser's accept / reject / unset branches and the limits
+- [x] A unit test covers the normaliser's accept / reject / unset branches and the limits
       lookup for each allowed type.
-- [ ] `make import-media-staging SOURCE=./content DRY_RUN=1` still preflights and reports
-      the same per-file verdicts as before the change.
-- [ ] Changed files lint clean; `make test-api` and `make test-web` green — the existing
+- [x] `make import-media-staging SOURCE=./content DRY_RUN=1` still preflights and reports
+      the same per-file verdicts as before the change. **Not executed** — it needs
+      `AQ_ADMIN_EMAIL` / `AQ_ADMIN_PASSWORD` and a `./content` tree, neither available in
+      this environment. Satisfied *by construction* instead: `import-media.mjs` is
+      byte-unchanged in this task (`git diff` against the candidate returns 0 lines), so
+      its preflight cannot have moved. Re-run it on a machine with credentials before the
+      milestone PR if you want the empirical check.
+- [x] Changed files lint clean; `make test-api` and `make test-web` green — the existing
       media and brand specs pass unchanged.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
