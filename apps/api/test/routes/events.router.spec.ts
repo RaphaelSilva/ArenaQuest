@@ -30,6 +30,12 @@ const ADMIN_ID = 'evt-author';
 const GROUP_ID = 'evt-group';
 
 const WHATSAPP = '5519999991155';
+/**
+ * The message an admin stored on the row. It is deliberately nothing the server
+ * could have produced — the API composes no default, so the only way this string
+ * reaches the response is by being read back out of the column.
+ */
+const STORED_MESSAGE = 'Hi! I want a spot at the open mat.';
 
 let tokenNoGrant: string;
 let tokenDirect: string;
@@ -92,6 +98,16 @@ beforeAll(async () => {
     slug: 'public-upcoming',
     title: 'Open mat',
     content: 'Welcome <script>alert(1)</script> everyone',
+    audience: Entities.Config.EventAudience.PUBLIC,
+    whatsappNumber: WHATSAPP,
+    whatsappMessage: STORED_MESSAGE,
+  });
+  // A number with no message: `contact` is still present, because the
+  // suppression rule keys on the number alone.
+  await repo.create({
+    ...base,
+    slug: 'public-no-message',
+    title: 'Open mat without a message',
     audience: Entities.Config.EventAudience.PUBLIC,
     whatsappNumber: WHATSAPP,
   });
@@ -196,7 +212,12 @@ beforeAll(async () => {
 // The audience matrix — four viewers against every event state
 // ===========================================================================
 
-const ANONYMOUS_UPCOMING = ['public-no-contact', 'public-no-flyer', 'public-upcoming'].sort();
+const ANONYMOUS_UPCOMING = [
+  'public-no-contact',
+  'public-no-flyer',
+  'public-no-message',
+  'public-upcoming',
+].sort();
 
 describe('GET /v1/events — audience matrix', () => {
   it('anonymous sees exactly the published, public, upcoming set', async () => {
@@ -483,12 +504,13 @@ describe('GET /v1/events/{slug}', () => {
     expect(body.content).toContain('Welcome');
   });
 
-  it('resolves the contact from the event own number', async () => {
+  it('resolves the contact from the event own number and stored message', async () => {
     const res = await req('/events/public-upcoming');
     const body = await res.json<{ contact: { number: string; message: string; label: string } }>();
 
     expect(body.contact.number).toBe(WHATSAPP);
-    expect(body.contact.message).toContain('"Open mat"');
+    // Verbatim, end to end: what the admin wrote is what crosses the wire.
+    expect(body.contact.message).toBe(STORED_MESSAGE);
     // Passed through as stored; the web resolves the dictionary default.
     expect(body.contact.label).toBe('');
   });
@@ -500,7 +522,20 @@ describe('GET /v1/events/{slug}', () => {
     expect(body.contact).toBeNull();
   });
 
-  it('reflects the current title in the composed message after a rename', async () => {
+  it('serves a contact with an empty message when the column is unset', async () => {
+    // RFC 0014 §5 as amended 2026-09-22. The number alone makes the block; the
+    // key is present and empty, so the client needs no optional branch, and the
+    // button opens a chat with no pre-filled text.
+    const res = await req('/events/public-no-message');
+    const body = await res.json<{ contact: { number: string; message: string } }>();
+
+    expect(res.status).toBe(200);
+    expect(body.contact).not.toBeNull();
+    expect(body.contact.number).toBe(WHATSAPP);
+    expect(body.contact).toHaveProperty('message', '');
+  });
+
+  it('does not rewrite the stored message when the event is renamed', async () => {
     const repo = new D1EventRepository(env.DB);
     const event = await repo.findBySlug('public-upcoming');
     await repo.update(event!.id, { title: 'Open mat — renamed' });
@@ -508,10 +543,20 @@ describe('GET /v1/events/{slug}', () => {
     const res = await req('/events/public-upcoming');
     const body = await res.json<{ title: string; contact: { message: string } }>();
 
-    expect(body.title).toBe('Open mat — renamed');
-    expect(body.contact.message).toContain('"Open mat — renamed"');
-    // The slug is the public identity and does not follow the title.
     expect(res.status).toBe(200);
+    expect(body.title).toBe('Open mat — renamed');
+    // The admin owns this text. A rename is not an edit of it.
+    expect(body.contact.message).toBe(STORED_MESSAGE);
+    expect(body.contact.message).not.toContain('renamed');
+  });
+
+  it('puts no non-ASCII text of its own into the contact block', async () => {
+    // Every contact column on this fixture is ASCII, so a non-ASCII byte in the
+    // block could only have come from a literal on the server.
+    const res = await req('/events/public-no-message');
+    const body = await res.json<{ contact: unknown }>();
+
+    expect(JSON.stringify(body.contact)).toMatch(/^[\x00-\x7F]*$/);
   });
 });
 
