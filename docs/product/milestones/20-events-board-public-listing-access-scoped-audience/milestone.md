@@ -1,6 +1,6 @@
 # Milestone 20 — Events board — public listing, access-scoped audiences and per-event WhatsApp contact
 
-**Status:** 📝 Draft
+**Status:** ✅ Done
 **Scope:** `apps/api` (events bounded context), `packages/shared` (events types/port + shared media/contact domain), `apps/web` (`(public)` + admin events UI). Derived from [RFC 0014](../../RFCs/0014-events-board-and-whatsapp-contact.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: `apps/api/migrations/0027_create_events.sql`; the new events files under `apps/api/src/{adapters/db/d1-event-repository.ts,controllers/events.controller.ts,controllers/admin-events.controller.ts,routes/events.router.ts,routes/admin/events.ts,middleware/optional-auth.ts}` and their wiring in `container.ts` / `routes/index.ts` / `routes/admin/index.ts`; the new shared code `packages/shared/{types/entities.ts (add Entities.Events + two enums),ports/i-event-repository.ts,ports/index.ts,domain/contact/whatsapp.ts,domain/media/limits.ts}`; `apps/web/src/app/(public)/**`, `apps/web/src/app/(protected)/admin/events/**`, `apps/web/src/lib/{events-api.ts,admin-events-api.ts}`, both i18n dictionaries, and the SEO baseline files (`robots.ts`, `sitemap.ts`, the `<html lang>` fix in `layout.tsx`); and, for the closeout only, a new local seed file under `apps/api/migrations/seed/`, the `db-seed-local` target in `Makefile`, `CLAUDE.md`'s media-limits sentence, `docs/product/FEATURES.md`, RFC 0014's `Status:` header and its `docs/product/RFCs/README.md` row. It may **edit** `admin-media.controller.ts` **only** to import the extracted `media/limits.ts`, `scripts/content/import-media.test.mjs` **only** to add the parity test that pins the importer's own table to it (the importer script itself is a zero-dependency stdlib script run without a build step and is **not** modified — see Task 01), and `apps/web/src/lib/brand.ts` **only** to re-export the moved `normalizeWhatsapp`. It is explicitly **not** an opportunity to: add pricing/invoicing/payment for an event or any FK to `subscriptions` (that is RFC 0015); build RSVP/attendance/capacity; grant content access from an audience row or touch `getEffectiveAccessTopicIds`, `d1-enrollment-repository.ts` or any `src/core/billing/` file; add recurring events, iCal, reminders or notifications; make the marketing landing page data-driven; or fix the identical declared-size upload hole in **topic** media (backlog item, not here). If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
@@ -103,7 +103,7 @@ Each task is one independent PR with one owner and one review surface. Backend a
 | 05 | [Public events board, detail page and SEO baseline](./05-public-web.task.md) | 4 | Frontend | ✅ Done |
 | 06 | [Admin events backoffice](./06-admin-web.task.md) | 5 | Frontend | ✅ Done |
 | 07 | [Board polish, empty and past-event states](./07-web-polish.task.md) | 6 | Frontend | ✅ Done |
-| 08 | [Seeded example event and documentation closeout](./08-seed-and-docs.task.md) | 6 | Backend | ☐ Open |
+| 08 | [Seeded example event and documentation closeout](./08-seed-and-docs.task.md) | 6 | Backend | ✅ Done |
 
 Dependency graph:
 

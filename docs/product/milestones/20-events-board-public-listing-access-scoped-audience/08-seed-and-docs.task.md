@@ -1,6 +1,6 @@
 # Task 08 — Backend: Seeded example event and documentation closeout (Phase 6)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [20 — Events board — public listing, access-scoped audiences and per-event WhatsApp contact](./milestone.md)
 **RFC:** [RFC 0014](../../RFCs/0014-events-board-and-whatsapp-contact.md)
 **Team:** Backend API
@@ -103,31 +103,41 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make db-reset-local` followed by `make dev-api` and `make dev-web` shows a populated
+- [x] `make db-reset-local` followed by `make dev-api` and `make dev-web` shows a populated
       `/events` board on a machine that has never run this feature, with no hand-written SQL.
-- [ ] The seed covers a `public` upcoming, a `members`, a `restricted`-with-group, a past
+- [x] The seed covers a `public` upcoming, a `members`, a `restricted`-with-group, a past
       and a draft event; an anonymous `GET /v1/events` returns exactly the `public` one, and
       a seeded member of the granted group sees the restricted one.
-- [ ] Running `make db-seed-local` twice in a row succeeds and produces no duplicate rows.
-- [ ] `apps/api/scripts/check-no-dev-seed.ts` still detects a dev-seeded database, and the
+- [x] Running `make db-seed-local` twice in a row succeeds and produces no duplicate rows.
+- [x] `apps/api/scripts/check-no-dev-seed.ts` still detects a dev-seeded database, and the
       `guard-no-dev-seed-staging` / `guard-no-dev-seed-prod` targets behave unchanged.
-- [ ] The seeded WhatsApp numbers are obvious placeholders, not real numbers.
-- [ ] `git grep -n "admin-media.controller" CLAUDE.md` no longer claims that file is the
+- [x] The seeded WhatsApp numbers are obvious placeholders, not real numbers.
+- [x] `git grep -n "admin-media.controller" CLAUDE.md` no longer claims that file is the
       source of truth for media limits; the sentence names
       `packages/shared/domain/media/limits.ts` instead.
-- [ ] `docs/product/FEATURES.md` describes the events board, including that the public
+- [x] `docs/product/FEATURES.md` describes the events board, including that the public
       surface is anonymous and indexed.
-- [ ] `NEXT_PUBLIC_SITE_URL` is defined for every environment that deploys; a built
+- [x] `NEXT_PUBLIC_SITE_URL` is defined for every environment that deploys; a built
       `sitemap.xml` carries the tenant's real origin, not `localhost`.
-- [ ] RFC 0014's `Status:` reads `Implemented` in its header and its row in
+- [x] RFC 0014's `Status:` reads `Implemented` in its header and its row in
       `docs/product/RFCs/README.md` matches.
-- [ ] `closeout-analysis.md` exists, names every deferred item with its reason, and links
-      any follow-up backlog entries created — including the topic-media declared-size hole.
-- [ ] Every task file in this milestone has a final `**Status:**` consistent with
+- [x] `closeout-analysis.md` exists **on disk**, names every deferred item with its reason,
+      and links any follow-up backlog entries created — including the topic-media
+      declared-size hole. It is **deliberately not committed**: `.gitignore:88` matches
+      `docs/product/**/closeout-analysis.md`, and no milestone in this repo has ever
+      tracked one — implementation exhaust stays out of the tree, like `planing/`.
+      **Consequence, handled:** a local-only note is a poor home for unfinished work, so
+      every item the closeout raises that outlives the milestone was also filed as a
+      tracked backlog task — `security/01-ssr-requests-share-one-rate-limit-bucket`,
+      `deployment/01-db-reset-local-does-not-fully-reset`,
+      `refactoring/08-presigned-max-size-pins-rather-than-caps` and
+      `refactoring/09-admin-events-missing-get-by-id` — and the two human verifications
+      were annotated onto Tasks 06 and 07 themselves.
+- [x] Every task file in this milestone has a final `**Status:**` consistent with
       `milestone.md` §5.
-- [ ] `apps/api/src/`, `packages/shared/` and `apps/web/src/` are absent from the diff.
-- [ ] `make lint`, `make test-api` and `make test-web` pass green.
-- [ ] No diff outside the scope guardrail.
+- [x] `apps/api/src/`, `packages/shared/` and `apps/web/src/` are absent from the diff.
+- [x] `make lint`, `make test-api` and `make test-web` pass green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
