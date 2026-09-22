@@ -167,8 +167,10 @@ siblings would collide. Uploads run concurrently (`--concurrency`, default 3).
 
 Preflight validates every file against the API's own limits *before the first
 write* (`video/mp4` ≤ 100 MB, `application/pdf` ≤ 25 MB, images ≤ 5 MB — see
-`apps/api/src/controllers/admin-media.controller.ts`, the source of truth) and
-aborts with a per-file report; `--skip-invalid` imports the rest instead.
+`packages/shared/domain/media/limits.ts`, the source of truth since M20 Task 01;
+`admin-media.controller.ts`, the event flyer path and this importer all read that
+one table) and aborts with a per-file report; `--skip-invalid` imports the rest
+instead.
 Credentials are read from `AQ_ADMIN_EMAIL` / `AQ_ADMIN_PASSWORD` in the
 environment only, never argv, and the account needs role `admin` or
 `content_creator`. `AQ_API_BASE_URL` overrides the target for local development
@@ -260,6 +262,8 @@ Cloud-agnostic foundation. Key areas:
 - **`types/entities.ts`** — Canonical entity schema organized in namespaces: `Entities.Config` (enums), `Entities.Identity` (User, Profile, UserGroup, Enrollments), `Entities.Content` (TopicNode hierarchy, Media, Tag), `Entities.Engagement` (Task, TaskStage), `Entities.Progress` (TopicProgress, TaskProgress). All apps import types from here.
 - **`utils/sanitize-markdown.ts`** — Shared Markdown sanitiser used before persisting topic content.
 - **`domain/time/`** — Shared time helpers used across apps.
+- **`domain/media/limits.ts`** — The allowed-type/size table. **The single source of truth** for media limits: `admin-media.controller.ts`, the event flyer path and `scripts/content/import-media.mjs` all read it, so a limit is changed in exactly one place.
+- **`domain/contact/whatsapp.ts`** — `normalizeWhatsapp`, shared so the API rejects at write time exactly the numbers the web would refuse to render.
 
 ### `apps/api`
 Cloudflare Workers serverless backend (Hono). Patterns to follow:
@@ -274,15 +278,16 @@ Cloudflare Workers serverless backend (Hono). Patterns to follow:
     3. **Full wildcard** — `*` — echoes back the actual request `Origin` header (required because browsers block `Access-Control-Allow-Origin: *` on credentialed requests). **For local development only — never set this in staging or production.**
   - Production is locked to exact origins; do not introduce wildcards without a security review (see `docs/product/backlog/cors/`). Staging includes the PR-preview wildcard (`https://*.arenaquest-web-staging.pages.dev`). Local development uses `ALLOWED_ORIGINS=http://localhost:3000` (or `*`) in `.dev.vars` — see `.dev.vars.example`.
 - **User Management** — Includes admin lockout guards to prevent deleting the last active admin or self-lockout.
+- **Events board (the only anonymous data surface)** — `GET /v1/events`, `/{slug}` and `/{slug}/flyer` answer **without a token** and answer *more* when one is present. They are mounted at `/v1/events`, deliberately **not** under `routes/public/` — that directory means "non-admin, authenticated" and reusing it would blur a security boundary. `middleware/optional-auth.ts` is the one middleware that does not reject: an invalid token degrades to anonymous instead of `401`. Audience (`public` · `members` · `restricted`) is resolved server-side in `D1EventRepository`, whose anonymous listing is a **separate statement** with a literal `audience = 'public'` filter rather than the authenticated query with a null user. Out-of-audience detail reads return **404, not 403**, so the open surface is not an enumeration oracle. "Past" is a computed predicate (`COALESCE(ends_at, starts_at + 1 day) < now`), never a column. Anonymous routes carry an IP-keyed `KvRateLimiter` (60 rpm).
 - **Tests** — Vitest with `@cloudflare/vitest-pool-workers`. Config: `vitest.config.mts`.
 
 ### `apps/web`
-Next.js 15 + React 19 frontend deployed to Cloudflare Pages via `@cloudflare/next-on-pages`. App router layout under `src/app/` is split into `(auth)` (login) and `(protected)` (admin backoffice, catalog, dashboard) groups. Admin tooling includes the topic-tree manager and media uploader; the participant catalog renders sanitised Markdown alongside dedicated media viewers. API clients live in `src/lib/*-api.ts`. Uses `NEXT_PUBLIC_API_URL` for environment-specific backend targeting.
+Next.js 15 + React 19 frontend deployed to Cloudflare Pages via `@cloudflare/next-on-pages`. App router layout under `src/app/` is split into `(auth)` (login), `(protected)` (admin backoffice, catalog, dashboard) and `(public)` (the events board and detail pages, readable with no account) groups. The `(public)` pages are **server-rendered** — a client-side fetch would hand a crawler an empty shell — and ship the SEO baseline with them (`robots.ts`, `sitemap.ts`). Admin tooling includes the topic-tree manager, the media uploader and the events backoffice; the participant catalog renders sanitised Markdown alongside dedicated media viewers. API clients live in `src/lib/*-api.ts`. Uses `NEXT_PUBLIC_API_URL` for environment-specific backend targeting and **`NEXT_PUBLIC_SITE_URL` for its own public origin** — the latter is baked into `sitemap.xml`, `robots.txt`'s `Sitemap:` line, `og:url` and the canonical tags, defaults to `http://localhost:3000`, and is derived per environment from the label profile's `webOrigin` by the deploy CLI, so a real deploy never publishes a sitemap pointing at loopback.
 
 ## Key Conventions
 
 - **Commit style** — Conventional Commits (`feature:`, `hotfix:`, etc.). See CONTRIBUTING.md.
-- **Branch strategy** — `main` (production), `develop` (staging), feature branches off `develop`.
+- **Branch strategy** — `main` is the trunk and the only long-lived branch; `feature/*` and `hotfix/*` are cut from it and merged back into it by PR. A merge to `main` deploys staging, then production. **There is no `develop` branch** — staging validation is a `workflow_dispatch` on the feature branch. See CONTRIBUTING.md, which is the source of truth for this.
 - **Package manager** — pnpm with frozen lockfile.
 - **TypeScript** — strict mode. Shared types live in `packages/shared`.
 - **No external auth deps** — Auth is intentionally implemented with Web Crypto API only. Do not introduce `jsonwebtoken`, `bcrypt`, or similar.

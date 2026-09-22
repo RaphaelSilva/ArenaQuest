@@ -1,7 +1,7 @@
 # RFC 0014: Events board — public listing, access-scoped audiences and per-event WhatsApp contact
 
 **Date:** 2026-09-16
-**Status:** Draft
+**Status:** Implemented
 **Revised:** 2026-09-22
 **Author:** raphaelsilva
 **Affected:**

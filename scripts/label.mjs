@@ -112,6 +112,11 @@ export function deriveExpected(profile, env) {
     : `https://${webOrigin},https://*.${webOrigin},http://localhost:3000`;
   return {
     NEXT_PUBLIC_API_URL: `https://${apiHost}`,
+    // Same origin as WEB_BASE_URL, deliberately kept as its own key: one is an
+    // api-var the Worker reads at runtime, the other a build var baked into the
+    // web bundle's sitemap, robots.txt and canonical tags. Deriving both from
+    // the one `webOrigin` anchor is what stops them drifting.
+    NEXT_PUBLIC_SITE_URL: `https://${webOrigin}`,
     GOOGLE_REDIRECT_URI: `https://${apiHost}/auth/google/callback`,
     WEB_BASE_URL: `https://${webOrigin}`,
     ALLOWED_ORIGINS: allowedOrigins,

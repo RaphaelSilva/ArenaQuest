@@ -26,6 +26,11 @@
 {
   "build": {
     "NEXT_PUBLIC_API_URL":           { "required": true,  "derivedFrom": "apiHost" },
+    // The origin the web app itself is served from, baked into sitemap.xml,
+    // robots.txt's Sitemap: line, og:url and the canonical tags. Required:
+    // unset, the build falls back to http://localhost:3000 and a deployed
+    // tenant publishes a sitemap pointing at loopback (RFC 0014 section 7).
+    "NEXT_PUBLIC_SITE_URL":          { "required": true,  "derivedFrom": "webOrigin" },
     "NEXT_PUBLIC_LANGUAGE":          { "required": false, "enum": ["pt", "en"] },
     "NEXT_PUBLIC_BRAND_SIGLA":       { "required": true,  "from": "brand" },
     "NEXT_PUBLIC_BRAND_NAME_PREFIX": { "required": true,  "from": "brand" },
