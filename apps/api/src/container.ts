@@ -134,6 +134,17 @@ export interface EventsContext {
    * world-readable and the bytes are never proxied.
    */
   storage: IStorageAdapter;
+  /**
+   * Identity probes for the admin surface (Task 04).
+   *
+   * An audience grant names a user or a group, and the join tables carry
+   * foreign keys: these two exist so that `PUT /{id}/audience` can refuse an
+   * unknown id with a `422` instead of letting D1 surface it as a `500`. They
+   * are the *same instances* the identity group holds — a second copy of a
+   * per-request adapter, not a second adapter.
+   */
+  users: IUserRepository;
+  userGroups: IUserGroupRepository;
 }
 
 export interface InfraContext {
@@ -328,7 +339,7 @@ export function buildContainer(env: Env): AppContainer {
     progress: { progressRepo, enrollmentRepo },
     gamification: { questRepo, badgeRepo, gamificationRepo, missionRepo, xpEngine, streakEngine, questEvaluator, badgeEngine },
     billing: { billingRepo, billingService, accountingService },
-    events: { eventRepo, storage },
+    events: { eventRepo, storage, users, userGroups },
     infra: {
       auth,
       mailer,

@@ -600,10 +600,22 @@ now live in `packages/shared`, and a seeded example event for `make db-seed-loca
   public URL, unchanged; a previously shared link still resolves.
 - **Phase 3** — a flyer upload of a 6 MB JPEG is rejected with the same `422 FileTooLarge`
   shape the topic uploader returns, from the same shared limits module.
-- **Phase 3** — a client that presigns declaring `sizeBytes: 1024`, `PUT`s a 50 MB object
-  and then calls finalize is rejected with `422 FileTooLarge`, the object is removed and
-  `flyer_status` stays `'pending'`. This is the assertion that makes the 5 MB decision real;
-  without it the ceiling is a client-side suggestion.
+- **Phase 3** — a stored flyer object whose **real** size exceeds the ceiling is rejected
+  with `422 FileTooLarge` at finalize, the object is removed and `flyer_status` stays
+  `'pending'`. This is the assertion that makes the 5 MB decision real; without it the
+  ceiling is only ever checked against a number the client sent.
+
+  *Amended 2026-09-22, during Phase 3.* This criterion originally read "a client that
+  presigns declaring `sizeBytes: 1024`, `PUT`s a 50 MB object and then calls finalize".
+  Measured against the AWS SDK, that path does not exist: `ContentLength` is emitted into
+  `X-Amz-SignedHeaders`, so a presigned PUT whose body does not match the declared byte
+  count fails the signature check. The presign consequently signs with the declared size
+  (validated against the ceiling first), which pins the upload; an oversize stored object
+  is reachable only by an out-of-band write to the bucket. The finalize `headObject` check
+  is what catches that, so the decision stands — only the described attack was wrong.
+  Consequence noted for the future: `PresignedUrlOptions.maxSizeBytes` is a misleading
+  name, since `R2StorageAdapter` maps it to `ContentLength`, which pins rather than caps.
+  Correcting the port is its own backlog item.
 - **Phase 4** — a signed-out visitor loads `/events`, opens an event and lands on
   WhatsApp with a message naming that event, having never authenticated. The number in the
   URL is the event's own, not `NEXT_PUBLIC_BRAND_WHATSAPP`.
@@ -642,10 +654,19 @@ now live in `packages/shared`, and a seeded example event for `make db-seed-loca
   `admin-media.controller.ts:87` compares `body.sizeBytes` to `SIZE_LIMIT_BYTES`, the
   presign is then signed with `maxSizeBytes: sizeBytes` — the declared size, not the
   ceiling (`:103`) — and `finalizeUpload` calls `objectExists`, which asserts existence and
-  never looks at the object's real size (`:129`). A client that declares 1 KB and `PUT`s
-  50 MB is refused only if R2 rejects the signed `ContentLength`, which nothing in this
-  repository verifies. §3 therefore adds a size re-check at finalize, and the same hole in
-  topic media needs its own backlog item rather than a fix here.
+  never looks at the object's real size (`:129`). §3 therefore adds a size re-check at
+  finalize, and the same hole in topic media needs its own backlog item rather than a fix
+  here.
+
+  *Amended 2026-09-22, during Phase 3.* This paragraph originally ended "A client that
+  declares 1 KB and `PUT`s 50 MB is refused only if R2 rejects the signed `ContentLength`,
+  which nothing in this repository verifies." Measured against the SDK, the signature
+  **does** enforce it: `ContentLength` is emitted into `X-Amz-SignedHeaders`, so a PUT that
+  does not match the declared byte count fails outright. Signing with the declared size is
+  therefore correct, and the topic path's real gap is narrower than described — it is only
+  the missing finalize re-read, which is what lets an object written to the bucket by any
+  other route pass as `ready`. That narrowing does not weaken the case for the backlog
+  item; it sharpens what the item has to fix.
 
 - **2026-09-22 (product owner)** — **the contact number has no runtime tenant fallback.**
   `contact.number` is `events.whatsapp_number` or `null`; the tenant's number becomes a

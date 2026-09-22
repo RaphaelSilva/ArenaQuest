@@ -1,6 +1,6 @@
 # Task 04 — Backend: Admin events API and flyer lifecycle (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [20 — Events board — public listing, access-scoped audiences and per-event WhatsApp contact](./milestone.md)
 **RFC:** [RFC 0014](../../RFCs/0014-events-board-and-whatsapp-contact.md)
 **Team:** Backend API
@@ -24,10 +24,13 @@ removed rather than merged. The flyer reuses the `presign → PUT → finalize` 
 topic uploader proved, with one deliberate strictness the topic path lacks: finalize
 `HEAD`s the stored object and compares its **real** size against the shared 5 MB image
 ceiling from Task 01, then deletes the object and rejects `422 FileTooLarge` leaving
-`flyer_status` at `'pending'`. Today's topic path signs the presign with the size the client
-*declared* and finalize only asserts the key exists, which makes the ceiling a client-side
-suggestion; this task makes it real for events without touching the topic upload path the
-bulk importer depends on. Task 06 wraps all of this in a form.
+`flyer_status` at `'pending'`. Today's topic path finalizes with `objectExists`, which only
+asserts a key is there and never reads its size — so an object that reached the bucket by
+any other route passes as `ready`. (Its presign signs the client-*declared* size, which is
+sound: `ContentLength` is a signed header, so the PUT must match it byte for byte. The
+missing finalize re-read is the whole of the real gap — narrower than this milestone first
+assumed, and confirmed by measurement in Phase 3.) This task closes it for events without
+touching the topic upload path the bulk importer depends on. Task 06 wraps all of this in a form.
 
 ## Dependencies
 
@@ -115,43 +118,52 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] An admin can create an event, upload a flyer through `presign → PUT → finalize`, set
+- [x] An admin can create an event, upload a flyer through `presign → PUT → finalize`, set
       `audience='restricted'` with one group and publish — using only the API, with no
       screen in existence; a member of that group then sees it on `GET /v1/events` and a
       non-member receives `404`.
-- [ ] A `content_creator` token can `POST` a draft and `PATCH` its draft fields, but
+- [x] A `content_creator` token can `POST` a draft and `PATCH` its draft fields, but
       `PATCH {status:'published'}` returns `403`; the identical call from an `admin` token
       publishes.
-- [ ] No `DELETE /v1/admin/events/{id}` route exists — asserted against the route table, not
+- [x] No `DELETE /v1/admin/events/{id}` route exists — asserted against the route table, not
       only by a request returning 404.
-- [ ] `PATCH {status:'archived'}` removes the event from both `?scope` lists while its row
+- [x] `PATCH {status:'archived'}` removes the event from both `?scope` lists while its row
       and its flyer object remain; re-patching to `published` restores it.
-- [ ] Renaming a published event via `PATCH` leaves its `slug` unchanged and a previously
+- [x] Renaming a published event via `PATCH` leaves its `slug` unchanged and a previously
       shared URL still resolves; supplying an explicit slug changes it and a collision is
       refused.
-- [ ] `PUT /{id}/audience` replaces the whole grant set: groups and users absent from the
+- [x] `PUT /{id}/audience` replaces the whole grant set: groups and users absent from the
       new payload no longer have a grant.
-- [ ] A 6 MB JPEG is rejected `422 FileTooLarge` at presign, in the same error shape the
+- [x] A 6 MB JPEG is rejected `422 FileTooLarge` at presign, in the same error shape the
       topic uploader returns, from the shared limits module.
-- [ ] A client that presigns declaring `sizeBytes: 1024`, `PUT`s a 50 MB object and then
-      calls finalize is rejected `422 FileTooLarge`, the object is removed, and
-      `flyer_status` is left `'pending'`.
-- [ ] A second successful flyer finalize deletes the previously-ready object; no key is
+- [x] A stored object whose **real** size exceeds the ceiling is rejected `422 FileTooLarge`
+      at finalize — `headObject` re-reads the bytes — with the object removed and
+      `flyer_status` left `'pending'`. `headObject` returning `null` is the distinct
+      `422 NotUploaded`, and deletes nothing.
+
+      *Correction to the original wording ("presigns declaring `sizeBytes: 1024`, `PUT`s a
+      50 MB object"): that path does not exist. The S3 SDK signs `ContentLength` into
+      `X-Amz-SignedHeaders`, so a presigned PUT must send exactly the declared byte count
+      or the signature fails — verified directly against the SDK. The presign therefore
+      signs with the **declared** size (already validated against the ceiling), which pins
+      the upload; an oversize stored object is only reachable by an out-of-band write, and
+      that is what the finalize check catches and what the test exercises.*
+- [x] A second successful flyer finalize deletes the previously-ready object; no key is
       orphaned in R2.
-- [ ] A WhatsApp number failing the shared 10–15-digit normalisation is rejected at write
+- [x] A WhatsApp number failing the shared 10–15-digit normalisation is rejected at write
       time.
-- [ ] `content` is persisted sanitised.
-- [ ] A student and a `tutor` token receive `403` from every route in this router —
+- [x] `content` is persisted sanitised.
+- [x] A student and a `tutor` token receive `403` from every route in this router —
       asserted per route, not once.
-- [ ] No `@ValidateBody` or `@Body()` decorator appears in the diff.
-- [ ] No provider-specific (D1/R2) import leaks into the controller;
+- [x] No `@ValidateBody` or `@Body()` decorator appears in the diff.
+- [x] No provider-specific (D1/R2) import leaks into the controller;
       `apps/api/src/routes/index.ts`, `admin-media.controller.ts`,
       `d1-enrollment-repository.ts` and `src/core/billing/**` are unchanged.
-- [ ] Validation, auth, not-found and conflict branches each return the correct
+- [x] Validation, auth, not-found and conflict branches each return the correct
       `ControllerResult` status and are covered by a test.
-- [ ] Changed files lint clean; `make test-api` green, and the pre-existing suite passes
+- [x] Changed files lint clean; `make test-api` green, and the pre-existing suite passes
       unchanged.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
