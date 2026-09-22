@@ -19,7 +19,10 @@ designer's export routinely exceeds it and being told after a failed upload is t
 moment to learn. The **audience selector** offers `public` / `members` / `restricted`, and
 `restricted` reveals group and user pickers over the existing `admin-groups-api`; choosing
 `public` warns plainly that the event becomes readable by anyone on the internet, including
-its contact number. The **WhatsApp fields** show a **live preview of the composed message** —
+its contact number. The **WhatsApp fields** are where the contact text is *authored*: the
+message field is **pre-filled from a dictionary template** composed with the event's title
+and date, and what the admin submits is what the API stores and serves — the server
+composes nothing (RFC 0014 decision of 2026-09-22). A **live preview** shows it —
 the administrator should read the exact text a visitor will send before publishing, not
 discover it afterwards. And the **slug** field is generated from the title at creation and
 never re-derived on rename, with a manual override that warns it breaks links already
@@ -90,12 +93,19 @@ In:
 - The audience selector with its group and user pickers over `admin-groups-api`, and the
   `public` warning.
 - The WhatsApp number, message and label fields with a live preview of the composed
-  message. The number field is **pre-filled with the tenant's `NEXT_PUBLIC_BRAND_WHATSAPP`
-  on a new event** — that constant's only remaining job (RFC 0014 decision of 2026-09-22):
-  a starting value a human accepts or replaces, persisted onto the row on save, never a
-  fallback applied behind the reader's back. The preview must show plainly that clearing
-  the field means **no button at all** on the public page, not a silent fall back to the
-  house number.
+  message. Both value fields are **pre-filled and then persisted**, never resolved at read
+  time (RFC 0014 decisions of 2026-09-22):
+  - the **number** from the tenant's `NEXT_PUBLIC_BRAND_WHATSAPP` — that constant's only
+    remaining job — a starting value a human accepts or replaces;
+  - the **message** from a dictionary template composed with the event's title and date, so
+    the suggestion follows the build language and no Portuguese literal can reach an `en`
+    build.
+
+  The preview must show plainly that clearing the number means **no button at all** on the
+  public page, and that clearing the message means the chat opens with **no pre-filled
+  text** — neither falls back to anything. When the title changes after a message was
+  written, the form warns, because the stored text will otherwise keep advertising the old
+  name (the risk RFC Alternative 9 named, now owned by a human rather than hidden).
 - The publish and archive actions, with publish hidden or disabled and explained for a
   `content_creator`.
 - The admin nav entry.

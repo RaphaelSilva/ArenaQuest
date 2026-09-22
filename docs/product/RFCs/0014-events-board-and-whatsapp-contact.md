@@ -348,9 +348,11 @@ Resolution, server-side, so the rule lives in one place:
   event. The tenant's own number is offered as a *pre-filled value in the admin form*
   (§7), so the common case is still one keystroke, but what reaches a reader was written
   to the row deliberately.
-- **message** — `events.whatsapp_message` when the admin wrote one, else composed from the
-  event: `Olá! Tenho interesse no evento "{title}" ({date}).` Storing `NULL` rather than
-  the rendered default means renaming the event does not strand a stale message.
+- **message** — `events.whatsapp_message`, as stored. **The API composes nothing**
+  (decided 2026-09-22, below). An empty column means the button opens a chat with no
+  pre-filled text; it is not an invitation for the server to invent one. The suggested
+  wording is composed in the **admin form** from a dictionary template and persisted on
+  save, so it follows the build language and belongs to whoever runs the event.
 - **label** — `events.contact_label` when set, else the dictionary default, resolved by
   the web layer so it follows the build language. The default is **"Eu quero"** (decided
   2026-09-20); `dict-en` carries its own sibling string, since identical keys across both
@@ -458,7 +460,12 @@ the admin should see the exact text a visitor will send before publishing. The *
 field is pre-filled with the tenant's own `NEXT_PUBLIC_BRAND_WHATSAPP`** on a new event,
 which is where that constant now earns its keep: it is a starting value a human accepts or
 replaces, not a rule resolved behind the reader's back (§5). An event run by a visiting
-instructor is one edit away, and whatever is submitted is persisted on the row. Two more
+instructor is one edit away, and whatever is submitted is persisted on the row. The
+**message field is pre-filled the same way**, from a dictionary template composed with the
+event's title and date — so the suggestion follows the build language, the admin reads the
+exact text a visitor will send before publishing, and the stored value is the one that
+ships. When the title changes after a message was written, the form says so, since the
+stored text will otherwise keep advertising the old name. Two more
 fields carry decisions of 2026-09-22: a **slug** field that is generated from the title at
 creation and **never re-derived on rename** (an explicit manual edit is allowed, for a
 typo, with a warning that it breaks links already shared — the URL is public and pasted
@@ -516,9 +523,19 @@ hardcoded strings in `src/{app,components,hooks}/**`, enforced by `check-i18n-co
    preview would expose the content the enrollment system exists to protect. The §4 redirect
    gets a stable URL with the bucket still private.
 
-9. **Store the composed WhatsApp message at creation time.** Rejected. Renaming an event
-   would leave a message advertising the old name, and the divergence is invisible until a
-   student quotes it back. `NULL` means "compose from the current title".
+9. **Store the composed WhatsApp message at creation time.** ~~Rejected.~~ **Adopted
+   2026-09-22** — see the dated decision below. The original rejection read: "Renaming an
+   event would leave a message advertising the old name, and the divergence is invisible
+   until a student quotes it back. `NULL` means 'compose from the current title'."
+
+   That reasoning assumed the composition had a correct place to live. It does not: the
+   API has no language context (no `LANGUAGE` binding, no locale), so composing there
+   hardcodes one language — the same defect as the contact-number fallback above, one
+   layer down. The message is now stored on the row, pre-filled in the admin form from a
+   dictionary template, and owned by whoever runs the event. The staleness this
+   alternative warned about is real but is now a *visible edit* rather than a silent
+   system default; the form warns when the title changed after the message was written
+   (§7).
 
 10. **Model the event as a `TopicNode` with a date.** Rejected. A topic is a node in a
     learning hierarchy with progress, prerequisites, comments and XP hanging off it. An
@@ -667,6 +684,26 @@ now live in `packages/shared`, and a seeded example event for `make db-seed-loca
   the missing finalize re-read, which is what lets an object written to the bucket by any
   other route pass as `ready`. That narrowing does not weaken the case for the backlog
   item; it sharpens what the item has to fix.
+
+- **2026-09-22 (product owner)** — **the WhatsApp message comes from the database, not from
+  the server's imagination.** `contact.message` is `events.whatsapp_message` as stored; the
+  API composes nothing. This reverses Alternative 9 above.
+
+  The rule the owner stated: *each event is the responsibility of whoever runs it, so the
+  text that event sends belongs to that event.* The technical case is the same defect
+  found twice already in this RFC — asking the API to resolve something only the web
+  knows. Here it was the **build language**: the composed default was the Portuguese
+  literal `Olá! Tenho interesse no evento "{title}" ({date}).`, hardcoded in a Worker that
+  has no `LANGUAGE` binding and no locale. Under `NEXT_PUBLIC_LANGUAGE=en` the button read
+  "I'm interested" and opened WhatsApp in Portuguese — precisely the leak the 2026-09-20
+  label decision was made to prevent, reintroduced one layer below it.
+
+  Consequences: the admin form pre-fills the message field from a **dictionary** template
+  (so the suggestion is translated) and persists whatever is submitted, exactly as it does
+  for the number; an empty column yields a button with no pre-filled text rather than a
+  server-invented one; and the staleness Alternative 9 feared is accepted, mitigated by a
+  form warning when the title changed after the message was written. The API keeps no
+  user-facing literal in any language.
 
 - **2026-09-22 (product owner)** — **the contact number has no runtime tenant fallback.**
   `contact.number` is `events.whatsapp_number` or `null`; the tenant's number becomes a
