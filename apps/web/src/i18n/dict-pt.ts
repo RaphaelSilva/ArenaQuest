@@ -188,6 +188,65 @@ export const dictPt = {
       },
     },
   },
+  // Public events board (RFC 0014 / Milestone 20). The only surface a stranger
+  // reads without a session, so every string here is also SEO copy.
+  events: {
+    /**
+     * Locale that formats every date on the board. Dates are rendered in the
+     * *event's* IANA zone — see `components/events/event-format.ts` — and this
+     * is the only place the language of the month names is decided.
+     */
+    locale: 'pt-BR',
+    /** `date · time (zone)`, composed so punctuation stays translatable. */
+    when: (date: string, time: string, zone: string) => `${date} · ${time} (${zone})`,
+    header: {
+      skipToContent: 'Ir para o conteúdo',
+      navLabel: 'Navegação',
+      home: 'Início',
+      events: 'Eventos',
+      signIn: 'Entrar',
+    },
+    board: {
+      title: 'Eventos',
+      subtitle: 'Seminários, graduações e treinos abertos. Dá para ver tudo sem criar conta.',
+      metaDescription:
+        'Agenda de seminários, graduações e treinos abertos. Veja os próximos eventos e o que já aconteceu.',
+      tabsLabel: 'Período dos eventos',
+      tabUpcoming: 'Próximos',
+      tabPast: 'Anteriores',
+      listLabel: 'Lista de eventos',
+      emptyUpcoming: 'Nenhum evento marcado por enquanto. Volte em breve.',
+      emptyPast: 'Ainda não há eventos realizados por aqui.',
+      signedOutTitle: 'Tem mais evento para ver',
+      signedOutBody:
+        'Alguns eventos são só para alunos. Entre na sua conta para ver o quadro completo.',
+      signedOutCta: 'Entrar',
+      flyerAlt: (title: string) => `Cartaz do evento ${title}`,
+      openEvent: (title: string) => `Ver detalhes de ${title}`,
+    },
+    audience: {
+      members: 'Alunos',
+      restricted: 'Restrito',
+    },
+    detail: {
+      back: 'Voltar para os eventos',
+      whenLabel: 'Quando',
+      whereLabel: 'Onde',
+      aboutLabel: 'Sobre o evento',
+      /**
+       * Default button text, used only when the event stores no `contactLabel`.
+       * This is the one contact field the web resolves: it is a translated UI
+       * string, so the API cannot know it. The number and the pre-filled
+       * message are never defaulted.
+       */
+      contactDefaultLabel: 'Eu quero',
+      loading: 'Carregando o evento…',
+      notFoundTitle: 'Evento não encontrado',
+      notFoundBody:
+        'Este evento não existe, já saiu do ar, ou não está disponível para a sua conta.',
+      notFoundCta: 'Ver todos os eventos',
+    },
+  },
   admin: {
     dashboard: {
       title: 'Admin Dashboard',

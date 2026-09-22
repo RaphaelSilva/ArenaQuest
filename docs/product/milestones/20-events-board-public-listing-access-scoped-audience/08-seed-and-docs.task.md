@@ -79,6 +79,12 @@ In:
   granted to a seeded group, a past event, and a draft — wired to the existing seeded
   accounts and groups, idempotent, local only.
 - The `db-seed-local` Makefile target extended to apply it.
+- **`NEXT_PUBLIC_SITE_URL` wired for real deploys** (surfaced by Task 05). It drives
+  `sitemap.xml`, `robots.txt`'s sitemap line, `og:url` and the canonical tags, and it is
+  currently **undefined**, defaulting to `http://localhost:3000`. A deploy that ships
+  without it publishes a sitemap advertising localhost to crawlers — which would undo the
+  whole point of indexing the board. Add it to `.env.example`, the web build vars, and the
+  label profiles the deploy CLI bakes from, so each tenant's own origin is used.
 - The `CLAUDE.md` correction pointing media limits at `packages/shared/domain/media/limits.ts`,
   plus a short events entry in the architecture notes.
 - The `docs/product/FEATURES.md` events board entry.
@@ -111,6 +117,8 @@ Out:
       `packages/shared/domain/media/limits.ts` instead.
 - [ ] `docs/product/FEATURES.md` describes the events board, including that the public
       surface is anonymous and indexed.
+- [ ] `NEXT_PUBLIC_SITE_URL` is defined for every environment that deploys; a built
+      `sitemap.xml` carries the tenant's real origin, not `localhost`.
 - [ ] RFC 0014's `Status:` reads `Implemented` in its header and its row in
       `docs/product/RFCs/README.md` matches.
 - [ ] `closeout-analysis.md` exists, names every deferred item with its reason, and links

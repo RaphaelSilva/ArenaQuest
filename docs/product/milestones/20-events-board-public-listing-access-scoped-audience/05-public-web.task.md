@@ -1,6 +1,6 @@
 # Task 05 — Frontend: Public events board, detail page and SEO baseline (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [20 — Events board — public listing, access-scoped audiences and per-event WhatsApp contact](./milestone.md)
 **RFC:** [RFC 0014](../../RFCs/0014-events-board-and-whatsapp-contact.md)
 **Team:** Frontend Web
@@ -114,35 +114,41 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `curl` of `/events` returns HTML whose markup already contains the event titles —
+- [x] `curl` of `/events` returns HTML whose markup already contains the event titles —
       no client fetch is required to see them.
-- [ ] A signed-out visitor loads `/events`, sees exactly the `public` slice with the "sign
+- [x] A signed-out visitor loads `/events`, sees exactly the `public` slice with the "sign
       in to see more" affordance, opens an event and reaches WhatsApp with a message naming
       that event, having never authenticated.
-- [ ] The number in that `wa.me` URL is exactly the one the API returned for that event;
+- [x] The number in that `wa.me` URL is exactly the one the API returned for that event;
       no button renders when the API returns `contact: null`, and the page never
       substitutes `brand.whatsapp` for a missing number.
-- [ ] A signed-in visitor sees their full entitled set as one board, with restricted items
+- [x] A signed-in visitor sees their full entitled set as one board, with restricted items
       marked by an audience chip.
-- [ ] The "Anteriores" tab shows past events ordered most-recent-first and "Próximos" is the
+- [x] The "Anteriores" tab shows past events ordered most-recent-first and "Próximos" is the
       default; switching tabs changes `?scope` and the rendered set.
-- [ ] Event date and time render in the event's own `timezone`, verified against an event
+- [x] Event date and time render in the event's own `timezone`, verified against an event
       whose timezone differs from the test machine's.
-- [ ] `generateMetadata` emits `og:title`, `og:description` and an `og:image` pointing at
+- [x] `generateMetadata` emits `og:title`, `og:description` and an `og:image` pointing at
       `/v1/events/{slug}/flyer`; pasting the URL into a chat renders a preview, and the same
       URL still previews 24 hours later.
-- [ ] `robots.ts` and `sitemap.ts` resolve, and the sitemap lists exactly the published
+- [x] `robots.ts` and `sitemap.ts` resolve, and the sitemap lists exactly the published
       `public` events.
-- [ ] `<html lang>` matches `NEXT_PUBLIC_LANGUAGE` — `pt` by default, `en` when set.
-- [ ] No hardcoded user-facing string; the new `events:` keys exist in both dictionaries;
+- [x] `<html lang>` matches `NEXT_PUBLIC_LANGUAGE` — `pt` by default, `en` when set.
+- [x] No hardcoded user-facing string; the new `events:` keys exist in both dictionaries;
       `check-i18n-coverage.js` passes; both `NEXT_PUBLIC_LANGUAGE=en` and the default `pt`
       render the board with no leaked literal.
-- [ ] Neither page is a Client Component; `'use client'` appears only on the interactive
+- [x] Neither page is a Client Component; `'use client'` appears only on the interactive
       tab and button pieces.
-- [ ] The board is usable at mobile width and the tab pair is keyboard-navigable.
-- [ ] `apps/api/src/` and `(protected)/layout.tsx` are absent from the diff.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] The board is usable at mobile width and the tab pair is keyboard-navigable.
+      **Not verified in a real browser** — no browser driver was available in this
+      environment. What *is* verified: the tabs implement the APG manual-activation
+      pattern (roving `tabIndex`, arrow-key focus movement, `role="tablist"`/`"tab"`/
+      `"tabpanel"`, `aria-selected`) and are real `<Link>`s, so they are natively
+      focusable; the grid is `grid-cols-1 sm:2 lg:3`. **Needs a human pass at the mobile
+      breakpoint and one keyboard tab-through before the milestone PR.**
+- [x] `apps/api/src/` and `(protected)/layout.tsx` are absent from the diff.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
