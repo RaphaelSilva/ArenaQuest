@@ -16,14 +16,13 @@ import type {
 /**
  * Business rules of the admin events surface, on pure mocks.
  *
- * The file that matters most here is the flyer trio. `admin-media.controller`
- * signs its presigned URL with the size the **client declared** and finalizes
- * on `objectExists`, which never looks at how many bytes actually landed; this
- * controller signs with the ceiling and re-reads the stored size, and the three
- * assertions that pin that difference —
- * `signs the upload URL against the ceiling`, `rejects a stored object over the
- * ceiling` and `treats a missing object as NotUploaded` — are the point of the
- * task. Do not relax them into "presign rejects a big number".
+ * The part that matters most here is the flyer trio. `admin-media.controller`
+ * finalizes on `objectExists`, which never looks at how many bytes actually
+ * landed, so its ceiling is only ever a claim the client made at presign time;
+ * this controller re-reads the **stored** size. The two assertions that pin
+ * that difference — `rejects a stored object over the ceiling` and `treats a
+ * missing object as NotUploaded` — are the point of the task, and neither may
+ * be relaxed into "presign rejects a big number".
  */
 
 const CEILING = 5 * 1024 * 1024;
@@ -429,7 +428,7 @@ describe('replaceAudience', () => {
 // ---------------------------------------------------------------------------
 
 describe('presignFlyer', () => {
-  it('signs the upload URL against the CEILING, not against the declared size', async () => {
+  it('signs the upload URL against the declared size, never against the ceiling', async () => {
     const event = await seed();
 
     await controller.presignFlyer(event.id, {
@@ -439,9 +438,12 @@ describe('presignFlyer', () => {
     });
 
     const [, options] = storage.getPresignedUploadUrl.mock.calls[0] as [string, { maxSizeBytes: number }];
-    // The declared 1 KB must not become the bound the signature carries.
-    expect(options.maxSizeBytes).toBe(CEILING);
-    expect(options.maxSizeBytes).not.toBe(1024);
+    // `maxSizeBytes` becomes R2's `ContentLength`, which the presigner *signs*
+    // rather than treating as an upper bound. Signing with the ceiling would
+    // pin every flyer PUT to exactly 5 MB and make the endpoint unusable; the
+    // ceiling is enforced at finalize, against the bytes that actually landed.
+    expect(options.maxSizeBytes).toBe(1024);
+    expect(options.maxSizeBytes).not.toBe(CEILING);
   });
 
   it('rejects a 6 MB JPEG with 422 FileTooLarge and reports the ceiling', async () => {

@@ -112,7 +112,7 @@ export interface FlyerPresignDto {
   uploadUrl: string;
   /** Seconds the upload URL stays valid. */
   expiresInSeconds: number;
-  /** The ceiling the URL was signed against, in bytes. */
+  /** The ceiling the declared size was checked against, in bytes. */
   maxBytes: number;
   flyer: AdminEventFlyerDto;
 }
@@ -455,15 +455,23 @@ export class AdminEventsController {
 
     const key = `events/${id}/flyer-${crypto.randomUUID()}-${sanitizeFileName(body.fileName)}`;
 
-    // Signed against **the ceiling**, not against `body.sizeBytes`. The declared
-    // size is a claim by the client and must not become the bound the signature
-    // carries: whoever "tightens" this back to the declared size reopens the
-    // hole the topic path still has. The size that is actually enforced is the
-    // stored one, re-read in `finalizeFlyer`.
+    // Signed against the **declared** size, which the check above already
+    // bounded by the ceiling. Do not "harden" this by passing `maxBytes`:
+    // `maxSizeBytes` reaches R2 as `ContentLength`, which the presigner puts in
+    // `X-Amz-SignedHeaders` — it is a *signed header*, not an upper bound, so
+    // signing with the ceiling would pin every flyer upload to exactly
+    // 5,242,880 bytes and nothing else would be uploadable at all.
+    //
+    // The two checks are therefore independent and both real: the signature
+    // pins the PUT to exactly what the client declared, so a different payload
+    // cannot be substituted through this URL, and `finalizeFlyer` re-reads the
+    // **stored** size with `headObject` — that is what enforces the ceiling,
+    // including against anything written to the bucket out of band. The gap in
+    // the topic path is that missing finalize check, not this line.
     const uploadUrl = await this.storage.getPresignedUploadUrl(key, {
       expiresInSeconds: FLYER_URL_TTL_SECONDS,
       contentType: body.contentType,
-      maxSizeBytes: maxBytes,
+      maxSizeBytes: body.sizeBytes,
     });
 
     await this.events.setFlyerPending(id, {
