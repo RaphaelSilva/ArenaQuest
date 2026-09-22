@@ -129,3 +129,91 @@ describe('AdminEventsPage', () => {
     }
   });
 });
+
+/**
+ * The states the authoring list shows when there is nothing to list.
+ *
+ * "No events" and "the API did not answer" look the same from the component's
+ * point of view — both leave `events` empty — and telling them apart matters
+ * more here than on the public board: an admin shown "no events yet, create the
+ * first one" while the backend is down may well go and re-create events that
+ * already exist.
+ */
+describe('AdminEventsPage — empty, loading and failure', () => {
+  it('offers a way to create the first event when the tenant has none', async () => {
+    mockAdminEvents.list.mockResolvedValue({ data: [], total: 0, limit: 50, offset: 0 });
+    render(<AdminEventsPage />);
+
+    await waitFor(() => expect(screen.getByText(d.list.emptyTitle)).toBeInTheDocument());
+    expect(screen.getByText(d.list.empty)).toBeInTheDocument();
+
+    // The affordance is inside the empty panel itself, not only in the header
+    // the admin has already scrolled past.
+    const panel = screen.getByText(d.list.emptyTitle).closest('section') as HTMLElement;
+    expect(within(panel).getByRole('link', { name: d.list.newButton })).toHaveAttribute(
+      'href',
+      '/admin/events/new',
+    );
+  });
+
+  it('distinguishes an empty filter from an empty tenant', async () => {
+    const user = userEvent.setup();
+    render(<AdminEventsPage />);
+    await screen.findByText('Seminário de outubro');
+
+    mockAdminEvents.list.mockResolvedValue({ data: [], total: 0, limit: 50, offset: 0 });
+    await user.click(screen.getByRole('button', { name: d.status.archived }));
+
+    await waitFor(() => expect(screen.getByText(d.list.emptyFilteredTitle)).toBeInTheDocument());
+    // Not an invitation to create: the events exist, the filter hides them.
+    expect(screen.queryByText(d.list.emptyTitle)).not.toBeInTheDocument();
+  });
+
+  it('reads a failed load as a failure, never as an empty tenant', async () => {
+    mockAdminEvents.list.mockRejectedValue(new Error('network down'));
+    render(<AdminEventsPage />);
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    expect(screen.getByRole('alert')).toHaveTextContent(d.list.errorTitle);
+    expect(screen.getByRole('alert')).toHaveTextContent(d.list.errorLoading);
+
+    expect(screen.queryByText(d.list.emptyTitle)).not.toBeInTheDocument();
+    // And no count either: "0 event(s)" would be a claim about the tenant
+    // rather than about the request that failed.
+    expect(screen.queryByText(d.list.countLabel(0))).not.toBeInTheDocument();
+  });
+
+  it('lets the admin retry without leaving the page', async () => {
+    const user = userEvent.setup();
+    mockAdminEvents.list.mockRejectedValueOnce(new Error('network down'));
+    mockAdminEvents.list.mockResolvedValue({
+      data: [makeEvent()],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    });
+
+    render(<AdminEventsPage />);
+    await screen.findByRole('alert');
+
+    await user.click(screen.getByRole('button', { name: d.list.retry }));
+    await waitFor(() => expect(screen.getByText('Seminário de outubro')).toBeInTheDocument());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('announces the load in progress rather than showing a bare page', async () => {
+    let release: (() => void) | undefined;
+    mockAdminEvents.list.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ data: [], total: 0, limit: 50, offset: 0 });
+        }),
+    );
+
+    render(<AdminEventsPage />);
+
+    expect(screen.getByRole('status')).toHaveTextContent(d.list.loading);
+    release?.();
+    await waitFor(() => expect(screen.getByText(d.list.emptyTitle)).toBeInTheDocument());
+  });
+});

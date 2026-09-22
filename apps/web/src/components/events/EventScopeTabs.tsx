@@ -70,10 +70,11 @@ export function EventScopeTabs({ scope }: { scope: EventScope }) {
             // arrow keys reach the other one. APG, roving tabindex.
             tabIndex={isActive ? 0 : -1}
             href={`/events?scope=${candidate}`}
-            className="rounded-[9px] px-4 py-2 text-sm font-semibold transition-colors duration-200"
+            className="inline-flex min-h-11 items-center justify-center rounded-[9px] px-4 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2"
             style={{
               background: isActive ? 'var(--aq-accent)' : 'transparent',
               color: isActive ? '#0B0E17' : 'var(--aq-text2)',
+              outlineColor: 'var(--aq-accent)',
               fontFamily: "'Space Grotesk', sans-serif",
             }}
           >

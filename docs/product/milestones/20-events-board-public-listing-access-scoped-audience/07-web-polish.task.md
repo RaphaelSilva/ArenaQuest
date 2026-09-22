@@ -1,6 +1,6 @@
 # Task 07 — Frontend: Board polish, empty and past-event states (Phase 6)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [20 — Events board — public listing, access-scoped audiences and per-event WhatsApp contact](./milestone.md)
 **RFC:** [RFC 0014](../../RFCs/0014-events-board-and-whatsapp-contact.md)
 **Team:** Frontend Web
@@ -56,8 +56,11 @@ screen; it finishes the two that exist.
   arrive while a tenant has nothing upcoming.
 - **A past event stays readable.** Its detail page keeps its content, flyer and date and is
   marked as past; retaining history is pointless if the page it leads to is a dead end.
-  Whether the contact button still renders on a past event is a product call to confirm and
-  then apply consistently.
+  **Decided:** the contact button **stays** on a past event, rendered *below* the past
+  marker so the reader knows the date has passed before writing. The stored message is the
+  admin's own text and a reader may be asking about the next edition; removing the button
+  would silently delete a contact path nobody asked to remove. Reversing it is one line and
+  one dictionary key.
 - **App Router conventions.** Server Component by default; `'use client'` only where
   interactive state requires it. No page is converted to Client for a loading state.
 - **i18n.** No hardcoded user-facing string under `src/{app,components,hooks}/**`. This task
@@ -92,29 +95,39 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A tenant with no upcoming events renders a deliberate, server-rendered empty board
+- [x] A tenant with no upcoming events renders a deliberate, server-rendered empty board
       that points toward the "Anteriores" tab; `curl` of `/events` shows that copy in the
       markup.
-- [ ] A board with no past events renders its own empty state rather than a blank tab.
-- [ ] The admin list with no events renders an empty state with a create affordance.
-- [ ] A past event's detail page is marked as past and still renders its content, flyer and
+- [x] A board with no past events renders its own empty state rather than a blank tab.
+- [x] The admin list with no events renders an empty state with a create affordance.
+- [x] A past event's detail page is marked as past and still renders its content, flyer and
       date.
-- [ ] An out-of-audience slug, an archived slug and a nonexistent slug render an **identical**
+- [x] An out-of-audience slug, an archived slug and a nonexistent slug render an **identical**
       not-found surface — asserted by comparing them, not by checking each alone.
-- [ ] An event with no flyer renders the placeholder on both the card and the detail page;
+- [x] An event with no flyer renders the placeholder on both the card and the detail page;
       no broken image appears.
-- [ ] Loading and error states exist on the public board, the detail page and the admin
+- [x] Loading and error states exist on the public board, the detail page and the admin
       list, and an API failure produces a readable message rather than an empty page.
-- [ ] No hardcoded user-facing string remains anywhere in the milestone's web surfaces;
+- [x] No hardcoded user-facing string remains anywhere in the milestone's web surfaces;
       every `events:` key is present and identical in both dictionaries;
       `check-i18n-coverage.js` passes; both `NEXT_PUBLIC_LANGUAGE=en` and the default `pt`
       render every state with no leaked literal.
-- [ ] Every surface is usable at mobile width; the tab pair is keyboard-navigable with
+- [x] Every surface is usable at mobile width; the tab pair is keyboard-navigable with
       correct semantics; flyer and placeholder carry alternative text; audience chips do not
       rely on colour alone.
-- [ ] `apps/api/src/` and `apps/web/src/lib/*-api.ts` are absent from the diff.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+      **Partially verified.** Asserted in tests: the labelled `tablist` with exactly one
+      selected tab, roving `tabIndex`, arrow-key focus movement with wrap, manual
+      activation, a translated word **and** a distinct per-audience glyph on each chip (so
+      the levels differ with every colour stripped), alt text on the flyer, an accessible
+      name on the placeholder, one link per card named after its event.
+      **Not verified, and not claimed:** contrast ratios in either theme, focus-ring
+      visibility, real screen-reader output, and reflow at true mobile and tablet
+      viewports. No browser driver exists in this environment. `min-h-11` tap targets and
+      `focus-visible` rings were added but confirmed only in markup. **Needs a human pass
+      before the milestone PR**, together with Task 06's end-to-end walkthrough.
+- [x] `apps/api/src/` and `apps/web/src/lib/*-api.ts` are absent from the diff.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

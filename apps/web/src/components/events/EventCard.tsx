@@ -2,42 +2,42 @@
 
 import Link from 'next/link';
 import { useDict } from '@web/context/dict-context';
-import { eventFlyerUrl, type EventListItem } from '@web/lib/events-api';
+import type { EventListItem } from '@web/lib/events-api';
 import { formatEventWhen } from './event-format';
 import { EventAudienceChip } from './EventAudienceChip';
+import { EventFlyer } from './EventFlyer';
 
 /**
  * One card on the board: flyer thumbnail, date, title, summary and — beyond
  * `public` — the audience chip.
  *
  * The whole card is one link, so the keyboard reaches every event with a single
- * Tab per card rather than three.
+ * Tab per card rather than three. The flyer is always rendered through
+ * `EventFlyer`, including when the event has none: a placeholder that keeps the
+ * ratio is what stops a mixed board from turning into a ragged grid.
  */
 export function EventCard({ event }: { event: EventListItem }) {
   const dict = useDict();
   const when = formatEventWhen(event, dict.events.locale);
 
   return (
-    <li>
+    <li className="flex">
       <Link
         href={`/events/${event.slug}`}
         aria-label={dict.events.board.openEvent(event.title)}
-        className="group flex h-full flex-col overflow-hidden rounded-[14px] border transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2"
+        className="group flex h-full w-full flex-col overflow-hidden rounded-[14px] border transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2"
         style={{
           background: 'var(--aq-bg2)',
           borderColor: 'var(--aq-border)',
           outlineColor: 'var(--aq-accent)',
         }}
       >
-        {event.hasFlyer && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={eventFlyerUrl(event.slug)}
-            alt={dict.events.board.flyerAlt(event.title)}
-            className="aspect-[16/9] w-full object-cover"
-            loading="lazy"
-          />
-        )}
+        <EventFlyer
+          slug={event.slug}
+          title={event.title}
+          hasFlyer={event.hasFlyer}
+          variant="card"
+        />
 
         <div className="flex flex-1 flex-col gap-2 p-5">
           <div className="flex flex-wrap items-center gap-2">

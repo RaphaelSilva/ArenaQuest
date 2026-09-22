@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatEventWhen, mergeEventLists } from '../event-format';
+import { formatEventWhen, isPastEvent, mergeEventLists } from '../event-format';
 
 const SAO_PAULO = {
   startsAt: '2026-10-10T13:00:00.000Z',
@@ -60,5 +60,30 @@ describe('mergeEventLists', () => {
     const merged = mergeEventLists([a, b], [b, c], 'upcoming');
     expect(merged).toHaveLength(3);
     expect(new Set(merged.map((e) => e.id)).size).toBe(3);
+  });
+});
+
+describe('isPastEvent', () => {
+  const NOW = Date.parse('2026-10-10T14:00:00.000Z');
+
+  it('is false while the event is still running', () => {
+    // Started at 13:00Z, ends at 16:00Z: at 14:00Z it is happening, not past.
+    expect(isPastEvent(SAO_PAULO, NOW)).toBe(false);
+  });
+
+  it('is true once the declared end has gone by', () => {
+    expect(isPastEvent(SAO_PAULO, Date.parse('2026-10-10T16:00:01.000Z'))).toBe(true);
+  });
+
+  it('falls back to the start for an open-ended event', () => {
+    const openEnded = { startsAt: SAO_PAULO.startsAt, endsAt: null };
+    expect(isPastEvent(openEnded, NOW)).toBe(true);
+    expect(isPastEvent(openEnded, Date.parse('2026-10-10T12:59:00.000Z'))).toBe(false);
+  });
+
+  it('never marks an event past on an unparseable instant', () => {
+    // A wrongly stamped "already happened" on a live seminar costs a booking;
+    // a missing marker on a dead one costs nothing.
+    expect(isPastEvent({ startsAt: 'not-a-date', endsAt: null }, NOW)).toBe(false);
   });
 });

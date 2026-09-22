@@ -102,7 +102,7 @@ Each task is one independent PR with one owner and one review surface. Backend a
 | 04 | [Admin events API and flyer lifecycle](./04-admin-api.task.md) | 3 | Backend | ✅ Done |
 | 05 | [Public events board, detail page and SEO baseline](./05-public-web.task.md) | 4 | Frontend | ✅ Done |
 | 06 | [Admin events backoffice](./06-admin-web.task.md) | 5 | Frontend | ✅ Done |
-| 07 | [Board polish, empty and past-event states](./07-web-polish.task.md) | 6 | Frontend | ☐ Open |
+| 07 | [Board polish, empty and past-event states](./07-web-polish.task.md) | 6 | Frontend | ✅ Done |
 | 08 | [Seeded example event and documentation closeout](./08-seed-and-docs.task.md) | 6 | Backend | ☐ Open |
 
 Dependency graph:

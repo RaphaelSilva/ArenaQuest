@@ -47,3 +47,71 @@ describe('events dictionary', () => {
     }
   });
 });
+
+/**
+ * The milestone-wide sweep (Task 07).
+ *
+ * Tasks 05 and 06 introduced two whole sections — the public board and the
+ * authoring backoffice — and the states added here finish them. The checks
+ * below are the same three applied to the *admin* half, which nothing covered
+ * before: the public board is the surface that would embarrass a dojo in front
+ * of a stranger, but an `en` deploy whose backoffice is half in Portuguese is
+ * just as broken, and only an English-speaking admin would ever find out.
+ */
+describe('events backoffice dictionary', () => {
+  it('carries the same key set in both languages', () => {
+    const en = leafStrings(dictEn.admin.events).map(([key]) => key);
+    const pt = leafStrings(dictPt.admin.events).map(([key]) => key);
+    expect(en.sort()).toEqual(pt.sort());
+  });
+
+  it('leaks no Portuguese literal into the English build', () => {
+    const portuguese = /\b(evento|eventos|próximos|anteriores|entrar|cartaz|quando|onde)\b/i;
+
+    for (const [key, value] of leafStrings(dictEn.admin.events)) {
+      expect(portuguese.test(value), `${key} = ${value}`).toBe(false);
+    }
+  });
+
+  it('has no empty string in either language', () => {
+    const entries = [...leafStrings(dictEn.admin.events), ...leafStrings(dictPt.admin.events)];
+    for (const [key, value] of entries) {
+      expect(value.trim(), key).not.toBe('');
+    }
+  });
+});
+
+/**
+ * Every state this task added exists in both languages, as a *distinct*
+ * sentence.
+ *
+ * Parity alone would pass if a key were filled by copying its neighbour —
+ * which is exactly how "no events yet" ends up on a board that failed to load.
+ * The whole point of these states is that they are told apart, so the test
+ * asserts they are different strings rather than merely present ones.
+ */
+describe('the board states say different things', () => {
+  for (const [language, dict] of [
+    ['pt', dictPt],
+    ['en', dictEn],
+  ] as const) {
+    it(`separates empty, unavailable and past in ${language}`, () => {
+      const board = dict.events.board;
+      const distinct = [
+        board.empty.upcomingTitle,
+        board.empty.pastTitle,
+        board.error.title,
+        board.loading,
+        dict.events.detail.pastBadge,
+        dict.events.detail.notFoundTitle,
+      ];
+      expect(new Set(distinct).size).toBe(distinct.length);
+    });
+
+    it(`separates the admin empty state from the admin failure in ${language}`, () => {
+      const list = dict.admin.events.list;
+      const distinct = [list.emptyTitle, list.emptyFilteredTitle, list.errorTitle, list.loading];
+      expect(new Set(distinct).size).toBe(distinct.length);
+    });
+  }
+});
