@@ -190,6 +190,64 @@ export const dictEn = {
       },
     },
   },
+  // Public events board (RFC 0014 / Milestone 20). The only surface a stranger
+  // reads without a session, so every string here is also SEO copy.
+  events: {
+    /**
+     * Locale that formats every date on the board. Dates are rendered in the
+     * *event's* IANA zone — see `components/events/event-format.ts` — and this
+     * is the only place the language of the month names is decided.
+     */
+    locale: 'en-US',
+    /** `date · time (zone)`, composed so punctuation stays translatable. */
+    when: (date: string, time: string, zone: string) => `${date} · ${time} (${zone})`,
+    header: {
+      skipToContent: 'Skip to content',
+      navLabel: 'Navigation',
+      home: 'Home',
+      events: 'Events',
+      signIn: 'Sign in',
+    },
+    board: {
+      title: 'Events',
+      subtitle: 'Seminars, gradings and open sessions. No account needed to look around.',
+      metaDescription:
+        'Seminars, gradings and open training sessions. See what is coming up and what already happened.',
+      tabsLabel: 'Event period',
+      tabUpcoming: 'Upcoming',
+      tabPast: 'Past',
+      listLabel: 'Event list',
+      emptyUpcoming: 'Nothing on the calendar yet. Check back soon.',
+      emptyPast: 'No past events here yet.',
+      signedOutTitle: 'There is more to see',
+      signedOutBody: 'Some events are for members only. Sign in to see the full board.',
+      signedOutCta: 'Sign in',
+      flyerAlt: (title: string) => `Flyer for ${title}`,
+      openEvent: (title: string) => `See details for ${title}`,
+    },
+    audience: {
+      members: 'Members',
+      restricted: 'Restricted',
+    },
+    detail: {
+      back: 'Back to events',
+      whenLabel: 'When',
+      whereLabel: 'Where',
+      aboutLabel: 'About this event',
+      /**
+       * Default button text, used only when the event stores no `contactLabel`.
+       * This is the one contact field the web resolves: it is a translated UI
+       * string, so the API cannot know it. The number and the pre-filled
+       * message are never defaulted.
+       */
+      contactDefaultLabel: "I'm interested",
+      loading: 'Loading the event…',
+      notFoundTitle: 'Event not found',
+      notFoundBody:
+        'This event does not exist, is no longer published, or is not available to your account.',
+      notFoundCta: 'See all events',
+    },
+  },
   admin: {
     dashboard: {
       title: 'Admin Dashboard',
