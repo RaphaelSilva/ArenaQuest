@@ -21,8 +21,7 @@ size table that `CLAUDE.md` already claims is a single source of truth — today
 literal in `admin-media.controller.ts` and a second copy inside `import-media.mjs`'s
 `validateMediaFile`. The controller is migrated onto the shared table with **no change to
 its behaviour or its numbers**; the importer, a zero-dependency script that runs without a
-build step, keeps its copy under a parity test instead (see
-[the plan](./planing/01-shared-foundations.plan.md) §2). `brand.ts` re-exports the moved
+build step, keeps its copy under a parity test instead. `brand.ts` re-exports the moved
 helper so every current caller keeps working. Everything here is pure and
 unit-testable without a Worker: no D1, no R2, no Cloudflare type crosses into
 `packages/shared`. Tasks 02–04 consume the port and the enums; Task 04 enforces the
@@ -48,8 +47,7 @@ flyer ceiling from this limits table rather than a third literal.
     allowed-type/size literal with an import from the shared limits module. No change to
     the values, the error shapes, or the upload lifecycle.
   - `scripts/content/import-media.test.mjs` — **only** to add the parity test. The
-    importer script itself is **not** modified (see the acceptance criteria and
-    [the plan](./planing/01-shared-foundations.plan.md) §2).
+    importer script itself is **not** modified (reasoning in the bullet below).
   - `packages/shared/**/__tests__/**` (or the workspace's existing test location) — unit
     tests for the two domain modules.
 - **No Cloudflare types in shared.** `packages/shared` stays cloud-agnostic: the port
@@ -117,10 +115,9 @@ Out:
       `domain/media/limits.ts`; the ceilings are numerically identical to today's.
 - [x] `scripts/content/import-media.mjs` **keeps** its own table — it is a documented
       zero-dependency stdlib script run without a build step, and `@arenaquest/shared`
-      resolves only through an untracked `dist/` (see
-      [the plan](./planing/01-shared-foundations.plan.md) §2). A **parity test** asserts
-      the importer's table equals the shared one, so a future divergence fails CI instead
-      of drifting silently.
+      resolves only through an untracked `dist/` (reasoning in Technical Constraints
+      above). A **parity test** asserts the importer's table equals the shared one, so a
+      future divergence fails CI instead of drifting silently.
 - [x] A unit test covers the normaliser's accept / reject / unset branches and the limits
       lookup for each allowed type.
 - [x] `make import-media-staging SOURCE=./content DRY_RUN=1` still preflights and reports
