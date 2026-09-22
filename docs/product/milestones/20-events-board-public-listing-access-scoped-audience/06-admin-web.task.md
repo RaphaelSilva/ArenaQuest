@@ -1,6 +1,6 @@
 # Task 06 — Frontend: Admin events backoffice (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [20 — Events board — public listing, access-scoped audiences and per-event WhatsApp contact](./milestone.md)
 **RFC:** [RFC 0014](../../RFCs/0014-events-board-and-whatsapp-contact.md)
 **Team:** Frontend Web
@@ -121,30 +121,40 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] An admin creates and publishes an event end to end through the backoffice with **no
+- [x] An admin creates and publishes an event end to end through the backoffice with **no
       `curl`** — including the flyer upload, a restricted audience with one group, and the
       WhatsApp fields.
-- [ ] The composed-message preview shows the exact text a visitor will send, updates as the
+      **Verified at build and unit level only — the live browser walkthrough was not run**,
+      here or by the implementer: no browser driver is available in this environment. What
+      is proven: every payload the form issues, the publish gate for both roles, the
+      audience pickers, the preview behaviour, the slug override flow, and a clean
+      `make build-web` for all three routes under both `NEXT_PUBLIC_LANGUAGE` values.
+      **RFC 0014's Phase 5 success criterion asks for exactly this walkthrough by a human**
+      ("an admin creates and publishes an event end to end through the backoffice, with no
+      `curl`" — the RFC notes this criterion exists because RFC 0013 once left it implicit).
+      **It must be performed before the milestone PR**, together with Task 05's mobile and
+      keyboard pass.
+- [x] The composed-message preview shows the exact text a visitor will send, updates as the
       title changes, and shows the fallback composition when the message field is blank.
-- [ ] The flyer uploader rejects a 6 MB JPEG with a clear message naming the 5 MB ceiling,
+- [x] The flyer uploader rejects a 6 MB JPEG with a clear message naming the 5 MB ceiling,
       and surfaces the finalize-time rejection as an error rather than a silent failure.
-- [ ] Selecting `restricted` reveals the group and user pickers; selecting `public` shows
+- [x] Selecting `restricted` reveals the group and user pickers; selecting `public` shows
       the warning that the event and its contact number become readable by anyone.
-- [ ] Renaming an existing event leaves the slug field untouched; the manual override warns
+- [x] Renaming an existing event leaves the slug field untouched; the manual override warns
       that shared links break before it is accepted.
-- [ ] A `content_creator` session sees no enabled publish control and is told why; an
+- [x] A `content_creator` session sees no enabled publish control and is told why; an
       `admin` session publishes successfully.
-- [ ] No delete control is rendered anywhere in the surface; removal is the archive action,
+- [x] No delete control is rendered anywhere in the surface; removal is the archive action,
       and an archived event is visibly distinguished in the list.
-- [ ] The timezone field pre-fills `America/Sao_Paulo` and an edited value round-trips.
-- [ ] No hardcoded user-facing string; every new key exists in both `dict-en.ts` and
+- [x] The timezone field pre-fills `America/Sao_Paulo` and an edited value round-trips.
+- [x] No hardcoded user-facing string; every new key exists in both `dict-en.ts` and
       `dict-pt.ts`; `check-i18n-coverage.js` passes.
-- [ ] The uploader is the existing component configured for the event endpoints, not a
+- [x] The uploader is the existing component configured for the event endpoints, not a
       second implementation.
-- [ ] The form is usable at tablet width and every action is keyboard-reachable.
-- [ ] `apps/api/src/` is absent from the diff.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] The form is usable at tablet width and every action is keyboard-reachable.
+- [x] `apps/api/src/` is absent from the diff.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

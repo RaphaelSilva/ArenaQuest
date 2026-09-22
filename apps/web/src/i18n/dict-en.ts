@@ -249,6 +249,185 @@ export const dictEn = {
     },
   },
   admin: {
+    /**
+     * Copy for the shared `MediaUploader`, which is configured per endpoint
+     * family (topic media, event flyer, …) rather than forked. These strings
+     * describe the *lifecycle*, so they are the same whatever is being
+     * uploaded; the copy that names the accepted types and the ceiling is
+     * supplied per target.
+     */
+    uploader: {
+      preparing: 'Preparing...',
+      uploading: 'Uploading...',
+      finishing: 'Finishing...',
+      uploadComplete: 'Upload complete',
+      cancelLabel: 'Cancel this upload',
+      uploadFailedStatus: (status: number) => `Upload failed with status ${status}`,
+      networkError: 'Network error during upload',
+      uploadFailed: 'Upload failed',
+    },
+    /**
+     * The events backoffice (RFC 0014, Milestone 20 Task 06).
+     *
+     * Two groups here are decisions rather than labels. `contact.messageTemplate`
+     * is where the pre-filled WhatsApp message is *composed* — the API composes
+     * nothing, so this template following the build language is what keeps a
+     * Portuguese literal out of an `en` deploy. And every `warning` string is
+     * load-bearing: clearing the number removes the public button outright,
+     * clearing the message opens the chat empty, and moving a slug breaks links
+     * already shared. None of them falls back to anything.
+     */
+    events: {
+      title: 'Events',
+      subtitle: 'Seminars, gradings and open sessions — drafts included.',
+      list: {
+        newButton: 'New event',
+        filterLabel: 'Status',
+        filterAll: 'All',
+        countLabel: (total: number) => `${total} event(s)`,
+        edit: 'Edit',
+        empty: 'No events yet. Create the first one.',
+        errorLoading: 'Could not load the events.',
+        archivedNote: 'Archived — off the public board',
+      },
+      status: {
+        draft: 'Draft',
+        published: 'Published',
+        archived: 'Archived',
+      },
+      audienceName: {
+        public: 'Public',
+        members: 'Members',
+        restricted: 'Restricted',
+      },
+      form: {
+        createTitle: 'New event',
+        editTitle: 'Edit event',
+        backToList: 'Back to events',
+        notFound: 'This event no longer exists.',
+        basicsSection: 'The basics',
+        titleLabel: 'Title',
+        titlePlaceholder: 'Open mat with Sensei Tanaka',
+        summaryLabel: 'Summary',
+        summaryHint: 'One plain-text line for the board card.',
+        contentLabel: 'Description',
+        contentHint: 'Markdown. Sanitised by the API before it is stored.',
+        locationLabel: 'Location',
+        locationPlaceholder: 'Dojo Central — Campinas, SP',
+        whenSection: 'When it happens',
+        startsAtLabel: 'Starts at',
+        endsAtLabel: 'Ends at',
+        endsAtHint: 'Leave blank for an open-ended event.',
+        timezoneLabel: 'Timezone',
+        timezoneHint:
+          'The zone the event is announced in. Everyone reads the same clock time, wherever they are.',
+        createButton: 'Create draft',
+        saveButton: 'Save changes',
+        saving: 'Saving…',
+        saved: 'Saved',
+        requiredTitle: 'A title is required.',
+        requiredStartsAt: 'A start date and time is required.',
+        invalidRange: 'The end must come after the start.',
+        errorSaving: 'Could not save the event.',
+        errorSlugConflict: 'That link is already taken by another event.',
+      },
+      slug: {
+        label: 'Public link',
+        generatedHint: 'Generated from the title. It is set once, when the event is created.',
+        frozenHint:
+          'Fixed at creation and never re-derived — renaming the event keeps this link working.',
+        overrideButton: 'Change the link',
+        overrideWarning:
+          'Warning: every link already shared — in a WhatsApp group, a post, a printed flyer — stops working the moment this changes. A URL that is already out there cannot be recalled.',
+        overrideConfirm: 'I understand, let me edit it',
+        overrideCancel: 'Keep the current link',
+      },
+      flyer: {
+        sectionTitle: 'Flyer',
+        ceilingNotice:
+          'JPEG, PNG or WebP, up to 5 MB. Export at that size before uploading — anything larger is refused.',
+        dropzoneTitle: 'Click to upload the flyer or drag it here',
+        dropzoneHint: 'JPEG, PNG or WebP — 5 MB maximum',
+        fileTooBig: 'This image is over the 5 MB ceiling. Export it smaller and try again.',
+        availableAfterCreate: 'Create the draft first — the flyer attaches to a saved event.',
+        currentLabel: 'Current flyer',
+        pendingLabel: 'Upload started but never confirmed. Upload it again.',
+        unknownSize: 'unknown size',
+        removeButton: 'Remove the flyer',
+        removing: 'Removing…',
+        removeFailed: 'Could not remove the flyer.',
+        errorTooLarge: (maxMb: number) =>
+          `Refused: the image is over the ${maxMb} MB ceiling. The API checks the bytes it actually stored, so a smaller export is the only fix.`,
+        errorUnsupported: 'Refused: a flyer must be a JPEG, PNG or WebP image.',
+        errorNotUploaded: 'The upload never landed in storage. Try again.',
+      },
+      audience: {
+        sectionTitle: 'Who can see it',
+        optionPublic: 'Public',
+        optionPublicHint: 'Anyone on the internet, with no account at all.',
+        optionMembers: 'Members',
+        optionMembersHint: 'Any signed-in account.',
+        optionRestricted: 'Restricted',
+        optionRestrictedHint: 'Only the groups and people named below.',
+        publicWarning:
+          'This event becomes readable by anyone on the internet, signed in or not — including its WhatsApp number, which will be on a public page and indexed by search engines.',
+        groupsLabel: 'Groups',
+        groupsEmpty: 'No groups exist yet.',
+        usersLabel: 'People',
+        usersEmpty: 'No accounts to pick from.',
+        loadingTargets: 'Loading groups and people…',
+        errorTargets: 'Could not load the groups and people.',
+        errorSavingGrants: 'The event was saved, but its audience list was not.',
+        selectedCount: (groups: number, users: number) =>
+          `${groups} group(s) and ${users} person(s) selected`,
+      },
+      contact: {
+        sectionTitle: 'WhatsApp contact',
+        sectionHint:
+          'Both fields are saved onto this event. Nothing is filled in later on the reader’s behalf.',
+        numberLabel: 'Number',
+        numberHint: 'Pre-filled with this site’s number. Replace it to send this event elsewhere.',
+        numberPlaceholder: '5519999991155',
+        messageLabel: 'Pre-filled message',
+        messageHint: 'The exact text the visitor’s chat opens with. Edit it freely.',
+        /**
+         * The suggestion the form starts from. Composed here, in the build's
+         * own language, because the API stores whatever is submitted and
+         * composes nothing of its own.
+         */
+        messageTemplate: (title: string, when: string) =>
+          `Hi! I saw "${title}" on ${when} and I would like to know more.`,
+        useSuggestion: 'Use the suggested message',
+        labelLabel: 'Button text',
+        labelHint: 'Leave blank to use the site default.',
+        labelPlaceholder: 'I’m interested',
+        previewTitle: 'What the visitor gets',
+        previewButton: (label: string) => `Button: “${label}”`,
+        previewMessageLabel: 'Message the chat opens with:',
+        previewNoNumber:
+          'No number: there will be no button at all on the public page. Nothing takes its place.',
+        previewNoMessage:
+          'No message: the button still appears, and the chat opens with nothing typed in it. Nothing is composed for you.',
+        titleChangedWarning:
+          'The title changed after this message was written, so the message still names the old one. Edit it, or use the suggestion again.',
+      },
+      publish: {
+        sectionTitle: 'Publication',
+        publishButton: 'Publish',
+        publishing: 'Publishing…',
+        unpublishButton: 'Back to draft',
+        archiveButton: 'Archive',
+        archiving: 'Archiving…',
+        archiveConfirm:
+          'Archive this event? It leaves the public board and can be brought back as a draft.',
+        adminOnly: 'Only an administrator can publish an event, so this control is disabled for you. You can keep editing the draft.',
+        forbidden: 'The API refused: publishing requires the administrator role.',
+        stateDraft: 'This event is a draft. Nobody outside the backoffice can see it.',
+        statePublished: 'This event is live on the public board.',
+        stateArchived: 'This event is archived and off the public board.',
+        errorTransition: 'Could not change the publication state.',
+      },
+    },
     dashboard: {
       title: 'Admin Dashboard',
       subtitle: 'Manage users, content and platform settings.',
@@ -409,13 +588,12 @@ export const dictEn = {
       media: {
         sectionTitle: 'Media Attachments',
         sectionSubtitle: 'Upload and manage files associated with this topic.',
+        // The lifecycle copy lives in `admin.uploader`; what stays here is the
+        // copy that describes *what topics accept*, handed to the shared
+        // uploader by `useTopicMediaTarget`.
         uploader: {
           dropzoneTitle: 'Click to upload or drag and drop',
           dropzoneHint: 'PDF, Video or Images up to 100MB',
-          preparing: 'Preparing...',
-          uploading: 'Uploading...',
-          finishing: 'Finishing...',
-          uploadComplete: 'Upload complete',
           fileTooBig: 'File too large (max 100MB)',
         },
         list: {
@@ -1874,6 +2052,7 @@ export const dictEn = {
       users: 'Users',
       topics: 'Topics',
       tasks: 'Tasks',
+      events: 'Events',
       badges: 'Badges',
       quests: 'Quests',
       missions: 'Missions',
