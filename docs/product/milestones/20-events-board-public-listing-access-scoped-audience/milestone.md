@@ -14,7 +14,7 @@
 - **Three server-resolved audience levels — `public` / `members` / `restricted`.** Reusing `user_groups` (never `enrollments_*`), defaulting to `members` so a wrong default hides rather than leaks (RFC §1, §2).
 - **A per-event flyer through the existing presign→PUT→finalize lifecycle, with a real size ceiling.** Flyer lives in columns on `events`; finalize re-checks the stored object's true size against the 5 MB image limit via `headObject` (RFC §3).
 - **A stable, private flyer URL.** `GET /v1/events/{slug}/flyer` 302s to a fresh presigned GET, so a pasted link and its `og:image` keep previewing while the bucket stays private (RFC §4).
-- **A per-event WhatsApp CTA, pre-identified.** Number/message/label resolved server-side (event value → tenant fallback → none); the message names the event so a lead arrives identified (RFC §5).
+- **A per-event WhatsApp CTA, pre-identified.** Number and message resolved server-side from the event row (no runtime tenant fallback — the admin form pre-fills the tenant number and it is persisted); the message names the event so a lead arrives identified (RFC §5).
 - **A shared single source of truth for media limits and WhatsApp normalisation.** `packages/shared/domain/media/limits.ts` and `.../contact/whatsapp.ts`, replacing the duplicated literals (RFC §3, §5).
 - **A server-rendered, indexable public board with a minimal SEO baseline.** `(public)` route group, `robots.ts`, `sitemap.ts` over the `public` set, and the `<html lang>` fix; a "Próximos"/"Anteriores" tab pair over `?scope` (RFC §7, decisions #2/#3).
 - **An admin backoffice to author, gate and publish events.** List + form with flyer uploader, audience selector, WhatsApp fields with live message preview, immutable-slug + timezone fields; publish is `admin`-only (RFC §6, §7, decisions #5/#6).
@@ -41,7 +41,7 @@ Out of scope (explicit, from RFC 0014 Non-Goals):
 - The anonymous endpoints are IP-rate-limited (`CF-Connecting-IP`, 60 req/min); the 61st in a window is `429`.
 
 **Contact resolution**
-- `contact.number` = `events.whatsapp_number` when set, else `NEXT_PUBLIC_BRAND_WHATSAPP`, else `null` (no button). `contact.message` = `events.whatsapp_message` when set, else composed from the current title/date. `contact.label` = `events.contact_label` when set, else the dictionary default (`"Eu quero"` / `"I'm interested"`).
+- `contact.number` = `events.whatsapp_number`, else `null` (no button). **No runtime tenant fallback** — the number is whatever the row stores; the tenant's number is a pre-filled value in the admin form, persisted onto the event like any other field (RFC 0014 decision of 2026-09-22: `NEXT_PUBLIC_BRAND_WHATSAPP` is a build-time variable of the *web* bundle that the Worker cannot read, and persisting keeps a published contact auditable). `contact.message` = `events.whatsapp_message` when set, else composed from the current title/date. `contact.label` = `events.contact_label` when set, else the dictionary default (`"Eu quero"` / `"I'm interested"`) — resolved in the web layer, since it is a translated UI string.
 - A number that fails the shared 10–15-digit normalisation is rejected at write time.
 
 **Admin surface**
@@ -71,7 +71,7 @@ Out of scope (explicit, from RFC 0014 Non-Goals):
 - [ ] Renaming a published event via `PATCH` leaves its `slug` and public URL unchanged; a previously shared link still resolves.
 - [ ] A 6 MB JPEG flyer is rejected `422 FileTooLarge` from the shared limits module; a client declaring `sizeBytes: 1024` then `PUT`-ing 50 MB is rejected at finalize, the object removed and `flyer_status` left `'pending'`.
 - [ ] `GET /v1/events/{slug}/flyer` returns a 302 to a presigned GET with the specified `Cache-Control`; the bucket is not world-readable.
-- [ ] A signed-out visitor loads `/events`, opens an event and reaches WhatsApp with a message naming that event; the number is the event's own, not `NEXT_PUBLIC_BRAND_WHATSAPP` when the event sets one.
+- [ ] A signed-out visitor loads `/events`, opens an event and reaches WhatsApp with a message naming that event; the number is the one stored on that event's row. An event whose `whatsapp_number` is empty renders **no** button — it does not silently fall back to the tenant number.
 - [ ] `curl` of `/events` (server-rendered HTML) contains event titles in the markup; `robots.ts`/`sitemap.ts` resolve; `<html lang>` matches `NEXT_PUBLIC_LANGUAGE`.
 - [ ] `check-i18n-coverage.js` passes; `NEXT_PUBLIC_LANGUAGE=en` and default `pt` both render the board with no hardcoded string.
 - [ ] `git grep -n "getEffectiveAccessTopicIds" apps/api/src` returns its pre-milestone baseline — 13 lines across 5 files (the definition in `d1-enrollment-repository.ts` plus 12 callers); no diff under `src/core/billing/` or in `d1-enrollment-repository.ts`.

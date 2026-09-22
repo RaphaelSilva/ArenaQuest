@@ -342,9 +342,12 @@ contact: {
 
 Resolution, server-side, so the rule lives in one place:
 
-- **number** — `events.whatsapp_number` when set, else the tenant's build-time
-  `NEXT_PUBLIC_BRAND_WHATSAPP`, else `null` and no button is rendered (the same
-  degradation `page.tsx:588` already implements).
+- **number** — `events.whatsapp_number`, or `null` and no button is rendered (the same
+  degradation `page.tsx:588` already implements). **There is no runtime tenant fallback**
+  (decided 2026-09-22, below): the number the event publishes is the number stored on the
+  event. The tenant's own number is offered as a *pre-filled value in the admin form*
+  (§7), so the common case is still one keystroke, but what reaches a reader was written
+  to the row deliberately.
 - **message** — `events.whatsapp_message` when the admin wrote one, else composed from the
   event: `Olá! Tenho interesse no evento "{title}" ({date}).` Storing `NULL` rather than
   the rendered default means renaming the event does not strand a stale message.
@@ -451,7 +454,11 @@ and audience columns, and a form with the date/time pair, markdown editor, the f
 uploader (the existing uploader component, pointed at the event endpoints), an audience
 selector (`public` / `members` / `restricted` + group and user pickers over
 `admin-groups-api`), and the WhatsApp fields with a live preview of the composed message —
-the admin should see the exact text a visitor will send before publishing. Two more
+the admin should see the exact text a visitor will send before publishing. The **number
+field is pre-filled with the tenant's own `NEXT_PUBLIC_BRAND_WHATSAPP`** on a new event,
+which is where that constant now earns its keep: it is a starting value a human accepts or
+replaces, not a rule resolved behind the reader's back (§5). An event run by a visiting
+instructor is one edit away, and whatever is submitted is persisted on the row. Two more
 fields carry decisions of 2026-09-22: a **slug** field that is generated from the title at
 creation and **never re-derived on rename** (an explicit manual edit is allowed, for a
 typo, with a warning that it breaks links already shared — the URL is public and pasted
@@ -639,6 +646,29 @@ now live in `packages/shared`, and a seeded example event for `make db-seed-loca
   50 MB is refused only if R2 rejects the signed `ContentLength`, which nothing in this
   repository verifies. §3 therefore adds a size re-check at finalize, and the same hole in
   topic media needs its own backlog item rather than a fix here.
+
+- **2026-09-22 (product owner)** — **the contact number has no runtime tenant fallback.**
+  `contact.number` is `events.whatsapp_number` or `null`; the tenant's number becomes a
+  pre-filled value in the admin form (§7) and is persisted onto the row like any other
+  field.
+
+  Three reasons, in order of weight. **It was not implementable as drafted:**
+  `NEXT_PUBLIC_BRAND_WHATSAPP` is a *build-time variable of the web bundle*
+  (`next.config.ts:17`, baked from `config/labels/<label>.jsonc`), and the Worker has no
+  such binding — there is no `BRAND_WHATSAPP` var, no secret and no tenant configuration
+  table anywhere in this database. An API asked to resolve it server-side could not read
+  it, so the original §5 described a resolution no layer could perform. **Persisting is
+  more honest:** with a runtime fallback, changing the tenant's number silently rewrites
+  the published contact of every past event, and nobody can later say which number an
+  event actually advertised. **And the alternative was disproportionate:** giving the
+  Worker the value means a new var in `wrangler.jsonc`, in `.dev.vars.example`, in every
+  `config/labels/*.jsonc` and in the deploy CLI's brand baking — growing this RFC into the
+  tenant provisioning system that RFC 0012 owns, to avoid one pre-filled form field.
+
+  Consequence: the milestone's "Contact resolution" requirement drops the fallback clause,
+  and the admin form (§7) owns the pre-fill. `contact.label` is unaffected — its default
+  legitimately lives in the dictionaries, because it is a translated UI string and i18n is
+  the web's job, whereas a phone number is data.
 
 The seven questions the 2026-09-16 draft left open were resolved in dialogue on
 **2026-09-22**:

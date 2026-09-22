@@ -35,9 +35,9 @@ backoffice that fills this board; Task 07 polishes its empty and past states.
 - [Task 03](./03-anonymous-read-api.task.md) — hard dependency. This task consumes
   `GET /v1/events`, `GET /v1/events/{slug}` and `GET /v1/events/{slug}/flyer` and ships no
   endpoint of its own. It must not land ahead of that contract.
-- Extends `apps/web/src/lib/whatsapp.ts` (`whatsappLink`, used unchanged) and
-  `apps/web/src/lib/brand.ts` (the tenant fallback number, already re-exported through
-  shared by Task 01).
+- Extends `apps/web/src/lib/whatsapp.ts` (`whatsappLink`, used unchanged). It does **not**
+  read `brand.whatsapp`: the contact number arrives resolved from the API, and this surface
+  applies no fallback of its own (RFC 0014 decision of 2026-09-22).
 - Adds `apps/web/src/lib/events-api.ts` — a new client, because `fetchWithAuth` assumes a
   session and these reads must work with no token at all.
 
@@ -119,9 +119,9 @@ Out:
 - [ ] A signed-out visitor loads `/events`, sees exactly the `public` slice with the "sign
       in to see more" affordance, opens an event and reaches WhatsApp with a message naming
       that event, having never authenticated.
-- [ ] The number in that `wa.me` URL is the event's own when it sets one, and
-      `NEXT_PUBLIC_BRAND_WHATSAPP` only when it does not; no button renders when neither
-      resolves.
+- [ ] The number in that `wa.me` URL is exactly the one the API returned for that event;
+      no button renders when the API returns `contact: null`, and the page never
+      substitutes `brand.whatsapp` for a missing number.
 - [ ] A signed-in visitor sees their full entitled set as one board, with restricted items
       marked by an audience chip.
 - [ ] The "Anteriores" tab shows past events ordered most-recent-first and "Próximos" is the

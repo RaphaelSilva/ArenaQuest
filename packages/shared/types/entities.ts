@@ -298,7 +298,8 @@ export namespace Entities {
 
         /**
          * The resolved WhatsApp call-to-action for one event, or `null` when the
-         * event carries no number and no tenant fallback applies.
+         * event's stored number is empty — there is no runtime tenant fallback
+         * (RFC 0014, decision of 2026-09-22).
          */
         export interface EventContact {
             /** Normalised digits, ready for `wa.me` — see `domain/contact/whatsapp`. */
