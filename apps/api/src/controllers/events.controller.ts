@@ -238,11 +238,23 @@ function toListItem(event: Entities.Events.Event): EventListItemDto {
  * number per event keeps a published contact auditable years later. An empty
  * column therefore suppresses the whole block, and the page renders no button —
  * the same degradation the landing page already implements.
+ *
+ * **The API composes nothing.** `message` is `events.whatsapp_message` verbatim.
+ * The Worker has no language context — no `LANGUAGE` binding, no locale, no
+ * `Accept-Language` it could trust for a stored artefact — so any sentence
+ * composed here would hardcode one language and ship it to every build. That is
+ * precisely the leak the label rule above exists to prevent: under
+ * `NEXT_PUBLIC_LANGUAGE=en` the button would read "I'm interested" and open
+ * WhatsApp in Portuguese. The suggested wording is composed in the admin form
+ * from the dictionary, which *does* know the build language, and persisted on
+ * save. Note the parameter type: this function is handed the three contact
+ * columns and nothing else, so it cannot reach for a title or a date even by
+ * accident.
  */
 export function resolveContact(
   event: Pick<
     Entities.Events.Event,
-    'whatsappNumber' | 'whatsappMessage' | 'contactLabel' | 'title' | 'startsAt' | 'timezone'
+    'whatsappNumber' | 'whatsappMessage' | 'contactLabel'
   >,
 ): EventContactDto | null {
   // Re-normalised on read as well as on write, so a row inserted by a seed, a
@@ -251,52 +263,19 @@ export function resolveContact(
   const number = normalizeWhatsapp(event.whatsappNumber);
   if (!number) return null;
 
-  const stored = event.whatsappMessage?.trim() ?? '';
-
   return {
     number,
-    // A stored `null` composes from the event as it is *now*, which is the
-    // whole reason the default is not materialised into the column: renaming an
-    // event would otherwise strand every reader on the old title.
-    message: stored !== '' ? stored : composeContactMessage(event),
+    // An unset column serialises as `''`, not as an omitted key: `message` stays
+    // a required `string` in the schema and in the DTO, so the web client calls
+    // `whatsappLink(number, message)` with no `?? ''` at the call site and no
+    // optional-property branch. The observable result is the same — WhatsApp
+    // opens a chat with no pre-filled text — but the client has one shape to
+    // handle instead of two. Whitespace-only is normalised to that same `''`
+    // rather than being sent as a pre-filled blank.
+    message: event.whatsappMessage?.trim() ?? '',
     // Passed through as stored, `''` included. The default is a translated
     // string and belongs to the web dictionary, which knows the build language;
     // resolving it here would ship one language to both builds.
     label: event.contactLabel,
   };
-}
-
-/**
- * The default first message.
- *
- * The literal is product copy fixed by RFC 0014 §5 rather than developer-facing
- * text: it is the sentence a reader sends to the dojo, and the board ships in
- * Portuguese. It is composed here, on the server, so the rule lives in one
- * place for the web page, the OpenGraph preview and any later consumer.
- */
-export function composeContactMessage(
-  event: Pick<Entities.Events.Event, 'title' | 'startsAt' | 'timezone'>,
-): string {
-  return `Olá! Tenho interesse no evento "${event.title}" (${formatEventDate(event.startsAt, event.timezone)}).`;
-}
-
-/**
- * The event's start date in the event's own zone.
- *
- * The zone is stored on the row precisely because an anonymous reader carries
- * no `users.timezone`. A zone the runtime rejects falls back to the ISO date
- * rather than throwing: a malformed IANA string must not take down a public
- * page over a cosmetic detail.
- */
-function formatEventDate(startsAt: Date, timezone: string): string {
-  try {
-    return new Intl.DateTimeFormat('pt-BR', {
-      timeZone: timezone,
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(startsAt);
-  } catch {
-    return startsAt.toISOString().slice(0, 10);
-  }
 }

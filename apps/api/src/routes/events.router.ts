@@ -54,9 +54,16 @@ const EventSlugParamSchema = z.object({
   slug: z.string().min(1).max(200).openapi({ example: 'seminario-de-verao' }),
 });
 
+/**
+ * `message` is required and may be `''`: it is `events.whatsapp_message` as the
+ * admin stored it, and the API composes no default (RFC 0014 §5, amended
+ * 2026-09-22). It is not `.optional()`, so the client has one shape to render
+ * rather than two. The example is deliberately illustrative rather than a
+ * product string — no user-facing copy in any language is defined here.
+ */
 const EventContactSchema = z.object({
   number: z.string().openapi({ example: '5519999991155' }),
-  message: z.string().openapi({ example: 'Olá! Tenho interesse no evento "..." (10/10/2026).' }),
+  message: z.string().openapi({ example: '' }),
   label: z.string().openapi({ example: '' }),
 });
 

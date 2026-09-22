@@ -1,9 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  EventsController,
-  composeContactMessage,
-  resolveContact,
-} from '@api/controllers/events.controller';
+import { EventsController, resolveContact } from '@api/controllers/events.controller';
 import { Entities } from '@arenaquest/shared/types/entities';
 import type {
   IEventRepository,
@@ -255,54 +252,101 @@ describe('contact resolution', () => {
     expect(result.data.contact?.number).toBe('5519999991155');
   });
 
-  it('prefers the stored message when the admin wrote one', () => {
+  it('returns the stored message verbatim — byte for byte, unwrapped', () => {
+    // Not `toContain`: the assertion is equality, because anything the API added
+    // around the admin's sentence would be text in a language it cannot know.
+    const stored = 'Hi! About the seminar on the 10th — is there space left?';
     const contact = resolveContact(
-      makeEvent({ whatsappNumber: '5519999991155', whatsappMessage: 'Hi about the seminar' }),
+      makeEvent({ whatsappNumber: '5519999991155', whatsappMessage: stored }),
     );
 
-    expect(contact?.message).toBe('Hi about the seminar');
+    expect(contact?.message).toBe(stored);
   });
 
-  it('treats a blank stored message as unset and composes instead', () => {
+  it('yields an empty message for a null column — the server composes nothing', () => {
+    // RFC 0014 §5 as amended 2026-09-22: an empty column means the button opens
+    // a chat with no pre-filled text. It is not an invitation to invent one.
+    const contact = resolveContact(
+      makeEvent({ whatsappNumber: '5519999991155', whatsappMessage: null }),
+    );
+
+    expect(contact).not.toBeNull();
+    expect(contact?.message).toBe('');
+  });
+
+  it('serialises the empty message as a present "" rather than omitting the key', () => {
+    // The web client calls `whatsappLink(number, message)` unconditionally; a
+    // required string means no `?? ''` at the call site and one shape to render.
+    const contact = resolveContact(
+      makeEvent({ whatsappNumber: '5519999991155', whatsappMessage: null }),
+    );
+
+    expect(contact).toHaveProperty('message');
+    expect(JSON.parse(JSON.stringify(contact))).toHaveProperty('message', '');
+  });
+
+  it('normalises a whitespace-only stored message to the same empty string', () => {
     const contact = resolveContact(
       makeEvent({ whatsappNumber: '5519999991155', whatsappMessage: '   ' }),
     );
 
-    expect(contact?.message).toBe(composeContactMessage(makeEvent()));
+    expect(contact?.message).toBe('');
   });
 
-  it('composes from the CURRENT title, so a rename never strands the message', () => {
+  it('keeps contact non-null when the number is set but the message is not', () => {
+    // The suppression rule keys on the NUMBER alone; a numbered event with no
+    // message is a valid call-to-action, not a missing one.
+    const contact = resolveContact(
+      makeEvent({ whatsappNumber: '5519999991155', whatsappMessage: '' }),
+    );
+
+    expect(contact).toEqual({ number: '5519999991155', message: '', label: '' });
+  });
+
+  it('does NOT follow a rename: the stored text is owned by the admin', () => {
+    // The inverse of the behaviour this controller shipped with. Staleness after
+    // a rename is now a visible edit in the admin form rather than a silent
+    // server default that could only ever be written in one language.
+    const stored = 'Interested in the winter camp';
     const before = resolveContact(
-      makeEvent({ whatsappNumber: '5519999991155', title: 'Winter camp' }),
+      makeEvent({ whatsappNumber: '5519999991155', title: 'Winter camp', whatsappMessage: stored }),
     );
     const after = resolveContact(
-      makeEvent({ whatsappNumber: '5519999991155', title: 'Winter camp 2026' }),
-    );
-
-    expect(before?.message).toContain('"Winter camp"');
-    expect(after?.message).toContain('"Winter camp 2026"');
-    expect(after?.message).not.toBe(before?.message);
-  });
-
-  it('names the start date in the event own timezone', () => {
-    const contact = resolveContact(
       makeEvent({
         whatsappNumber: '5519999991155',
-        // 00:30 UTC on the 11th is still the 10th in Sao Paulo (UTC-3).
-        startsAt: new Date('2026-10-11T00:30:00.000Z'),
-        timezone: 'America/Sao_Paulo',
+        title: 'Winter camp 2026 — now in March',
+        whatsappMessage: stored,
       }),
     );
 
-    expect(contact?.message).toContain('10/10/2026');
+    expect(after?.message).toBe(before?.message);
+    expect(after?.message).toBe(stored);
   });
 
-  it('falls back to the ISO date rather than throwing on a bad timezone', () => {
+  it('ignores the title, the start instant and the timezone entirely', () => {
+    // A zone the runtime would reject used to matter, because the composition
+    // formatted a date with it. Nothing on the contact path reads it now, so a
+    // malformed IANA string cannot reach a formatter at all.
     const contact = resolveContact(
-      makeEvent({ whatsappNumber: '5519999991155', timezone: 'Not/AZone' }),
+      makeEvent({
+        whatsappNumber: '5519999991155',
+        title: 'Anything at all',
+        startsAt: new Date('2026-10-11T00:30:00.000Z'),
+        timezone: 'Not/AZone',
+      }),
     );
 
-    expect(contact?.message).toContain('2026-10-10');
+    expect(contact).toEqual({ number: '5519999991155', message: '', label: '' });
+  });
+
+  it('adds no characters of its own to a contact built from ASCII-only columns', () => {
+    // The black-box half of the guard below: given input the API could only make
+    // non-ASCII by contributing copy, the output stays ASCII.
+    const contact = resolveContact(
+      makeEvent({ whatsappNumber: '5519999991155', whatsappMessage: 'Plain ASCII', contactLabel: '' }),
+    );
+
+    expect(JSON.stringify(contact)).toMatch(/^[\x00-\x7F]*$/);
   });
 
   it('passes the label through as stored, empty string included', () => {
@@ -310,6 +354,25 @@ describe('contact resolution', () => {
     expect(
       resolveContact(makeEvent({ whatsappNumber: '5519999991155', contactLabel: 'Eu quero' }))?.label,
     ).toBe('Eu quero');
+  });
+
+  it('defines no user-facing literal in any language anywhere in the controller', () => {
+    // The white-box half. A behavioural test can only catch copy on the paths it
+    // exercises; this catches a helper someone adds next year and calls from one
+    // branch. Comments are stripped first — prose is allowed to contain an em
+    // dash or an accent; executable code on this surface is not allowed to
+    // contain a sentence. The controller has no regex or URL literals, so the
+    // naive strip is safe here.
+    const source = readFileSync(
+      new URL('../../src/controllers/events.controller.ts', import.meta.url),
+      'utf8',
+    );
+    const code = source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+
+    const nonAscii = code.match(/[^\x00-\x7F]/g);
+    expect(nonAscii ?? []).toEqual([]);
   });
 });
 
