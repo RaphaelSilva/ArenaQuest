@@ -1,6 +1,6 @@
 # Task 03 — Backend: Anonymous events read API (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [20 — Events board — public listing, access-scoped audiences and per-event WhatsApp contact](./milestone.md)
 **RFC:** [RFC 0014](../../RFCs/0014-events-board-and-whatsapp-contact.md)
 **Team:** Backend API
@@ -25,8 +25,11 @@ product asked for is the *difference between two responses*, not a second route 
 could call wrongly. A detail or flyer read outside the caller's audience returns **404, not
 403**, byte-identical to a slug that does not exist, denying an enumeration oracle on a
 surface open to the internet. Contact resolution lives here too: number from the event else
-the tenant fallback else `null`, message from the event else composed from the current title
-and date, so renaming an event never strands a stale message. Because these endpoints cost a
+`null` when the row stores none — **no runtime tenant fallback** (RFC 0014 decision of
+2026-09-22; the tenant constant is a build-time variable of the web bundle the Worker
+cannot read, and persisting the number keeps a published contact auditable) — message from
+the event else composed from the current title and date, so renaming an event never strands
+a stale message. Because these endpoints cost a
 caller nothing, an IP-keyed rate limiter guards them at 60 requests per minute. Task 05
 renders all of this; Task 04 writes it.
 
@@ -91,7 +94,8 @@ In:
   branches.
 - `GET /v1/events` with `?scope` and pagination; `GET /v1/events/{slug}`;
   `GET /v1/events/{slug}/flyer`.
-- Contact resolution: number (event → tenant fallback → `null`, suppressing the button),
+- Contact resolution: number (the event's stored value, or `null` suppressing the button —
+  no tenant fallback),
   message (event → composed from the current title and date), and the label passed through
   for the web layer to default from its dictionary.
 - The `events` container group and the IP-keyed rate limiter.
@@ -108,37 +112,38 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `GET /v1/events` with **no `Authorization` header** returns `200` and exactly the
+- [x] `GET /v1/events` with **no `Authorization` header** returns `200` and exactly the
       `published` + `audience='public'` set.
-- [ ] The same call with a student's token returns that set ∪ `members` ∪ the events
+- [x] The same call with a student's token returns that set ∪ `members` ∪ the events
       granted to that student's groups and to that student directly, and nothing else.
-- [ ] A request carrying an **invalid or expired** token receives the anonymous slice with
+- [x] A request carrying an **invalid or expired** token receives the anonymous slice with
       `200` — never `401` — on all three routes.
-- [ ] `GET /v1/events/{slug}` for an out-of-audience event returns `404` with a body
+- [x] `GET /v1/events/{slug}` for an out-of-audience event returns `404` with a body
       byte-identical to the response for a slug that does not exist; asserted by comparing
       the two bodies, not by reading each separately.
-- [ ] A draft and an archived event are absent from every anonymous and authenticated
+- [x] A draft and an archived event are absent from every anonymous and authenticated
       response on these routes, at both `?scope` values.
-- [ ] A published event past `COALESCE(ends_at, starts_at + 1 day)` is absent from the
+- [x] A published event past `COALESCE(ends_at, starts_at + 1 day)` is absent from the
       default `?scope=upcoming` and present in `?scope=past`, and no row was written.
-- [ ] `GET /v1/events/{slug}/flyer` returns `302` to a presigned GET with
+- [x] `GET /v1/events/{slug}/flyer` returns `302` to a presigned GET with
       `Cache-Control: public, max-age=60` for a `public` event and `no-store` otherwise;
       `404` when the caller is out of audience or the event has no flyer; the bucket is
       not world-readable.
-- [ ] The resolved `contact.number` is the event's own when it sets one and the tenant
-      fallback when it does not; `contact` is `null` when neither resolves; the composed
-      message names the event's **current** title.
-- [ ] The 61st anonymous request from one IP inside the window returns `429`; a request
+- [x] The resolved `contact.number` is exactly the event's stored `whatsapp_number`;
+      `contact` is `null` when that column is empty, and **no** tenant constant is
+      consulted — asserted by a test that leaves the column empty and expects `null`, not a
+      number. The composed message names the event's **current** title.
+- [x] The 61st anonymous request from one IP inside the window returns `429`; a request
       from a second IP in the same window is unaffected.
-- [ ] No `@ValidateBody` or `@Body()` decorator appears anywhere in the diff; the routes
+- [x] No `@ValidateBody` or `@Body()` decorator appears anywhere in the diff; the routes
       declare their input through `createRoute` + Zod.
-- [ ] No provider-specific (D1/R2) import leaks into the controller; `routes/public/**`
+- [x] No provider-specific (D1/R2) import leaks into the controller; `routes/public/**`
       and `middleware/auth-guard.ts` are unchanged.
-- [ ] Validation, not-found and rate-limit branches each return the correct
+- [x] Validation, not-found and rate-limit branches each return the correct
       `ControllerResult` status and are covered by a test.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs, and the
+- [x] Changed files lint clean; `make test-api` green for the affected specs, and the
       pre-existing suite passes unchanged.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -57,7 +57,11 @@ CREATE TABLE IF NOT EXISTS events (
   flyer_replaced_key TEXT,
 
   -- Contact: the responsible person for THIS event (RFC 0014 section 5).
-  whatsapp_number  TEXT NOT NULL DEFAULT '',          -- normalised digits, or '' to fall back
+  -- Normalised digits, or '' meaning this event publishes no number and its page
+  -- renders no contact button. There is no runtime tenant fallback: the admin form
+  -- pre-fills the house number and whatever is submitted is stored here, so what a
+  -- reader sees is always this column (RFC 0014, decision of 2026-09-22).
+  whatsapp_number  TEXT NOT NULL DEFAULT '',
   whatsapp_message TEXT,                              -- NULL -> composed from the title at read time
   contact_label    TEXT NOT NULL DEFAULT '',          -- '' -> the dictionary default
 

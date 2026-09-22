@@ -89,9 +89,13 @@ In:
   ceiling stated and the oversize and lying-upload rejections surfaced as clear errors.
 - The audience selector with its group and user pickers over `admin-groups-api`, and the
   `public` warning.
-- The WhatsApp number, message and label fields with a live preview of the composed message,
-  including what a visitor sees when the fields are left blank and the tenant fallback
-  applies.
+- The WhatsApp number, message and label fields with a live preview of the composed
+  message. The number field is **pre-filled with the tenant's `NEXT_PUBLIC_BRAND_WHATSAPP`
+  on a new event** — that constant's only remaining job (RFC 0014 decision of 2026-09-22):
+  a starting value a human accepts or replaces, persisted onto the row on save, never a
+  fallback applied behind the reader's back. The preview must show plainly that clearing
+  the field means **no button at all** on the public page, not a silent fall back to the
+  house number.
 - The publish and archive actions, with publish hidden or disabled and explained for a
   `content_creator`.
 - The admin nav entry.

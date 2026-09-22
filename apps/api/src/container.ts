@@ -19,6 +19,7 @@ import { D1GamificationRepository } from '@api/adapters/db/d1-gamification-repos
 import { D1MissionRepository } from '@api/adapters/db/d1-mission-repository';
 import { D1CommentRepository } from '@api/adapters/db/d1-comment-repository';
 import { D1BillingRepository } from '@api/adapters/db/d1-billing-repository';
+import { D1EventRepository } from '@api/adapters/db/d1-event-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
 import { ConsoleMailAdapter } from '@api/adapters/mail/console-mail-adapter';
@@ -62,6 +63,7 @@ import type {
   IOAuthAccountRepository,
   IMailer,
   IBillingRepository,
+  IEventRepository,
 } from '@arenaquest/shared/ports';
 
 // ---------------------------------------------------------------------------
@@ -119,6 +121,21 @@ export interface BillingContext {
   accountingService: AccountingService;
 }
 
+/**
+ * Events board (RFC 0014 §6). Its own group because the board is a bounded
+ * context of its own: an event is an announcement, and nothing here reads or
+ * writes an enrollment, a topic or a grant of content access.
+ */
+export interface EventsContext {
+  eventRepo: IEventRepository;
+  /**
+   * The same R2 adapter the content group holds, exposed here because the
+   * flyer redirect mints its presigned GET through it. The bucket is never made
+   * world-readable and the bytes are never proxied.
+   */
+  storage: IStorageAdapter;
+}
+
 export interface InfraContext {
   auth: IAuthAdapter;
   mailer: IMailer;
@@ -127,6 +144,8 @@ export interface InfraContext {
     register: IRateLimiter;
     activate: IRateLimiter;
     forgotPassword: IRateLimiter;
+    /** The anonymous events board, keyed on `CF-Connecting-IP`. */
+    events: IRateLimiter;
   };
   cors: {
     allowedOrigins?: string;
@@ -152,6 +171,7 @@ export interface AppContainer {
   progress: ProgressContext;
   gamification: GamificationContext;
   billing: BillingContext;
+  events: EventsContext;
   infra: InfraContext;
   controllers: ControllersContext;
 }
@@ -229,6 +249,9 @@ export function buildContainer(env: Env): AppContainer {
   // identity — a probe rather than the repository, as `StreakEngine` does.
   const accountingService = new AccountingService(billingRepo, userExists);
 
+  // Events repo (RFC 0014). The audience rule lives inside it and nowhere else.
+  const eventRepo = new D1EventRepository(env.DB);
+
   // Infra: mail
   const mailer: IMailer = env.MAIL_DRIVER === 'resend'
     ? new ResendMailAdapter({ apiKey: env.RESEND_API_KEY, from: env.MAIL_FROM })
@@ -253,6 +276,16 @@ export function buildContainer(env: Env): AppContainer {
     maxAttempts: 3,
     lockoutMs: 60 * 60_000,
     prefix: 'rl:forgot:',
+  });
+  // The events board is the one surface reachable without an account, so its
+  // budget is per IP rather than per credential: 60 requests a minute, which a
+  // reader browsing the board never approaches and a scraper hits immediately.
+  // Its own prefix keeps it from sharing a bucket with a login attempt.
+  const eventsLimiter = new KvRateLimiter(env.RATE_LIMIT_KV, {
+    windowMs: 60_000,
+    maxAttempts: 60,
+    lockoutMs: 60_000,
+    prefix: 'rl:events:',
   });
 
   // Controllers
@@ -295,10 +328,11 @@ export function buildContainer(env: Env): AppContainer {
     progress: { progressRepo, enrollmentRepo },
     gamification: { questRepo, badgeRepo, gamificationRepo, missionRepo, xpEngine, streakEngine, questEvaluator, badgeEngine },
     billing: { billingRepo, billingService, accountingService },
+    events: { eventRepo, storage },
     infra: {
       auth,
       mailer,
-      rateLimiters: { login: loginLimiter, register: registerLimiter, activate: activateLimiter, forgotPassword: forgotPasswordLimiter },
+      rateLimiters: { login: loginLimiter, register: registerLimiter, activate: activateLimiter, forgotPassword: forgotPasswordLimiter, events: eventsLimiter },
       cors: {
         allowedOrigins: env.ALLOWED_ORIGINS,
         // Enforce strict validation when ALLOWED_ORIGINS is configured; fall
