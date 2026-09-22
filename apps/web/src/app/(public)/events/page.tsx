@@ -52,6 +52,12 @@ export async function generateMetadata(): Promise<Metadata> {
  *
  * The entitled superset is merged in on the client, after hydration, inside
  * `EventsBoard`.
+ *
+ * `fetchPublicEventList` collapses every failure into `null` — a `5xx`, a `429`
+ * and an unreachable API alike — which is the right shape for a page a stranger
+ * is reading, but it is *not* the same thing as a board with nothing on it. The
+ * difference is handed down as `unavailable` so the board can say the listing
+ * could not be loaded instead of claiming the dojo has nothing planned.
  */
 export default async function EventsPage({
   searchParams,
@@ -77,7 +83,7 @@ export default async function EventsPage({
 
       <EventScopeTabs scope={scope} />
 
-      <EventsBoard initial={list?.data ?? []} scope={scope} />
+      <EventsBoard initial={list?.data ?? []} scope={scope} unavailable={list === null} />
     </div>
   );
 }

@@ -1,11 +1,11 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@web/hooks/use-auth';
 import { useDict } from '@web/context/dict-context';
 import { fetchViewerEvent, type EventDetail } from '@web/lib/events-api';
 import { EventDetailView } from './EventDetailView';
+import { CompassGlyph, EventStateLink, EventStatePanel } from './EventStatePanel';
 
 /**
  * What `/events/{slug}` renders when the **anonymous** server fetch came back
@@ -52,37 +52,44 @@ export function EventDetailFallback({ slug }: { slug: string }) {
 function EventDetailLoading() {
   const dict = useDict();
   return (
-    <p className="mx-auto w-full max-w-3xl px-6 py-16 text-sm" style={{ color: 'var(--aq-text2)' }}>
+    <p
+      role="status"
+      aria-live="polite"
+      className="mx-auto w-full max-w-3xl px-6 py-16 text-center text-sm"
+      style={{ color: 'var(--aq-text2)' }}
+    >
       {dict.events.detail.loading}
     </p>
   );
 }
 
+/**
+ * The single not-found surface.
+ *
+ * **It takes no arguments, and that is the point.** An out-of-audience slug, an
+ * archived slug and a slug that never existed all land here, and the component
+ * has nothing to tell them apart with even if a later change wanted to: no
+ * slug, no status, no reason. Task 03 made the API's three 404 bodies
+ * byte-identical to deny an enumeration oracle on a surface open to the
+ * internet — a UI that worded one of them differently would rebuild that oracle
+ * one layer up, and this signature is what makes doing so a deliberate act
+ * rather than an accident.
+ *
+ * `__tests__/event-not-found.test.tsx` pins it by comparing three rendered
+ * pages to each other, so a field added for one case breaks the build.
+ */
 export function EventNotFound() {
   const dict = useDict();
 
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-col items-start gap-4 px-6 py-16">
-      <h1
-        className="text-2xl font-bold"
-        style={{ color: 'var(--aq-text)', fontFamily: "'Space Grotesk', sans-serif" }}
-      >
-        {dict.events.detail.notFoundTitle}
-      </h1>
-      <p className="text-sm leading-relaxed" style={{ color: 'var(--aq-text2)' }}>
-        {dict.events.detail.notFoundBody}
-      </p>
-      <Link
-        href="/events"
-        className="rounded-[10px] px-5 py-2.5 text-sm font-semibold transition-all duration-200"
-        style={{
-          background: 'var(--aq-accent)',
-          color: '#0B0E17',
-          fontFamily: "'Space Grotesk', sans-serif",
-        }}
-      >
-        {dict.events.detail.notFoundCta}
-      </Link>
-    </section>
+    <div className="mx-auto w-full max-w-3xl px-6 py-16">
+      <EventStatePanel
+        headingLevel={1}
+        icon={<CompassGlyph />}
+        title={dict.events.detail.notFoundTitle}
+        body={dict.events.detail.notFoundBody}
+        action={<EventStateLink href="/events">{dict.events.detail.notFoundCta}</EventStateLink>}
+      />
+    </div>
   );
 }

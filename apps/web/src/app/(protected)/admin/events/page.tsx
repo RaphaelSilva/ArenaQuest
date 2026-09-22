@@ -10,6 +10,13 @@ import { useDict } from '@web/context/dict-context';
 import { Spinner } from '@web/components/spinner';
 import { Badge } from '@web/components/design-system';
 import { formatEventWhen } from '@web/components/events/event-format';
+import {
+  AlertGlyph,
+  CalendarGlyph,
+  EventStateButton,
+  EventStateLink,
+  EventStatePanel,
+} from '@web/components/events/EventStatePanel';
 import type { AdminEvent, AdminEventStatus } from '@web/lib/admin-events-api';
 
 export const runtime = 'edge';
@@ -94,8 +101,8 @@ export default function AdminEventsPage() {
         </div>
         <Link
           href="/admin/events/new"
-          className="rounded-lg px-4 py-2 text-sm font-semibold"
-          style={{ background: 'var(--accent)', color: '#0B0E17' }}
+          className="inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2"
+          style={{ background: 'var(--accent)', color: '#0B0E17', outlineColor: 'var(--accent)' }}
         >
           {d.list.newButton}
         </Link>
@@ -111,10 +118,11 @@ export default function AdminEventsPage() {
             type="button"
             onClick={() => setFilter(value)}
             aria-pressed={filter === value}
-            className="rounded-full border px-3 py-1 text-xs"
+            className="rounded-full border px-3 py-1.5 text-xs focus-visible:outline-2 focus-visible:outline-offset-2"
             style={{
               borderColor: filter === value ? 'var(--accent)' : 'var(--border2)',
               color: filter === value ? 'var(--accent)' : 'var(--text2)',
+              outlineColor: 'var(--accent)',
             }}
           >
             {filterLabel[value]}
@@ -122,31 +130,49 @@ export default function AdminEventsPage() {
         ))}
       </div>
 
-      {error && (
-        <p
-          role="alert"
-          className="mb-4 rounded-lg px-4 py-3 text-sm"
-          style={{ background: 'var(--error-bg)', color: 'var(--error)' }}
-        >
-          {error}
+      {/* The count is a fact about a list that loaded. While the load is in
+          flight or has failed there is no list, so "0 event(s)" would be a
+          claim about the tenant rather than about the request. */}
+      {!loading && !error && (
+        <p className="mb-3 text-xs" style={{ color: 'var(--text3)' }}>
+          {d.list.countLabel(total)}
         </p>
       )}
 
-      <p className="mb-3 text-xs" style={{ color: 'var(--text3)' }}>
-        {d.list.countLabel(total)}
-      </p>
-
       {loading ? (
-        <div className="flex justify-center py-12">
+        <div role="status" aria-live="polite" className="flex flex-col items-center gap-3 py-12">
           <Spinner className="h-6 w-6 text-zinc-400" />
+          <span className="text-sm" style={{ color: 'var(--text2)' }}>
+            {d.list.loading}
+          </span>
         </div>
+      ) : error ? (
+        /* A failed load is *not* an empty tenant. Telling an admin "no events
+           yet. Create the first one." while the API is down invites them to
+           re-create events that already exist. */
+        <EventStatePanel
+          role="alert"
+          tone="error"
+          icon={<AlertGlyph />}
+          title={d.list.errorTitle}
+          body={error}
+          action={<EventStateButton onClick={() => void load()}>{d.list.retry}</EventStateButton>}
+        />
       ) : events.length === 0 ? (
-        <p
-          className="rounded-xl border border-dashed py-8 text-center text-sm"
-          style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}
-        >
-          {d.list.empty}
-        </p>
+        <EventStatePanel
+          icon={<CalendarGlyph />}
+          title={filter === 'all' ? d.list.emptyTitle : d.list.emptyFilteredTitle}
+          body={filter === 'all' ? d.list.empty : d.list.emptyFiltered}
+          action={
+            filter === 'all' ? (
+              <EventStateLink href="/admin/events/new">{d.list.newButton}</EventStateLink>
+            ) : (
+              <EventStateButton onClick={() => setFilter('all')}>
+                {d.list.filterAll}
+              </EventStateButton>
+            )
+          }
+        />
       ) : (
         <ul className="space-y-2">
           {events.map((event) => (

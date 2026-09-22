@@ -217,12 +217,43 @@ export const dictEn = {
       tabUpcoming: 'Upcoming',
       tabPast: 'Past',
       listLabel: 'Event list',
-      emptyUpcoming: 'Nothing on the calendar yet. Check back soon.',
-      emptyPast: 'No past events here yet.',
+      loading: 'Loading the listing…',
+      /**
+       * The empty board is indexable content, not an error.
+       *
+       * It is the first state a brand-new dojo sees and the one a crawler may
+       * arrive to. So the copy invites — and points at the past tab: a club
+       * between seminars still has a history worth showing.
+       */
+      empty: {
+        upcomingTitle: 'Nothing on the calendar yet',
+        upcomingBody:
+          'No new date has been announced. In the meantime, take a look at what already happened here.',
+        upcomingCta: 'See what already happened',
+        pastTitle: 'Nothing in the rear-view yet',
+        pastBody: 'Once a seminar, a grading or an open session wraps up, it stays here.',
+        pastCta: 'See the calendar',
+      },
+      /**
+       * The listing did not answer. Deliberately distinct from an empty board:
+       * saying "nothing scheduled" while the API is down is a false claim about
+       * the dojo rather than about the request.
+       */
+      error: {
+        title: 'The calendar could not be loaded',
+        body: 'Something failed while fetching the list. Please reload the page in a moment.',
+        retry: 'Try again',
+      },
       signedOutTitle: 'There is more to see',
       signedOutBody: 'Some events are for members only. Sign in to see the full board.',
       signedOutCta: 'Sign in',
       flyerAlt: (title: string) => `Flyer for ${title}`,
+      /**
+       * An event with no flyer renders a placeholder, never a broken image box
+       * — and the placeholder announces itself to a screen reader rather than
+       * sitting there silently.
+       */
+      flyerPlaceholderAlt: (title: string) => `No flyer for ${title}`,
       openEvent: (title: string) => `See details for ${title}`,
     },
     audience: {
@@ -241,6 +272,14 @@ export const dictEn = {
        * message are never defaulted.
        */
       contactDefaultLabel: "I'm interested",
+      /**
+       * An event that has already happened is still a page: flyer, date and
+       * body all stay. The tone is factual — this is a record, not an error.
+       * And the contact button **stays**, below the note, because someone
+       * writing in about an old seminar is usually asking about the next one.
+       */
+      pastBadge: 'Already happened',
+      pastNote: 'This one has already happened. Message us to hear about the next edition.',
       loading: 'Loading the event…',
       notFoundTitle: 'Event not found',
       notFoundBody:
@@ -286,8 +325,19 @@ export const dictEn = {
         filterAll: 'All',
         countLabel: (total: number) => `${total} event(s)`,
         edit: 'Edit',
-        empty: 'No events yet. Create the first one.',
+        loading: 'Loading the listing…',
+        emptyTitle: 'No events yet',
+        empty: 'Start with the first one: it is created as a draft and only goes live once published.',
+        /**
+         * An empty list because of the filter, not because the dojo has no
+         * events. Different situations calling for different actions — one asks
+         * to create, the other to clear the filter.
+         */
+        emptyFilteredTitle: 'Nothing with that status',
+        emptyFiltered: 'There are events on file, but none in this status.',
+        errorTitle: 'Could not load',
         errorLoading: 'Could not load the events.',
+        retry: 'Try again',
         archivedNote: 'Archived — off the public board',
       },
       status: {

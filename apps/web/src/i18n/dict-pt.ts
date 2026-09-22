@@ -215,13 +215,44 @@ export const dictPt = {
       tabUpcoming: 'Próximos',
       tabPast: 'Anteriores',
       listLabel: 'Lista de eventos',
-      emptyUpcoming: 'Nenhum evento marcado por enquanto. Volte em breve.',
-      emptyPast: 'Ainda não há eventos realizados por aqui.',
+      loading: 'Carregando os eventos…',
+      /**
+       * O quadro vazio é conteúdo indexável, não um erro.
+       *
+       * É o primeiro estado de um dojo recém-criado e é o que um robô de busca
+       * pode encontrar. Então a cópia convida — e aponta para "Anteriores":
+       * quem está entre seminários ainda tem história para mostrar.
+       */
+      empty: {
+        upcomingTitle: 'Nada marcado por enquanto',
+        upcomingBody:
+          'Ainda não há data nova na agenda. Enquanto isso, dá para ver o que já rolou por aqui.',
+        upcomingCta: 'Ver o que já aconteceu',
+        pastTitle: 'Nada no retrovisor ainda',
+        pastBody: 'Quando um seminário, uma graduação ou um treino aberto terminar, ele fica aqui.',
+        pastCta: 'Ver a agenda',
+      },
+      /**
+       * A listagem não respondeu. Diferente do quadro vazio de propósito:
+       * dizer "nada marcado" com a API fora do ar é uma afirmação falsa sobre
+       * o dojo, não sobre a requisição.
+       */
+      error: {
+        title: 'Não deu para carregar a agenda',
+        body: 'Algo falhou ao buscar a lista. Recarregue a página em instantes.',
+        retry: 'Tentar de novo',
+      },
       signedOutTitle: 'Tem mais evento para ver',
       signedOutBody:
         'Alguns eventos são só para alunos. Entre na sua conta para ver o quadro completo.',
       signedOutCta: 'Entrar',
       flyerAlt: (title: string) => `Cartaz do evento ${title}`,
+      /**
+       * O evento sem cartaz renderiza um espaço reservado, nunca um ícone de
+       * imagem quebrada — e o espaço reservado também se anuncia a quem usa
+       * leitor de tela, em vez de ficar em silêncio.
+       */
+      flyerPlaceholderAlt: (title: string) => `Sem cartaz para ${title}`,
       openEvent: (title: string) => `Ver detalhes de ${title}`,
     },
     audience: {
@@ -240,6 +271,14 @@ export const dictPt = {
        * message are never defaulted.
        */
       contactDefaultLabel: 'Eu quero',
+      /**
+       * Um evento que já passou continua sendo uma página: cartaz, data e
+       * conteúdo ficam. O tom é factual — é registro, não erro. E o botão de
+       * contato **permanece**, abaixo do aviso, porque quem escreve num
+       * seminário antigo costuma estar perguntando da próxima edição.
+       */
+      pastBadge: 'Já aconteceu',
+      pastNote: 'Este evento já aconteceu. Fale com a gente para saber da próxima edição.',
       loading: 'Carregando o evento…',
       notFoundTitle: 'Evento não encontrado',
       notFoundBody:
@@ -285,8 +324,19 @@ export const dictPt = {
         filterAll: 'Todos',
         countLabel: (total: number) => `${total} evento(s)`,
         edit: 'Editar',
-        empty: 'Nenhum evento ainda. Crie o primeiro.',
+        loading: 'Carregando os eventos…',
+        emptyTitle: 'Nenhum evento ainda',
+        empty: 'Comece pelo primeiro: ele nasce como rascunho e só vai ao ar quando você publicar.',
+        /**
+         * Lista vazia por causa do filtro, não porque o dojo não tem evento.
+         * São situações diferentes e levam a ações diferentes — uma pede criar,
+         * a outra pede limpar o filtro.
+         */
+        emptyFilteredTitle: 'Nenhum evento com esse status',
+        emptyFiltered: 'Existem eventos cadastrados, mas nenhum neste status.',
+        errorTitle: 'Não deu para carregar',
         errorLoading: 'Não foi possível carregar os eventos.',
+        retry: 'Tentar de novo',
         archivedNote: 'Arquivado — fora do quadro público',
       },
       status: {

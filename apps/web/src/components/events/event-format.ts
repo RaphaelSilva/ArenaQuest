@@ -79,6 +79,32 @@ export function formatEventWhen(
   return { date, time, zone };
 }
 
+/**
+ * Whether the event is over.
+ *
+ * The board already splits `upcoming` from `past` server-side, but the detail
+ * page has no scope: a link shared in a group chat in March is opened in June,
+ * and the page must say so rather than read like an invitation to a session
+ * that has already happened.
+ *
+ * The comparison is against the **end** of the event when it declares one, so a
+ * seminar that runs 10:00–17:00 is not marked past at 10:01. An open-ended
+ * event has only its start to go on.
+ *
+ * `now` is a parameter so the test does not depend on the wall clock. The
+ * instants are UTC on the wire, so no timezone enters here — the event's own
+ * zone matters for *rendering* the date, never for ordering it.
+ */
+export function isPastEvent(
+  event: { startsAt: string; endsAt: string | null },
+  now: number = Date.now(),
+): boolean {
+  const end = Date.parse(event.endsAt ?? event.startsAt);
+  // An unparseable instant is treated as not-past: a marker wrongly stamped on
+  // a live event is worse than one missing from a dead one.
+  return Number.isFinite(end) && end < now;
+}
+
 function isKnownZone(timezone: string): boolean {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: timezone });
