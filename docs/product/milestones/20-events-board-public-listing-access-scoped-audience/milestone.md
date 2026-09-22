@@ -96,7 +96,7 @@ Each task is one independent PR with one owner and one review surface. Backend a
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [Shared foundations — media limits, WhatsApp normalisation and event contracts](./01-shared-foundations.task.md) | 0 | Backend | ☐ Open |
+| 01 | [Shared foundations — media limits, WhatsApp normalisation and event contracts](./01-shared-foundations.task.md) | 0 | Backend | ✅ Done |
 | 02 | [Events schema and D1 repository](./02-schema-and-repository.task.md) | 1 | Backend | ☐ Open |
 | 03 | [Anonymous events read API](./03-anonymous-read-api.task.md) | 2 | Backend | ☐ Open |
 | 04 | [Admin events API and flyer lifecycle](./04-admin-api.task.md) | 3 | Backend | ☐ Open |

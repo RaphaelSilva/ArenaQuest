@@ -49,6 +49,7 @@ import {
   withRetry,
   writeSkippedReport,
   SKIP_STATES,
+  CONTENT_TYPE_BY_EXTENSION,
   SIZE_LIMIT_BYTES,
 } from './import-media.mjs';
 
@@ -1155,6 +1156,53 @@ test('resolveBaseUrl refuses to let an env var redirect a deployed import', () =
     () => resolveBaseUrl('arenaquest', 'production', { override: 'https://evil.example.com' }),
     /may only point at localhost/,
   );
+});
+
+// -- parity with the shared limits table --------------------------------------
+
+/**
+ * The shared media limits, read out of the TypeScript source.
+ *
+ * This importer is a documented stdlib-only script with no install and no build
+ * step — `make import-media-*` runs it straight from the checkout, while
+ * `@arenaquest/shared` resolves only through an untracked `dist/`. So it keeps
+ * its own table, and this test is what stops the two drifting: it parses
+ * `MEDIA_SIZE_LIMIT_BYTES` as text rather than importing it, which needs no
+ * build and no dependency.
+ */
+function readSharedSizeLimits() {
+  const sourcePath = new URL('../../packages/shared/domain/media/limits.ts', import.meta.url);
+  const source = readFileSync(sourcePath, 'utf8');
+
+  const block = source.match(/MEDIA_SIZE_LIMIT_BYTES[^=]*=\s*\{([\s\S]*?)\n\};/);
+  assert.ok(block, 'MEDIA_SIZE_LIMIT_BYTES object literal not found in the shared limits module');
+
+  const table = {};
+  for (const [, type, expression] of block[1].matchAll(/'([^']+)':\s*([\d\s*]+?),/g)) {
+    const factors = expression.trim().split('*').map((factor) => Number(factor.trim()));
+    assert.ok(
+      factors.every(Number.isFinite),
+      `shared ceiling for ${type} is not a plain product of integers: ${expression}`,
+    );
+    table[type] = factors.reduce((product, factor) => product * factor, 1);
+  }
+
+  assert.ok(Object.keys(table).length > 0, 'no ceilings parsed out of the shared limits module');
+  return table;
+}
+
+test('SIZE_LIMIT_BYTES matches the shared table byte for byte', () => {
+  assert.deepEqual(SIZE_LIMIT_BYTES, readSharedSizeLimits());
+});
+
+test('every extension the importer maps has a ceiling on both sides', () => {
+  const shared = readSharedSizeLimits();
+  for (const contentType of new Set(Object.values(CONTENT_TYPE_BY_EXTENSION))) {
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(shared, contentType),
+      `${contentType} is accepted by the importer but absent from the shared limits table`,
+    );
+  }
 });
 
 // -- manifest source ----------------------------------------------------------
