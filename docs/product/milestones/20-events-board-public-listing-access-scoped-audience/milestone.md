@@ -69,7 +69,7 @@ Out of scope (explicit, from RFC 0014 Non-Goals):
 - [ ] A `content_creator` token can `POST` a draft and `PATCH` draft fields, but `PATCH {status:'published'}` returns `403`; the same from an `admin` token publishes.
 - [ ] No `DELETE /v1/admin/events/{id}` route exists; `PATCH {status:'archived'}` removes the event from both `?scope` lists while its flyer object stays in R2.
 - [ ] Renaming a published event via `PATCH` leaves its `slug` and public URL unchanged; a previously shared link still resolves.
-- [ ] A 6 MB JPEG flyer is rejected `422 FileTooLarge` from the shared limits module; a client declaring `sizeBytes: 1024` then `PUT`-ing 50 MB is rejected at finalize, the object removed and `flyer_status` left `'pending'`.
+- [ ] A 6 MB JPEG flyer is rejected `422 FileTooLarge` from the shared limits module; and a stored object exceeding the ceiling is rejected **at finalize** by re-reading its real size with `headObject`, the object removed and `flyer_status` left `'pending'`. (The original wording — "a client declaring `sizeBytes: 1024` then `PUT`-ing 50 MB" — described an attack the presigned URL never permitted: the SDK signs `ContentLength` as a *signed header*, so a PUT must match the declared size byte for byte. The reachable path to an oversize stored object is an out-of-band write, which is how the test exercises it. The finalize check is what makes the ceiling real either way.)
 - [ ] `GET /v1/events/{slug}/flyer` returns a 302 to a presigned GET with the specified `Cache-Control`; the bucket is not world-readable.
 - [ ] A signed-out visitor loads `/events`, opens an event and reaches WhatsApp with a message naming that event; the number is the one stored on that event's row. An event whose `whatsapp_number` is empty renders **no** button — it does not silently fall back to the tenant number.
 - [ ] `curl` of `/events` (server-rendered HTML) contains event titles in the markup; `robots.ts`/`sitemap.ts` resolve; `<html lang>` matches `NEXT_PUBLIC_LANGUAGE`.
@@ -99,7 +99,7 @@ Each task is one independent PR with one owner and one review surface. Backend a
 | 01 | [Shared foundations — media limits, WhatsApp normalisation and event contracts](./01-shared-foundations.task.md) | 0 | Backend | ✅ Done |
 | 02 | [Events schema and D1 repository](./02-schema-and-repository.task.md) | 1 | Backend | ✅ Done |
 | 03 | [Anonymous events read API](./03-anonymous-read-api.task.md) | 2 | Backend | ✅ Done |
-| 04 | [Admin events API and flyer lifecycle](./04-admin-api.task.md) | 3 | Backend | ☐ Open |
+| 04 | [Admin events API and flyer lifecycle](./04-admin-api.task.md) | 3 | Backend | ✅ Done |
 | 05 | [Public events board, detail page and SEO baseline](./05-public-web.task.md) | 4 | Frontend | ☐ Open |
 | 06 | [Admin events backoffice](./06-admin-web.task.md) | 5 | Frontend | ☐ Open |
 | 07 | [Board polish, empty and past-event states](./07-web-polish.task.md) | 6 | Frontend | ☐ Open |
