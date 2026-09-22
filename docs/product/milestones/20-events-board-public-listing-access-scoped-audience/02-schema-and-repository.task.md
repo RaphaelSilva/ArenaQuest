@@ -1,6 +1,6 @@
 # Task 02 — Backend: Events schema and D1 repository (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [20 — Events board — public listing, access-scoped audiences and per-event WhatsApp contact](./milestone.md)
 **RFC:** [RFC 0014](../../RFCs/0014-events-board-and-whatsapp-contact.md)
 **Team:** Backend API
@@ -66,6 +66,16 @@ of their own.
   with a collision suffix when the derived value is taken, and is never re-derived on a
   later title change. An explicit slug supplied by a caller is honoured; Task 04 owns the
   route that offers it.
+- **One column beyond RFC 0014's schema block, deliberately:** `flyer_replaced_key`.
+  Internal bookkeeping, never mapped onto the entity. RFC §3 step 3 requires finalize to
+  "delete the previously-ready key if this was a replacement", but presign overwrites
+  `flyer_key` with the new key, so within the five columns the RFC lists the displaced key
+  is unrecoverable and `setFlyerReady` could only ever return `null` — an R2 orphan on
+  every flyer replacement. Deleting at presign time instead destroys a live flyer whenever
+  an upload is abandoned. Presign stashes the displaced key under
+  `CASE WHEN flyer_status = 'ready'` in the same UPDATE; finalize returns and clears it.
+  The column makes the RFC's own stated requirement achievable; the migration and the SQL
+  both carry this rationale inline.
 - **Events stay out of the learning tree.** No foreign key to `topic_nodes`, no row in
   `media`, no reference to `enrollments_user` or `enrollments_user_group`, and no change to
   any existing table. `d1-enrollment-repository.ts` and everything under `src/core/billing/`
@@ -99,33 +109,33 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `0027_create_events.sql` applies cleanly to a fresh local D1 and creates `events`,
+- [x] `0027_create_events.sql` applies cleanly to a fresh local D1 and creates `events`,
       `event_audience_group` and `event_audience_user` with their indexes; no existing
       table is altered.
-- [ ] Inserting a row with neither `status` nor `audience` set yields `draft` and
+- [x] Inserting a row with neither `status` nor `audience` set yields `draft` and
       `members`; a write of any value outside the allowed sets is rejected by the database.
-- [ ] The anonymous list returns exactly the `published` + `public` set for a fixture
+- [x] The anonymous list returns exactly the `published` + `public` set for a fixture
       spanning all three audiences and both non-published statuses.
-- [ ] The authenticated list returns that set ∪ `members` ∪ the caller's directly granted
+- [x] The authenticated list returns that set ∪ `members` ∪ the caller's directly granted
       events ∪ their group-granted events, and nothing else — asserted per audience level,
       not once.
-- [ ] Slug lookup applies the same audience rule as the list: an out-of-audience slug
+- [x] Slug lookup applies the same audience rule as the list: an out-of-audience slug
       resolves to nothing, so the caller above can return 404 rather than 403.
-- [ ] An event past `COALESCE(ends_at, starts_at + 1 day)` is absent from `upcoming` and
+- [x] An event past `COALESCE(ends_at, starts_at + 1 day)` is absent from `upcoming` and
       present in `past`, ordered ascending and descending respectively; an event with a
       null `ends_at` crosses the boundary one day after `starts_at`; no row is written by
       either read.
-- [ ] Creating two events from the same title yields two distinct slugs; updating a title
+- [x] Creating two events from the same title yields two distinct slugs; updating a title
       afterwards leaves the slug untouched.
-- [ ] Replacing an audience grant set removes the grants not present in the new set, and
+- [x] Replacing an audience grant set removes the grants not present in the new set, and
       deleting a group or a user removes its grant rows without deleting the event.
-- [ ] No D1-specific import leaks into a port or a controller; `IEventRepository` is the
+- [x] No D1-specific import leaks into a port or a controller; `IEventRepository` is the
       only type the layers above this task reference.
-- [ ] `git grep -n "getEffectiveAccessTopicIds" apps/api/src` returns the same four call
+- [x] `git grep -n "getEffectiveAccessTopicIds" apps/api/src` returns the same four call
       sites as before; `d1-enrollment-repository.ts` and `src/core/billing/**` are absent
       from the diff.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -174,4 +174,4 @@ Out:
 9. `git diff --stat` confirms only the guardrail files changed and that
    `apps/api/src/routes/index.ts`, `admin-media.controller.ts` and `apps/web/` are absent
    from the list; `git grep -n "getEffectiveAccessTopicIds" apps/api/src` returns the same
-   four call sites as before.
+   pre-milestone baseline of 13 lines across 5 files.

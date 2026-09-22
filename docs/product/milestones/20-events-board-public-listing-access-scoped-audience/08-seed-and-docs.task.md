@@ -136,7 +136,7 @@ Out:
    each statement is true of the code at this commit — in particular the media-limits
    pointer.
 6. Confirm `git grep -n "getEffectiveAccessTopicIds" apps/api/src` still returns the same
-   four call sites, and that no file under `src/core/billing/` or
+   pre-milestone baseline of 13 lines across 5 files, and that no file under `src/core/billing/` or
    `d1-enrollment-repository.ts` has changed across the whole milestone.
 7. `make lint`, `make test-api`, `make test-web`.
 8. `git diff --stat` confirms only the guardrail files changed, and that no application
