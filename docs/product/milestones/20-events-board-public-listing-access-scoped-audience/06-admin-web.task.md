@@ -108,7 +108,20 @@ In:
   name (the risk RFC Alternative 9 named, now owned by a human rather than hidden).
 - The publish and archive actions, with publish hidden or disabled and explained for a
   `content_creator`.
-- The admin nav entry.
+- The admin nav entry. **Delivered** — `admin-sidebar.tsx:62`, with
+  `[ADMIN, CONTENT_CREATOR]` and a comment noting a content creator authors drafts while
+  only an admin publishes.
+
+  *Two follow-ups this uncovered, both handled in `feature/m20/events-entry-points.task`:*
+  - `nav.tsx` carries a **second, duplicated `adminLinks` array** for the mobile drawer,
+    which was not updated — so the entry existed on desktop and not on mobile. The
+    duplication is the real defect; see
+    [backlog `refactoring/10`](../../backlog/refactoring/10-admin-nav-links-duplicated.task.md).
+  - The **public** entry points — `/events` in the authenticated nav and a link from the
+    landing page — were covered by **no task in this milestone**. RFC 0014 §7 specifies the
+    board in detail and never says how anyone reaches it; that gap propagated into all
+    eight task files, and the board shipped navigable only by typing its URL. The RFC now
+    carries an "Entry points" subsection.
 - Component tests: the form issues the expected payloads, the audience selector reveals its
   pickers only for `restricted`, the message preview updates with the title, the publish
   control is unavailable to a `content_creator`, and no delete control renders.
