@@ -487,6 +487,18 @@ export default function LandingPage() {
         <Logo />
 
         <nav className="flex items-center gap-3" aria-label="Navegação principal">
+          {/*
+            The public events board. A visitor with no account can only reach it
+            from here — this is the product's only anonymous page — so it sits in
+            the topbar, beside the way in, rather than further down the page.
+          */}
+          <Link
+            href="/events"
+            className="rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 hover:text-[var(--aq-text)]"
+            style={{ color: 'var(--aq-text2)' }}
+          >
+            {dict.landing.nav.events}
+          </Link>
           <Link
             href="/login"
             className="rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 hover:text-[var(--aq-text)]"

@@ -154,6 +154,11 @@ export const dictEn = {
     },
   },
   landing: {
+    // The landing page is the only public surface a stranger reaches without a
+    // session, so it is the one place the events board can be discovered from.
+    nav: {
+      events: 'Events',
+    },
     footer: {
       rights: 'All rights reserved.',
       poweredBy: 'Powered by',
@@ -2084,6 +2089,7 @@ export const dictEn = {
     nav: {
       dashboard: 'Dashboard',
       catalog: 'Catalogue',
+      events: 'Events',
       tasks: 'Tasks',
       settings: 'Settings',
       admin: 'Admin',
