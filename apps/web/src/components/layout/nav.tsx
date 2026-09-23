@@ -16,17 +16,23 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
   const canAccessAdmin = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
   const dict = useDict();
 
+  // `prefix` marks a section whose detail routes live under its own path — the
+  // entry stays highlighted on `/catalog/<id>` and `/events/<slug>`.
   const navLinks = [
-    { label: dict.layout.nav.dashboard, href: '/dashboard' },
-    { label: dict.layout.nav.catalog, href: '/catalog' },
-    { label: dict.layout.nav.tasks, href: '/tasks' },
-    { label: dict.layout.nav.settings, href: '/settings' },
+    { label: dict.layout.nav.dashboard, href: '/dashboard', prefix: false },
+    { label: dict.layout.nav.catalog, href: '/catalog', prefix: true },
+    { label: dict.layout.nav.events, href: '/events', prefix: true },
+    { label: dict.layout.nav.tasks, href: '/tasks', prefix: false },
+    { label: dict.layout.nav.settings, href: '/settings', prefix: false },
   ];
 
   const adminLinks = [
     { label: dict.layout.adminSidebar.users, href: '/admin/users', roles: [ROLES.ADMIN] },
     { label: dict.layout.adminSidebar.topics, href: '/admin/topics', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.tasks, href: '/admin/tasks', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
+    // A `content_creator` authors and edits event drafts; only an `admin` may
+    // publish one, which the form states rather than this nav hiding the area.
+    { label: dict.layout.adminSidebar.events, href: '/admin/events', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.badges, href: '/admin/badges', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.quests, href: '/admin/quests', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.missions, href: '/admin/missions', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
@@ -60,7 +66,7 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
         <nav className="flex flex-1 flex-col overflow-y-auto p-4">
           <ul className="space-y-1">
             {navLinks.map((link) => {
-              const isActive = pathname === link.href || (link.href === '/catalog' && pathname.startsWith('/catalog/'));
+              const isActive = pathname === link.href || (link.prefix && pathname.startsWith(link.href + '/'));
               return (
                 <li key={link.href}>
                   <Link
@@ -161,7 +167,13 @@ export function Nav() {
             className={(pathname === '/catalog' || pathname.startsWith('/catalog/')) ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
           >
             {dict.layout.nav.catalog}
-          </Link>          
+          </Link>
+          <Link
+            href="/events"
+            className={(pathname === '/events' || pathname.startsWith('/events/')) ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
+          >
+            {dict.layout.nav.events}
+          </Link>
           <Link
             href="/tasks"
             className={pathname === '/tasks' ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}

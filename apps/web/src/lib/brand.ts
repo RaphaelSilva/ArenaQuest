@@ -33,16 +33,13 @@ function readEnv(value: string | undefined, fallback: string): string {
 /**
  * Normalise a public WhatsApp number to the digits `wa.me` expects.
  *
- * Everything that is not a digit is dropped, so the profile may carry the
- * number in any readable form (`+55 19 99999-1155`). A result shorter than a
- * plausible international number (country code + area + subscriber) is treated
- * as unset rather than rendered as a broken link — a half-filled placeholder
- * must not ship a CTA that opens an empty chat.
+ * The implementation moved to `@arenaquest/shared/domain/contact/whatsapp` so
+ * the API can reject at write time exactly what this build would refuse to
+ * render (RFC 0014). Re-exported here because every existing caller imports it
+ * from this module.
  */
-export function normalizeWhatsapp(value: string | undefined): string {
-  const digits = (value ?? '').replace(/\D/g, '');
-  return digits.length >= 10 && digits.length <= 15 ? digits : '';
-}
+import { normalizeWhatsapp } from '@arenaquest/shared/domain/contact/whatsapp';
+export { normalizeWhatsapp };
 
 /** A brand is "custom" when any identity field diverges from the ArenaQuest default. */
 export function computeIsCustom(sigla: string, namePrefix: string, nameAccent: string): boolean {

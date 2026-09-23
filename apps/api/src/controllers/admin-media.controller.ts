@@ -2,25 +2,25 @@ import { z } from 'zod';
 import type { ITopicNodeRepository, IMediaRepository, IStorageAdapter } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
 import type { ControllerResult } from '@api/core/result';
+import {
+  ALLOWED_MEDIA_TYPES,
+  MEDIA_SIZE_LIMIT_BYTES,
+} from '@arenaquest/shared/domain/media/limits';
 
 
 // ---------------------------------------------------------------------------
 // Validation constants
 // ---------------------------------------------------------------------------
-
-const ALLOWED_TYPES = ['application/pdf', 'video/mp4', 'image/jpeg', 'image/png', 'image/webp'] as const;
-
-const SIZE_LIMIT_BYTES: Record<string, number> = {
-  'application/pdf': 25 * 1024 * 1024, // 25 MB
-  'video/mp4':       100 * 1024 * 1024, // 100 MB
-  'image/jpeg':      5 * 1024 * 1024, // 5 MB
-  'image/png':       5 * 1024 * 1024, // 5 MB
-  'image/webp':      5 * 1024 * 1024, // 5 MB
-};
+//
+// The allowed types and their ceilings live in `@arenaquest/shared/domain/media`
+// — the single source of truth this file used to hold as a literal. The values
+// are unchanged; `ALLOWED_MEDIA_TYPES` is a readonly tuple, so `z.enum` still
+// narrows `contentType` to the same five literals and the route contract is
+// byte-identical.
 
 export const PresignSchema = z.object({
   fileName: z.string().min(1).max(255),
-  contentType: z.enum(ALLOWED_TYPES),
+  contentType: z.enum(ALLOWED_MEDIA_TYPES),
   sizeBytes: z.number().int().positive(),
 });
 
@@ -83,7 +83,7 @@ export class AdminMediaController {
     if (!topic) return { ok: false, status: 404, error: 'NotFound', meta: { detail: 'topic not found' } };
 
     const { fileName, contentType, sizeBytes } = body;
-    const maxBytes = SIZE_LIMIT_BYTES[contentType];
+    const maxBytes = MEDIA_SIZE_LIMIT_BYTES[contentType];
     if (sizeBytes > maxBytes) {
       return {
         ok: false,

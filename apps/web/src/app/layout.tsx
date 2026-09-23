@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Space_Grotesk, JetBrains_Mono } from "next/font/goog
 import { AuthProvider } from "@web/context/auth-context";
 import { DictProvider } from "@web/context/dict-context";
 import { ThemeProvider } from "@web/context/theme-context";
+import { getLanguageFromEnv } from "@web/i18n/config";
 import { brand } from "@web/lib/brand";
 import { themeBootstrapScript } from "@web/lib/theme";
 import "./globals.css";
@@ -42,7 +43,7 @@ export default function RootLayout({
     // on <html> before React hydrates, so the attribute legitimately differs
     // from the server-rendered markup.
     <html
-      lang="en"
+      lang={getLanguageFromEnv()}
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >

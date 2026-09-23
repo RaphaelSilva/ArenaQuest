@@ -30,6 +30,43 @@ export namespace Entities {
             PRIVATE = 'private',
         }
 
+        /**
+         * Publication lifecycle of an event. Constrained by the
+         * `status IN ('draft','published','archived')` CHECK on `events`
+         * (RFC 0014 section 1). Only `published` is ever readable outside the
+         * admin surface.
+         */
+        export enum EventStatus {
+            DRAFT = 'draft',
+            PUBLISHED = 'published',
+            ARCHIVED = 'archived',
+        }
+
+        /**
+         * Who may see an event. Constrained by the
+         * `audience IN ('public','members','restricted')` CHECK on `events`
+         * (RFC 0014 section 1), and resolved server-side, never by the client.
+         *
+         * An audience grant is permission to see an *announcement*. It is not
+         * an enrollment and must never be read as one.
+         */
+        export enum EventAudience {
+            /**
+             * Readable by the internet — genuinely **anonymous**, with no token
+             * at all.
+             *
+             * This is deliberately stronger than {@link TopicVisibility.PUBLIC},
+             * which means only "any authenticated user". The word was already
+             * taken in this codebase with the weaker meaning, so the middle
+             * level here is spelled `members` (RFC 0014, Current State 2).
+             */
+            PUBLIC = 'public',
+            /** Any authenticated user — the level `TopicVisibility.PUBLIC` calls "public". */
+            MEMBERS = 'members',
+            /** Only the named groups and users; the safe default for a new event. */
+            RESTRICTED = 'restricted',
+        }
+
         export enum MediaStatus {
             PENDING = 'pending',
             READY = 'ready',
@@ -226,6 +263,91 @@ export namespace Entities {
                 pdf: number;
                 total: number;
             };
+        }
+
+    }
+
+    /**
+     * Events board (RFC 0014). An event is an **announcement**, not a product:
+     * it has no price, no invoice and no enrollment, and seeing one grants no
+     * content access.
+     */
+    export namespace Events {
+
+        /**
+         * Upload state of the event flyer. `none` is a row that never had one;
+         * `pending` is presigned but not yet confirmed; only `ready` is served.
+         */
+        export type EventFlyerStatus = 'none' | 'pending' | 'ready';
+
+        /**
+         * A flyer is exactly one image owned by one event, so it lives in
+         * columns on the event rather than in `Content.Media` — which is bound
+         * to a topic node by construction (RFC 0014 section 3).
+         */
+        export interface EventFlyer {
+            status: EventFlyerStatus;
+            /** Storage key, or null while the status is `none`. */
+            key: string | null;
+            /** Content type of the stored object, always an image type. */
+            type: string | null;
+            sizeBytes: number | null;
+            /** Original file name, kept for display only. */
+            name: string | null;
+        }
+
+        /**
+         * The resolved WhatsApp call-to-action for one event, or `null` when the
+         * event's stored number is empty — there is no runtime tenant fallback
+         * (RFC 0014, decision of 2026-09-22).
+         */
+        export interface EventContact {
+            /** Normalised digits, ready for `wa.me` — see `domain/contact/whatsapp`. */
+            number: string;
+            /** Pre-filled first message; composed from the title when unset. */
+            message: string;
+            /** Button text; the dictionary default when unset. */
+            label: string;
+        }
+
+        /** Who a `restricted` event is addressed to. Whole-set, never additive. */
+        export interface EventAudienceGrants {
+            groupIds: string[];
+            userIds: string[];
+        }
+
+        export interface Event {
+            id: string;
+            /** Stable, unique, URL-facing identity; the public page is keyed on it. */
+            slug: string;
+            title: string;
+            /** Plain text blurb for the list card. */
+            summary: string;
+            /** Markdown, sanitised with `sanitizeMarkdown` on write. */
+            content: string;
+            location: string;
+            /** UTC instant; orders the board. */
+            startsAt: Date;
+            /** Nullable by design: an event may be open-ended. */
+            endsAt: Date | null;
+            /**
+             * IANA zone the event is rendered in. Stored beside the instant
+             * because an anonymous reader carries no `users.timezone`.
+             */
+            timezone: string;
+            status: Config.EventStatus;
+            audience: Config.EventAudience;
+            flyer: EventFlyer;
+            /** Normalised digits, or '' when this event has no own number. */
+            whatsappNumber: string;
+            /** null composes the message from the title at read time. */
+            whatsappMessage: string | null;
+            /** '' falls back to the dictionary default. */
+            contactLabel: string;
+            /** Id of the user who created the event. */
+            createdBy: string;
+            createdAt: Date;
+            updatedAt: Date;
         }
 
     }

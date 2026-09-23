@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useApiClient } from '@web/context/auth-context';
-import type { PresignInput } from '@web/lib/admin-media-api';
 import { useDict } from '@web/context/dict-context';
+import type { MediaUploadTarget } from './media-upload-target';
 
 type UploadState = 'idle' | 'presigning' | 'uploading' | 'finalizing' | 'success' | 'error';
 
@@ -16,17 +15,23 @@ type ActiveUpload = {
   abortController?: AbortController;
 };
 
+/**
+ * Raised when the operator cancels; carried as a type rather than as a message
+ * string so the check below survives translation.
+ */
+class UploadCancelled extends Error {}
+
 type MediaUploaderProps = {
-  topicId: string;
+  /** The endpoint family to drive — topic media, an event flyer, … */
+  target: MediaUploadTarget;
   onUploadComplete: () => void;
 };
 
-export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps) {
-  const client = useApiClient();
+export function MediaUploader({ target, onUploadComplete }: MediaUploaderProps) {
   const [uploads, setUploads] = useState<ActiveUpload[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dict = useDict();
-  const d = dict.admin.topics.media;
+  const d = dict.admin.uploader;
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -44,7 +49,7 @@ export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps)
     for (const upload of newUploads) {
       processUpload(upload);
     }
-    
+
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -60,27 +65,26 @@ export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps)
     updateUpload({ abortController });
 
     try {
-      // 1. Presign
-      const presignData: PresignInput = {
+      // Courtesy check — the API re-checks the stored bytes either way.
+      if (upload.file.size > target.maxBytes) {
+        throw new Error(target.labels.fileTooBig);
+      }
+
+      // 1. Presign. `sizeBytes` is exactly `file.size`: it is signed into the
+      //    URL as `ContentLength`, so step 2 must send precisely these bytes.
+      const ticket = await target.presign({
         fileName: upload.file.name,
         contentType: upload.file.type || 'application/octet-stream',
         sizeBytes: upload.file.size,
-      };
-      
-      // Basic client side validation
-      if (upload.file.size > 100 * 1024 * 1024) {
-          throw new Error(d.uploader.fileTooBig);
-      }
+      });
 
-      const { uploadUrl, media } = await client.adminMedia.getPresignedUrl(topicId, presignData);
-
-      // 2. Upload to R2
+      // 2. Upload the very same `File` object — untransformed, unsliced.
       updateUpload({ state: 'uploading' });
-      
+
       const xhr = new XMLHttpRequest();
-      xhr.open('PUT', uploadUrl, true);
+      xhr.open('PUT', ticket.uploadUrl, true);
       xhr.setRequestHeader('Content-Type', upload.file.type || 'application/octet-stream');
-      
+
       abortController.signal.addEventListener('abort', () => xhr.abort());
 
       const uploadPromise = new Promise<void>((resolve, reject) => {
@@ -95,36 +99,35 @@ export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps)
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
           } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
+            reject(new Error(d.uploadFailedStatus(xhr.status)));
           }
         };
 
-        xhr.onerror = () => reject(new Error('Network error during upload'));
-        xhr.onabort = () => reject(new Error('Upload cancelled'));
+        xhr.onerror = () => reject(new Error(d.networkError));
+        xhr.onabort = () => reject(new UploadCancelled());
       });
 
       xhr.send(upload.file);
       await uploadPromise;
 
-      // 3. Finalize
+      // 3. Finalize — where the API compares the stored bytes to its ceiling.
       updateUpload({ state: 'finalizing', progress: 100 });
-      await client.adminMedia.finalize(topicId, media.id);
+      await target.finalize(ticket.handle);
 
       updateUpload({ state: 'success' });
       onUploadComplete();
-      
+
       // Clear success after 3s
       setTimeout(() => {
         setUploads((prev) => prev.filter((u) => u.id !== upload.id));
       }, 3000);
-
     } catch (err) {
-      const error = err instanceof Error ? err : new Error('Upload failed');
-      if (error.message === 'Upload cancelled') {
+      if (err instanceof UploadCancelled) {
         setUploads((prev) => prev.filter((u) => u.id !== upload.id));
-      } else {
-        updateUpload({ state: 'error', error: error.message });
+        return;
       }
+      const error = err instanceof Error ? err : new Error(d.uploadFailed);
+      updateUpload({ state: 'error', error: error.message });
     }
   };
 
@@ -151,7 +154,9 @@ export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps)
           type="file"
           ref={fileInputRef}
           className="hidden"
-          multiple
+          multiple={target.multiple}
+          accept={target.accept}
+          aria-label={target.labels.dropzoneTitle}
           onChange={(e) => handleFiles(e.target.files)}
         />
         <div className="rounded-full bg-indigo-100 p-3 text-indigo-600 transition-transform group-hover:scale-110 dark:bg-indigo-500/20 dark:text-indigo-400">
@@ -160,10 +165,10 @@ export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps)
           </svg>
         </div>
         <p className="mt-4 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          {d.uploader.dropzoneTitle}
+          {target.labels.dropzoneTitle}
         </p>
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          {d.uploader.dropzoneHint}
+          {target.labels.dropzoneHint}
         </p>
       </div>
 
@@ -182,6 +187,8 @@ export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps)
                 </div>
                 {upload.state !== 'success' && upload.state !== 'error' && (
                   <button
+                    type="button"
+                    aria-label={d.cancelLabel}
                     onClick={() => cancelUpload(upload.id)}
                     className="flex-shrink-0 rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-red-500 dark:hover:bg-zinc-800"
                   >
@@ -191,18 +198,18 @@ export function MediaUploader({ topicId, onUploadComplete }: MediaUploaderProps)
                   </button>
                 )}
               </div>
-              
+
               {upload.state === 'error' ? (
-                <p className="mt-2 text-xs text-red-500">{upload.error}</p>
+                <p role="alert" className="mt-2 text-xs text-red-500">{upload.error}</p>
               ) : upload.state === 'success' ? (
-                 <p className="mt-2 text-xs text-emerald-500">{d.uploader.uploadComplete}</p>
+                 <p className="mt-2 text-xs text-emerald-500">{d.uploadComplete}</p>
               ) : (
                 <div className="mt-3">
                   <div className="flex justify-between text-xs text-zinc-500 mb-1">
                     <span>
-                      {upload.state === 'presigning' && d.uploader.preparing}
-                      {upload.state === 'uploading' && d.uploader.uploading}
-                      {upload.state === 'finalizing' && d.uploader.finishing}
+                      {upload.state === 'presigning' && d.preparing}
+                      {upload.state === 'uploading' && d.uploading}
+                      {upload.state === 'finalizing' && d.finishing}
                     </span>
                     <span>{upload.progress}%</span>
                   </div>

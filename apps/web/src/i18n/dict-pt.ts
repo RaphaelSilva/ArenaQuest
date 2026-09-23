@@ -152,6 +152,11 @@ export const dictPt = {
     },
   },
   landing: {
+    // The landing page is the only public surface a stranger reaches without a
+    // session, so it is the one place the events board can be discovered from.
+    nav: {
+      events: 'Eventos',
+    },
     footer: {
       rights: 'Todos os direitos reservados.',
       poweredBy: 'Desenvolvido por',
@@ -188,7 +193,295 @@ export const dictPt = {
       },
     },
   },
+  // Public events board (RFC 0014 / Milestone 20). The only surface a stranger
+  // reads without a session, so every string here is also SEO copy.
+  events: {
+    /**
+     * Locale that formats every date on the board. Dates are rendered in the
+     * *event's* IANA zone — see `components/events/event-format.ts` — and this
+     * is the only place the language of the month names is decided.
+     */
+    locale: 'pt-BR',
+    /** `date · time (zone)`, composed so punctuation stays translatable. */
+    when: (date: string, time: string, zone: string) => `${date} · ${time} (${zone})`,
+    header: {
+      skipToContent: 'Ir para o conteúdo',
+      navLabel: 'Navegação',
+      home: 'Início',
+      events: 'Eventos',
+      signIn: 'Entrar',
+    },
+    board: {
+      title: 'Eventos',
+      subtitle: 'Seminários, graduações e treinos abertos. Dá para ver tudo sem criar conta.',
+      metaDescription:
+        'Agenda de seminários, graduações e treinos abertos. Veja os próximos eventos e o que já aconteceu.',
+      tabsLabel: 'Período dos eventos',
+      tabUpcoming: 'Próximos',
+      tabPast: 'Anteriores',
+      listLabel: 'Lista de eventos',
+      loading: 'Carregando os eventos…',
+      /**
+       * O quadro vazio é conteúdo indexável, não um erro.
+       *
+       * É o primeiro estado de um dojo recém-criado e é o que um robô de busca
+       * pode encontrar. Então a cópia convida — e aponta para "Anteriores":
+       * quem está entre seminários ainda tem história para mostrar.
+       */
+      empty: {
+        upcomingTitle: 'Nada marcado por enquanto',
+        upcomingBody:
+          'Ainda não há data nova na agenda. Enquanto isso, dá para ver o que já rolou por aqui.',
+        upcomingCta: 'Ver o que já aconteceu',
+        pastTitle: 'Nada no retrovisor ainda',
+        pastBody: 'Quando um seminário, uma graduação ou um treino aberto terminar, ele fica aqui.',
+        pastCta: 'Ver a agenda',
+      },
+      /**
+       * A listagem não respondeu. Diferente do quadro vazio de propósito:
+       * dizer "nada marcado" com a API fora do ar é uma afirmação falsa sobre
+       * o dojo, não sobre a requisição.
+       */
+      error: {
+        title: 'Não deu para carregar a agenda',
+        body: 'Algo falhou ao buscar a lista. Recarregue a página em instantes.',
+        retry: 'Tentar de novo',
+      },
+      signedOutTitle: 'Tem mais evento para ver',
+      signedOutBody:
+        'Alguns eventos são só para alunos. Entre na sua conta para ver o quadro completo.',
+      signedOutCta: 'Entrar',
+      flyerAlt: (title: string) => `Cartaz do evento ${title}`,
+      /**
+       * O evento sem cartaz renderiza um espaço reservado, nunca um ícone de
+       * imagem quebrada — e o espaço reservado também se anuncia a quem usa
+       * leitor de tela, em vez de ficar em silêncio.
+       */
+      flyerPlaceholderAlt: (title: string) => `Sem cartaz para ${title}`,
+      openEvent: (title: string) => `Ver detalhes de ${title}`,
+    },
+    audience: {
+      members: 'Alunos',
+      restricted: 'Restrito',
+    },
+    detail: {
+      back: 'Voltar para os eventos',
+      whenLabel: 'Quando',
+      whereLabel: 'Onde',
+      aboutLabel: 'Sobre o evento',
+      /**
+       * Default button text, used only when the event stores no `contactLabel`.
+       * This is the one contact field the web resolves: it is a translated UI
+       * string, so the API cannot know it. The number and the pre-filled
+       * message are never defaulted.
+       */
+      contactDefaultLabel: 'Eu quero',
+      /**
+       * Um evento que já passou continua sendo uma página: cartaz, data e
+       * conteúdo ficam. O tom é factual — é registro, não erro. E o botão de
+       * contato **permanece**, abaixo do aviso, porque quem escreve num
+       * seminário antigo costuma estar perguntando da próxima edição.
+       */
+      pastBadge: 'Já aconteceu',
+      pastNote: 'Este evento já aconteceu. Fale com a gente para saber da próxima edição.',
+      loading: 'Carregando o evento…',
+      notFoundTitle: 'Evento não encontrado',
+      notFoundBody:
+        'Este evento não existe, já saiu do ar, ou não está disponível para a sua conta.',
+      notFoundCta: 'Ver todos os eventos',
+    },
+  },
   admin: {
+    /**
+     * Cópia do `MediaUploader` compartilhado, configurado por família de
+     * endpoints (mídia de tópico, flyer de evento, …) em vez de duplicado.
+     * Estas strings descrevem o *ciclo de vida*, logo são as mesmas para
+     * qualquer upload; a cópia que nomeia os tipos aceitos e o limite é
+     * fornecida por alvo.
+     */
+    uploader: {
+      preparing: 'Preparando...',
+      uploading: 'Enviando...',
+      finishing: 'Finalizando...',
+      uploadComplete: 'Upload concluído',
+      cancelLabel: 'Cancelar este upload',
+      uploadFailedStatus: (status: number) => `Falha no upload com status ${status}`,
+      networkError: 'Erro de rede durante o upload',
+      uploadFailed: 'Falha no upload',
+    },
+    /**
+     * O backoffice de eventos (RFC 0014, Milestone 20 Task 06).
+     *
+     * Dois grupos aqui são decisões, não rótulos. `contact.messageTemplate` é
+     * onde a mensagem pré-preenchida do WhatsApp é *composta* — a API não
+     * compõe nada, então este template seguir o idioma do build é o que mantém
+     * um literal em português fora de um deploy `en`. E toda string `warning` é
+     * estrutural: limpar o número remove o botão público por completo, limpar a
+     * mensagem abre a conversa vazia, e mover um slug quebra links já
+     * compartilhados. Nenhuma delas recorre a um fallback.
+     */
+    events: {
+      title: 'Eventos',
+      subtitle: 'Seminários, graduações e treinos abertos — rascunhos inclusive.',
+      list: {
+        newButton: 'Novo evento',
+        filterLabel: 'Status',
+        filterAll: 'Todos',
+        countLabel: (total: number) => `${total} evento(s)`,
+        edit: 'Editar',
+        loading: 'Carregando os eventos…',
+        emptyTitle: 'Nenhum evento ainda',
+        empty: 'Comece pelo primeiro: ele nasce como rascunho e só vai ao ar quando você publicar.',
+        /**
+         * Lista vazia por causa do filtro, não porque o dojo não tem evento.
+         * São situações diferentes e levam a ações diferentes — uma pede criar,
+         * a outra pede limpar o filtro.
+         */
+        emptyFilteredTitle: 'Nenhum evento com esse status',
+        emptyFiltered: 'Existem eventos cadastrados, mas nenhum neste status.',
+        errorTitle: 'Não deu para carregar',
+        errorLoading: 'Não foi possível carregar os eventos.',
+        retry: 'Tentar de novo',
+        archivedNote: 'Arquivado — fora do quadro público',
+      },
+      status: {
+        draft: 'Rascunho',
+        published: 'Publicado',
+        archived: 'Arquivado',
+      },
+      audienceName: {
+        public: 'Público',
+        members: 'Membros',
+        restricted: 'Restrito',
+      },
+      form: {
+        createTitle: 'Novo evento',
+        editTitle: 'Editar evento',
+        backToList: 'Voltar para eventos',
+        notFound: 'Este evento não existe mais.',
+        basicsSection: 'O básico',
+        titleLabel: 'Título',
+        titlePlaceholder: 'Treino aberto com o Sensei Tanaka',
+        summaryLabel: 'Resumo',
+        summaryHint: 'Uma linha em texto puro para o card do quadro.',
+        contentLabel: 'Descrição',
+        contentHint: 'Markdown. A API sanitiza antes de armazenar.',
+        locationLabel: 'Local',
+        locationPlaceholder: 'Dojo Central — Campinas, SP',
+        whenSection: 'Quando acontece',
+        startsAtLabel: 'Início',
+        endsAtLabel: 'Término',
+        endsAtHint: 'Deixe em branco para um evento sem hora de término.',
+        timezoneLabel: 'Fuso horário',
+        timezoneHint:
+          'O fuso em que o evento é anunciado. Todo mundo lê o mesmo horário, esteja onde estiver.',
+        createButton: 'Criar rascunho',
+        saveButton: 'Salvar alterações',
+        saving: 'Salvando…',
+        saved: 'Salvo',
+        requiredTitle: 'O título é obrigatório.',
+        requiredStartsAt: 'A data e hora de início são obrigatórias.',
+        invalidRange: 'O término precisa vir depois do início.',
+        errorSaving: 'Não foi possível salvar o evento.',
+        errorSlugConflict: 'Esse link já pertence a outro evento.',
+      },
+      slug: {
+        label: 'Link público',
+        generatedHint: 'Gerado a partir do título. É definido uma única vez, na criação.',
+        frozenHint:
+          'Fixado na criação e nunca recalculado — renomear o evento mantém este link funcionando.',
+        overrideButton: 'Alterar o link',
+        overrideWarning:
+          'Atenção: todo link já compartilhado — num grupo de WhatsApp, num post, num panfleto impresso — para de funcionar no instante em que isto mudar. Uma URL que já está circulando não pode ser recolhida.',
+        overrideConfirm: 'Entendi, quero editar',
+        overrideCancel: 'Manter o link atual',
+      },
+      flyer: {
+        sectionTitle: 'Flyer',
+        ceilingNotice:
+          'JPEG, PNG ou WebP, até 5 MB. Exporte nesse tamanho antes de enviar — qualquer coisa maior é recusada.',
+        dropzoneTitle: 'Clique para enviar o flyer ou arraste até aqui',
+        dropzoneHint: 'JPEG, PNG ou WebP — 5 MB no máximo',
+        fileTooBig: 'Esta imagem passa do limite de 5 MB. Exporte menor e tente de novo.',
+        availableAfterCreate: 'Crie o rascunho primeiro — o flyer se anexa a um evento já salvo.',
+        currentLabel: 'Flyer atual',
+        pendingLabel: 'Upload iniciado mas nunca confirmado. Envie novamente.',
+        unknownSize: 'tamanho desconhecido',
+        removeButton: 'Remover o flyer',
+        removing: 'Removendo…',
+        removeFailed: 'Não foi possível remover o flyer.',
+        errorTooLarge: (maxMb: number) =>
+          `Recusado: a imagem passa do limite de ${maxMb} MB. A API confere os bytes que realmente armazenou, então a única saída é exportar menor.`,
+        errorUnsupported: 'Recusado: um flyer precisa ser uma imagem JPEG, PNG ou WebP.',
+        errorNotUploaded: 'O upload não chegou ao armazenamento. Tente de novo.',
+      },
+      audience: {
+        sectionTitle: 'Quem pode ver',
+        optionPublic: 'Público',
+        optionPublicHint: 'Qualquer pessoa na internet, sem conta nenhuma.',
+        optionMembers: 'Membros',
+        optionMembersHint: 'Qualquer conta autenticada.',
+        optionRestricted: 'Restrito',
+        optionRestrictedHint: 'Somente os grupos e as pessoas indicados abaixo.',
+        publicWarning:
+          'Este evento passa a ser legível por qualquer pessoa na internet, logada ou não — inclusive o número de WhatsApp, que ficará numa página pública e indexada por buscadores.',
+        groupsLabel: 'Grupos',
+        groupsEmpty: 'Nenhum grupo cadastrado ainda.',
+        usersLabel: 'Pessoas',
+        usersEmpty: 'Nenhuma conta disponível para escolher.',
+        loadingTargets: 'Carregando grupos e pessoas…',
+        errorTargets: 'Não foi possível carregar os grupos e as pessoas.',
+        errorSavingGrants: 'O evento foi salvo, mas a lista de público não.',
+        selectedCount: (groups: number, users: number) =>
+          `${groups} grupo(s) e ${users} pessoa(s) selecionados`,
+      },
+      contact: {
+        sectionTitle: 'Contato no WhatsApp',
+        sectionHint:
+          'Os dois campos são gravados neste evento. Nada é preenchido depois no lugar de quem lê.',
+        numberLabel: 'Número',
+        numberHint: 'Pré-preenchido com o número deste site. Troque para direcionar este evento a outra pessoa.',
+        numberPlaceholder: '5519999991155',
+        messageLabel: 'Mensagem pré-preenchida',
+        messageHint: 'O texto exato com que a conversa do visitante abre. Edite à vontade.',
+        /**
+         * A sugestão de que o formulário parte. Composta aqui, no idioma do
+         * próprio build, porque a API grava o que for enviado e não compõe
+         * nada por conta própria.
+         */
+        messageTemplate: (title: string, when: string) =>
+          `Olá! Vi "${title}" em ${when} e gostaria de saber mais.`,
+        useSuggestion: 'Usar a mensagem sugerida',
+        labelLabel: 'Texto do botão',
+        labelHint: 'Deixe em branco para usar o padrão do site.',
+        labelPlaceholder: 'Eu quero',
+        previewTitle: 'O que o visitante recebe',
+        previewButton: (label: string) => `Botão: “${label}”`,
+        previewMessageLabel: 'Mensagem com que a conversa abre:',
+        previewNoNumber:
+          'Sem número: não haverá botão nenhum na página pública. Nada entra no lugar.',
+        previewNoMessage:
+          'Sem mensagem: o botão continua aparecendo, e a conversa abre sem nada digitado. Nada é composto por você.',
+        titleChangedWarning:
+          'O título mudou depois que esta mensagem foi escrita, então ela ainda cita o título antigo. Edite-a, ou use a sugestão de novo.',
+      },
+      publish: {
+        sectionTitle: 'Publicação',
+        publishButton: 'Publicar',
+        publishing: 'Publicando…',
+        unpublishButton: 'Voltar para rascunho',
+        archiveButton: 'Arquivar',
+        archiving: 'Arquivando…',
+        archiveConfirm:
+          'Arquivar este evento? Ele sai do quadro público e pode voltar como rascunho.',
+        adminOnly: 'Só um administrador pode publicar um evento, então este controle está desabilitado para você. Você pode continuar editando o rascunho.',
+        forbidden: 'A API recusou: publicar exige o papel de administrador.',
+        stateDraft: 'Este evento é um rascunho. Ninguém fora do backoffice consegue vê-lo.',
+        statePublished: 'Este evento está no ar no quadro público.',
+        stateArchived: 'Este evento está arquivado e fora do quadro público.',
+        errorTransition: 'Não foi possível alterar o estado de publicação.',
+      },
+    },
     dashboard: {
       title: 'Admin Dashboard',
       subtitle: 'Gerencie usuários, conteúdo e configurações da plataforma.',
@@ -349,13 +642,12 @@ export const dictPt = {
       media: {
         sectionTitle: 'Anexos de Mídia',
         sectionSubtitle: 'Faça upload e gerencie arquivos associados a este tópico.',
+        // A cópia do ciclo de vida vive em `admin.uploader`; aqui fica apenas a
+        // cópia que descreve *o que tópicos aceitam*, entregue ao uploader
+        // compartilhado por `useTopicMediaTarget`.
         uploader: {
           dropzoneTitle: 'Clique para fazer upload ou arraste e solte',
           dropzoneHint: 'PDF, Vídeo ou Imagens até 100MB',
-          preparing: 'Preparando...',
-          uploading: 'Enviando...',
-          finishing: 'Finalizando...',
-          uploadComplete: 'Upload concluído',
           fileTooBig: 'Arquivo muito grande (máx. 100MB)',
         },
         list: {
@@ -1799,6 +2091,7 @@ export const dictPt = {
     nav: {
       dashboard: 'Dashboard',
       catalog: 'Catálogo',
+      events: 'Eventos',
       tasks: 'Tarefas',
       settings: 'Configurações',
       admin: 'Admin',
@@ -1817,6 +2110,7 @@ export const dictPt = {
       users: 'Usuários',
       topics: 'Tópicos',
       tasks: 'Tarefas',
+      events: 'Eventos',
       badges: 'Conquistas',
       quests: 'Desafios',
       missions: 'Missões',
