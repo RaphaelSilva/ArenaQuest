@@ -476,6 +476,16 @@ later be sourced from the tenant profile in `config/labels/<label>.jsonc` or fro
 configuration row in the database, with **no change to how an event renders**, since the
 stored `events.timezone` remains the source of truth on read.
 
+**Entry points** — *added 2026-09-23, after implementation.* This section originally
+specified the board, the detail page, the layout and the SEO baseline, and never said how
+anyone **reaches** the board. The gap propagated into all eight task files and the feature
+shipped navigable only by typing its URL. Three links are required and are part of the
+feature, not polish: `/events` in the authenticated nav; `/admin/events` in the admin
+sidebar (`admin` · `content_creator`, matching topics and tasks, since a content creator
+may author drafts); and a link from the **public landing page**, which matters most — a
+board whose whole purpose is to be found by someone with no account is worthless if the
+product's only public page does not mention it.
+
 **i18n** — a new `events:` section in `dict-en.ts` and `dict-pt.ts` with identical keys, no
 hardcoded strings in `src/{app,components,hooks}/**`, enforced by `check-i18n-coverage.js`.
 
