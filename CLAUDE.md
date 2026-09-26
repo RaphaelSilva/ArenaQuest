@@ -41,6 +41,13 @@ cd apps/api && pnpm test test/index.spec.ts
 cd apps/api && pnpm test --grep "test name"
 ```
 
+**Git worktrees (one per feature):**
+```bash
+make worktree-open KIND=rfc NUMBER=16 SLUG=x      # planning: docs/rfc-0016-x → .worktrees/rfc-0016-x
+make worktree-open KIND=milestone MILESTONE=21    # execution: feature/m21/candidate → .worktrees/m21-candidate
+make worktree-sweep DRY_RUN=1                     # preview removing worktrees whose PR merged
+```
+
 **Cloudflare & Database:**
 ```bash
 make cf-typegen            # regenerate Worker bindings types
@@ -282,7 +289,8 @@ Next.js 15 + React 19 frontend deployed to Cloudflare Pages via `@cloudflare/nex
 ## Key Conventions
 
 - **Commit style** — Conventional Commits (`feature:`, `hotfix:`, etc.). See CONTRIBUTING.md.
-- **Branch strategy** — `main` (production), `develop` (staging), feature branches off `develop`.
+- **Branch strategy** — `main` is the trunk and the only long-lived branch (a merge deploys staging, then production behind an approval); every branch is cut from `main` and returns through a reviewed PR. There is no `develop`.
+- **One git worktree per feature** — the root checkout stays on `main`, clean, and is only used to open worktrees. A feature is opened with `make worktree-open` (`scripts/git/worktree.mjs`) under `.worktrees/` (gitignored), named after its candidate (`feature/m<N>/candidate` → `.worktrees/m<N>-candidate`), and every branch hop, commit and merge for it happens inside that worktree. Run `make setup` in a new worktree (deps, env files and local D1 are per worktree). Planning is a separate, earlier worktree and PR: the RFC → milestone/backlog/epic → task files chain is written in `.worktrees/rfc-<NNNN>-<slug>` (branch `docs/rfc-<NNNN>-<slug>`) and merged into `main` before the feature worktree is opened. A worktree stays on disk through review and is removed only after its PR is merged into `main`, by `make worktree-sweep` — run automatically by the Claude Code `SessionStart` hook in `.claude/settings.json` (needs `gh auth login`). The sweep only touches worktrees carrying the marker `worktree-open` writes, and skips a dirty one or one with commits the PR lacks. Never touch a worktree you did not open — others may belong to another process. See CONTRIBUTING.md, `write-rfc` and the `developer` skill.
 - **Package manager** — pnpm with frozen lockfile.
 - **TypeScript** — strict mode. Shared types live in `packages/shared`.
 - **No external auth deps** — Auth is intentionally implemented with Web Crypto API only. Do not introduce `jsonwebtoken`, `bcrypt`, or similar.

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/scripts/git/worktree.mjs\" ] && node \"$CLAUDE_PROJECT_DIR/scripts/git/worktree.mjs\" sweep --hook || true",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
