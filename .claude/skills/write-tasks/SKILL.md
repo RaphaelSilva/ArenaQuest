@@ -21,6 +21,16 @@ Task Breakdown table in sync. Two dependency-free Node scripts back it:
 Paths below are **relative to the repo root**. Run the scripts from the repo root
 with Node (stdlib only — no install).
 
+## Where to work
+
+Run this skill **inside the planning worktree** — the one opened for the RFC this
+work derives from (`.worktrees/rfc-<NNNN>-<slug>`, branch `docs/rfc-<NNNN>-<slug>`),
+so the RFC and its milestone and task files ship together in one planning PR to `main`. If the RFC is
+already merged, open a fresh planning worktree from `origin/main`
+(`docs/<slug>` → `.worktrees/docs-<slug>`). The full lifecycle — numbering, opening,
+PR, and the sweep that removes the worktree after the merge — is in `write-rfc` §*Where to
+work: the planning worktree*. Never write planning docs in the root checkout on `main`.
+
 ## Where this sits
 
 `write-rfc` → **`write-feature`** (RFC → milestone.md) → **`write-tasks`** (this

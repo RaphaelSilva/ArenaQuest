@@ -26,6 +26,7 @@
         build build-api build-web \
         lint lint-api lint-web lint-shared \
         test test-api test-web test-scripts convert-skipped \
+        worktree-open worktree-sweep \
         db-migrate-local db-seed-local db-reset-local \
         db-migrate-staging db-migrate-prod db-migrations-staging-local \
         bootstrap-admin cf-typegen \
@@ -164,7 +165,8 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/cloudflare/provision-label.test.mjs \
 		scripts/content/import-media.test.mjs \
 		scripts/content/drive-source.test.mjs \
-		scripts/media/convert-skipped.test.mjs
+		scripts/media/convert-skipped.test.mjs \
+		scripts/git/worktree.test.mjs
 
 test-api: ## Run apps/api tests (Vitest + Cloudflare Workers pool)
 	pnpm turbo test --filter api
@@ -219,6 +221,22 @@ convert-skipped: ## Convert the files an import skipped, locally (REPORT=path SO
 		$(if $(filter 1,$(FORCE)),--force,) \
 		$(if $(filter 1,$(CONFIRM)),--yes,) \
 		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+# ==============================================================================
+##@ 🌳 LOCAL — git worktrees (one per feature, see CONTRIBUTING.md)
+# ==============================================================================
+worktree-open: ## Open (or reuse) a feature worktree from origin/main (KIND=rfc|docs|milestone|chained|epic|backlog; NUMBER, SLUG, MILESTONE, EPIC, TOPIC; ADOPT=1)
+	@test -n "$(KIND)" || { printf "$(RED)  ✖  KIND is required — e.g. make worktree-open KIND=milestone MILESTONE=21$(RESET)\n"; exit 1; }
+	node scripts/git/worktree.mjs open --kind $(KIND) \
+		$(if $(NUMBER),--number $(NUMBER),) \
+		$(if $(SLUG),--slug $(SLUG),) \
+		$(if $(MILESTONE),--milestone $(MILESTONE),) \
+		$(if $(EPIC),--epic $(EPIC),) \
+		$(if $(TOPIC),--topic $(TOPIC),) \
+		$(if $(filter 1,$(ADOPT)),--adopt,)
+
+worktree-sweep: ## Remove managed worktrees whose PR is merged into main (DRY_RUN=1 to preview; needs gh auth)
+	node scripts/git/worktree.mjs sweep $(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
 # ==============================================================================
 ##@ 🟡 STAGING — remote (requires wrangler login)

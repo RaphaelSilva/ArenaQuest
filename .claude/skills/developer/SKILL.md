@@ -59,17 +59,74 @@ Never invent topology. Compute it from the task's source folder.
 - **PR creation requires explicit user confirmation.** The PR targets `main` and is the
   only path into it. (No PRs at all in chained mode.)
 
-### Smart Check & Swap
+### Worktree per feature (the working model)
 
-1. `git branch --show-current` and `git status`.
-2. If current == target task branch and the tree is clean → proceed to §4. If dirty → ask before stashing/discarding (never auto-stash silently).
-3. If current != target: confirm clean tree (else abort + ask), `git fetch origin`, then create the branch from its correct parent:
+**Every feature lives in its own git worktree.** The root checkout
+(`/root/ArenaQuest`) stays on `main`, clean, and is only used to *open* worktrees —
+never to switch branches, commit or merge. All branch hops for a feature (candidate →
+task → back to candidate) happen **inside that feature's worktree**.
+
+- **Location:** `.worktrees/` at the repo root (gitignored). The worktree is named
+  after the feature's candidate branch:
+
+  | Mode | Branch the worktree opens on | Worktree path |
+  |---|---|---|
+  | Milestone | `feature/m<N>/candidate` | `.worktrees/m<N>-candidate` |
+  | Epic | `feature/epic/<epic_name>/candidate` | `.worktrees/epic-<epic_name>-candidate` |
+  | Chained | `feature/m<N>/<subject_slug>` | `.worktrees/m<N>-<subject_slug>` |
+  | Backlog | `feature/backlog/<topic>/<task_slug>.task` | `.worktrees/backlog-<topic>-<task_slug>` |
+
+- **Foreign worktrees are off-limits.** `git worktree list` may show worktrees owned
+  by another process (e.g. `.worktrees/t_*`, or a candidate someone else is driving).
+  Never `remove`, `prune`, `checkout` inside, commit to, or clean one you did not open
+  for this feature. If the target path already exists as a worktree on the right
+  branch, *reuse* it; if it exists on another branch, STOP and ask.
+- **The stash is shared by every worktree.** Never use bare `git stash`/`stash pop`;
+  set work aside with a WIP commit instead.
+- **Per-worktree local state.** `node_modules`, `apps/api/.dev.vars`,
+  `apps/web/.env.local` and the local D1 replica (`apps/api/.wrangler`) are **not**
+  shared. Run `make setup` once in a new worktree before any `make lint`/`make test-*`
+  (docs-only work can skip it). Two worktrees running `make dev` at the same time will
+  collide on ports 3000/8787 — stop one first.
+
+**Planning comes first, in its own worktree.** The RFC → milestone/backlog/epic →
+task files chain is written in a planning worktree and merged into `main` through its
+own PR (see `write-rfc` §*Where to work*). This skill starts from that merged plan:
+its feature worktree is always opened from `origin/main` *after* the planning PR landed.
+
+### Open the worktree (from the root checkout)
+
+1. In the root checkout: `git worktree list` and `git status` — the root must be on
+   `main` and clean; if not, STOP and ask (never auto-stash).
+2. `git fetch origin`.
+3. Open (or reuse) the feature worktree with the helper — it attaches to the
+   candidate if it already exists (locally or on origin), otherwise creates it from
+   `origin/main`, and marks the worktree as managed so the sweep can remove it later:
    ```bash
-   git checkout <parent_branch>
-   git pull --ff-only origin <parent_branch>
-   git checkout -b <target_branch>
+   make worktree-open KIND=milestone MILESTONE=<N>
+   make worktree-open KIND=epic EPIC=<epic_name>
+   make worktree-open KIND=chained MILESTONE=<N> SLUG=<subject_slug>
+   make worktree-open KIND=backlog TOPIC=<topic> SLUG=<task_slug>
    ```
-   Creating the candidate/subject branch first if it doesn't exist.
+   It refuses a path that holds a worktree it did not open. New branches are always
+   based on `origin/main` — `main` is checked out in the root and git refuses to check
+   it out twice.
+4. **Route the session into the worktree** (`cd .worktrees/<name>`) and run every
+   subsequent command — plan, delegation, verification, commits, merges, pushes —
+   from there. Pass the worktree path to every subagent as its working directory.
+
+### Smart Check & Swap (inside the worktree)
+
+1. `git branch --show-current` and `git status` in the feature worktree.
+2. If current == target task branch and the tree is clean → proceed to §4. If dirty → ask before discarding (never auto-stash).
+3. If current != target: confirm a clean tree (else abort + ask), then hop from the candidate:
+   ```bash
+   git checkout <candidate_branch>
+   git pull --ff-only origin <candidate_branch>   # when it exists on origin
+   git checkout -b <target_task_branch>
+   ```
+   Backlog has no candidate: the worktree already sits on the task branch.
+   Chained: cut the first task from the subject, each later one from the previous task branch.
 
 ## 3. Loop control
 
@@ -79,10 +136,12 @@ Never cut a task's branch until the previous one merged. Report `✓ <task_slug>
 
 **DAG awareness:** read each task's `Dependencies` metadata. Independent tasks may be
 run concurrently as background subagents in isolated worktrees
-(`isolation: "worktree"`). Dependent tasks wait for their parents.
+(`isolation: "worktree"`), each cut from the candidate's HEAD; their branches are
+merged back **inside the feature worktree**. Dependent tasks wait for their parents.
 
 **Chained loop:** skip the per-task merge; each task closes by committing its status
-update on its own branch and pushing once. After the **last** task verifies green:
+update on its own branch and pushing once. After the **last** task verifies green
+(inside `.worktrees/m<N>-<subject_slug>`):
 ```bash
 git checkout feature/m<N>/<subject_slug>
 git merge --ff-only feature/m<N>/<last_task_slug>.task
@@ -92,7 +151,8 @@ Always a clean fast-forward; if git refuses, STOP and report.
 
 ## 4. Per-task operating loop
 
-For each task, after the branch is prepared (§2):
+For each task, after the feature worktree is open and the branch is prepared (§2).
+Every step below runs **inside the feature worktree**:
 
 1. **Plan.** Parse the `.task.md` end-to-end (metadata, slug, summary, dependencies,
    acceptance criteria, verification plan). Decide the persona(s) from scope:
@@ -127,6 +187,15 @@ For each task, after the branch is prepared (§2):
    - **Chained:** no per-task merge — only the final fast-forward (§3).
    Offer to delete the local task branch after merge. **`main` is never a merge target
    here:** the candidate/subject/backlog branch reaches it only through a confirmed PR.
+7. **Leave the worktree in place; the sweep removes it after the merge.** Do not
+   remove it yourself when the PR opens: the worktree stays on disk while the PR is under review, so requested changes are
+   made right there. Once the PR is **merged into `main`**, the sweep removes it: the
+   Claude Code `SessionStart` hook (`.claude/settings.json`) runs the same sweep
+   on every session start, and it can be run by hand (`make worktree-sweep`,
+   `DRY_RUN=1` to preview). It only touches worktrees opened by `make worktree-open`
+   (they carry a marker), and skips any that is dirty, has commits the PR does not, or
+   holds the current session.
+   Never touch a worktree this feature did not open.
 
 ## 5. Failure handling in a loop
 
@@ -147,6 +216,9 @@ If a task fails after 2 repairs or its subagent emits `BLOCKED:`:
 - **English only** in all plans, commits, and subagent prompts.
 - **Parent owns destructive/observable steps** (branches, verification, commits, pushes, merges, status files); subagents only write code and commit locally.
 - **Push once per task.** No intermediate pushes.
+- **One worktree per feature; the root checkout stays on `main`.** All branch hops,
+  commits and merges happen inside `.worktrees/<name>`. Never touch a worktree this
+  feature did not open.
 - **`main` is PR-only.** Never commit, merge or push to `main`; a run ends at the
   candidate/subject/task branch and, on explicit confirmation, at a PR targeting `main`.
 - **BLOCKED protocol.** A subagent `BLOCKED:` line halts the loop before any commit/merge; surface it and wait.
@@ -156,5 +228,5 @@ If a task fails after 2 repairs or its subagent emits `BLOCKED:`:
 ## 7. Final output
 
 After a single task: end with the relative path to its `.plan.md` on the last line,
-nothing after it. After a loop: print a summary table (task | branch | status), with a
+nothing after it. After a loop: print a summary table (task | branch | status) preceded by the feature worktree path, with a
 "Cut from" column and a trailing fast-forward row in chained mode.
