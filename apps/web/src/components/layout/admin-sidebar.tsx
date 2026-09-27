@@ -57,6 +57,9 @@ export function AdminSidebar() {
     { label: dict.layout.adminSidebar.users, href: '/admin/users', requiredRoles: [ROLES.ADMIN] },
     { label: dict.layout.adminSidebar.topics, href: '/admin/topics', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.tasks, href: '/admin/tasks', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
+    // A `content_creator` authors event drafts; only an `admin` may publish
+    // one, which the form states rather than this nav hiding the whole area.
+    { label: dict.layout.adminSidebar.events, href: '/admin/events', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.badges, href: '/admin/badges', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.quests, href: '/admin/quests', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
     { label: dict.layout.adminSidebar.missions, href: '/admin/missions', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },

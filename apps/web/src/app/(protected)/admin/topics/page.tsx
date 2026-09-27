@@ -11,6 +11,7 @@ import type {
 } from '@web/lib/admin-topics-api';
 import type { Media } from '@web/lib/admin-media-api';
 import { MediaUploader } from '@web/components/admin/MediaUploader';
+import { useTopicMediaTarget } from '@web/components/admin/use-topic-media-target';
 import { MediaList } from '@web/components/admin/MediaList';
 import { Spinner } from '@web/components/spinner';
 import { Button, Badge } from '@web/components/design-system';
@@ -225,6 +226,10 @@ export default function AdminTopicsPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // The topic-media upload lifecycle, injected into the shared `MediaUploader`
+  // (the component is configured per endpoint family, never forked).
+  const mediaUploadTarget = useTopicMediaTarget(selectedId ?? '');
 
   // Inline title editing
   const [inlineEditId, setInlineEditId] = useState<string | null>(null);
@@ -994,7 +999,7 @@ export default function AdminTopicsPage() {
 
               {selectedId && (
                 <MediaUploader
-                  topicId={selectedId}
+                  target={mediaUploadTarget}
                   onUploadComplete={reloadMedia}
                 />
               )}

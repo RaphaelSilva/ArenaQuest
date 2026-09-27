@@ -13,6 +13,7 @@ import * as adminUsersApiModule from './admin-users-api';
 import * as adminMediaApiModule from './admin-media-api';
 import * as adminEnrollmentApiModule from './admin-enrollment-api';
 import * as adminGroupsApiModule from './admin-groups-api';
+import * as adminEventsApiModule from './admin-events-api';
 import * as adminGamificationApiModule from './admin-gamification-api';
 import * as adminBillingApiModule from './admin-billing-api';
 import * as meBillingApiModule from './me-billing-api';
@@ -100,6 +101,10 @@ export class ApiClient {
 
   get adminGroups() {
     return adminGroupsApiModule.createAdminGroupsApi(this.http);
+  }
+
+  get adminEvents() {
+    return adminEventsApiModule.createAdminEventsApi(this.http);
   }
 
   get adminGamification() {

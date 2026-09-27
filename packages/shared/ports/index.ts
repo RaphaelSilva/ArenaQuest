@@ -22,4 +22,5 @@ export * from './i-comment-repository';
 export * from './i-mission-repository';
 export * from './i-user-group-repository';
 export * from './i-billing-repository';
+export * from './i-event-repository';
 // i-database-adapter defines the full future IDatabaseAdapter contract (not yet implemented)

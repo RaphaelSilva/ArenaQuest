@@ -6,6 +6,7 @@ import { buildTopicsRouter } from '@api/routes/topics.router';
 import { buildPublicRouter } from '@api/routes/public';
 import { buildMeRouter } from '@api/routes/me';
 import { buildCommentsRouter } from '@api/routes/comments.router';
+import { buildEventsRouter } from '@api/routes/events.router';
 import { buildHealthRouter } from '@api/routes/public/health';
 
 import { authGuard } from '@api/middleware/auth-guard';
@@ -80,6 +81,9 @@ export class AppRouter {
     v1.route('/admin', buildAdminRouter(container));
     v1.route('/me', buildMeRouter(container));
     v1.route('/topics', buildTopicsRouter({ content, progress, gamification }));
+    // Anonymous by design (RFC 0014 §6) — mounted here rather than inside
+    // `buildPublicRouter`, whose routes all carry `authGuard`.
+    v1.route('/events', buildEventsRouter(container));
 
     app.route('/v1', v1);
 

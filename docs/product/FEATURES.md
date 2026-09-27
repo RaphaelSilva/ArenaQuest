@@ -325,6 +325,54 @@ credential and changes nothing.
 
 ---
 
+## 9. Events & Public Surface
+
+### Events board
+An administrator registers an event — date, location, markdown body, flyer image
+— chooses **who may see it**, and the platform renders it in two places at once.
+`/events` and `/events/{slug}` are **the first pages in the product readable with
+no account at all**: they are server-rendered, carry OpenGraph tags, and ship
+with the SEO baseline (`robots.ts`, `sitemap.ts` over the published `public`
+set), so the board is **anonymous and indexed** — a stranger can find the dojo
+through a search engine, and a link pasted into WhatsApp renders a preview with
+the flyer. The same URL serves a signed-in reader more: one endpoint,
+`GET /v1/events`, returns the union of what the caller is entitled to, so the
+"other list for members" is the *difference between two responses*, not a second
+route the client has to choose correctly.
+
+Audience has three levels — `public` (the internet), `members` (any
+authenticated user) and `restricted` (named `user_groups` and users) — resolved
+**server-side**, never by the client. The anonymous listing is its own SQL
+statement with a literal `audience = 'public'` filter rather than the
+authenticated query with a null viewer, because a null on the wrong side of that
+expression is a data leak rather than an error. Out-of-audience detail reads
+return `404`, byte-identical to a slug that does not exist, so an open surface is
+not an enumeration oracle. `audience` defaults to `members` and `status` to
+`draft` in the *schema*, so the failure mode of a forgotten column is "fewer
+people saw it", never "we published a private grading to the internet";
+publishing is `admin`-only, a narrower gate than creating a draft.
+
+An event is an **announcement, not a product**: no price, no invoice, no
+enrollment. An audience row grants permission to see an announcement and
+**never** content access — which is why it lives in its own tables rather than in
+`enrollments_*`, and why `getEffectiveAccessTopicIds` is untouched by the whole
+feature. "Past" is a computed predicate (`COALESCE(ends_at, starts_at + 1 day) <
+now`), so a row moves between the *Próximos* and *Anteriores* tabs as the clock
+passes it, with no sweep and nothing written on expiry. The flyer lives in
+columns on `events` and is served through a stable route that 302s to a freshly
+minted presigned GET, so the bucket stays private and an `og:image` URL does not
+expire. Each event carries **its own WhatsApp number and pre-filled message**, so
+a seminar run by a visiting instructor sends its leads to that instructor, and
+whoever receives the message knows which flyer produced it.
+
+**Code:** `apps/api/src/controllers/{events,admin-events}.controller.ts`, `apps/api/src/adapters/db/d1-event-repository.ts`, `apps/api/src/middleware/optional-auth.ts`, `apps/web/src/app/(public)/events/`, `apps/web/src/app/(protected)/admin/events/`
+→ [M20 Events board](./milestones/20-events-board-public-listing-access-scoped-audience/milestone.md) · [RFC 0014](./RFCs/0014-events-board-and-whatsapp-contact.md) · ✅
+_A deployed build must set `NEXT_PUBLIC_SITE_URL`; unset, the sitemap and the
+canonical tags advertise `http://localhost:3000`. The deploy CLI derives it from
+each label profile's `webOrigin`._
+
+---
+
 ## Specified but not built
 
 | Feature | Where |
