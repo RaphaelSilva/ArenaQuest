@@ -372,11 +372,12 @@ Container wiring: `D1EventChargeRepository` is instantiated per request inside
   `contractStanding` and `extrasStanding` (either, both or neither), so "late on the
   monthly fee" and "has an extra that slipped through" are separate one-click filters.
   The default sort is contract outstanding, then extras outstanding.
-- **Holds stay on the contract rail.** `billing_standing_holds` keeps its RFC 0013
-  meaning — "stop chasing this student's monthly fee" — and does **not** turn the extras
-  standing `exempt`. An extra is a payment-control item; an arrangement about it is
-  recorded as an adjustment or a note on the charge, not a hold. (Open Question 4 keeps
-  this revisitable without a rebuild: a separate `event_charge_holds` table.)
+- **Holds apply to monthly fees only** (Resolved #9). `billing_standing_holds` keeps its
+  RFC 0013 meaning — "stop chasing this student's monthly fee" — and does **not** turn
+  the extras standing `exempt` nor suppress an extras reminder. The extras rail has no
+  hold: an arrangement about an extra is recorded as an adjustment or a note on the
+  charge. If that is ever revisited it is a new `event_charge_holds` table;
+  `billing_standing_holds` is keyed on `user_id` alone and is not rebuilt.
 - A user whose charges are all paid or void and who has no contract **stays** on the
   roster while any charge exists — `contract: null`, extras `good` — because the roster
   is "people with financial history", which is what the administrator asked to control.
@@ -385,10 +386,12 @@ Container wiring: `D1EventChargeRepository` is instantiated per request inside
 
 The run **issues nothing** for extras: charges are always issued by a person. It changes
 in two read-only ways, **each kept on its own rail**:
-- **Reminders** (`due_date`, `grace_lapsed`) walk open charges as well as open invoices,
-  with a charge-specific message ("your charge for *<event>* falls due on …") and a
-  distinct `BillingReminderKind` prefix (`extras.due_date`, `extras.grace_lapsed`), so
-  the audit log and the digest never mix them.
+- **Reminders** — the e-mails the run already sends *to the student* — cover charges with
+  the **same two triggers** as invoices (Resolved #8): on the due date, and when the grace
+  period lapses. The message names the event ("your charge of R$ 150 for *Seminário de
+  Março* is due today") and never says "membership". Extras reminders have their own
+  `BillingReminderKind` values (`extras_due_date`, `extras_grace_lapsed`), so the audit
+  log and the digest never mix them, and a contract hold does **not** suppress them.
 - **Standing crossings** are resolved per rail. The admin digest gets two sections —
   "crossed on the monthly fee" and "crossed on extras" — and a student can appear in
   one, the other, or both.
@@ -421,7 +424,7 @@ out of `routes/admin/events.ts`, per RFC 0014's boundary.
 | `PUT` | `/v1/admin/billing/event-prices/{eventId}` | Set/replace price, due-in days, grace |
 | `DELETE` | `/v1/admin/billing/event-prices/{eventId}` | Stop offering; existing charges untouched |
 | `GET` | `/v1/admin/billing/charges?eventId&userId&status` | List with balances |
-| `POST` | `/v1/admin/billing/charges` | Issue to `userIds[]` (1–200) for one `eventId`; optional `amountMinor`, `dueDate`, `graceDays`, `termsNote`. Returns `{ created, absorbed }` |
+| `POST` | `/v1/admin/billing/charges` | Issue to `userIds[]` (1–200) for one `eventId`; optional `amountMinor`, `dueDate`, `graceDays`, `termsNote`. Returns `{ created, absorbed, outsideAudience }` |
 | `POST` | `/v1/admin/billing/charges/{id}/void` | Void with reason; `409` with net payments |
 | `POST` | `/v1/admin/billing/charges/{id}/adjustments` | Discount / credit / waiver / surcharge |
 | `POST` | `/v1/admin/billing/charges/{id}/payments` | Record a payment |
@@ -445,6 +448,14 @@ Changed:
   `contract` so the existing screen means what it meant. The two agings are never
   bucketed together.
 
+**`outsideAudience` is a warning, never a write** (Resolved #7). For a `restricted` event,
+the service lists the charged users who are not in its audience — neither granted
+directly (`event_audience_user`) nor through a group (`event_audience_group`) — so the
+administrator learns that the buyer cannot see what they are paying for. The charge is
+still issued; nothing is added to the audience. A dry-run form of the same check,
+`GET /v1/admin/billing/events/{eventId}/audience-check?userIds=…`, lets the dialog warn
+*before* submitting. For `public` and `members` events the list is always empty.
+
 Validation is `@hono/zod-openapi` `createRoute` schemas returning `ControllerResult`, as
 the rest of the billing router.
 
@@ -456,7 +467,9 @@ the rest of the billing router.
   reusing `payment-form.tsx`, `adjustment-form.tsx` and `void-invoice-form.tsx` by
   parametrising the target kind. "Charge participants" opens a multi-select of users
   (with a group filter that expands to its members client-side) and a "create user"
-  shortcut.
+  shortcut. When the event is `restricted`, every selected user outside its audience is
+  flagged inline ("this person does not see this event on the board") with a link to the
+  event's audience in the events backoffice; submitting is still allowed.
 - **Roster — two badges, never one.** Each row shows a *Monthly fee* badge (contract
   standing, or "no contract") and an *Extras* badge (extras standing, or "—"), each with
   its own outstanding amount and overdue count. Two independent filters sit above the
@@ -511,8 +524,9 @@ the rest of the billing router.
    on their monthly fee, and the manual access policy reads that standing. It would also
    hide an unpaid extra behind a paid-up contract. Replaced by the two rails of §2.
 8. **Auto-grant event visibility to buyers.** *Rejected for v1* — visibility is a form of
-   access and this RFC grants none. The admin adds the buyer to the audience in the
-   events backoffice if the event is `restricted`. See Open Questions.
+   access and this RFC grants none. Also rejected (owner, 2026-09-27): an opt-in
+   "add to audience" checkbox in the charge dialog. Chosen instead: a **warning only**
+   (Resolved #7); the admin adds the buyer to the audience in the events backoffice.
 
 ## Implementation Plan
 
@@ -578,7 +592,12 @@ label (the migration is additive and empty tables are inert for tenants not usin
   their `/v1/me/billing` `extras` object.
 - (P3) Filtering the roster by `contractStanding=delinquent` returns exactly the students
   RFC 0013 returned before this RFC shipped, whatever charges exist.
-- (P3) A hold turns the contract standing `exempt` and leaves the extras standing as is.
+- (P3) A hold turns the contract standing `exempt` and leaves the extras standing — and
+  the extras reminders — as they are.
+- (P3) An overdue charge produces one `extras_due_date` e-mail on its due date and one
+  `extras_grace_lapsed` e-mail when its grace lapses, each naming the event.
+- (P2) Charging a user outside a `restricted` event's audience returns them in
+  `outsideAudience` and writes no `event_audience_*` row.
 - (P3) The roster issues a constant number of queries (4) regardless of the number of
   students.
 - (P3) The movement report for a month with R$ 300 of fees and R$ 150 of extras received
@@ -600,19 +619,13 @@ label (the migration is additive and empty tables are inert for tenants not usin
 | 4 | Buyers without a contract are students (current or future), are charged like any student, and appear on the roster and reports. | 2026-09-27 | Product owner |
 | 5 | **Two rails, never merged.** An extra is not a contract pending payment. Contract standing reads contract invoices only and is what the manual access policy consults; extras have their own standing as a payment-control view. Supersedes the merged-standing draft (Alternative 7). | 2026-09-27 | Product owner |
 | 6 | **Charges only on `published` events.** No pre-sale on a `draft`; an `archived` event cannot be charged either (`409`). Existing charges are unaffected if the event is later archived. | 2026-09-27 | Product owner |
+| 7 | **Restricted audience: warn only.** Charging a user who cannot see a `restricted` event flags it (`outsideAudience`, inline warning) but neither blocks the charge nor adds the user to the audience. | 2026-09-27 | Product owner |
+| 8 | **Extras reminders:** the student gets the same two e-mails as for a monthly fee — on the due date and when grace lapses — worded for the event. | 2026-09-27 | Product owner |
+| 9 | **Holds apply to monthly fees only.** No hold on the extras rail; a contract hold neither exempts extras standing nor suppresses extras reminders. | 2026-09-27 | Product owner |
 
 ## Open Questions
 
-1. **Audience on restricted events** — should the charge dialog *offer* (not do) adding
-   the buyer to a `restricted` event's audience, as a separate explicit action? Owner:
-   product owner. Default until answered: no, the admin does it in the events backoffice.
-2. **Reminder copy and timing for extras** — same `due_date`/`grace_lapsed` triggers as
-   invoices, or a reminder only before the event date? Owner: product owner. Default:
-   same triggers.
-3. **Does the extras rail need its own hold?** v1 says no: holds stay on the contract
-   rail and an arrangement about an extra is an adjustment or a note. If wanted, it is a
-   new `event_charge_holds` table — `billing_standing_holds` is keyed on `user_id` alone
-   and is not rebuilt. Owner: product owner.
+None. Every question raised in drafting is recorded above under Resolved Decisions.
 
 ## References
 
