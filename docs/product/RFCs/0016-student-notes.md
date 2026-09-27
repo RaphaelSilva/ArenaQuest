@@ -430,8 +430,7 @@ dictionaries in both languages, component tests including the two-tab conflict.
 
 ## Open Questions
 
-1. **Deactivated authors.** `ON DELETE CASCADE` covers hard deletion; a deactivated (not
-   deleted) user's shared notes stay listed. Hide them? *Owner: product.*
+None — all resolved on 2026-09-27 (below).
 
 ## Resolved Decisions
 
@@ -446,6 +445,9 @@ dictionaries in both languages, component tests including the two-tab conflict.
 - **2026-09-27 — Staff get a per-student view in this RFC** (product owner):
   `GET /v1/admin/users/{userId}/notes` and a *Notes* section in the user backoffice.
 - **2026-09-27 — `tutor` sees notes as a student** (product owner): shared notes only.
+- **2026-09-27 — A deactivated author's shared notes stay visible** (product owner). The class
+  listing does not filter on the author's account status; the note keeps its author name.
+  Hard deletion of the user still removes the notes (`ON DELETE CASCADE`).
 - **2026-09-27 — Concurrency is detected with an integer `revision` in a conditional `UPDATE`**
   (this revision), replacing the first draft's `baseUpdatedAt`, which a same-second double
   save would defeat.
