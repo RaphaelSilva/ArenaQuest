@@ -75,33 +75,52 @@ equivalent is `make deploy-staging`.
 
 ## 🔄 Workflow Overview
 
+**Every feature is developed in its own git worktree.** The root checkout stays on
+`main` and is only used to open worktrees; all branch switching, commits and merges
+for a feature happen inside that feature's worktree, under `.worktrees/` (gitignored).
+
 ```
-main ◄──────────────────── PR (reviewed, CI green)
-  │
-feature/my-feature ◄───── your work here
+ArenaQuest/                          ← root checkout, always on main, clean
+└── .worktrees/
+    └── m19-candidate/               ← feature/m19/candidate
+          ├─ feature/m19/<task>.task   (cut from the candidate, merged back into it)
+          └─ ...
+main ◄──────────────────── PR from the candidate (reviewed, CI green)
 ```
+
+The worktree is named after the feature's candidate branch:
+`feature/m<N>/candidate` → `.worktrees/m<N>-candidate`,
+`feature/epic/<name>/candidate` → `.worktrees/epic-<name>-candidate`. A backlog
+change without a candidate uses `.worktrees/backlog-<topic>-<slug>`.
 
 ### Step-by-step
 
-1. **Sync your local `main`**
+1. **From the root checkout, open the feature worktree**
    ```bash
-   git checkout main
-   git pull origin main
+   make worktree-open KIND=milestone MILESTONE=19
+   ```
+   It fetches `origin`, attaches to `feature/m19/candidate` if it already exists or
+   creates it from `origin/main`, and marks the worktree as managed so the sweep
+   can remove it later. Other kinds: `KIND=epic EPIC=<name>`,
+   `KIND=backlog TOPIC=<topic> SLUG=<slug>`, `KIND=chained MILESTONE=<N> SLUG=<subject>`.
+
+2. **Move into it and bootstrap its local state**
+   ```bash
+   cd .worktrees/m19-candidate
+   make setup        # node_modules, .dev.vars, .env.local and local D1 are per worktree
    ```
 
-2. **Create a feature branch**
+3. **Hop through the task branches inside the worktree**
    ```bash
-   git checkout -b feature/short-description
+   git checkout -b feature/m19/my-task.task          # cut from the candidate
+   git add . && git commit -m "feat(scope): short description"
+   git push -u origin feature/m19/my-task.task
+   git checkout feature/m19/candidate
+   git merge --no-ff feature/m19/my-task.task
+   git push origin feature/m19/candidate
    ```
 
-3. **Develop, commit, and push**
-   ```bash
-   git add .
-   git commit -m "feat(scope): short description"
-   git push origin feature/short-description
-   ```
-
-4. **Open a Pull Request** targeting `main`.
+4. **Open a Pull Request** from the candidate targeting `main`.
    - A Cloudflare Pages Preview URL will be generated automatically.
    - Ensure all CI checks pass before requesting review.
 
@@ -111,6 +130,47 @@ feature/my-feature ◄───── your work here
 6. **After approval**, the branch is merged into `main` via squash or merge
    commit. The pipeline deploys staging, then waits for the production
    environment approval.
+
+7. **The worktree is removed after the merge, automatically.** It stays on disk
+   during review so requested changes are made in place. Once the PR is merged into
+   `main`, `make worktree-sweep` removes it and deletes the local branches (the
+   candidate and its task branches) — the branch keeps living on GitHub. The
+   Claude Code `SessionStart` hook in `.claude/settings.json` runs the same sweep on
+   every session start; `make worktree-sweep DRY_RUN=1` previews it. The sweep
+   needs `gh auth login`, only touches worktrees opened by `make worktree-open`,
+   and skips any that is dirty or has commits the merged PR does not.
+
+### Planning happens in its own worktree first
+
+The documentation chain — RFC → milestone (or backlog/epic structure) → task files —
+is written in a **planning worktree** and merged into `main` through its own PR,
+before any code worktree is opened:
+
+```bash
+make worktree-open KIND=rfc NUMBER=16 SLUG=my-proposal
+cd .worktrees/rfc-0016-my-proposal
+# write-rfc → write-feature → write-tasks, commit as you go
+git push -u origin docs/rfc-0016-my-proposal      # then open the PR to main
+# after the merge, the sweep removes the worktree
+```
+
+Planning with no new RFC uses `make worktree-open KIND=docs SLUG=<slug>`
+(`docs/<slug>` → `.worktrees/docs-<slug>`). Check
+`origin/main` and the open `origin/docs/rfc-*` branches before picking an RFC
+number. Once the planning PR is merged, the feature worktree
+(`.worktrees/m<N>-candidate`) is opened from `origin/main` as above.
+
+### Worktree rules
+
+- Never switch branches, commit or merge in the root checkout — it stays on `main`.
+- Open worktrees with `make worktree-open`, not a bare `git worktree add`: only a
+  worktree it opened carries the marker the sweep looks for.
+- Base new branches on `origin/main`: `main` is checked out in the root, and git
+  refuses to check out the same branch in two worktrees.
+- Only touch the worktree you opened. Others listed by `git worktree list` may
+  belong to another person or process.
+- The stash is shared by every worktree — prefer a WIP commit over `git stash`.
+- Two worktrees running `make dev` at the same time collide on ports 3000/8787.
 
 ---
 

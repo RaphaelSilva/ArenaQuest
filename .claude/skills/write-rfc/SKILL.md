@@ -14,13 +14,61 @@ enforces that standard with two dependency-free Node scripts:
   non-zero exit on a hard violation, so it drops into a pre-commit hook or CI.
 
 Paths below are **relative to the repo root** (`docs/product/RFCs`, the
-scripts under `.claude/skills/write-rfc/`). Run them from the repo root.
+scripts under `.claude/skills/write-rfc/`). Run them from the root **of the
+planning worktree** (see *Where to work*), never from the root checkout on `main`.
 
 > **The `.claude/skills/` directory is a symlink to `.agents/skills/`.** It
 > resolves fine for the Node runtime (Linux). The Windows `\\wsl.localhost`
 > bridge can't traverse the symlink — if a tool errors with `ENOTDIR` /
 > `Input/output error` on `.claude/skills/...`, use the real path
 > `.agents/skills/write-rfc/...` instead. Both point at the same files.
+
+## Where to work: the planning worktree
+
+Planning is written in its **own git worktree and ships as its own PR**, separate
+from any code. The root checkout stays on `main`; one planning worktree carries the
+whole documentation chain — RFC (`write-rfc`) → milestone (`write-feature`), or the
+backlog/epic structure → task files (`write-tasks`) — until it is ready for review.
+
+| What is being planned | Branch | Worktree |
+|---|---|---|
+| A new RFC (and everything derived from it) | `docs/rfc-<NNNN>-<slug>` | `.worktrees/rfc-<NNNN>-<slug>` |
+| Planning with no new RFC (backlog/epic item, milestone for an already-merged RFC) | `docs/<slug>` | `.worktrees/docs-<slug>` |
+
+1. **Pick the number.** `new-rfc.mjs` numbers from the directory, so derive
+   `<NNNN>` from the trunk *and* from RFC branches still in flight, or two open PRs
+   collide on the same number:
+   ```bash
+   git fetch origin
+   git ls-tree --name-only origin/main docs/product/RFCs/ | grep -E '/[0-9]{4}-'
+   git branch -r --list 'origin/docs/rfc-*'
+   ```
+2. **Open the worktree from the root checkout** (on `main`, clean) and route the
+   session into it. The helper bases the branch on `origin/main` and marks the
+   worktree as managed:
+   ```bash
+   make worktree-open KIND=rfc NUMBER=<NNNN> SLUG=<slug>   # or KIND=docs SLUG=<slug>
+   cd .worktrees/rfc-<NNNN>-<slug>
+   ```
+   Docs-only work needs no `make setup` — the skill scripts are stdlib Node.
+3. **Iterate there** until the chain is ready: scaffold and fill the RFC, then the
+   milestone / backlog / epic structure and its task files, validating each with its
+   `check-*.mjs`. Commit as you go (`docs(rfc): …`, `docs(milestone): …`).
+4. **Push and open the PR to `main`** (the PR only on explicit user confirmation):
+   `git push -u origin docs/rfc-<NNNN>-<slug>`.
+5. **Keep the worktree until the merge.** The worktree stays on disk while the PR is under review, so requested changes are
+   made right there. Once the PR is **merged into `main`**, the sweep removes it: the
+   Claude Code `SessionStart` hook (`.claude/settings.json`) runs the same sweep
+   on every session start, and it can be run by hand (`make worktree-sweep`,
+   `DRY_RUN=1` to preview). It only touches worktrees opened by `make worktree-open`
+   (they carry a marker), and skips any that is dirty, has commits the PR does not, or
+   holds the current session.
+6. **After the PR merges into `main`,** execution starts in a *new* feature worktree
+   opened by the `developer` skill (`.worktrees/m<N>-candidate`, from `origin/main`).
+
+Never touch a worktree you did not open — `git worktree list` may show worktrees
+owned by another process — and never use bare `git stash` (the stash is shared by
+every worktree).
 
 ## The standard
 

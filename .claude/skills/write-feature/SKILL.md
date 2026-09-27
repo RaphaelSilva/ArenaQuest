@@ -27,6 +27,16 @@ Paths below are **relative to the repo root**. Run them from the repo root.
 > `Input/output error` on `.claude/skills/...`, use the real path
 > `.agents/skills/write-feature/...` instead. Both point at the same files.
 
+## Where to work
+
+Run this skill **inside the planning worktree** — the one opened for the RFC this
+work derives from (`.worktrees/rfc-<NNNN>-<slug>`, branch `docs/rfc-<NNNN>-<slug>`),
+so the RFC and its milestone (or backlog/epic structure) ship together in one planning PR to `main`. If the RFC is
+already merged, open a fresh planning worktree from `origin/main`
+(`docs/<slug>` → `.worktrees/docs-<slug>`). The full lifecycle — numbering, opening,
+PR, and the sweep that removes the worktree after the merge — is in `write-rfc` §*Where to
+work: the planning worktree*. Never write planning docs in the root checkout on `main`.
+
 ## The standard
 
 The modern, RFC-derived milestone (milestones 8 onward) has, in this order:
