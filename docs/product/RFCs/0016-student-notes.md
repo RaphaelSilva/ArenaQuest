@@ -13,12 +13,13 @@
 - `apps/api/src/controllers/notes.controller.ts` (new — ownership, visibility, staff and moderation rules)
 - `apps/api/src/routes/notes.router.ts` (new — topic-scoped routes)
 - `apps/api/src/routes/me/notes.ts` (new — "my notes" review list)
-- `apps/api/src/routes/admin/notes.ts` (new — moderation: force-unshare, clear moderation)
+- `apps/api/src/routes/admin/notes.ts` (new — staff: per-student note list, force-unshare, clear moderation)
 - `apps/api/src/container.ts`, `apps/api/src/routes/index.ts` (wiring)
 - `apps/api/src/openapi/components/entities.ts` (new schemas)
 - `apps/web/src/lib/notes-api.ts` (new client)
 - `apps/web/src/components/catalog/notes/*` (new — editor with autosave and conflict banner, class notes list)
 - `apps/web/src/app/(protected)/notes/page.tsx` (new — "My notes")
+- `apps/web/src/app/(protected)/admin/users/[userId]/page.tsx` (new *Notes* section — every note by that student)
 - `apps/web/src/i18n/dict-en.ts`, `dict-pt.ts` (new `notes:` section, identical keys)
 
 ---
@@ -27,10 +28,10 @@
 
 Give students a **notebook per topic**: on any published topic they can read, a student
 writes one Markdown note of their own. A note is **private by default** — hidden from other
-students, but readable by staff (`admin`, `content_creator`). The author may **share** it,
-which makes it readable by every other student who can read that topic. **Admins can
-force-unshare** a shared note (moderation), which returns it to private and blocks
-re-sharing until an admin clears the flag. A "My notes" page lets the student review
+students, but readable by staff (`admin`, `content_creator`), per topic or per student. The
+author may **share** it, which makes it readable by every other student who can read that
+topic. **Staff can force-unshare** a shared note (moderation), which returns it to private and
+blocks re-sharing until staff clear the flag. A "My notes" page lets the student review
 everything they wrote across topics. Notes are a new `Engagement` entity, deliberately
 separate from comments: a comment is a public, append-only contribution to a discussion; a
 note is an **editable study artifact** whose audience among students is the author's choice.
@@ -48,7 +49,8 @@ The topic page today has exactly one place for a student to write: the discussio
 | Student wants to reread everything they wrote | No per-user view; comments are scattered per topic | "My notes" lists every note across topics |
 | A good summary could help classmates | Buried in a thread sorted by date | Author shares it; it appears under "Class notes" |
 | Staff want to follow how students are studying a topic | No signal beyond comments | Staff read every note on the topic, private included |
-| A shared note is inappropriate | Admin can delete a comment | Admin force-unshares; the author keeps their text |
+| Staff want to see everything one student wrote | Not possible | Per-student notes list in the user backoffice |
+| A shared note is inappropriate | Admin can delete a comment | Staff force-unshare; the author keeps their text |
 
 Notes and comments differ in ownership, lifecycle and audience, so bolting sharing and
 editing onto `topic_comments` would change the meaning of an existing, XP-awarding entity
@@ -61,10 +63,11 @@ editing onto `topic_comments` would change the meaning of an existing, XP-awardi
   note on it, in Markdown sanitised on write.
 - A note is `private` or `shared`; the author toggles it at any time.
 - **Private is private among students**: no other student can read it through any endpoint.
-  **Staff (`admin`, `content_creator`) can read every note**, private or shared, read-only.
+  **Staff (`admin`, `content_creator`) can read every note**, private or shared, read-only —
+  topic by topic on the topic page, and student by student in the user backoffice.
 - Shared notes are listed on the topic for every student who can read the topic.
-- **Admins can force-unshare** a shared note; a moderated note cannot be re-shared by its
-  author until an admin clears the flag.
+- **Staff can force-unshare** a shared note; a moderated note cannot be re-shared by its
+  author until staff clear the flag.
 - A "My notes" page lists the student's notes across all topics.
 - The editor never silently loses text when the same note is open in two tabs (§4).
 - Topic access is enforced exactly as the catalog does it — published, not archived, in the
@@ -74,17 +77,18 @@ editing onto `topic_comments` would change the meaning of an existing, XP-awardi
 **Non-Goals**
 - **Peer rating of shared notes** (1–5 score). Removed on 2026-09-27; may return in a future
   RFC (Alternatives §3).
-- **XP, quests or badges for notes** (Open Question 1).
+- **XP, quests or badges for notes** (decided 2026-09-27; see Resolved Decisions).
+- **Tutor powers over notes.** A `tutor` sees notes exactly as a student does.
 - **Several notes per topic, titles, folders, tags.** One note per student per topic
   (Alternatives §2).
-- **Staff editing or deleting a student's note.** Staff read; admins unshare. The text is
+- **Staff editing or deleting a student's note.** Staff read and unshare. The text is
   always the student's.
 - **Anonymous sharing.** A shared note shows its author's name, like comments do.
 - **Comments or threads on notes.** The discussion remains the place to talk.
 - **Real-time collaborative editing** and version history. A note has one writer; concurrent
   writes from that writer are detected, not merged (§4).
 - **Media attachments inside notes.** Markdown text only; links are allowed.
-- **Notifications** ("your note was unshared by an admin" beyond the banner in the editor).
+- **Notifications** ("your note was unshared by the staff" beyond the banner in the editor).
 
 ## Current State (for reference)
 
@@ -133,7 +137,7 @@ CREATE TABLE IF NOT EXISTS topic_notes (
                  CHECK (visibility IN ('private', 'shared')),
   revision       INTEGER NOT NULL DEFAULT 1,  -- +1 on every write, by anyone (§4)
   shared_at      TEXT,                         -- last time it became shared
-  moderated_at   TEXT,                         -- set by an admin force-unshare; blocks re-sharing
+  moderated_at   TEXT,                         -- set by a staff force-unshare; blocks re-sharing
   moderated_by   TEXT REFERENCES users(id),
   created_at     TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
@@ -180,10 +184,12 @@ effective access set. "Staff" = `admin` or `content_creator`.
 | List notes on T | shared notes (incl. own) | shared notes | **all** notes, with visibility badge |
 | Share / unshare own note | ✅ unless moderated (`409 NOTE_MODERATED`) | — | — |
 | Edit or delete someone else's note | — | ❌ `404` | ❌ `403` |
-| Force-unshare / clear moderation | — | — | `admin` only (Open Question 2) |
+| List every note by one student | — | — | ✅ read-only, user backoffice |
+| Force-unshare / clear moderation | — | — | ✅ `admin` and `content_creator` |
 
 "T readable" = published, not archived, in the caller's effective access set; any miss is
-`404`. Staff bypass the effective-access check, as they do for topics.
+`404`. Staff bypass the effective-access check, as they do for topics. A `tutor` is treated
+as a student here (decided 2026-09-27).
 
 Decisions encoded in the table:
 
@@ -193,12 +199,13 @@ Decisions encoded in the table:
   student is never misled about who can see their text.
 - **Staff access is read-only.** There is no staff edit or delete path; the only staff write
   is moderation, and it changes visibility, never the body.
-- **Moderation is an unshare, not a delete** (reinforced 2026-09-27).
-  `POST /v1/admin/notes/{id}/unshare` sets `visibility = 'private'`, `moderated_at`,
+- **Moderation is an unshare, not a delete** (reinforced 2026-09-27), available to both staff
+  roles — the `/v1/admin` umbrella already admits `admin` and `content_creator`, so no extra
+  guard is added. `POST /v1/admin/notes/{id}/unshare` sets `visibility = 'private'`, `moderated_at`,
   `moderated_by` and bumps `revision`. The author keeps the text and can keep editing it
-  privately; re-sharing returns `409 NOTE_MODERATED` until an admin clears the flag
+  privately; re-sharing returns `409 NOTE_MODERATED` until staff clear the flag
   (`DELETE /v1/admin/notes/{id}/moderation`). The author's editor shows a banner
-  *"An administrator made this note private"*.
+  *"The staff made this note private"*.
 - **Losing access to a topic does not take the student's words away.** "My notes" lists all
   of the author's notes, each flagged `topicAccessible`. A note on a topic the student can no
   longer read is **read-only** (no edit, no share) and absent from the class listing; it can
@@ -257,9 +264,9 @@ would succeed and silently replace *X+a* with *X+b*: tab A's paragraph is gone, 
 tells the student.
 
 **Other writers go through the same token:**
-- **Admin force-unshare** bumps `revision`. An author editing the note in an open tab gets
-  `409` on the next autosave, and the banner explains the note was made private by an
-  administrator — rather than the tab silently re-sharing it.
+- **Staff force-unshare** bumps `revision`. An author editing the note in an open tab gets
+  `409` on the next autosave, and the banner explains the note was made private by the
+  staff — rather than the tab silently re-sharing it.
 - **Delete in tab A while tab B edits**: B's next save matches no row → `409` with
   `meta.current = null`; the banner offers **Recreate** (sends `baseRevision 0`) or
   **Discard**.
@@ -281,8 +288,9 @@ Mounted like comments — `buildNotesRouter` at `v1.route('/', …)`, behind `au
 | `DELETE /v1/topics/{id}/notes/me` | student | Hard-delete the caller's note | `204` |
 | `GET /v1/topics/{id}/notes?cursor=` | any | Students: shared notes. Staff: all notes. Newest first, page of 20 | `200 { data: Note[], nextCursor }` |
 | `GET /v1/me/notes?cursor=` | student | Every note the caller wrote, newest `updatedAt` first, with topic title and `topicAccessible` | `200 { data, nextCursor }` |
-| `POST /v1/admin/notes/{id}/unshare` | admin | Force-unshare (moderation) | `200 Note` |
-| `DELETE /v1/admin/notes/{id}/moderation` | admin | Clear the moderation flag | `204` |
+| `GET /v1/admin/users/{userId}/notes?cursor=` | staff | Every note by that student, private included, newest `updatedAt` first, with topic title | `200 { data, nextCursor }` |
+| `POST /v1/admin/notes/{id}/unshare` | staff | Force-unshare (moderation) | `200 Note` |
+| `DELETE /v1/admin/notes/{id}/moderation` | staff | Clear the moderation flag | `204` |
 
 - The class listing for students is ordered by `shared_at` desc and includes the caller's own
   shared note flagged `isMine`. It never returns a private row to a non-staff caller,
@@ -302,6 +310,7 @@ export interface INoteRepository {
                                       | { ok: false; stale: NoteRecord | null }>;
   deleteMine(topicNodeId: string, authorId: string): Promise<boolean>;
   listByTopic(topicNodeId: string, opts: { includePrivate: boolean; viewerId: string; page: CursorPage }): Promise<Paged<NoteRecord>>;
+  /** Serves both "My notes" (the author) and the staff per-student list. */
   listByAuthor(authorId: string, page: CursorPage): Promise<Paged<AuthoredNoteRecord>>;
   setModeration(id: string, adminId: string | null): Promise<NoteRecord | null>;
 }
@@ -319,8 +328,11 @@ next to `commentRepo`.
   §3, and the moderation banner when applicable; and *Class notes* — shared notes rendered
   with the catalog's existing sanitised Markdown renderer.
 - **Staff** see *Class notes* with every note on the topic, each with a *private* / *shared*
-  badge; admins get an **Unshare** action on shared notes and **Allow sharing again** on
-  moderated ones. Staff never see an editor on someone else's note.
+  badge, an **Unshare** action on shared notes and **Allow sharing again** on moderated ones.
+  Staff never see an editor on someone else's note.
+- **User backoffice** (`(protected)/admin/users/[userId]`) gets a *Notes* section: every note
+  by that student grouped by topic, with visibility and moderation badges and the same
+  Unshare / Allow sharing again actions. Read-only otherwise.
 - **Sharing is a deliberate act**: switching to *shared* shows a one-line confirmation that
   classmates will see the note with the author's name.
 - **"My notes"** (`(protected)/notes`) lists the caller's notes grouped by topic with
@@ -359,7 +371,7 @@ next to `commentRepo`.
 
 ## Implementation Plan
 
-Total: **~4–5 dev days**, as one milestone with backend and frontend tasks kept separate.
+Total: **~5–6 dev days**, as one milestone with backend and frontend tasks kept separate.
 
 ### Phase 0 — Shared foundations (~0.5 d)
 Entity types, `Config.NoteVisibility`, `domain/notes/limits.ts`, `INoteRepository` port.
@@ -374,13 +386,14 @@ including the same-second double write.
 `GET /v1/me/notes`, the access table of §3 as tests (student ↔ student `404`, staff read-only),
 `409 NOTE_STALE`.
 
-### Phase 3 — Moderation API (~0.5 d)
-Admin unshare / clear moderation, `409 NOTE_MODERATED`, revision bump, OpenAPI schemas and
+### Phase 3 — Staff API (~0.5–1 d)
+`GET /v1/admin/users/{userId}/notes`, unshare / clear moderation for both staff roles, `409 NOTE_MODERATED`, revision bump, OpenAPI schemas and
 regenerated `api-types.gen.ts`.
 
-### Phase 4 — Web (~1.5 d)
+### Phase 4 — Web (~2–2.5 d)
 `notes-api.ts`, Notes panel (editor, autosave, save-state indicator, conflict and moderation
-banners, audience line), Class notes with staff badges and admin actions, "My notes" page,
+banners, audience line), Class notes with staff badges and moderation actions, "My notes" page, *Notes* section in
+the user backoffice,
 dictionaries in both languages, component tests including the two-tab conflict.
 
 ## Tradeoffs & Risks
@@ -388,8 +401,9 @@ dictionaries in both languages, component tests including the two-tab conflict.
 | Risk | Mitigation |
 |---|---|
 | Students assume "private" means nobody else reads it | The audience line under the switch names staff explicitly; same text in "My notes" |
-| Abusive content in a shared note | Admin force-unshare with sticky `moderated_at`; the author keeps their private text |
-| Admin unshares while the author is editing, and the tab re-shares it | Moderation bumps `revision`; the tab's next save is `409` and shows the moderation banner |
+| Abusive content in a shared note | Staff force-unshare with sticky `moderated_at`; the author keeps their private text |
+| Two staff members disagree (one unshares, another re-allows) | `moderated_by` records who acted last; out-of-band policy, not code |
+| Staff unshares while the author is editing, and the tab re-shares it | Moderation bumps `revision`; the tab's next save is `409` and shows the moderation banner |
 | Two tabs overwrite each other | Conditional `UPDATE … WHERE revision = ?`, `409 NOTE_STALE`, explicit Load latest / Keep mine |
 | A student ignores the banner and keeps typing in a stale tab | Autosave stays paused while in conflict; the indicator shows *not saved* |
 | Large notes bloat the class listing payload | `NOTE_BODY_MAX = 20 000`; page size 20; an `excerpt` field can be added later without breaking clients |
@@ -406,24 +420,17 @@ dictionaries in both languages, component tests including the two-tab conflict.
 - (Ph 1–2) A write with a stale `baseRevision` returns `409 NOTE_STALE`, leaves the row
   unchanged, and returns the current note; two writes in the same second with the same
   `baseRevision` produce exactly one `200` and one `409`.
-- (Ph 3) Force-unshare hides the note from students, bumps `revision`, and blocks re-sharing
-  with `409 NOTE_MODERATED` until an admin clears it; the body is never changed.
+- (Ph 3) An admin and a content creator can each force-unshare; it hides the note from
+  students, bumps `revision`, and blocks re-sharing with `409 NOTE_MODERATED` until staff
+  clear it; the body is never changed. A student or tutor calling it gets `403`.
+- (Ph 3) `GET /v1/admin/users/{userId}/notes` returns every note by that student, private
+  included, to staff, and `403` to anyone else.
 - (Ph 4) With the same note open in two tabs, neither tab's text is lost without the student
   choosing it; the flow works in both `pt` and `en` builds and the i18n coverage check passes.
 
 ## Open Questions
 
-1. **Should notes feed gamification?** Candidates: XP once per note when first shared
-   (idempotency key = note id), a quest kind `share_note`. Sharing is not a quality signal on
-   its own, so XP would reward empty shares. Recommendation: ship without. *Owner: product.*
-2. **Can a `content_creator` moderate, or only `admin`?** Both can read every note; the draft
-   gives the unshare power to `admin` only, matching comment deletion. *Owner: product.*
-3. **Staff views beyond the topic page.** Staff read notes topic by topic in *Class notes*.
-   Is a per-student view in the user backoffice ("all notes by this student") needed in this
-   RFC, or later? *Owner: product.*
-4. **Tutors.** The `tutor` role exists but has no content powers today. Does it read notes
-   like staff, only shared ones, or none? The draft gives it the student view. *Owner: product.*
-5. **Deactivated authors.** `ON DELETE CASCADE` covers hard deletion; a deactivated (not
+1. **Deactivated authors.** `ON DELETE CASCADE` covers hard deletion; a deactivated (not
    deleted) user's shared notes stay listed. Hide them? *Owner: product.*
 
 ## Resolved Decisions
@@ -432,7 +439,13 @@ dictionaries in both languages, component tests including the two-tab conflict.
   (`admin`, `content_creator`) read every note. Replaces the first draft's "no role bypass".
 - **2026-09-27 — Peer rating removed from scope** (product owner). Recorded as Alternatives §3,
   deferred.
-- **2026-09-27 — Admin moderation by force-unshare is required** (product owner).
+- **2026-09-27 — Moderation by force-unshare is required** (product owner), and **both staff
+  roles moderate** — `admin` and `content_creator`.
+- **2026-09-27 — No gamification for notes in this RFC** (product owner). No XP, quest or badge;
+  sharing is not a quality signal, and XP would reward empty shares. Revisit with data.
+- **2026-09-27 — Staff get a per-student view in this RFC** (product owner):
+  `GET /v1/admin/users/{userId}/notes` and a *Notes* section in the user backoffice.
+- **2026-09-27 — `tutor` sees notes as a student** (product owner): shared notes only.
 - **2026-09-27 — Concurrency is detected with an integer `revision` in a conditional `UPDATE`**
   (this revision), replacing the first draft's `baseUpdatedAt`, which a same-second double
   save would defeat.
@@ -447,4 +460,4 @@ dictionaries in both languages, component tests including the two-tab conflict.
   `apps/web/src/components/catalog/Discussion.tsx`
 - Related RFCs: RFC 0005 (effective access set and node visibility — the gate notes reuse),
   RFC 0003 (route organisation and OpenAPI), RFC 0009 (gamification catalog — where note XP
-  would plug in, Open Question 1)
+  would plug in if gamification is revisited)
