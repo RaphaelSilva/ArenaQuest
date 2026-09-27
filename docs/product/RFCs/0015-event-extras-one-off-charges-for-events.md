@@ -323,7 +323,8 @@ failing — the same "a retry is a no-op" contract as RFC 0013 §6.
 `EventChargeService` (new) owns the write rules and mirrors `BillingService` method for
 method: positive payment amounts only, reversal by mirror row with a mandatory reason,
 no reversal of a reversal, no payment on a void charge, currency equality, mandatory
-`terms_note` on a negotiated amount, mandatory `void_reason`. Voiding a charge that has
+`terms_note` on a negotiated amount, mandatory `void_reason`, and issuing only against a
+`published` event (`409` otherwise). Voiding a charge that has
 net payments is refused with `409` — reverse the payments first, so the refund is visible
 in the ledger. Every write emits the same `audit(...)` line shape (`billing.charge.*`).
 
@@ -449,7 +450,7 @@ the rest of the billing router.
 
 ### 8. Web
 
-- **Admin billing → new "Extras" tab.** Pick an event (published or draft, not archived);
+- **Admin billing → new "Extras" tab.** Pick a **published** event (draft and archived events cannot be charged, Resolved #6);
   shows its price (editable), its summary (charged, received, outstanding) and the charge
   list with the same payment / adjustment / reverse / void actions the invoice list has,
   reusing `payment-form.tsx`, `adjustment-form.tsx` and `void-invoice-form.tsx` by
@@ -598,6 +599,7 @@ label (the migration is additive and empty tables are inert for tenants not usin
 | 3 | Additive model: new tables beside RFC 0013's; no rebuild of `invoices` (Alternative 1). | 2026-09-27 | Product owner |
 | 4 | Buyers without a contract are students (current or future), are charged like any student, and appear on the roster and reports. | 2026-09-27 | Product owner |
 | 5 | **Two rails, never merged.** An extra is not a contract pending payment. Contract standing reads contract invoices only and is what the manual access policy consults; extras have their own standing as a payment-control view. Supersedes the merged-standing draft (Alternative 7). | 2026-09-27 | Product owner |
+| 6 | **Charges only on `published` events.** No pre-sale on a `draft`; an `archived` event cannot be charged either (`409`). Existing charges are unaffected if the event is later archived. | 2026-09-27 | Product owner |
 
 ## Open Questions
 
@@ -607,9 +609,7 @@ label (the migration is additive and empty tables are inert for tenants not usin
 2. **Reminder copy and timing for extras** — same `due_date`/`grace_lapsed` triggers as
    invoices, or a reminder only before the event date? Owner: product owner. Default:
    same triggers.
-3. **Should charges be issuable on a `draft` event** (pre-sale before announcing)? Default:
-   yes; archived events are refused.
-4. **Does the extras rail need its own hold?** v1 says no: holds stay on the contract
+3. **Does the extras rail need its own hold?** v1 says no: holds stay on the contract
    rail and an arrangement about an extra is an adjustment or a note. If wanted, it is a
    new `event_charge_holds` table — `billing_standing_holds` is keyed on `user_id` alone
    and is not rebuilt. Owner: product owner.
