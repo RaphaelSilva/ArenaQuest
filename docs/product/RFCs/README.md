@@ -23,6 +23,7 @@ it lives in the linked milestone, and is summarised in
 | [0012](./0012-tenant-provisioning-backend-parity.md) | Tenant provisioning — Cloudflare bring-up with backend parity | ✅ Implemented | [M18](../milestones/18-tenant-provisioning-backend-parity/milestone.md) | 2026-08-08 |
 | [0013](./0013-student-billing-contracts-and-receivables-accounting.md) | Student billing, contracts and receivables accounting | Accepted | [M19](../milestones/19-student-billing-and-receivables/milestone.md) | 2026-09-10 |
 | [0014](./0014-events-board-and-whatsapp-contact.md) | Events board — public listing, access-scoped audiences and per-event WhatsApp contact | ✅ Implemented | [M20](../milestones/20-events-board-public-listing-access-scoped-audience/milestone.md) | 2026-09-16 |
+| [0016](./0016-student-notes-and-peer-rating.md) | Student notes — private and shared topic notes with peer rating | 📝 Draft | — | 2026-09-27 |
 
 Milestones 1–7 predate this process and derive directly from
 [`../specification.md`](../specification.md).
