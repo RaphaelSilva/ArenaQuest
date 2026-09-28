@@ -11,17 +11,27 @@
 --
 -- Three properties of this file are deliberate and should survive edits:
 --
---   1. **The topics are seeded here, not assumed.** No earlier seed creates a
---      topic, and a note needs one that passes the catalog gate: published,
---      not archived and in the reader's effective access set. Both topics are
---      `visibility = 'public'`, which puts them in every account's access set
---      without an enrollment row, so the seed never touches `enrollments_*`.
---   2. **Two topics, because of UNIQUE (topic_node_id, author_id).** Only two
---      student accounts are seeded, and each may hold one note per topic. The
---      first topic carries the private and the shared note side by side, so
---      the privacy rule is falsifiable on one page: student2 wrote the
+--   1. **The topics are seeded here, not assumed, and they must be reachable
+--      from the catalog UI.** No earlier seed creates a topic, and a note needs
+--      one that passes the catalog gate: published, not archived and in the
+--      reader's effective access set. Every topic here is
+--      `visibility = 'public'`, and getEffectiveAccessTopicIds adds each
+--      non-archived public node on its own (not only roots), so all three are
+--      in every account's access set without an enrollment row and the seed
+--      never touches `enrollments_*`. Two further constraints come from the
+--      UI, not the API:
+--        - ids are **UUID-format literals**, because GET /v1/topics/{id}
+--          validates the path id as a UUID (a `seed-…` id answers 400);
+--        - the note topics are **children** of a root "Notes Sandbox", because
+--          the topic page mounts Discussion and the Notes panel only when
+--          `parentId !== null`. The root is also where the catalog lists them.
+--      The `…21a*` (topics) / `…21b*` (notes) suffixes tie the ids to M21.
+--   2. **Two note topics, because of UNIQUE (topic_node_id, author_id).** Only
+--      two student accounts are seeded, and each may hold one note per topic.
+--      The first child carries the private and the shared note side by side,
+--      so the privacy rule is falsifiable on one page: student2 wrote the
 --      private note, and student@ must see the shared note but not that one.
---      The moderated note lives on the second topic.
+--      The moderated note lives on the second child.
 --   3. **The moderated row is what setModeration would have written.** It was
 --      created (revision 1), shared (revision 2, shared_at stamped) and then
 --      force-unshared by the seeded admin (revision 3): visibility 'private',
@@ -33,9 +43,10 @@
 -- `users`, so no name is repeated here.
 --
 -- Accounts that see each state (passwords in 0001 / 0002):
---   student@arenaquest.dev   → own shared note on topic 1 (flagged isMine),
---                              own moderated note on topic 2 (banner, switch off)
---   student2@arenaquest.dev  → own private note on topic 1, and student@'s
+--   student@arenaquest.dev   → own shared note on "Study Notes" (flagged isMine),
+--                              own moderated note on "Moderated Notes" (banner,
+--                              switch off)
+--   student2@arenaquest.dev  → own private note on "Study Notes", and student@'s
 --                              shared note in Class notes
 --   admin@ / professor@      → all three, private included, with badges and
 --                              Unshare / Allow sharing again
@@ -45,33 +56,48 @@
 -- ---------------------------------------------------------------------------
 INSERT OR IGNORE INTO topic_nodes
   (id, parent_id, title, content, status, sort_order, estimated_minutes, archived, visibility) VALUES
+  -- The root. It holds no note itself: the Notes panel does not render on a
+  -- root topic.
   (
-    'seed-topic-notes-0000-0000-00000001',
+    '00000000-0000-4000-8000-0000000021a0',
     NULL,
-    'Study Notes Sandbox',
-    '## Study Notes Sandbox
+    'Notes Sandbox',
+    '## Notes Sandbox
 
-A local seed topic for the Notes panel. It carries one **shared** note by
-student@arenaquest.dev and one **private** note by student2@arenaquest.dev.
+A local seed topic for trying the Notes panel. Open one of its two subtopics:
+the panel appears on subtopics only.',
+    'published',
+    900,
+    0,
+    0,
+    'public'
+  ),
+  (
+    '00000000-0000-4000-8000-0000000021a1',
+    '00000000-0000-4000-8000-0000000021a0',
+    'Study Notes',
+    '## Study Notes
+
+This subtopic carries one **shared** note by student@arenaquest.dev and one
+**private** note by student2@arenaquest.dev.
 
 Log in as each of them, and as a staff account, to compare what each one sees.',
     'published',
-    900,
+    0,
     10,
     0,
     'public'
   ),
   (
-    'seed-topic-notes-0000-0000-00000002',
-    NULL,
-    'Moderated Notes Sandbox',
-    '## Moderated Notes Sandbox
+    '00000000-0000-4000-8000-0000000021a2',
+    '00000000-0000-4000-8000-0000000021a0',
+    'Moderated Notes',
+    '## Moderated Notes
 
-A local seed topic whose only note was shared and then unshared by staff.
-Its author sees the moderation banner and cannot share it again until staff
-allow it.',
+This subtopic''s only note was shared and then unshared by staff. Its author
+sees the moderation banner and cannot share it again until staff allow it.',
     'published',
-    901,
+    1,
     10,
     0,
     'public'
@@ -84,10 +110,10 @@ INSERT OR IGNORE INTO topic_notes
   (id, topic_node_id, author_id, body, visibility, revision,
    shared_at, moderated_at, moderated_by, created_at, updated_at) VALUES
 
-  -- 1. SHARED — listed in Class notes for every reader of topic 1.
+  -- 1. SHARED — listed in Class notes for every reader of "Study Notes".
   (
-    'seed-note-shared-0000-0000-00000001',
-    'seed-topic-notes-0000-0000-00000001',
+    '00000000-0000-4000-8000-0000000021b1',
+    '00000000-0000-4000-8000-0000000021a1',
     'seed-student-0000-0000-0000-0000-000000000002',
     '## What I took from this topic
 
@@ -107,8 +133,8 @@ Sharing this one so the class can compare.',
   -- 2. PRIVATE — readable by its author and by staff only. It must never
   -- appear to student@arenaquest.dev, on this topic's Class notes or anywhere.
   (
-    'seed-note-private-000-0000-00000002',
-    'seed-topic-notes-0000-0000-00000001',
+    '00000000-0000-4000-8000-0000000021b2',
+    '00000000-0000-4000-8000-0000000021a1',
     'seed-student-free-0000-0000-00000004',
     'Private draft: questions to ask the instructor next week.
 
@@ -125,8 +151,8 @@ Sharing this one so the class can compare.',
 
   -- 3. MODERATED — shared, then force-unshared by the seeded admin.
   (
-    'seed-note-moderated-0000-0000-000003',
-    'seed-topic-notes-0000-0000-00000002',
+    '00000000-0000-4000-8000-0000000021b3',
+    '00000000-0000-4000-8000-0000000021a2',
     'seed-student-0000-0000-0000-0000-000000000002',
     'A note that was shared and then unshared by staff.
 
