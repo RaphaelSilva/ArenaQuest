@@ -1,6 +1,6 @@
 # Task 06 — Backend: Daily run — extras reminders and per-rail crossings (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [22 — Event extras: one-off charges on a separate billing rail](./milestone.md)
 **RFC:** [RFC 0015](../../RFCs/0015-event-extras-one-off-charges-for-events.md)
 **Team:** Backend API
@@ -61,19 +61,19 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Over a simulated span covering a charge's due date and grace lapse, the run sends
+- [x] Over a simulated span covering a charge's due date and grace lapse, the run sends
       exactly one `extras_due_date` and one `extras_grace_lapsed` e-mail to that student, each
       naming the event.
-- [ ] A student with an active contract hold still receives the extras reminders.
-- [ ] Re-running the same day sends no additional extras reminder.
-- [ ] The row counts of `event_prices`, `event_charges`, `event_charge_adjustments` and
+- [x] A student with an active contract hold still receives the extras reminders.
+- [x] Re-running the same day sends no additional extras reminder.
+- [x] The row counts of `event_prices`, `event_charges`, `event_charge_adjustments` and
       `event_charge_payments` are identical before and after a run.
-- [ ] The admin digest lists contract crossings and extras crossings in separate sections;
+- [x] The admin digest lists contract crossings and extras crossings in separate sections;
       a student who crossed only on extras does not appear in the contract section.
-- [ ] Contract invoice issuance and contract reminders produce the same output as before this
+- [x] Contract invoice issuance and contract reminders produce the same output as before this
       task on the existing run tests.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
