@@ -3,7 +3,7 @@
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useDict } from '@web/context/dict-context';
 import { MyNoteEditor } from './MyNoteEditor';
-import { ClassNotesPlaceholder } from './ClassNotesPlaceholder';
+import { ClassNotesList } from './ClassNotesList';
 
 type NotesTab = 'mine' | 'class';
 
@@ -12,8 +12,8 @@ const TABS: readonly NotesTab[] = ['mine', 'class'];
 type NotesPanelProps = {
   topicId: string;
   /**
-   * Content of the *Class notes* tab. Omitted, the tab shows a placeholder;
-   * Task 06 passes the class notes list here.
+   * Content of the *Class notes* tab. Omitted, the tab shows the topic's
+   * class notes list.
    */
   classNotes?: ReactNode;
   /** Autosave debounce override, for tests. */
@@ -112,7 +112,7 @@ export function NotesPanel({ topicId, classNotes, debounceMs }: NotesPanelProps)
         >
           {/* The editor stays mounted while hidden so a pending autosave is not lost on a tab switch. */}
           {tab === 'mine' && <MyNoteEditor topicId={topicId} debounceMs={debounceMs} />}
-          {tab === 'class' && tab === active && (classNotes ?? <ClassNotesPlaceholder />)}
+          {tab === 'class' && tab === active && (classNotes ?? <ClassNotesList topicId={topicId} />)}
         </div>
       ))}
     </section>

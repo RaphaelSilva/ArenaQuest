@@ -80,4 +80,36 @@ describe('notes-api', () => {
     await expect(createNotesApi(http).deleteMine('t1')).resolves.toBeUndefined();
     expect(http).toHaveBeenCalledWith('DELETE', '/topics/t1/notes/me', undefined);
   });
+
+  it('listForTopic GETs the first page and encodes the cursor on the next', async () => {
+    const page = { data: [{ ...NOTE, visibility: 'shared', isMine: true }], nextCursor: 'a b/c' };
+    const http = vi.fn().mockImplementation(async () => json(200, page));
+    const api = createNotesApi(http);
+
+    expect(await api.listForTopic('t1')).toEqual(page);
+    expect(http).toHaveBeenLastCalledWith('GET', '/topics/t1/notes', undefined);
+
+    await api.listForTopic('t1', 'a b/c');
+    expect(http).toHaveBeenLastCalledWith('GET', '/topics/t1/notes?cursor=a%20b%2Fc', undefined);
+  });
+
+  it('listMine GETs /me/notes with the cursor', async () => {
+    const page = { data: [{ ...NOTE, topicTitle: 'T', topicAccessible: true }], nextCursor: null };
+    const http = vi.fn().mockImplementation(async () => json(200, page));
+    const api = createNotesApi(http);
+
+    expect(await api.listMine()).toEqual(page);
+    expect(http).toHaveBeenLastCalledWith('GET', '/me/notes', undefined);
+    await api.listMine('x=1');
+    expect(http).toHaveBeenLastCalledWith('GET', '/me/notes?cursor=x%3D1', undefined);
+  });
+
+  it('list calls map 400 to InvalidCursor and 404 to NotFound', async () => {
+    const bad = createNotesApi(vi.fn().mockResolvedValue(json(400, { error: 'InvalidCursor' })));
+    await expect(bad.listMine('junk')).rejects.toMatchObject({ code: 'InvalidCursor', status: 400 });
+    await expect(bad.listForTopic('t1', 'junk')).rejects.toMatchObject({ code: 'InvalidCursor' });
+
+    const missing = createNotesApi(vi.fn().mockResolvedValue(json(404, { error: 'NotFound' })));
+    await expect(missing.listForTopic('t1')).rejects.toMatchObject({ code: 'NotFound' });
+  });
 });

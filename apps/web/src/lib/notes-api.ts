@@ -9,6 +9,15 @@ export type Note = NonNullable<components['schemas']['Note']>;
 
 export type NoteVisibility = Note['visibility'];
 
+/** A shared note in a topic's *Class notes* list; `isMine` marks the caller's own. */
+export type ClassNote = components['schemas']['ClassNote'];
+
+/** One of the caller's notes on `/me/notes`, with the topic it belongs to. */
+export type AuthoredNote = components['schemas']['AuthoredNote'];
+
+/** A cursor-paginated page; `nextCursor` is `null` on the last page. */
+export type NotePage<T> = { data: T[]; nextCursor: string | null };
+
 export type SaveNoteInput = {
   body: string;
   visibility?: NoteVisibility;
@@ -29,7 +38,12 @@ export type SaveNoteResult =
   /** `400` — the body is empty or too long after sanitisation, or the request is malformed. */
   | { kind: 'invalid'; code: 'NOTE_BODY_EMPTY' | 'NOTE_BODY_TOO_LONG' | 'BadRequest' };
 
-export type NotesApiErrorCode = 'Unauthorized' | 'NetworkError' | 'NotFound' | 'Unknown';
+export type NotesApiErrorCode =
+  | 'Unauthorized'
+  | 'NetworkError'
+  | 'NotFound'
+  | 'InvalidCursor'
+  | 'Unknown';
 
 export class NotesApiError extends Error {
   readonly code: NotesApiErrorCode;
@@ -69,8 +83,32 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
   }
 }
 
+function throwForListStatus(res: Response, notFoundMessage: string): never {
+  if (res.status === 400) throw new NotesApiError('InvalidCursor', 400, 'Invalid cursor.');
+  throwForStatus(res, notFoundMessage);
+}
+
+function withCursor(path: string, cursor?: string | null): string {
+  return cursor ? `${path}?cursor=${encodeURIComponent(cursor)}` : path;
+}
+
 export function createNotesApi(http: HttpTransport) {
   return {
+    /** A page of the topic's notes as the API returns them (shared, newest first for students). */
+    async listForTopic(topicId: string, cursor?: string | null): Promise<NotePage<ClassNote>> {
+      const res = await send(http, 'GET', withCursor(`/topics/${topicId}/notes`, cursor));
+      if (!res.ok) throwForListStatus(res, 'Topic not found.');
+      return (await res.json()) as NotePage<ClassNote>;
+    },
+
+    /** A page of every note the caller wrote, last edited first. */
+    async listMine(cursor?: string | null): Promise<NotePage<AuthoredNote>> {
+      const res = await send(http, 'GET', withCursor('/me/notes', cursor));
+      if (!res.ok) throwForListStatus(res, 'Not found.');
+      return (await res.json()) as NotePage<AuthoredNote>;
+    },
+
+
     /** The caller's note on the topic, or `null` when there is none. */
     async getMine(topicId: string): Promise<Note | null> {
       const res = await send(http, 'GET', `/topics/${topicId}/notes/me`);
