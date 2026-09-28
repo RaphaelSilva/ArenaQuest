@@ -126,7 +126,7 @@ Out of scope (explicit, from RFC 0015 Non-Goals):
 | 02 | [Event-charge schema, D1 repository and local seed](./02-event-charge-schema-d1-repository-and-seed.task.md) | 1 | Backend | ✅ Done |
 | 03 | [Event-charge service and admin API](./03-event-charge-service-and-admin-api.task.md) | 2 | Backend | ✅ Done |
 | 04 | [Two-rail standing and roster](./04-two-rail-standing-and-roster.task.md) | 3 | Backend | ✅ Done |
-| 05 | [Per-rail reports, statement and `/v1/me/billing`](./05-per-rail-reports-statement-and-me-billing.task.md) | 3 | Backend | ☐ Open |
+| 05 | [Per-rail reports, statement and `/v1/me/billing`](./05-per-rail-reports-statement-and-me-billing.task.md) | 3 | Backend | ✅ Done |
 | 06 | [Daily run: extras reminders and per-rail crossings](./06-daily-run-extras-reminders-and-crossings.task.md) | 3 | Backend | ☐ Open |
 | 07 | [Admin Extras tab](./07-admin-extras-tab.task.md) | 4 | Frontend | ☐ Open |
 | 08 | [Two-rail roster, reports and statement panel](./08-two-rail-roster-reports-and-statement.task.md) | 4 | Frontend | ☐ Open |
