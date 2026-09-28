@@ -20,6 +20,7 @@ import * as meBillingApiModule from './me-billing-api';
 import * as progressApiModule from './progress-api';
 import * as dashboardApiModule from './dashboard-api';
 import * as commentsApiModule from './comments-api';
+import * as notesApiModule from './notes-api';
 
 // HTTP transport interface — injectable for testing
 export interface HttpTransport {
@@ -129,5 +130,9 @@ export class ApiClient {
 
   get comments() {
     return commentsApiModule.createCommentsApi(this.http);
+  }
+
+  get notes() {
+    return notesApiModule.createNotesApi(this.http);
   }
 }
