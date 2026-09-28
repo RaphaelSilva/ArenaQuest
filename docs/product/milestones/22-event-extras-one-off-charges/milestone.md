@@ -122,7 +122,7 @@ Out of scope (explicit, from RFC 0015 Non-Goals):
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [Event-charge domain, port and the rail-tagged receivable](./01-event-charge-domain-port-and-receivable.task.md) | 0 | Backend | ☐ Open |
+| 01 | [Event-charge domain, port and the rail-tagged receivable](./01-event-charge-domain-port-and-receivable.task.md) | 0 | Backend | ✅ Done |
 | 02 | [Event-charge schema, D1 repository and local seed](./02-event-charge-schema-d1-repository-and-seed.task.md) | 1 | Backend | ☐ Open |
 | 03 | [Event-charge service and admin API](./03-event-charge-service-and-admin-api.task.md) | 2 | Backend | ☐ Open |
 | 04 | [Two-rail standing and roster](./04-two-rail-standing-and-roster.task.md) | 3 | Backend | ☐ Open |
