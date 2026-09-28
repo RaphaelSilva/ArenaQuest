@@ -1,6 +1,6 @@
 # Task 07 — Frontend: Admin Extras tab (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [22 — Event extras: one-off charges on a separate billing rail](./milestone.md)
 **RFC:** [RFC 0015](../../RFCs/0015-event-extras-one-off-charges-for-events.md)
 **Team:** Frontend Web
@@ -64,20 +64,20 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The event selector lists only published events.
-- [ ] Charging three users sends one request with the three ids and the chosen event; the
+- [x] The event selector lists only published events.
+- [x] Charging three users sends one request with the three ids and the chosen event; the
       result shows each in the right group (created / absorbed / outside audience).
-- [ ] For a restricted event, a selected user outside the audience is flagged before submit,
+- [x] For a restricted event, a selected user outside the audience is flagged before submit,
       and the submit button stays enabled.
-- [ ] Entering an amount different from the price without a note blocks submit with a
+- [x] Entering an amount different from the price without a note blocks submit with a
       translated message.
-- [ ] Recording a payment, reversing it and voiding a charge from the list call the Task 03
+- [x] Recording a payment, reversing it and voiding a charge from the list call the Task 03
       endpoints and refresh the summary.
-- [ ] No hardcoded user-facing string; new keys exist in both `dict-en.ts` and `dict-pt.ts`;
+- [x] No hardcoded user-facing string; new keys exist in both `dict-en.ts` and `dict-pt.ts`;
       `check-i18n-coverage.js` passes.
-- [ ] The tab and dialog are responsive and keyboard-usable.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] The tab and dialog are responsive and keyboard-usable.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
