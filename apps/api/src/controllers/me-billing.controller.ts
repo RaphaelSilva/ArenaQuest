@@ -29,8 +29,13 @@ import type { Entities } from '@arenaquest/shared/types/entities';
  * student sees its effect — standing `exempt` — and not the note.
  */
 
+/**
+ * `standing`, `oldestOverdueDate` and the inherited `outstandingMinor` are the
+ * **contract rail only** (RFC 0015 §7). The extras rail arrives in the
+ * inherited `extras` object with its own standing, and is never folded in.
+ */
 export interface MyBillingStatement extends StudentStatement {
-  /** Resolved on every read from the invoices, the hold and `asOf`. */
+  /** Contract standing, resolved on every read from the invoices, the hold and `asOf`. */
   standing: Entities.Config.BillingStanding;
   /** Due date of the oldest unpaid invoice already past due; null if none is. */
   oldestOverdueDate: string | null;

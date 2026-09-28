@@ -157,6 +157,18 @@ const MovementReportSchema = z
     outstandingMinor: MinorUnits,
     invoicesIssued: z.number().int(),
     activeStudents: z.number().int(),
+    /** The extras rail of the month, from event charges only. */
+    extras: z
+      .object({
+        chargedMinor: MinorUnits,
+        adjustmentsMinor: MinorUnits,
+        receivedMinor: MinorUnits,
+        chargesIssued: z.number().int(),
+        receivableAtCloseMinor: MinorUnits,
+      })
+      .openapi('BillingMovementExtras'),
+    /** Cash that entered the till in the month, both rails. Not a standing, not a receivable. */
+    cashReceivedMinor: MinorUnits,
   })
   .openapi('BillingMovementReport');
 
@@ -171,9 +183,13 @@ const AgingBucketSchema = z
   })
   .openapi('BillingAgingBucket');
 
+const RailSchema = z.enum(['contract', 'extras']).openapi({ example: 'contract' });
+
 const AgingReportSchema = z
   .object({
     asOf: IsoDate,
+    /** The one rail bucketed; on `extras` the counts count event charges. */
+    rail: RailSchema,
     currency: ReportCurrencySchema,
     buckets: z.array(AgingBucketSchema),
     totalMinor: MinorUnits,
@@ -197,6 +213,91 @@ const StatementContractGroupSchema = z
   })
   .openapi('BillingStatementContractGroup');
 
+// The extras rail's record schemas (RFC 0015 §3), declared before the statement
+// because the statement's `extras` block lists charges with their ledger.
+const ChargeStatusSchema = z.enum(['open', 'paid', 'void']);
+
+const EventChargeSchema = z
+  .object({
+    id: z.string(),
+    eventId: z.string(),
+    userId: z.string(),
+    description: z.string(),
+    amountMinor: MinorUnits,
+    currency: z.string(),
+    termsSource: TermsSourceSchema,
+    termsNote: z.string(),
+    dueDate: IsoDate,
+    graceDays: z.number().int(),
+    status: ChargeStatusSchema,
+    issuedBy: z.string(),
+    issuedAt: z.string(),
+    voidedAt: z.string().nullable(),
+    voidReason: z.string().nullable(),
+  })
+  .openapi('BillingEventCharge');
+
+const EventChargeWithBalanceSchema = EventChargeSchema.extend({
+  balanceMinor: MinorUnits,
+}).openapi('BillingEventChargeWithBalance');
+
+const ChargeAdjustmentSchema = z
+  .object({
+    id: z.string(),
+    chargeId: z.string(),
+    kind: AdjustmentKindSchema,
+    amountMinor: MinorUnits,
+    reason: z.string(),
+    appliedBy: z.string(),
+    appliedAt: z.string(),
+  })
+  .openapi('BillingEventChargeAdjustment');
+
+const ChargePaymentSchema = z
+  .object({
+    id: z.string(),
+    chargeId: z.string(),
+    amountMinor: MinorUnits,
+    currency: z.string(),
+    method: PaymentMethodSchema,
+    paidAt: z.string(),
+    externalReference: z.string().nullable(),
+    note: z.string(),
+    reversesId: z.string().nullable(),
+    recordedBy: z.string(),
+    recordedAt: z.string(),
+  })
+  .openapi('BillingEventChargePayment');
+
+const EventChargeDetailSchema = EventChargeWithBalanceSchema.extend({
+  adjustments: z.array(ChargeAdjustmentSchema),
+  payments: z.array(ChargePaymentSchema),
+}).openapi('BillingEventChargeDetail');
+
+/** One event charge on a statement: the charge, its event, and its whole ledger. */
+const StatementChargeSchema = EventChargeDetailSchema.extend({
+  eventTitle: z.string().openapi({ example: 'Seminário de Inverno' }),
+  /** When the event starts; null when the event no longer exists. */
+  eventStartsAt: z.string().nullable().openapi({ example: '2026-07-18T13:00:00.000Z' }),
+}).openapi('BillingStatementCharge');
+
+export const StandingSchema = z
+  .enum(['good', 'due', 'delinquent', 'exempt'])
+  .openapi({ example: 'delinquent' });
+
+/**
+ * The extras rail of a statement (RFC 0015 §7): its own standing and its own
+ * outstanding, beside — never summed into — the contract `outstandingMinor`.
+ */
+const StatementExtrasSchema = z
+  .object({
+    standing: StandingSchema,
+    oldestOverdueDate: IsoDate.nullable(),
+    outstandingMinor: MinorUnits,
+    charges: z.array(StatementChargeSchema),
+  })
+  .openapi('BillingStatementExtras');
+
 /**
  * Exported so `/v1/me/billing` returns the **same** shape rather than a second
  * declaration of it. Reusing the instance also keeps the OpenAPI registry
@@ -211,12 +312,9 @@ export const StudentStatementSchema = z
     outstandingMinor: MinorUnits,
     contractGroups: z.array(StatementContractGroupSchema),
     invoices: z.array(StatementInvoiceSchema),
+    extras: StatementExtrasSchema,
   })
   .openapi('BillingStudentStatement');
-
-export const StandingSchema = z
-  .enum(['good', 'due', 'delinquent', 'exempt'])
-  .openapi({ example: 'delinquent' });
 
 const HoldSchema = z
   .object({
@@ -691,7 +789,7 @@ export const movementReportRoute = createRoute({
   path: '/reports/movement',
   summary: 'Monthly Movement',
   description:
-    "Billed, received and outstanding for one month, recomputed from the ledger rows. Billed is keyed off the invoice's issue date and the adjustment's applied date; received is keyed off the payment's paid date — a payment in September against an August invoice is September's received and August's billed.",
+    "Billed, received and outstanding for one month, recomputed from the ledger rows. Billed is keyed off the invoice's issue date and the adjustment's applied date; received is keyed off the payment's paid date — a payment in September against an August invoice is September's received and August's billed. Every top-level field is the contract rail only; `extras` reports event charges on the same date rules, and `cashReceivedMinor` is the one cross-rail figure — money that entered the till.",
   request: {
     query: z.object({
       month: z
@@ -709,10 +807,11 @@ export const agingReportRoute = createRoute({
   path: '/reports/aging',
   summary: 'Receivables Aging',
   description:
-    "Open balances bucketed 0-30 / 31-60 / 61-90 / 90+ by days past each invoice's own due date. Boundaries are exclusive: 30 days past due and 31 days past due land in different buckets.",
+    "Open balances bucketed 0-30 / 31-60 / 61-90 / 90+ by days past each item's own due date. Boundaries are exclusive: 30 days past due and 31 days past due land in different buckets. `rail` picks the one rail aged — `contract` (invoices, the default, unchanged) or `extras` (event charges); the two are never bucketed together.",
   request: {
     query: z.object({
       asOf: IsoDate.optional().openapi({ param: { name: 'asOf', in: 'query' } }),
+      rail: RailSchema.optional().openapi({ param: { name: 'rail', in: 'query' } }),
     }),
   },
   responses: { 200: json('Receivables aging', AgingReportSchema), ...REPORT_RESPONSES },
@@ -724,7 +823,7 @@ export const studentStatementRoute = createRoute({
   path: '/students/{userId}/statement',
   summary: "A Student's Statement",
   description:
-    'The student\'s contracts with their chains, invoices with their adjustments and payments, the outstanding total, and the two derived membership dates: "student since" spans every contract group, "current membership since" is the root of the group now active.',
+    'The student\'s contracts with their chains, invoices with their adjustments and payments, the outstanding total, and the two derived membership dates: "student since" spans every contract group, "current membership since" is the root of the group now active. `outstandingMinor` is the contract rail only; the sibling `extras` object carries the extras rail — its own standing, outstanding and each event charge with its event title, date and ledger.',
   request: { params: UserIdParamSchema },
   responses: {
     200: json('Student statement', StudentStatementSchema),
@@ -797,8 +896,6 @@ export const clearHoldRoute = createRoute({
 // `routes/admin/events.ts`.
 // ---------------------------------------------------------------------------
 
-const ChargeStatusSchema = z.enum(['open', 'paid', 'void']);
-
 const EventIdParamSchema = z.object({
   eventId: z.string().openapi({ param: { name: 'eventId', in: 'path' }, example: 'event-id' }),
 });
@@ -814,63 +911,6 @@ const EventPriceSchema = z
     updatedAt: z.string(),
   })
   .openapi('BillingEventPrice');
-
-const EventChargeSchema = z
-  .object({
-    id: z.string(),
-    eventId: z.string(),
-    userId: z.string(),
-    description: z.string(),
-    amountMinor: MinorUnits,
-    currency: z.string(),
-    termsSource: TermsSourceSchema,
-    termsNote: z.string(),
-    dueDate: IsoDate,
-    graceDays: z.number().int(),
-    status: ChargeStatusSchema,
-    issuedBy: z.string(),
-    issuedAt: z.string(),
-    voidedAt: z.string().nullable(),
-    voidReason: z.string().nullable(),
-  })
-  .openapi('BillingEventCharge');
-
-const EventChargeWithBalanceSchema = EventChargeSchema.extend({
-  balanceMinor: MinorUnits,
-}).openapi('BillingEventChargeWithBalance');
-
-const ChargeAdjustmentSchema = z
-  .object({
-    id: z.string(),
-    chargeId: z.string(),
-    kind: AdjustmentKindSchema,
-    amountMinor: MinorUnits,
-    reason: z.string(),
-    appliedBy: z.string(),
-    appliedAt: z.string(),
-  })
-  .openapi('BillingEventChargeAdjustment');
-
-const ChargePaymentSchema = z
-  .object({
-    id: z.string(),
-    chargeId: z.string(),
-    amountMinor: MinorUnits,
-    currency: z.string(),
-    method: PaymentMethodSchema,
-    paidAt: z.string(),
-    externalReference: z.string().nullable(),
-    note: z.string(),
-    reversesId: z.string().nullable(),
-    recordedBy: z.string(),
-    recordedAt: z.string(),
-  })
-  .openapi('BillingEventChargePayment');
-
-const EventChargeDetailSchema = EventChargeWithBalanceSchema.extend({
-  adjustments: z.array(ChargeAdjustmentSchema),
-  payments: z.array(ChargePaymentSchema),
-}).openapi('BillingEventChargeDetail');
 
 const IssueChargesResultSchema = z
   .object({
