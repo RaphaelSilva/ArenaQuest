@@ -378,6 +378,23 @@ const RosterEntrySchema = z
   })
   .openapi('BillingRosterEntry');
 
+/** One student who moved into `due` or `delinquent` on one rail since the previous run. */
+const RunCrossingSchema = z.object({
+  userId: z.string(),
+  from: StandingSchema,
+  to: StandingSchema,
+  oldestOverdueDate: IsoDate.nullable(),
+  outstandingMinor: MinorUnits,
+  currency: z.string(),
+});
+
+/** What happened to one rail's reminders on one run. */
+const ReminderCountsSchema = z.object({
+  sent: z.number().int(),
+  suppressed: z.number().int(),
+  undeliverable: z.number().int(),
+});
+
 /**
  * What one daily run did (RFC 0013 §6).
  *
@@ -418,16 +435,8 @@ const BillingRunReportSchema = z
         suppressedByHold: z.boolean(),
       }),
     ),
-    crossings: z.array(
-      z.object({
-        userId: z.string(),
-        from: StandingSchema,
-        to: StandingSchema,
-        oldestOverdueDate: IsoDate.nullable(),
-        outstandingMinor: MinorUnits,
-        currency: z.string(),
-      }),
-    ),
+    /** "Crossed on the monthly fee" — contract invoices only. */
+    crossings: z.array(RunCrossingSchema),
     suppressedByHold: z.array(
       z.object({ userId: z.string(), outstandingMinor: MinorUnits }),
     ),
@@ -442,6 +451,33 @@ const BillingRunReportSchema = z
     ),
     mailsSent: z.number().int(),
     adminsNotified: z.number().int(),
+    /**
+     * Extras notices (RFC 0015 §5), kept apart from the contract `reminders`.
+     * No `suppressedByHold`: a contract hold never reaches the extras rail.
+     */
+    extrasReminders: z.array(
+      z.object({
+        chargeId: z.string(),
+        eventId: z.string(),
+        /** The event title snapshot the message names. */
+        description: z.string(),
+        userId: z.string(),
+        kind: z.enum(['extras_due_date', 'extras_grace_lapsed']),
+        dueDate: IsoDate,
+        triggerOn: IsoDate,
+        balanceMinor: MinorUnits,
+        currency: z.string(),
+        sent: z.boolean(),
+      }),
+    ),
+    /** "Crossed on extras" — resolved from charges alone, with no hold. */
+    extrasCrossings: z.array(RunCrossingSchema),
+    /** Per-rail reminder tallies, never summed across rails. */
+    reminderCounts: z.object({
+      contract: ReminderCountsSchema,
+      /** `suppressed` is always 0: the extras rail has no hold. */
+      extras: ReminderCountsSchema,
+    }),
   })
   .openapi('BillingRunReport');
 
