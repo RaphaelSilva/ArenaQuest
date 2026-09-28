@@ -380,6 +380,127 @@ export type SetHoldInput = {
   expiresAt?: string | null;
 };
 
+// ---------------------------------------------------------------------------
+// Extras rail (RFC 0015) — one-off charges for a published event. Its own
+// ledger, never merged with the contract invoices above.
+// ---------------------------------------------------------------------------
+
+export type ChargeStatus = 'open' | 'paid' | 'void';
+
+export type BillingEventPrice = {
+  eventId: string;
+  amountMinor: number;
+  currency: string;
+  dueInDays: number;
+  graceDays: number;
+  updatedBy: string;
+  updatedAt: string;
+};
+
+/** The currency is never sent: the server prices in the active one. */
+export type SetEventPriceInput = {
+  amountMinor: number;
+  dueInDays?: number;
+  graceDays?: number;
+};
+
+export type BillingEventCharge = {
+  id: string;
+  eventId: string;
+  userId: string;
+  /** Snapshot of the event title at issue. */
+  description: string;
+  amountMinor: number;
+  currency: string;
+  termsSource: TermsSource;
+  termsNote: string;
+  dueDate: string;
+  graceDays: number;
+  status: ChargeStatus;
+  issuedBy: string;
+  issuedAt: string;
+  voidedAt: string | null;
+  voidReason: string | null;
+};
+
+export type BillingEventChargeWithBalance = BillingEventCharge & { balanceMinor: number };
+
+export type BillingEventChargeAdjustment = {
+  id: string;
+  chargeId: string;
+  kind: AdjustmentKind;
+  amountMinor: number;
+  reason: string;
+  appliedBy: string;
+  appliedAt: string;
+};
+
+export type BillingEventChargePayment = {
+  id: string;
+  chargeId: string;
+  amountMinor: number;
+  currency: string;
+  method: PaymentMethod;
+  paidAt: string;
+  externalReference: string | null;
+  note: string;
+  reversesId: string | null;
+  recordedBy: string;
+  recordedAt: string;
+};
+
+export type BillingEventChargeDetail = BillingEventChargeWithBalance & {
+  adjustments: BillingEventChargeAdjustment[];
+  payments: BillingEventChargePayment[];
+};
+
+export type EventChargeQuery = {
+  eventId?: string;
+  userId?: string;
+  status?: ChargeStatus;
+};
+
+/**
+ * Without `amountMinor` the event price is snapshot as standard terms; any
+ * other amount is negotiated and the server demands a `termsNote`.
+ */
+export type IssueEventChargesInput = {
+  eventId: string;
+  userIds: string[];
+  amountMinor?: number;
+  dueDate?: string;
+  graceDays?: number;
+  termsNote?: string;
+};
+
+/**
+ * `absorbed` pairs already had a live charge (a retry creates nothing);
+ * `outsideAudience` is a warning only — those users were still charged.
+ */
+export type IssueEventChargesResult = {
+  created: BillingEventCharge[];
+  absorbed: { eventId: string; userId: string }[];
+  outsideAudience: string[];
+};
+
+export type BillingEventChargeSummary = {
+  eventId: string;
+  currency: string;
+  chargedMinor: number;
+  /** Signed: negative reduces what is owed. */
+  adjustmentsMinor: number;
+  receivedMinor: number;
+  outstandingMinor: number;
+  chargeCount: number;
+  counts: Record<ChargeStatus, number>;
+};
+
+export type BillingEventAudienceCheck = {
+  eventId: string;
+  audience: 'public' | 'members' | 'restricted';
+  outsideAudience: string[];
+};
+
 export class AdminBillingApiError extends Error {
   constructor(
     public readonly code: string,
@@ -597,6 +718,109 @@ export function createAdminBillingApi(http: HttpTransport) {
         return get<BillingStudentStatement>(
           `${BASE}/students/${userId}/statement`,
           'BILLING_STATEMENT_FAILED',
+        );
+      },
+    },
+
+    /**
+     * The extras rail (RFC 0015 §7). A charge never grants or revokes access,
+     * and nothing here writes an audience row.
+     */
+    extras: {
+      /** `null` when the event is not for sale (the server answers `404`). */
+      async getPrice(eventId: string): Promise<BillingEventPrice | null> {
+        const res = await http('GET', `${BASE}/event-prices/${eventId}`);
+        if (res.status === 404) return null;
+        if (!res.ok) await rejectWith(res, 'BILLING_EVENT_PRICE_FAILED');
+        return (await res.json()) as BillingEventPrice;
+      },
+
+      setPrice(eventId: string, input: SetEventPriceInput): Promise<BillingEventPrice> {
+        return send<BillingEventPrice>(
+          'PUT',
+          `${BASE}/event-prices/${eventId}`,
+          'BILLING_EVENT_PRICE_SET_FAILED',
+          input,
+        );
+      },
+
+      async clearPrice(eventId: string): Promise<void> {
+        const res = await http('DELETE', `${BASE}/event-prices/${eventId}`);
+        if (!res.ok) await rejectWith(res, 'BILLING_EVENT_PRICE_CLEAR_FAILED');
+      },
+
+      listCharges(query: EventChargeQuery = {}): Promise<BillingEventChargeWithBalance[]> {
+        return get<BillingEventChargeWithBalance[]>(
+          `${BASE}/charges${queryString(query)}`,
+          'BILLING_CHARGES_LIST_FAILED',
+        );
+      },
+
+      getCharge(id: string): Promise<BillingEventChargeDetail> {
+        return get<BillingEventChargeDetail>(`${BASE}/charges/${id}`, 'BILLING_CHARGE_FAILED');
+      },
+
+      /** Idempotent: `201` when something was created, `200` when all was absorbed. */
+      issueCharges(input: IssueEventChargesInput): Promise<IssueEventChargesResult> {
+        return send<IssueEventChargesResult>(
+          'POST',
+          `${BASE}/charges`,
+          'BILLING_CHARGES_ISSUE_FAILED',
+          input,
+        );
+      },
+
+      voidCharge(id: string, reason: string): Promise<BillingEventCharge> {
+        return send<BillingEventCharge>(
+          'POST',
+          `${BASE}/charges/${id}/void`,
+          'BILLING_CHARGE_VOID_FAILED',
+          { reason },
+        );
+      },
+
+      addAdjustment(
+        id: string,
+        input: ApplyAdjustmentInput,
+      ): Promise<BillingEventChargeAdjustment> {
+        return send<BillingEventChargeAdjustment>(
+          'POST',
+          `${BASE}/charges/${id}/adjustments`,
+          'BILLING_CHARGE_ADJUSTMENT_FAILED',
+          input,
+        );
+      },
+
+      addPayment(id: string, input: RecordPaymentInput): Promise<BillingEventChargePayment> {
+        return send<BillingEventChargePayment>(
+          'POST',
+          `${BASE}/charges/${id}/payments`,
+          'BILLING_CHARGE_PAYMENT_FAILED',
+          input,
+        );
+      },
+
+      reversePayment(id: string, input: ReversePaymentInput): Promise<BillingEventChargePayment> {
+        return send<BillingEventChargePayment>(
+          'POST',
+          `${BASE}/charge-payments/${id}/reverse`,
+          'BILLING_CHARGE_PAYMENT_REVERSE_FAILED',
+          input,
+        );
+      },
+
+      summary(eventId: string): Promise<BillingEventChargeSummary> {
+        return get<BillingEventChargeSummary>(
+          `${BASE}/events/${eventId}/summary`,
+          'BILLING_EVENT_SUMMARY_FAILED',
+        );
+      },
+
+      /** Read-only: who among `userIds` a restricted event is not addressed to. */
+      audienceCheck(eventId: string, userIds: string[]): Promise<BillingEventAudienceCheck> {
+        return get<BillingEventAudienceCheck>(
+          `${BASE}/events/${eventId}/audience-check${queryString({ userIds: userIds.join(',') })}`,
+          'BILLING_AUDIENCE_CHECK_FAILED',
         );
       },
     },

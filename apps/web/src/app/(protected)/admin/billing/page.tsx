@@ -13,9 +13,10 @@ import { StudentsTab } from './students-tab';
 import { LedgerTab } from './ledger-tab';
 import { ReportsTab } from './reports-tab';
 import { PlansTab } from './plans-tab';
+import { ExtrasTab } from './extras-tab';
 import type { SignableStudent } from './sign-contract-dialog';
 
-const TABS = ['students', 'ledger', 'reports', 'plans'] as const;
+const TABS = ['students', 'ledger', 'extras', 'reports', 'plans'] as const;
 type Tab = (typeof TABS)[number];
 
 /**
@@ -41,6 +42,7 @@ export default function AdminBillingPage() {
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({
     students: null,
     ledger: null,
+    extras: null,
     reports: null,
     plans: null,
   });
@@ -221,6 +223,17 @@ export default function AdminBillingPage() {
       >
         {tab === 'ledger' && (
           <LedgerTab currency={currency} nameOf={nameOf} students={students} />
+        )}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="billing-panel-extras"
+        aria-labelledby="billing-tab-extras"
+        hidden={tab !== 'extras'}
+      >
+        {tab === 'extras' && (
+          <ExtrasTab currency={currency} nameOf={nameOf} students={students} />
         )}
       </div>
 

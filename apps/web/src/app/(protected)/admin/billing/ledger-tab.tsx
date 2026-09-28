@@ -26,6 +26,7 @@ import { downloadCsv, toCsv } from './ledger-csv';
 import { PaymentForm } from './payment-form';
 import { AdjustmentForm } from './adjustment-form';
 import { VoidInvoiceForm } from './void-invoice-form';
+import { ReversePaymentForm } from './reverse-payment-form';
 import { IssueInvoiceForm } from './issue-invoice-form';
 import { RunCyclePanel } from './run-cycle-panel';
 
@@ -78,9 +79,6 @@ export function LedgerTab({
   const [entriesError, setEntriesError] = useState<string | null>(null);
 
   const [reverseDraft, setReverseDraft] = useState<ReverseDraft | null>(null);
-  const [reverseReason, setReverseReason] = useState('');
-  const [reverseError, setReverseError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   // The four write actions and the confirmation they leave behind.
   const [writeDraft, setWriteDraft] = useState<WriteDraft | null>(null);
@@ -166,32 +164,14 @@ export function LedgerTab({
     [expanded, loadEntries],
   );
 
-  const submitReverse = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const afterReverse = async () => {
     if (!reverseDraft) return;
-    const reason = reverseReason.trim();
-    // The reversal refuses to submit without a reason: the mirror entry carries
-    // it forever, and an unexplained one is worse than none.
-    if (!reason) {
-      setReverseError(d.reverseReasonRequired);
-      return;
-    }
-    setBusy(true);
-    try {
-      await client.adminBilling.payments.reverse(reverseDraft.payment.id, { reason });
-      const invoice = rows.find((row) => row.id === reverseDraft.invoiceId);
-      setReverseDraft(null);
-      setReverseReason('');
-      setReverseError(null);
-      // The mirror entry moves the balance, so the list is re-read for the
-      // server's own status rather than adjusted here.
-      setRefreshToken((token) => token + 1);
-      if (invoice) await loadEntries(invoice);
-    } catch {
-      setReverseError(d.reverseError);
-    } finally {
-      setBusy(false);
-    }
+    const invoice = rows.find((row) => row.id === reverseDraft.invoiceId);
+    setReverseDraft(null);
+    // The mirror entry moves the balance, so the list is re-read for the
+    // server's own status rather than adjusted here.
+    setRefreshToken((token) => token + 1);
+    if (invoice) await loadEntries(invoice);
   };
 
   const exportRows = () => {
@@ -557,8 +537,6 @@ export function LedgerTab({
                                               payment,
                                               invoiceId: invoice.id,
                                             });
-                                            setReverseReason('');
-                                            setReverseError(null);
                                           }}
                                           aria-label={d.reverseAriaLabel(shortRef(payment.id))}
                                         >
@@ -605,55 +583,11 @@ export function LedgerTab({
       )}
 
       {reverseDraft && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={d.reverseDialogTitle}
-        >
-          <form
-            onSubmit={submitReverse}
-            className="w-full max-w-md space-y-4 rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
-          >
-            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-              {d.reverseDialogTitle}
-            </h2>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">{d.reverseExplainer}</p>
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text2)]">
-                {d.reverseReasonLabel}
-              </span>
-              <textarea
-                value={reverseReason}
-                onChange={(event) => setReverseReason(event.target.value)}
-                rows={3}
-                placeholder={d.reverseReasonPlaceholder}
-                className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
-              />
-            </label>
-            {reverseError && (
-              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                {reverseError}
-              </p>
-            )}
-            <div className="flex justify-end gap-3">
-              <Button
-                type="button"
-                variant="secondary"
-                size="md"
-                onClick={() => {
-                  setReverseDraft(null);
-                  setReverseError(null);
-                }}
-              >
-                {d.reverseCancel}
-              </Button>
-              <Button type="submit" variant="primary" size="md" disabled={busy}>
-                {d.reverseSubmit}
-              </Button>
-            </div>
-          </form>
-        </div>
+        <ReversePaymentForm
+          paymentId={reverseDraft.payment.id}
+          onClose={() => setReverseDraft(null)}
+          onReversed={afterReverse}
+        />
       )}
 
       {writeDraft?.action === 'payment' && (
