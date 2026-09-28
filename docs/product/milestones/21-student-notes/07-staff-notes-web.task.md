@@ -1,6 +1,6 @@
 # Task 07 — Frontend: Staff notes surfaces — moderation actions and user backoffice section (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [21 — Student notes — private and shared topic notes with staff moderation](./milestone.md)
 **RFC:** [RFC 0016](../../RFCs/0016-student-notes.md)
 **Team:** Frontend Web
@@ -60,17 +60,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Logged in as an admin and as a content creator, *Class notes* shows every note with a
+- [x] Logged in as an admin and as a content creator, *Class notes* shows every note with a
       visibility badge; *Unshare* on a shared note turns it private and moderated in place.
-- [ ] *Allow sharing again* clears the moderated badge; the author can then share.
-- [ ] The user backoffice *Notes* section lists the student's notes, private included,
+- [x] *Allow sharing again* clears the moderated badge; the author can then share.
+- [x] The user backoffice *Notes* section lists the student's notes, private included,
       with the same actions.
-- [ ] A tutor and a student see neither badges for others' private notes nor any staff
+- [x] A tutor and a student see neither badges for others' private notes nor any staff
       action.
-- [ ] No control in the diff edits or deletes another user's note.
-- [ ] `check-i18n-coverage.js` passes; `pt` and `en` builds both render.
-- [ ] Changed files lint clean; `make test-web` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] No control in the diff edits or deletes another user's note.
+- [x] `check-i18n-coverage.js` passes; `pt` and `en` builds both render.
+- [x] Changed files lint clean; `make test-web` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

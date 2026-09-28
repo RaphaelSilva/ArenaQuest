@@ -1,11 +1,35 @@
 'use client';
 
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useDict } from '@web/context/dict-context';
+import { useHasRole } from '@web/hooks/use-auth';
 import { MyNoteEditor } from './MyNoteEditor';
 import { ClassNotesList } from './ClassNotesList';
+import { StaffNoteActions, staffActionFor } from './StaffNoteActions';
+import { StaffNoteBadges } from './StaffNoteBadges';
 
 type NotesTab = 'mine' | 'class';
+
+/**
+ * The *Class notes* list, decorated for the staff (admin and content creator)
+ * with visibility badges and the moderation actions. A tutor is not staff.
+ * The gate is a UI affordance only — the API rejects a non-staff call with 403.
+ */
+function DefaultClassNotes({ topicId }: { topicId: string }) {
+  const isStaff = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
+  if (!isStaff) return <ClassNotesList topicId={topicId} />;
+  return (
+    <ClassNotesList
+      topicId={topicId}
+      renderBadges={(note) => <StaffNoteBadges note={note} />}
+      renderActions={(note, _reload, update) =>
+        // Moderation is for other people's notes; the staff's own is edited from *My note*.
+        !note.isMine && staffActionFor(note) ? <StaffNoteActions note={note} onChange={update} /> : undefined
+      }
+    />
+  );
+}
 
 const TABS: readonly NotesTab[] = ['mine', 'class'];
 
@@ -112,7 +136,7 @@ export function NotesPanel({ topicId, classNotes, debounceMs }: NotesPanelProps)
         >
           {/* The editor stays mounted while hidden so a pending autosave is not lost on a tab switch. */}
           {tab === 'mine' && <MyNoteEditor topicId={topicId} debounceMs={debounceMs} />}
-          {tab === 'class' && tab === active && (classNotes ?? <ClassNotesList topicId={topicId} />)}
+          {tab === 'class' && tab === active && (classNotes ?? <DefaultClassNotes topicId={topicId} />)}
         </div>
       ))}
     </section>

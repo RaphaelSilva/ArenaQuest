@@ -12,23 +12,26 @@ import { NoteCard } from './NoteCard';
 import { NotesListError, NotesListLoading } from './NotesListStatus';
 import { useNotePages } from './useNotePages';
 
-export type AuthoredNoteGroup = {
+export type NoteTopicGroup<T> = {
   topicNodeId: string;
   topicTitle: string;
-  topicAccessible: boolean;
-  notes: AuthoredNote[];
+  notes: T[];
 };
 
-/** Groups notes by topic, ordered by each topic's first appearance in the API order. */
-export function groupNotesByTopic(notes: readonly AuthoredNote[]): AuthoredNoteGroup[] {
-  const groups = new Map<string, AuthoredNoteGroup>();
+/**
+ * Groups notes by topic, ordered by each topic's first appearance in the API
+ * order. Shared by *My notes* and the staff's per-student section.
+ */
+export function groupNotesByTopic<T extends { topicNodeId: string; topicTitle: string }>(
+  notes: readonly T[],
+): NoteTopicGroup<T>[] {
+  const groups = new Map<string, NoteTopicGroup<T>>();
   for (const note of notes) {
     let group = groups.get(note.topicNodeId);
     if (!group) {
       group = {
         topicNodeId: note.topicNodeId,
         topicTitle: note.topicTitle,
-        topicAccessible: note.topicAccessible,
         notes: [],
       };
       groups.set(note.topicNodeId, group);
@@ -42,7 +45,7 @@ export type MyNotesListProps = {
   /** Extra chips for a card, after the visibility and moderation badges. */
   renderBadges?: (note: AuthoredNote) => ReactNode;
   /** Footer actions for a card. */
-  renderActions?: (note: AuthoredNote, reload: () => void) => ReactNode;
+  renderActions?: (note: AuthoredNote, reload: () => void, update: (patch: Partial<AuthoredNote>) => void) => ReactNode;
 };
 
 /**
@@ -73,7 +76,7 @@ export function MyNotesList({ renderBadges, renderActions }: MyNotesListProps) {
               className="mb-2 text-[15px] font-bold"
               style={{ fontFamily: 'var(--font-space-grotesk), sans-serif', color: 'var(--aq-text)' }}
             >
-              {group.topicAccessible ? (
+              {group.notes[0].topicAccessible ? (
                 <Link
                   href={`/catalog/${group.topicNodeId}`}
                   className="transition-colors duration-150 hover:text-[var(--aq-accent)]"
@@ -111,7 +114,7 @@ export function MyNotesList({ renderBadges, renderActions }: MyNotesListProps) {
                         </p>
                       )
                     }
-                    actions={renderActions?.(note, pages.reload)}
+                    actions={renderActions?.(note, pages.reload, (patch) => pages.update(note.id, patch))}
                   />
                 </li>
               ))}
