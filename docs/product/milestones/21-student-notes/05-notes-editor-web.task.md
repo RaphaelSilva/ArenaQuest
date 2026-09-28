@@ -1,6 +1,6 @@
 # Task 05 — Frontend: Topic notes panel — editor, autosave and conflict handling (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [21 — Student notes — private and shared topic notes with staff moderation](./milestone.md)
 **RFC:** [RFC 0016](../../RFCs/0016-student-notes.md)
 **Team:** Frontend Web
@@ -79,21 +79,21 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Typing in the editor and pausing ~2 s sends one save carrying the held `revision`;
+- [x] Typing in the editor and pausing ~2 s sends one save carrying the held `revision`;
       the indicator goes *saving* → *saved*.
-- [ ] Simulating two tabs (two editor instances on the same note), the second tab's save
+- [x] Simulating two tabs (two editor instances on the same note), the second tab's save
       shows the conflict banner and sends nothing further until the student chooses;
       neither text is lost without pressing **Keep mine**.
-- [ ] **Load latest** replaces the editor content with the server's note and places the
+- [x] **Load latest** replaces the editor content with the server's note and places the
       unsaved text on the clipboard.
-- [ ] The private/shared switch shows the audience line naming staff; switching to shared
+- [x] The private/shared switch shows the audience line naming staff; switching to shared
       requires confirmation; a moderated note shows the moderation banner and a disabled
       switch.
-- [ ] The counter and the save guard use `NOTE_BODY_MAX` from `@arenaquest/shared`.
-- [ ] `check-i18n-coverage.js` passes; `pt` and `en` builds both render the panel.
-- [ ] `Discussion.tsx` and `comments-api.ts` are unchanged.
-- [ ] Changed files lint clean; `make test-web` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] The counter and the save guard use `NOTE_BODY_MAX` from `@arenaquest/shared`.
+- [x] `check-i18n-coverage.js` passes; `pt` and `en` builds both render the panel.
+- [x] `Discussion.tsx` and `comments-api.ts` are unchanged.
+- [x] Changed files lint clean; `make test-web` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
