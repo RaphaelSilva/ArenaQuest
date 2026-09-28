@@ -1,6 +1,6 @@
 # Task 03 — Backend: Student notes API — my note, class notes and my-notes list (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [21 — Student notes — private and shared topic notes with staff moderation](./milestone.md)
 **RFC:** [RFC 0016](../../RFCs/0016-student-notes.md)
 **Team:** Backend API
@@ -88,26 +88,26 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A student's `PUT` with `baseRevision: 0` returns `201`, a following `GET` returns the
+- [x] A student's `PUT` with `baseRevision: 0` returns `201`, a following `GET` returns the
       note with `revision: 1`, and `DELETE` returns `204`.
-- [ ] The same three calls on a draft, archived or out-of-access topic return `404`.
-- [ ] A `PUT` with a stale `baseRevision` returns `409` with `error: NOTE_STALE` and the
+- [x] The same three calls on a draft, archived or out-of-access topic return `404`.
+- [x] A `PUT` with a stale `baseRevision` returns `409` with `error: NOTE_STALE` and the
       current note in `meta.current`; the stored row is unchanged.
-- [ ] A body that is empty after trim, or longer than `NOTE_BODY_MAX` after sanitisation,
+- [x] A body that is empty after trim, or longer than `NOTE_BODY_MAX` after sanitisation,
       returns `400`; a `<script>` in the body is stripped before storage.
-- [ ] A student and a tutor listing a topic receive only shared notes (their own flagged
+- [x] A student and a tutor listing a topic receive only shared notes (their own flagged
       `isMine`); an `admin` and a `content_creator` receive every note with its visibility.
-- [ ] No request parameter makes a private note of another student appear to a student;
+- [x] No request parameter makes a private note of another student appear to a student;
       asserted with a cursor taken from a staff listing.
-- [ ] `GET /v1/me/notes` returns every note of the caller with `topicAccessible`; for an
+- [x] `GET /v1/me/notes` returns every note of the caller with `topicAccessible`; for an
       inaccessible topic, `PUT` is refused and `DELETE` succeeds.
-- [ ] No `@ValidateBody` or `@Body()` decorator appears in the diff; comments files are
+- [x] No `@ValidateBody` or `@Body()` decorator appears in the diff; comments files are
       unchanged; no `xpEngine` call is added.
-- [ ] No provider-specific (D1/R2) import leaks into the controller.
-- [ ] Validation, auth, not-found and conflict branches each return the correct
+- [x] No provider-specific (D1/R2) import leaks into the controller.
+- [x] Validation, auth, not-found and conflict branches each return the correct
       `ControllerResult` status and are covered by a test.
-- [ ] Changed files lint clean; `make test-api` green, pre-existing suite unchanged.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green, pre-existing suite unchanged.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

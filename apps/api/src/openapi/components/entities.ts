@@ -181,3 +181,62 @@ export const UpdateBadgeBodySchema = z.object({
 
 
 
+// ---------------------------------------------------------------------------
+// Student notes (RFC 0016)
+// ---------------------------------------------------------------------------
+
+export const NOTE_VISIBILITIES = ['private', 'shared'] as const;
+
+export const NoteSchema = z.object({
+  id: z.string().uuid().openapi({ example: 'a1b2c3d4-e5f6-7890-1234-567890abcdef' }),
+  topicNodeId: z.string().openapi({ example: 'topic-1' }),
+  authorId: z.string().openapi({ example: 'student-a' }),
+  authorName: z.string().openapi({ example: 'Student A' }),
+  body: z.string().openapi({ description: 'Sanitised Markdown, 1..NOTE_BODY_MAX characters', example: 'The **key idea** is...' }),
+  visibility: z.enum(NOTE_VISIBILITIES).openapi({ example: 'private' }),
+  revision: z.number().int().min(1).openapi({ description: 'Concurrency token; send it back as `baseRevision`', example: 1 }),
+  sharedAt: z.string().nullable().openapi({ description: 'Last time the note became shared; null if it never was', example: null }),
+  moderated: z.boolean().openapi({ description: 'True while a staff force-unshare blocks re-sharing', example: false }),
+  createdAt: z.string().openapi({ example: '2026-09-28 12:00:00' }),
+  updatedAt: z.string().openapi({ example: '2026-09-28 12:00:00' }),
+}).openapi('Note');
+
+export const ClassNoteSchema = NoteSchema.extend({
+  isMine: z.boolean().openapi({ description: 'True when the caller wrote this note', example: false }),
+}).openapi('ClassNote');
+
+export const AuthoredNoteSchema = NoteSchema.extend({
+  topicTitle: z.string().openapi({ example: 'Intro to Algebra' }),
+  topicAccessible: z.boolean().openapi({
+    description: 'False when the caller can no longer read the topic; the note is then read-only (delete allowed)',
+    example: true,
+  }),
+}).openapi('AuthoredNote');
+
+const nextCursorField = z.string().nullable().openapi({
+  description: 'Opaque cursor of the next page; null on the last page',
+  example: null,
+});
+
+export const ClassNotePageSchema = z.object({
+  data: z.array(ClassNoteSchema),
+  nextCursor: nextCursorField,
+}).openapi('ClassNotePage');
+
+export const AuthoredNotePageSchema = z.object({
+  data: z.array(AuthoredNoteSchema),
+  nextCursor: nextCursorField,
+}).openapi('AuthoredNotePage');
+
+export const SaveNoteBodySchema = z.object({
+  body: z.string().openapi({ description: 'Markdown; sanitised and trimmed, then must be 1..NOTE_BODY_MAX characters', example: 'My note' }),
+  visibility: z.enum(NOTE_VISIBILITIES).optional().openapi({ description: 'Omitted: keep the current visibility (private on create)', example: 'private' }),
+  baseRevision: z.number().int().min(0).openapi({ description: 'The revision last received; 0 when no note exists yet', example: 0 }),
+}).openapi('SaveNoteBody');
+
+export const NoteConflictBodySchema = z.object({
+  error: z.enum(['NOTE_STALE', 'NOTE_MODERATED']).openapi({ example: 'NOTE_STALE' }),
+  current: NoteSchema.nullable().optional().openapi({
+    description: 'NOTE_STALE only: the stored note (null when it no longer exists)',
+  }),
+}).openapi('NoteConflictBody');

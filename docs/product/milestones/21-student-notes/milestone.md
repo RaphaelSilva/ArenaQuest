@@ -94,7 +94,7 @@ Each task is one independent PR with one owner and one review surface. Backend a
 |---|-----------|-------|------|--------|
 | 01 | [Notes contracts — entity, visibility, body limit and repository port](./01-shared-contracts.task.md) | 0 | Backend | ✅ Done |
 | 02 | [Notes schema and D1 repository with revision-guarded writes](./02-schema-and-repository.task.md) | 1 | Backend | ✅ Done |
-| 03 | [Student notes API — my note, class notes and my-notes list](./03-student-notes-api.task.md) | 2 | Backend | ☐ Open |
+| 03 | [Student notes API — my note, class notes and my-notes list](./03-student-notes-api.task.md) | 2 | Backend | ✅ Done |
 | 04 | [Staff notes API — per-student list and moderation](./04-staff-notes-api.task.md) | 3 | Backend | ☐ Open |
 | 05 | [Topic notes panel — editor, autosave and conflict handling](./05-notes-editor-web.task.md) | 4 | Frontend | ☐ Open |
 | 06 | [Class notes list and My notes page](./06-class-and-my-notes-web.task.md) | 4 | Frontend | ☐ Open |
