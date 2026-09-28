@@ -62,10 +62,13 @@ export function ExtrasTab({
   currency,
   nameOf,
   students,
+  initialEventId,
 }: {
   currency: BillingReportCurrency | null;
   nameOf: (userId: string) => string;
   students: readonly ChargeablePerson[];
+  /** Pre-selects an event — the admin event page links here with its id. */
+  initialEventId?: string;
 }) {
   const dict = useDict();
   const d = dict.admin.billing.extras;
@@ -79,7 +82,7 @@ export function ExtrasTab({
   const [events, setEvents] = useState<AdminEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
-  const [eventId, setEventId] = useState('');
+  const [eventId, setEventId] = useState(initialEventId ?? '');
 
   const [price, setPrice] = useState<BillingEventPrice | null>(null);
   const [priceError, setPriceError] = useState<string | null>(null);
