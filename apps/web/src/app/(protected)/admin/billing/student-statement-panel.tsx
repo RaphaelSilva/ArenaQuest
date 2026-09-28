@@ -1,18 +1,37 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button, Table, TableBody, TableCell, TableHeader, TableRow } from '@web/components/design-system';
+import { Badge, Button, Table, TableBody, TableCell, TableHeader, TableRow } from '@web/components/design-system';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
 import { Spinner } from '@web/components/spinner';
 import type {
   BillingStatementContractGroup,
+  BillingStatementExtras,
   BillingStudentStatement,
   BillingSubscription,
+  ChargeStatus,
+  Standing,
 } from '@web/lib/admin-billing-api';
 import { ContractActions } from './contract-actions';
 import { ContractChain } from './contract-chain';
 import { Money } from './money';
+import { StandingBadge } from './standing-badge';
+
+/** Presentation only: a charge's cached status, never a standing. */
+const CHARGE_TONE: Record<ChargeStatus, 'active' | 'archived' | 'inactive'> = {
+  open: 'archived',
+  paid: 'active',
+  void: 'inactive',
+};
+
+/** An absent block (a statement predating RFC 0015) reads as "never charged". */
+const NO_EXTRAS: BillingStatementExtras = {
+  standing: 'good',
+  oldestOverdueDate: null,
+  outstandingMinor: 0,
+  charges: [],
+};
 
 /**
  * The version of a contract group that is in force now.
@@ -51,9 +70,17 @@ export function StudentStatementPanel({
   studentName,
   onClose,
   onSignContract,
+  contractStanding,
 }: {
   userId: string;
   studentName: string;
+  /**
+   * The contract rail's standing, as the roster resolved it — the admin
+   * statement carries no contract standing of its own. `null` means the
+   * student has no contract; omitted means the caller did not say, and no
+   * badge is drawn.
+   */
+  contractStanding?: Standing | null;
   onClose: () => void;
   /**
    * The second entry point into signing (RFC 0013 §7). Optional: the panel is
@@ -65,6 +92,7 @@ export function StudentStatementPanel({
   const dict = useDict();
   const d = dict.admin.billing.statement;
   const ledgerDict = dict.admin.billing.ledger;
+  const rails = dict.admin.billing.rails;
   const client = useApiClient();
 
   const [statement, setStatement] = useState<BillingStudentStatement | null>(null);
@@ -168,6 +196,20 @@ export function StudentStatementPanel({
           </p>
         ) : statement ? (
           <div className="space-y-5">
+            {/*
+              The monthly fee and the extras are two rails, each with its own
+              badge and its own outstanding, never summed (RFC 0015 §8).
+            */}
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                {rails.contract}
+              </h3>
+              {contractStanding === null ? (
+                <span className="text-sm text-zinc-500">{d.noContract}</span>
+              ) : contractStanding ? (
+                <StandingBadge standing={contractStanding} railLabel={rails.contract} />
+              ) : null}
+            </div>
             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
                 <dt className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
@@ -284,9 +326,99 @@ export function StudentStatementPanel({
                 </Table>
               )}
             </section>
+
+            <ExtrasSection
+              extras={statement.extras ?? NO_EXTRAS}
+              currency={statement.currency}
+            />
           </div>
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * The extras rail of the statement: its own heading, standing badge and
+ * outstanding, then one row per event charge. The standing is the one the API
+ * resolved for the whole rail; a row carries its charge's status, never a
+ * standing derived here.
+ */
+function ExtrasSection({
+  extras,
+  currency,
+}: {
+  extras: BillingStatementExtras;
+  currency: BillingStudentStatement['currency'];
+}) {
+  const dict = useDict();
+  const d = dict.admin.billing.statement;
+  const rails = dict.admin.billing.rails;
+  const chargeStatus = dict.admin.billing.extras.charges.status;
+
+  return (
+    <section aria-label={rails.extras} className="space-y-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{rails.extras}</h3>
+        <StandingBadge standing={extras.standing} railLabel={rails.extras} />
+      </div>
+      <p className="text-xs text-zinc-500">{d.extrasNote}</p>
+
+      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+          <dt className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            {d.extrasOutstanding}
+          </dt>
+          <dd className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
+            <Money amountMinor={extras.outstandingMinor} currency={currency} />
+          </dd>
+        </div>
+        <div className="rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+          <dt className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            {d.extrasOldestOverdue}
+          </dt>
+          <dd className="text-sm text-zinc-900 dark:text-zinc-50">
+            {extras.oldestOverdueDate ?? d.none}
+          </dd>
+        </div>
+      </dl>
+
+      {extras.charges.length === 0 ? (
+        <p className="text-sm text-zinc-500">{d.extrasEmpty}</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow isHoverable={false}>
+              <TableCell isHeader>{d.columns.event}</TableCell>
+              <TableCell isHeader>{d.columns.eventDate}</TableCell>
+              <TableCell isHeader>{d.columns.due}</TableCell>
+              <TableCell isHeader>{d.columns.status}</TableCell>
+              <TableCell isHeader>{d.columns.amount}</TableCell>
+              <TableCell isHeader>{d.columns.balance}</TableCell>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {extras.charges.map((charge) => (
+              <TableRow key={charge.id}>
+                <TableCell>{charge.eventTitle}</TableCell>
+                <TableCell>{charge.eventStartsAt ? charge.eventStartsAt.slice(0, 10) : d.none}</TableCell>
+                <TableCell>{charge.dueDate}</TableCell>
+                <TableCell>
+                  <Badge status={CHARGE_TONE[charge.status]} size="sm">
+                    {chargeStatus[charge.status]}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Money amountMinor={charge.amountMinor} currency={currency} />
+                </TableCell>
+                <TableCell>
+                  <Money amountMinor={charge.balanceMinor} currency={currency} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </section>
   );
 }

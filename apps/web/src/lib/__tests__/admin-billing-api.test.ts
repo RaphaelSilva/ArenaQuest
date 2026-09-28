@@ -35,6 +35,34 @@ describe('createAdminBillingApi — the roster', () => {
     await api.students.roster({});
     expect(http).toHaveBeenCalledWith('GET', '/admin/billing/students');
   });
+
+  it('sends the two rail filters independently (RFC 0015)', async () => {
+    const { http, api } = apiWith(makeResponse({ jsonData: [] }));
+    await api.students.roster({ contractStanding: 'good', extrasStanding: 'delinquent' });
+    expect(http).toHaveBeenCalledWith(
+      'GET',
+      '/admin/billing/students?contractStanding=good&extrasStanding=delinquent',
+    );
+    await api.students.roster({ extrasStanding: 'due' });
+    expect(http).toHaveBeenLastCalledWith('GET', '/admin/billing/students?extrasStanding=due');
+  });
+});
+
+describe('createAdminBillingApi — aging rail', () => {
+  it('omits `rail` when none is given, so the server ages the contract rail', async () => {
+    const { http, api } = apiWith(makeResponse({ jsonData: {} }));
+    await api.reports.aging();
+    expect(http).toHaveBeenCalledWith('GET', '/admin/billing/reports/aging');
+  });
+
+  it('sends `rail=extras` with the date when asked', async () => {
+    const { http, api } = apiWith(makeResponse({ jsonData: {} }));
+    await api.reports.aging('2026-09-01', 'extras');
+    expect(http).toHaveBeenCalledWith(
+      'GET',
+      '/admin/billing/reports/aging?asOf=2026-09-01&rail=extras',
+    );
+  });
 });
 
 describe('createAdminBillingApi — invoices', () => {

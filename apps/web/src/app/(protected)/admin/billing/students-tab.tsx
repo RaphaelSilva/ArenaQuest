@@ -25,10 +25,26 @@ import { SignContractDialog } from './sign-contract-dialog';
 import type { SignableStudent } from './sign-contract-dialog';
 
 /**
- * `standing=exempt` is the held filter — Task 05 decided against a second
- * spelling, and a hold is the only way a student reaches it.
+ * `contractStanding=exempt` is the held filter — a hold is the only way a
+ * student reaches it, and a hold applies to the monthly fee only.
  */
-const STANDINGS: readonly Standing[] = ['good', 'due', 'delinquent', 'exempt'];
+const CONTRACT_STANDINGS: readonly Standing[] = ['good', 'due', 'delinquent', 'exempt'];
+
+/** The extras rail has no hold (RFC 0015 Resolved #9), so `exempt` is unreachable there. */
+const EXTRAS_STANDINGS: readonly Standing[] = ['good', 'due', 'delinquent'];
+
+type RailRows = readonly BillingRosterEntry[];
+
+/**
+ * The code a rail's total is stated in. Two codes on screen mean there is no
+ * single total to state, so the joined code is handed to `Money`, which
+ * withholds the amount rather than adding two currencies together.
+ */
+function totalCode(rows: RailRows, fallback: string | undefined): string | undefined {
+  const codes = [...new Set(rows.map((row) => row.currency))];
+  if (codes.length === 0) return fallback;
+  return codes.length === 1 ? codes[0] : codes.sort().join('/');
+}
 
 type HoldDraft = { entry: BillingRosterEntry; name: string };
 
@@ -59,9 +75,11 @@ export function StudentsTab({
   const dict = useDict();
   const d = dict.admin.billing.students;
   const client = useApiClient();
-  const filterId = useId();
+  const contractFilterId = useId();
+  const extrasFilterId = useId();
 
-  const [standing, setStanding] = useState<Standing | ''>('');
+  const [contractStanding, setContractStanding] = useState<Standing | ''>('');
+  const [extrasStanding, setExtrasStanding] = useState<Standing | ''>('');
   const [rows, setRows] = useState<BillingRosterEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,21 +91,29 @@ export function StudentsTab({
   const [holdExpiresAt, setHoldExpiresAt] = useState('');
   const [holdFormError, setHoldFormError] = useState<string | null>(null);
 
-  const [statementFor, setStatementFor] = useState<{ userId: string; name: string } | null>(null);
+  const [statementFor, setStatementFor] = useState<{
+    userId: string;
+    name: string;
+    contractStanding: Standing | null;
+  } | null>(null);
 
   const [signDraft, setSignDraft] = useState<SignDraft | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   /**
-   * The standing filter is a **server** parameter. Filtering a cached list
-   * locally would put a second copy of the standing rule in the client, where a
-   * hold set on another screen could never reach it.
+   * Both standing filters are **server** parameters, independent of each
+   * other. Filtering a cached list locally would put a second copy of the
+   * standing rule in the client, where a hold set on another screen could
+   * never reach it.
    */
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await client.adminBilling.students.roster(standing ? { standing } : {});
+      const data = await client.adminBilling.students.roster({
+        contractStanding: contractStanding || undefined,
+        extrasStanding: extrasStanding || undefined,
+      });
       setRows(data);
     } catch {
       setRows([]);
@@ -95,31 +121,35 @@ export function StudentsTab({
     } finally {
       setLoading(false);
     }
-  }, [client, standing, d.loadError]);
+  }, [client, contractStanding, extrasStanding, d.loadError]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   /**
-   * Every listed balance is summed, held rows included: a hold stops the
-   * chasing, not the debt, so it never removes money from a total on screen.
+   * One total per rail — never one merged figure (RFC 0015 Resolved #5). Every
+   * listed balance is summed, held rows included: a hold stops the chasing,
+   * not the debt, so it never removes money from a total on screen.
    */
-  const outstandingTotal = useMemo(
-    () => rows.reduce((sum, row) => sum + row.outstandingMinor, 0),
-    [rows],
+  const contractRows = useMemo(() => rows.filter((row) => row.contract !== null), [rows]);
+  const extrasRows = useMemo(() => rows.filter((row) => row.extras !== null), [rows]);
+  const contractTotal = useMemo(
+    () => contractRows.reduce((sum, row) => sum + (row.contract?.outstandingMinor ?? 0), 0),
+    [contractRows],
   );
-
-  /**
-   * The code the total is stated in. Two codes on screen mean there is no
-   * single total to state, so the joined code is handed to `Money`, which
-   * withholds the amount rather than adding two currencies together.
-   */
-  const totalCurrencyCode = useMemo(() => {
-    const codes = [...new Set(rows.map((row) => row.currency))];
-    if (codes.length === 0) return currency?.code;
-    return codes.length === 1 ? codes[0] : codes.sort().join('/');
-  }, [rows, currency]);
+  const extrasTotal = useMemo(
+    () => extrasRows.reduce((sum, row) => sum + (row.extras?.outstandingMinor ?? 0), 0),
+    [extrasRows],
+  );
+  const contractTotalCode = useMemo(
+    () => totalCode(contractRows, currency?.code),
+    [contractRows, currency],
+  );
+  const extrasTotalCode = useMemo(
+    () => totalCode(extrasRows, currency?.code),
+    [extrasRows, currency],
+  );
 
   const openHold = (entry: BillingRosterEntry) => {
     setHoldDraft({ entry, name: nameOf(entry.userId) });
@@ -192,19 +222,41 @@ export function StudentsTab({
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-1">
           <label
-            htmlFor={filterId}
+            htmlFor={contractFilterId}
             className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text2)]"
           >
-            {d.filterLabel}
+            {d.contractFilterLabel}
           </label>
           <select
-            id={filterId}
-            value={standing}
-            onChange={(event) => setStanding(event.target.value as Standing | '')}
+            id={contractFilterId}
+            value={contractStanding}
+            onChange={(event) => setContractStanding(event.target.value as Standing | '')}
             className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
           >
             <option value="">{d.filterAll}</option>
-            {STANDINGS.map((value) => (
+            {CONTRACT_STANDINGS.map((value) => (
+              <option key={value} value={value}>
+                {dict.admin.billing.standing[value]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor={extrasFilterId}
+            className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text2)]"
+          >
+            {d.extrasFilterLabel}
+          </label>
+          <select
+            id={extrasFilterId}
+            value={extrasStanding}
+            onChange={(event) => setExtrasStanding(event.target.value as Standing | '')}
+            className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+          >
+            <option value="">{d.filterAll}</option>
+            {EXTRAS_STANDINGS.map((value) => (
               <option key={value} value={value}>
                 {dict.admin.billing.standing[value]}
               </option>
@@ -214,14 +266,19 @@ export function StudentsTab({
 
         <div className="rounded-md border border-zinc-200 px-3 py-2 dark:border-zinc-800">
           <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            {d.totalOutstanding}
+            {d.contractTotalOutstanding}
           </p>
           <p className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-            <Money
-              amountMinor={outstandingTotal}
-              currency={currency}
-              code={totalCurrencyCode}
-            />
+            <Money amountMinor={contractTotal} currency={currency} code={contractTotalCode} />
+          </p>
+        </div>
+
+        <div className="rounded-md border border-zinc-200 px-3 py-2 dark:border-zinc-800">
+          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            {d.extrasTotalOutstanding}
+          </p>
+          <p className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
+            <Money amountMinor={extrasTotal} currency={currency} code={extrasTotalCode} />
           </p>
         </div>
 
@@ -269,10 +326,8 @@ export function StudentsTab({
           <TableHeader>
             <TableRow isHoverable={false}>
               <TableCell isHeader>{d.columns.student}</TableCell>
-              <TableCell isHeader>{d.columns.standing}</TableCell>
-              <TableCell isHeader>{d.columns.outstanding}</TableCell>
-              <TableCell isHeader>{d.columns.nextDue}</TableCell>
-              <TableCell isHeader>{d.columns.oldestOverdue}</TableCell>
+              <TableCell isHeader>{d.columns.contract}</TableCell>
+              <TableCell isHeader>{d.columns.extras}</TableCell>
               <TableCell isHeader>{d.columns.terms}</TableCell>
               <TableCell isHeader>{d.columns.actions}</TableCell>
             </TableRow>
@@ -292,21 +347,81 @@ export function StudentsTab({
                     )}
                   </TableCell>
                   <TableCell>
-                    <StandingBadge standing={row.standing} />
+                    {row.contract ? (
+                      <div className="space-y-1">
+                        <StandingBadge
+                          standing={row.contract.standing}
+                          railLabel={dict.admin.billing.rails.contract}
+                        />
+                        <span className="block font-medium">
+                          <Money
+                            amountMinor={row.contract.outstandingMinor}
+                            currency={currency}
+                            code={row.currency}
+                          />
+                        </span>
+                        {row.contract.oldestOverdueDate && (
+                          <span className="block text-xs text-zinc-500">
+                            {d.oldestOverdue(row.contract.oldestOverdueDate)}
+                          </span>
+                        )}
+                        {row.contract.nextDueDate && (
+                          <span className="block text-xs text-zinc-500">
+                            {d.nextDue(row.contract.nextDueDate)}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-zinc-500">{d.noContract}</span>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <Money amountMinor={row.outstandingMinor} currency={currency} code={row.currency} />
+                    {row.extras ? (
+                      <div className="space-y-1">
+                        <StandingBadge
+                          standing={row.extras.standing}
+                          railLabel={dict.admin.billing.rails.extras}
+                        />
+                        <span className="block font-medium">
+                          <Money
+                            amountMinor={row.extras.outstandingMinor}
+                            currency={currency}
+                            code={row.currency}
+                          />
+                        </span>
+                        <span className="block text-xs text-zinc-500">
+                          {d.extrasCounts(row.extras.overdueCharges, row.extras.openCharges)}
+                        </span>
+                        {row.extras.oldestOverdueDate && (
+                          <span className="block text-xs text-zinc-500">
+                            {d.oldestOverdue(row.extras.oldestOverdueDate)}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-zinc-500">{d.none}</span>
+                    )}
                   </TableCell>
-                  <TableCell>{row.nextDueDate ?? d.none}</TableCell>
-                  <TableCell>{row.oldestOverdueDate ?? d.none}</TableCell>
-                  <TableCell>{row.negotiatedTerms ? d.negotiated : d.standardTerms}</TableCell>
+                  <TableCell>
+                    {row.contract
+                      ? row.contract.negotiatedTerms
+                        ? d.negotiated
+                        : d.standardTerms
+                      : d.none}
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
                         variant="secondary"
                         size="sm"
-                        onClick={() => setStatementFor({ userId: row.userId, name })}
+                        onClick={() =>
+                          setStatementFor({
+                            userId: row.userId,
+                            name,
+                            contractStanding: row.contract?.standing ?? null,
+                          })
+                        }
                         aria-label={d.statementAriaLabel(name)}
                       >
                         {d.statementButton}
@@ -322,7 +437,9 @@ export function StudentsTab({
                         >
                           {d.clearHoldButton}
                         </Button>
-                      ) : (
+                      ) : row.contract ? (
+                        // A hold applies to the monthly fee only, so an
+                        // extras-only buyer has nothing to hold.
                         <Button
                           type="button"
                           variant="secondary"
@@ -333,7 +450,7 @@ export function StudentsTab({
                         >
                           {d.holdButton}
                         </Button>
-                      )}
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -403,6 +520,7 @@ export function StudentsTab({
         <StudentStatementPanel
           userId={statementFor.userId}
           studentName={statementFor.name}
+          contractStanding={statementFor.contractStanding}
           onClose={() => setStatementFor(null)}
           onSignContract={(userId) => setSignDraft({ userId, fromStatement: true })}
         />
