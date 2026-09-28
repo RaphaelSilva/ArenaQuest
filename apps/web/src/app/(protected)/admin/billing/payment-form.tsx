@@ -5,11 +5,11 @@ import { Button, Input } from '@web/components/design-system';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
 import type {
-  BillingInvoiceWithBalance,
   BillingReportCurrency,
   PaymentMethod,
   RecordPaymentInput,
 } from '@web/lib/admin-billing-api';
+import type { LedgerTarget, LedgerTargetKind } from './ledger-target';
 import { Money } from './money';
 import { explain } from './explain-error';
 import { toMinorUnits } from './minor-units';
@@ -49,11 +49,14 @@ type FieldErrors = { amount?: string };
  */
 export function PaymentForm({
   invoice,
+  kind = 'invoice',
   currency,
   onClose,
   onRecorded,
 }: {
-  invoice: BillingInvoiceWithBalance;
+  /** The invoice — or, with `kind="charge"`, the event charge — being paid. */
+  invoice: LedgerTarget;
+  kind?: LedgerTargetKind;
   currency: BillingReportCurrency | null;
   onClose: () => void;
   /** Called after the server accepted the payment. */
@@ -61,6 +64,8 @@ export function PaymentForm({
 }) {
   const dict = useDict();
   const d = dict.admin.billing.ledger.payment;
+  const extras = dict.admin.billing.extras;
+  const isCharge = kind === 'charge';
   const planValidation = dict.admin.billing.plans.validation;
   const methodLabels = dict.admin.billing.ledger.method;
   const client = useApiClient();
@@ -124,7 +129,11 @@ export function PaymentForm({
 
     setBusy(true);
     try {
-      await client.adminBilling.invoices.addPayment(invoice.id, payload);
+      if (isCharge) {
+        await client.adminBilling.extras.addPayment(invoice.id, payload);
+      } else {
+        await client.adminBilling.invoices.addPayment(invoice.id, payload);
+      }
       onRecorded();
     } catch (thrown) {
       setSubmitError(explain(thrown, d.error));
@@ -148,7 +157,9 @@ export function PaymentForm({
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             {d.dialogTitle}
           </h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{d.explainer}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {isCharge ? extras.paymentExplainer : d.explainer}
+          </p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">{d.noGateNote}</p>
         </div>
 
@@ -156,7 +167,7 @@ export function PaymentForm({
         <dl className="grid grid-cols-1 gap-3 rounded-md border border-zinc-200 p-3 sm:grid-cols-2 dark:border-zinc-800">
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              {d.invoiceLabel}
+              {isCharge ? extras.chargeLabel : d.invoiceLabel}
             </dt>
             <dd className="font-mono text-sm text-zinc-900 dark:text-zinc-50">
               {invoice.id.slice(0, 8)}
