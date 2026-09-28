@@ -19,6 +19,7 @@ import { D1GamificationRepository } from '@api/adapters/db/d1-gamification-repos
 import { D1MissionRepository } from '@api/adapters/db/d1-mission-repository';
 import { D1CommentRepository } from '@api/adapters/db/d1-comment-repository';
 import { D1BillingRepository } from '@api/adapters/db/d1-billing-repository';
+import { D1EventChargeRepository } from '@api/adapters/db/d1-event-charge-repository';
 import { D1EventRepository } from '@api/adapters/db/d1-event-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
@@ -63,6 +64,7 @@ import type {
   IOAuthAccountRepository,
   IMailer,
   IBillingRepository,
+  IEventChargeRepository,
   IEventRepository,
 } from '@arenaquest/shared/ports';
 
@@ -119,6 +121,11 @@ export interface BillingContext {
   billingService: BillingService;
   /** Read-only reporting over the same repository (RFC 0013 §5). */
   accountingService: AccountingService;
+  /**
+   * The extras rail's ledger (RFC 0015 §3): a sibling of `billingRepo`, never
+   * merged into it — the two ledgers share rules, not rows.
+   */
+  eventChargeRepo: IEventChargeRepository;
 }
 
 /**
@@ -251,6 +258,8 @@ export function buildContainer(env: Env): AppContainer {
 
   // Billing repo + service
   const billingRepo = new D1BillingRepository(env.DB);
+  // Extras rail (RFC 0015). Per request like every adapter, next to its sibling.
+  const eventChargeRepo = new D1EventChargeRepository(env.DB);
   // The probe is the only thing billing asks identity: `setHold` refuses an
   // unknown student with a 404 rather than letting the hold table's foreign key
   // surface as a 500.
@@ -338,7 +347,7 @@ export function buildContainer(env: Env): AppContainer {
     engagement: { taskRepo, taskStages, taskLinks, commentRepo },
     progress: { progressRepo, enrollmentRepo },
     gamification: { questRepo, badgeRepo, gamificationRepo, missionRepo, xpEngine, streakEngine, questEvaluator, badgeEngine },
-    billing: { billingRepo, billingService, accountingService },
+    billing: { billingRepo, billingService, accountingService, eventChargeRepo },
     events: { eventRepo, storage, users, userGroups },
     infra: {
       auth,
