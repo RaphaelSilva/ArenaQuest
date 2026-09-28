@@ -33,6 +33,7 @@ import { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine
 import { AuthService } from '@api/core/auth/auth-service';
 import { BillingService } from '@api/core/billing/billing-service';
 import { AccountingService } from '@api/core/billing/accounting-service';
+import { EventChargeService } from '@api/core/billing/event-charge-service';
 import { buildRegistrationMailHandler } from '@api/core/registration/registration-mail-handler';
 import { PasswordController } from '@api/controllers/password.controller';
 import { AccountController } from '@api/controllers/account.controller';
@@ -130,6 +131,8 @@ export interface BillingContext {
    * merged into it — the two ledgers share rules, not rows.
    */
   eventChargeRepo: IEventChargeRepository;
+  /** The extras rail's write rules (RFC 0015 §3), over `eventChargeRepo`. */
+  eventChargeService: EventChargeService;
 }
 
 /**
@@ -277,6 +280,11 @@ export function buildContainer(env: Env): AppContainer {
   // Events repo (RFC 0014). The audience rule lives inside it and nowhere else.
   const eventRepo = new D1EventRepository(env.DB);
 
+  // Extras rail service. It reads the event and its audience grants through
+  // their ports, and the active currency through the billing port; it writes
+  // only to its own ledger.
+  const eventChargeService = new EventChargeService(eventChargeRepo, eventRepo, userGroups, billingRepo);
+
   // Infra: mail
   const mailer: IMailer = env.MAIL_DRIVER === 'resend'
     ? new ResendMailAdapter({ apiKey: env.RESEND_API_KEY, from: env.MAIL_FROM })
@@ -352,7 +360,7 @@ export function buildContainer(env: Env): AppContainer {
     engagement: { taskRepo, taskStages, taskLinks, commentRepo, noteRepo },
     progress: { progressRepo, enrollmentRepo },
     gamification: { questRepo, badgeRepo, gamificationRepo, missionRepo, xpEngine, streakEngine, questEvaluator, badgeEngine },
-    billing: { billingRepo, billingService, accountingService, eventChargeRepo },
+    billing: { billingRepo, billingService, accountingService, eventChargeRepo, eventChargeService },
     events: { eventRepo, storage, users, userGroups },
     infra: {
       auth,
