@@ -1,6 +1,6 @@
 # Task 01 — Backend: Event-charge domain, port and the rail-tagged receivable (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [22 — Event extras: one-off charges on a separate billing rail](./milestone.md)
 **RFC:** [RFC 0015](../../RFCs/0015-event-extras-one-off-charges-for-events.md)
 **Team:** Backend API
@@ -63,18 +63,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `resolveRailStanding('contract', …)` over invoice-derived receivables returns exactly
+- [x] `resolveRailStanding('contract', …)` over invoice-derived receivables returns exactly
       what `resolveStanding` returns today for the same invoices (table-driven test reusing
       the standing-resolver cases).
-- [ ] `resolveRailStanding` called with a mixed input (an `event_charge` item on the
+- [x] `resolveRailStanding` called with a mixed input (an `event_charge` item on the
       `contract` rail, or the reverse) throws; a test proves it for both directions.
-- [ ] Void receivables are excluded before resolution; a test proves a voided overdue item
+- [x] Void receivables are excluded before resolution; a test proves a voided overdue item
       leaves the standing `good`.
-- [ ] `fromInvoice` and `fromCharge` preserve the item's own `graceDays` snapshot and balance.
-- [ ] `standing-resolver.ts` shows no diff.
-- [ ] No provider-specific (D1/R2) import appears in the port or the domain module.
-- [ ] Changed files lint clean; `make test-api` green (and the `packages/shared` specs pass).
-- [ ] No diff outside the scope guardrail.
+- [x] `fromInvoice` and `fromCharge` preserve the item's own `graceDays` snapshot and balance.
+- [x] `standing-resolver.ts` shows no diff.
+- [x] No provider-specific (D1/R2) import appears in the port or the domain module.
+- [x] Changed files lint clean; `make test-api` green (and the `packages/shared` specs pass).
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
