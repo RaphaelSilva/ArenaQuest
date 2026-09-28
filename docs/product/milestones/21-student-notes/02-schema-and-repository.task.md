@@ -1,6 +1,6 @@
 # Task 02 — Backend: Notes schema and D1 repository with revision-guarded writes (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [21 — Student notes — private and shared topic notes with staff moderation](./milestone.md)
 **RFC:** [RFC 0016](../../RFCs/0016-student-notes.md)
 **Team:** Backend API
@@ -77,20 +77,20 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make db-migrate-local` applies `0028` cleanly to a fresh replica; the table has the
+- [x] `make db-migrate-local` applies `0028` cleanly to a fresh replica; the table has the
       unique `(topic_node_id, author_id)`, the `visibility` check, `revision` defaulting to
       1, and both indexes.
-- [ ] A spec issuing two saves with the same `baseRevision` back to back asserts exactly one
+- [x] A spec issuing two saves with the same `baseRevision` back to back asserts exactly one
       written outcome and one stale outcome, and the stored body is the first one.
-- [ ] A stale outcome carries the current row (or `null` after a delete) and the stored row
+- [x] A stale outcome carries the current row (or `null` after a delete) and the stored row
       is unchanged.
-- [ ] Setting moderation leaves `body` byte-identical, sets `visibility` to `private`, and
+- [x] Setting moderation leaves `body` byte-identical, sets `visibility` to `private`, and
       increments `revision`.
-- [ ] The topic listing with `includePrivate` false never returns a private row, including
+- [x] The topic listing with `includePrivate` false never returns a private row, including
       when fed a cursor taken from an `includePrivate` true listing.
-- [ ] No provider-specific (D1/R2) import leaks into a port or controller.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] No provider-specific (D1/R2) import leaks into a port or controller.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

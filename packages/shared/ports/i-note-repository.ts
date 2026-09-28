@@ -47,7 +47,7 @@ export interface AuthoredNoteRecord extends NoteRecord {
   topicTitle: string;
   /** The topic's publication status (`draft` · `published` · `archived`). */
   topicStatus: Entities.Config.TopicNodeStatus;
-  /** `true` when the topic is archived, directly or through an archived ancestor. */
+  /** `true` when the topic is archived — the topic row's own archived flag, as the catalog gate checks. */
   topicArchived: boolean;
 }
 
@@ -136,8 +136,9 @@ export interface INoteRepository {
 
   /**
    * Sets moderation (`adminId` given: force-unshare, marks moderated) or clears it
-   * (`adminId: null`). Either way `revision` is incremented and the body is never
-   * touched. Returns the updated note, or `null` when it does not exist.
+   * (`adminId: null`). Setting forces `private` and increments `revision`, so an open
+   * editor notices on its next save; clearing touches only the moderation flag. The
+   * body is never touched. Returns the updated note, or `null` when it does not exist.
    */
   setModeration(id: string, adminId: string | null): Promise<NoteRecord | null>;
 }
