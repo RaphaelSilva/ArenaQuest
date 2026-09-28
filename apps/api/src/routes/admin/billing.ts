@@ -229,24 +229,53 @@ const HoldSchema = z
   .openapi('BillingStandingHold');
 
 /**
- * One roster line. `standing` is resolved on every read from the invoices, the
- * hold and `asOf` — there is no standing column behind it, and nothing here
- * gates anything: a `delinquent` row changes no permission.
+ * The contract rail of one roster line: RFC 0013's standing, resolved on every
+ * read from the contract's invoices, the hold and `asOf`.
+ */
+const RosterContractSchema = z
+  .object({
+    id: z.string(),
+    groupId: z.string(),
+    status: ContractStatusSchema,
+    nextDueDate: IsoDate.nullable(),
+    negotiatedTerms: z.boolean(),
+    standing: StandingSchema,
+    oldestOverdueDate: IsoDate.nullable(),
+    outstandingMinor: MinorUnits,
+  })
+  .openapi('BillingRosterContract');
+
+/**
+ * The extras rail of one roster line: resolved from event charges only, never
+ * held — a contract hold does not reach it.
+ */
+const RosterExtrasSchema = z
+  .object({
+    standing: StandingSchema,
+    oldestOverdueDate: IsoDate.nullable(),
+    outstandingMinor: MinorUnits,
+    /** Live charges with a positive balance. */
+    openCharges: z.number().int(),
+    /** Of those, the ones whose due date has arrived. */
+    overdueCharges: z.number().int(),
+  })
+  .openapi('BillingRosterExtras');
+
+/**
+ * One roster line (RFC 0015 §4). Two rails side by side and **no top-level
+ * standing or total**, so nothing can read one number as both. `contract` is
+ * null for a buyer with no contract; `extras` is null for someone never
+ * charged for an extra. Nothing here gates anything: a `delinquent` rail
+ * changes no permission.
  */
 const RosterEntrySchema = z
   .object({
     userId: z.string(),
     asOf: IsoDate,
-    standing: StandingSchema,
-    oldestOverdueDate: IsoDate.nullable(),
-    outstandingMinor: MinorUnits,
-    contractId: z.string(),
-    contractGroupId: z.string(),
-    contractStatus: ContractStatusSchema,
     currency: z.string().openapi({ example: 'BRL' }),
-    nextDueDate: IsoDate.nullable(),
-    negotiatedTerms: z.boolean(),
-    /** The stored row, expired or not; `standing === 'exempt'` says whether it bites. */
+    contract: RosterContractSchema.nullable(),
+    extras: RosterExtrasSchema.nullable(),
+    /** The stored row, expired or not; `contract.standing === 'exempt'` says whether it bites. */
     hold: HoldSchema.nullable(),
   })
   .openapi('BillingRosterEntry');
@@ -718,10 +747,19 @@ export const studentRosterRoute = createRoute({
   path: '/students',
   summary: 'The Student Billing Roster',
   description:
-    "Every student with a contract, with their standing resolved from their invoices rather than read from a column: outstanding balance, oldest overdue date, next due date and whether the terms were negotiated. `standing=exempt` is the held filter — a hold is the only way to reach it. Reporting only: nothing here gates a student's access.",
+    "Every user with a contract or any event charge, with two standings resolved side by side and never merged: `contract` (from contract invoices only — outstanding balance, oldest overdue date, next due date, negotiated terms; null when there is no contract) and `extras` (from event charges only — outstanding balance, oldest overdue date, open and overdue charge counts; null when never charged). There is no top-level standing or total. `contractStanding` and `extrasStanding` filter independently; `standing` is kept as an alias of `contractStanding`. `contractStanding=exempt` is the held filter — a hold applies to the contract rail only. Reporting only: nothing here gates a student's access.",
   request: {
     query: z.object({
-      standing: StandingSchema.optional().openapi({ param: { name: 'standing', in: 'query' } }),
+      contractStanding: StandingSchema.optional().openapi({
+        param: { name: 'contractStanding', in: 'query' },
+      }),
+      extrasStanding: StandingSchema.optional().openapi({
+        param: { name: 'extrasStanding', in: 'query' },
+      }),
+      standing: StandingSchema.optional().openapi({
+        param: { name: 'standing', in: 'query' },
+        description: 'Deprecated alias of `contractStanding`.',
+      }),
       asOf: IsoDate.optional().openapi({ param: { name: 'asOf', in: 'query' } }),
     }),
   },
@@ -1178,7 +1216,7 @@ export function buildAdminBillingRouter(container: AppContainer) {
     return c.json(result.data, 200);
   });
 
-  // Roster and holds. Read-and-label: the roster issues three aggregate reads
+  // Roster and holds. Read-and-label: the roster issues four aggregate reads
   // and resolves in memory, and a hold writes one row that no guard ever reads.
 
   router.openapi(studentRosterRoute, async (c) => {

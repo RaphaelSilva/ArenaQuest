@@ -134,7 +134,7 @@ describe('MeBillingController', () => {
     await seedDebt(STUDENT, 15000, '2026-01-10');
 
     const mine = ok(await controller.getMyStatement(STUDENT));
-    const entry = ok(await billing.listStudentRoster({ asOf: mine.asOf }))[0];
+    const entry = ok(await billing.listStudentRoster({ asOf: mine.asOf }))[0].contract!;
 
     expect(mine.standing).toBe(entry.standing);
     expect(mine.oldestOverdueDate).toBe(entry.oldestOverdueDate);

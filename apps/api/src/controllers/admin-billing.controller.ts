@@ -212,11 +212,16 @@ const AgingQuerySchema = z.object({
 const StudentParamSchema = z.object({ userId: z.string().min(1) });
 
 /**
- * The roster query. `standing=exempt` **is** the held filter: a hold is the
- * only way a student reaches `exempt`, so a second `held` flag would be a
- * second spelling of the same predicate, free to disagree with the first.
+ * The roster query: one filter per rail, independent of each other (RFC 0015
+ * §4). `contractStanding=exempt` **is** the held filter: a hold is the only way
+ * a student reaches `exempt`, so a second `held` flag would be a second
+ * spelling of the same predicate, free to disagree with the first. `standing`
+ * is RFC 0013's filter, kept as an alias of `contractStanding` so its meaning
+ * does not silently change.
  */
 const RosterQuerySchema = z.object({
+  contractStanding: z.nativeEnum(BillingStanding).optional(),
+  extrasStanding: z.nativeEnum(BillingStanding).optional(),
   standing: z.nativeEnum(BillingStanding).optional(),
   /** The day to resolve standing against; defaults to today in the service. */
   asOf: IsoDateSchema.optional(),
@@ -415,8 +420,8 @@ export class AdminBillingController {
   // Roster and holds — reported, never enforced ---------------------------
 
   /**
-   * The everyday admin screen: every student with a contract and their
-   * resolved standing. Nothing here gates anything — the roster is a listing,
+   * The everyday admin screen: every user with a contract or an event
+   * charge, with the two rails resolved side by side and never merged. Nothing here gates anything — the roster is a listing,
    * and a `delinquent` row changes no permission.
    */
   async listStudentRoster(query: unknown): Promise<ControllerResult<RosterEntry[]>> {

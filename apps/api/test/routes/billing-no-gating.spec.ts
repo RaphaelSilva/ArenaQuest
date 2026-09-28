@@ -71,11 +71,13 @@ async function jsonOf<T>(res: Response, expected: number): Promise<T> {
 
 type RosterEntry = {
   userId: string;
-  standing: string;
-  outstandingMinor: number;
-  oldestOverdueDate: string | null;
-  nextDueDate: string | null;
-  negotiatedTerms: boolean;
+  contract: {
+    standing: string;
+    outstandingMinor: number;
+    oldestOverdueDate: string | null;
+    nextDueDate: string | null;
+    negotiatedTerms: boolean;
+  } | null;
   hold: { reason: string; setBy: string; expiresAt: string | null } | null;
 };
 
@@ -162,10 +164,12 @@ describe('a delinquent student is still a student', () => {
     const entry = (await roster()).find((row) => row.userId === DEBTOR_ID)!;
 
     expect(entry).toMatchObject({
-      standing: 'delinquent',
-      outstandingMinor: 25000,
-      oldestOverdueDate: daysAgo(60),
-      negotiatedTerms: false,
+      contract: {
+        standing: 'delinquent',
+        outstandingMinor: 25000,
+        oldestOverdueDate: daysAgo(60),
+        negotiatedTerms: false,
+      },
       hold: null,
     });
 
@@ -174,7 +178,7 @@ describe('a delinquent student is still a student', () => {
       await call('GET', `/admin/billing/students/${DEBTOR_ID}/statement`, { token: adminToken }),
       200,
     );
-    expect(entry.outstandingMinor).toBe(statement.outstandingMinor);
+    expect(entry.contract!.outstandingMinor).toBe(statement.outstandingMinor);
   });
 
   /**
@@ -282,8 +286,8 @@ describe('a hold suppresses the alert and nothing else', () => {
       DEBTOR_ID,
     );
     const exempt = (await roster('?standing=exempt')).find((row) => row.userId === DEBTOR_ID)!;
-    expect(exempt).toMatchObject({ standing: 'exempt', outstandingMinor: 25000 });
-    expect(exempt.oldestOverdueDate).toBe(daysAgo(60));
+    expect(exempt.contract).toMatchObject({ standing: 'exempt', outstandingMinor: 25000 });
+    expect(exempt.contract!.oldestOverdueDate).toBe(daysAgo(60));
 
     // And every total is byte-identical. A hold that moved one would be a hold
     // that lost the dojo money.
@@ -375,13 +379,13 @@ describe('a hold suppresses the alert and nothing else', () => {
     );
 
     const today = (await roster()).find((row) => row.userId === DEBTOR_ID)!;
-    expect(today.standing).toBe('delinquent');
+    expect(today.contract!.standing).toBe('delinquent');
     // The row is still there, untouched — it simply stopped applying.
     expect(today.hold).toMatchObject({ reason: 'Paused for a fortnight.', expiresAt: daysAgo(1) });
 
     // On its last day it was still in force, read from those same rows.
     const lastDay = (await roster(`?asOf=${daysAgo(1)}`)).find((row) => row.userId === DEBTOR_ID)!;
-    expect(lastDay.standing).toBe('exempt');
+    expect(lastDay.contract!.standing).toBe('exempt');
 
     const stored = await env.DB.prepare(
       'SELECT user_id, reason, expires_at FROM billing_standing_holds WHERE user_id = ?',
@@ -409,7 +413,7 @@ describe('a hold suppresses the alert and nothing else', () => {
     expect((await roster('?standing=delinquent')).map((row) => row.userId)).toContain(DEBTOR_ID);
     // The debt was never what the hold was hiding.
     const back = (await roster('?standing=delinquent')).find((row) => row.userId === DEBTOR_ID)!;
-    expect(back.outstandingMinor).toBe(25000);
+    expect(back.contract!.outstandingMinor).toBe(25000);
 
     // Clearing one that is not set is a 404, not a silent success.
     expect(

@@ -272,7 +272,7 @@ export function buildContainer(env: Env): AppContainer {
   // unknown student with a 404 rather than letting the hold table's foreign key
   // surface as a 500.
   const userExists = (userId: string) => users.findById(userId).then((user) => user !== null);
-  const billingService = new BillingService(billingRepo, userExists);
+  const billingService = new BillingService(billingRepo, userExists, eventChargeRepo);
   // The statement 404s an unknown student, which is all billing needs from
   // identity — a probe rather than the repository, as `StreakEngine` does.
   const accountingService = new AccountingService(billingRepo, userExists);
