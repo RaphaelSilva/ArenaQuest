@@ -18,6 +18,7 @@ import { D1BadgeRepository } from '@api/adapters/db/d1-badge-repository';
 import { D1GamificationRepository } from '@api/adapters/db/d1-gamification-repository';
 import { D1MissionRepository } from '@api/adapters/db/d1-mission-repository';
 import { D1CommentRepository } from '@api/adapters/db/d1-comment-repository';
+import { D1NoteRepository } from '@api/adapters/db/d1-note-repository';
 import { D1BillingRepository } from '@api/adapters/db/d1-billing-repository';
 import { D1EventRepository } from '@api/adapters/db/d1-event-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
@@ -57,6 +58,7 @@ import type {
   IBadgeRepository,
   IGamificationRepository,
   ICommentRepository,
+  INoteRepository,
   IMissionRepository,
   IActivationTokenRepository,
   IPasswordResetTokenRepository,
@@ -92,6 +94,8 @@ export interface EngagementContext {
   taskStages: ITaskStageRepository;
   taskLinks: ITaskLinkingRepository;
   commentRepo: ICommentRepository;
+  /** Student notes (RFC 0016). */
+  noteRepo: INoteRepository;
 }
 
 export interface ProgressContext {
@@ -224,6 +228,7 @@ export function buildContainer(env: Env): AppContainer {
   const taskStages = new D1TaskStageRepository(env.DB);
   const taskLinks = new D1TaskLinkingRepository(env.DB);
   const commentRepo = new D1CommentRepository(env.DB);
+  const noteRepo = new D1NoteRepository(env.DB);
 
   // Identity: user groups
   const userGroups = new D1UserGroupRepository(env.DB);
@@ -335,7 +340,7 @@ export function buildContainer(env: Env): AppContainer {
   return {
     identity: { users, tokens, activationTokens, passwordResetTokens, oauthAccounts, authService, userGroups },
     content: { topics, tags, media, storage },
-    engagement: { taskRepo, taskStages, taskLinks, commentRepo },
+    engagement: { taskRepo, taskStages, taskLinks, commentRepo, noteRepo },
     progress: { progressRepo, enrollmentRepo },
     gamification: { questRepo, badgeRepo, gamificationRepo, missionRepo, xpEngine, streakEngine, questEvaluator, badgeEngine },
     billing: { billingRepo, billingService, accountingService },
