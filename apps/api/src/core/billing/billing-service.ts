@@ -15,6 +15,8 @@ import type {
   IMailer,
   MailMessage,
   IUserRepository,
+  IEventChargeRepository,
+  EventChargeWithBalanceRecord,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
 import { ROLES } from '@arenaquest/shared/constants/roles';
@@ -23,6 +25,8 @@ import {
   resolveStanding,
   type StandingInvoice,
 } from '@arenaquest/shared/domain/billing/standing-resolver';
+import { fromInvoice, resolveRailStanding } from '@arenaquest/shared/domain/billing/receivable';
+import { resolveExtrasRail, type ExtrasRailSummary } from '@api/core/billing/event-charge-service';
 import type { ControllerResult } from '@api/core/result';
 
 /**
@@ -170,32 +174,73 @@ export interface StandingSummary {
 }
 
 /**
- * One line of the admin roster: a student with a contract, their standing and
- * what the front desk needs to act on it.
- *
- * `hold` is the stored row, expired or not; whether it is still in force is
- * `standing === 'exempt'` and nothing else — there is no second copy of that
- * decision here.
+ * The contract rail of one roster line — RFC 0013's standing, from contract
+ * invoices only, beside the contract version it describes.
  */
-export interface RosterEntry extends StandingSummary {
+export interface RosterContractBlock {
   /** The contract the other fields describe: the active one, else the newest. */
-  contractId: string;
-  contractGroupId: string;
-  contractStatus: Entities.Config.ContractStatus;
-  currency: string;
+  id: string;
+  groupId: string;
+  status: Entities.Config.ContractStatus;
   /** The next due date of an active contract; null once it is not active. */
   nextDueDate: string | null;
   /** True when the contract's terms were negotiated rather than taken from the plan. */
   negotiatedTerms: boolean;
+  standing: Entities.Config.BillingStanding;
+  /** Due date of the oldest unpaid invoice already past due; null if none is. */
+  oldestOverdueDate: string | null;
+  /** What is still owed on the contract. A hold never changes this. */
+  outstandingMinor: number;
+}
+
+/** The extras rail of one roster line — from event charges only, never held. */
+export type RosterExtrasBlock = ExtrasRailSummary;
+
+/**
+ * One line of the admin roster: a user with a contract **or** any event charge,
+ * with each rail resolved on its own (RFC 0015 §4).
+ *
+ * There is deliberately **no top-level standing or total**: one number would
+ * invite the merge the two rails exist to prevent. `contract` is `null` for a
+ * buyer of extras who never signed; `extras` is `null` for a student never
+ * charged for one (a voided charge still counts as "charged").
+ *
+ * `hold` is the stored row, expired or not; whether it is still in force is
+ * `contract.standing === 'exempt'` and nothing else. It never reaches `extras`.
+ */
+export interface RosterEntry {
+  userId: string;
+  /** The day both rails were resolved against — `YYYY-MM-DD`. */
+  asOf: string;
+  /** The contract's currency; for a buyer with no contract, their newest charge's. */
+  currency: string;
+  contract: RosterContractBlock | null;
+  extras: RosterExtrasBlock | null;
   hold: BillingStandingHoldRecord | null;
 }
 
 export interface RosterFilter {
-  /** `exempt` is the held filter: a hold is the only way to reach it. */
+  /** Contract rail. `exempt` is the held filter: a hold is the only way to reach it. */
+  contractStanding?: Entities.Config.BillingStanding;
+  /** Extras rail. Never `exempt` — the extras rail has no hold. */
+  extrasStanding?: Entities.Config.BillingStanding;
+  /**
+   * @deprecated RFC 0013's single filter, kept as an alias of
+   * `contractStanding` so its meaning does not silently change.
+   */
   standing?: Entities.Config.BillingStanding;
   /** The day to resolve against; defaults to today. */
   asOf?: string;
 }
+
+/**
+ * The one read the roster needs from the extras ledger. Narrowed so the
+ * billing service can see charges without being able to write one.
+ */
+export type ChargeReader = Pick<IEventChargeRepository, 'listCharges'>;
+
+/** No extras ledger: what a service built with a repository alone sees. */
+const NO_CHARGES: ChargeReader = { listCharges: async () => [] };
 
 export interface SetHoldCommand {
   /** Mandatory: a hold with no reason quietly becomes permanent. */
@@ -276,6 +321,11 @@ function currentContract(contracts: SubscriptionRecord[]): SubscriptionRecord {
       ? contract
       : newest,
   );
+}
+
+/** The most recently issued charge — the currency a buyer with no contract is shown in. */
+function newestCharge(charges: EventChargeWithBalanceRecord[]): EventChargeWithBalanceRecord {
+  return charges.reduce((newest, charge) => (charge.issuedAt > newest.issuedAt ? charge : newest));
 }
 
 /**
@@ -495,6 +545,12 @@ export class BillingService {
      * working; the container passes the real probe.
      */
     private readonly studentExists: StudentExistsProbe = async () => true,
+    /**
+     * The extras ledger, read by the roster only. Defaults to an empty one so
+     * every existing caller keeps working; the container passes the real
+     * `IEventChargeRepository`.
+     */
+    private readonly charges: ChargeReader = NO_CHARGES,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -1016,30 +1072,48 @@ export class BillingService {
       data: {
         userId,
         asOf: day,
-        ...resolveStanding({
-          openInvoices: unvoided(invoices).map(toStandingInvoice),
-          hold: hold ? { expiresAt: hold.expiresAt } : null,
-          today: day,
-        }),
+        // The contract rail only: an invoice list cannot carry a charge, and
+        // `resolveRailStanding` throws if one ever did.
+        ...resolveRailStanding(
+          'contract',
+          unvoided(invoices).map(fromInvoice),
+          hold ? { expiresAt: hold.expiresAt } : null,
+          day,
+        ),
       },
     };
   }
 
   /**
-   * Every student with a contract, with their standing resolved.
+   * Every user with a contract **or** any event charge, each rail resolved on
+   * its own (RFC 0015 §4).
    *
-   * **Three aggregate reads, not three per student.** This is the everyday
-   * admin screen and it lists the whole dojo, so the invoices, the contracts
-   * and the holds are each fetched **once** and joined in memory. Calling
+   * **Four aggregate reads, not four per student.** This is the everyday admin
+   * screen and it lists the whole dojo, so contracts, invoices, charges and
+   * holds are each fetched **once** and joined in memory. Calling
    * `getStanding` in a loop here would issue two queries per student and is
    * exactly the regression the roster's query-count test exists to catch.
+   *
+   * The two rails never meet: invoices go to `resolveRailStanding('contract')`
+   * with the hold, charges go to `resolveExtrasRail` without it, and the
+   * iteration is over the union of **user ids**, never of receivables.
    */
   async listStudentRoster(filter: RosterFilter = {}): Promise<ControllerResult<RosterEntry[]>> {
     const asOf = filter.asOf ?? today();
 
-    const [subscriptions, invoices, holds] = await Promise.all([
+    if (
+      filter.standing !== undefined &&
+      filter.contractStanding !== undefined &&
+      filter.standing !== filter.contractStanding
+    ) {
+      return badRequest('`standing` is an alias of `contractStanding`; the two cannot disagree');
+    }
+    const contractStanding = filter.contractStanding ?? filter.standing;
+
+    const [subscriptions, invoices, charges, holds] = await Promise.all([
       this.repo.listSubscriptions({}),
       this.repo.listInvoices({}),
+      this.charges.listCharges({}),
       this.repo.listHolds(),
     ]);
 
@@ -1049,46 +1123,67 @@ export class BillingService {
     const contractsByUser = new Map<string, SubscriptionRecord[]>();
     for (const contract of subscriptions) push(contractsByUser, contract.userId, contract);
 
+    const chargesByUser = new Map<string, EventChargeWithBalanceRecord[]>();
+    for (const charge of charges) push(chargesByUser, charge.userId, charge);
+
     const holdByUser = new Map(holds.map((hold) => [hold.userId, hold]));
 
+    // The union of **users**, never of receivables.
+    const userIds = new Set<string>([...contractsByUser.keys(), ...chargesByUser.keys()]);
+
     const entries: RosterEntry[] = [];
-    for (const [userId, contracts] of contractsByUser) {
-      const contract = currentContract(contracts);
+    for (const userId of userIds) {
+      const contracts = contractsByUser.get(userId);
+      const userCharges = chargesByUser.get(userId);
       const hold = holdByUser.get(userId) ?? null;
 
-      // The same pure function the statement and the reminder run call. An
-      // expired hold is dropped here by comparing it against `asOf` — no
-      // cleanup job ever deletes the row, and none needs to.
-      const resolved = resolveStanding({
-        openInvoices: (invoicesByUser.get(userId) ?? []).map(toStandingInvoice),
-        hold: hold ? { expiresAt: hold.expiresAt } : null,
-        today: asOf,
-      });
+      let contract: RosterContractBlock | null = null;
+      let currency: string;
+      if (contracts) {
+        const current = currentContract(contracts);
+        currency = current.currency;
+        // The same pure function `getStanding` reaches. An expired hold is
+        // dropped here by comparing it against `asOf` — no cleanup job ever
+        // deletes the row, and none needs to.
+        const resolved = resolveRailStanding(
+          'contract',
+          (invoicesByUser.get(userId) ?? []).map(fromInvoice),
+          hold ? { expiresAt: hold.expiresAt } : null,
+          asOf,
+        );
+        contract = {
+          id: current.id,
+          groupId: current.contractGroupId,
+          status: current.status,
+          nextDueDate: nextDueDateOf(current, asOf),
+          negotiatedTerms: current.termsSource === ContractTermsSource.NEGOTIATED,
+          ...resolved,
+        };
+      } else {
+        // In the union only through a charge, so `userCharges` is non-empty.
+        currency = newestCharge(userCharges!).currency;
+      }
 
-      entries.push({
-        userId,
-        asOf,
-        ...resolved,
-        contractId: contract.id,
-        contractGroupId: contract.contractGroupId,
-        contractStatus: contract.status,
-        currency: contract.currency,
-        nextDueDate: nextDueDateOf(contract, asOf),
-        negotiatedTerms: contract.termsSource === ContractTermsSource.NEGOTIATED,
-        hold,
-      });
+      // No hold here, ever: a contract hold is not an arrangement about an extra.
+      const extras = userCharges ? resolveExtrasRail(userCharges, asOf) : null;
+
+      entries.push({ userId, asOf, currency, contract, extras, hold });
     }
 
-    const filtered =
-      filter.standing === undefined
-        ? entries
-        : entries.filter((entry) => entry.standing === filter.standing);
+    const filtered = entries.filter(
+      (entry) =>
+        (contractStanding === undefined || entry.contract?.standing === contractStanding) &&
+        (filter.extrasStanding === undefined || entry.extras?.standing === filter.extrasStanding),
+    );
 
-    // Largest debt first — the order the screen is read in — and by id inside a
-    // tie so the listing is stable between two identical requests.
+    // The monthly fee first, then extras — the order the screen is read in —
+    // and by id inside a tie so the listing is stable between two requests.
+    // The two amounts are compared in turn, never added.
     filtered.sort(
       (a, b) =>
-        b.outstandingMinor - a.outstandingMinor || (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0),
+        (b.contract?.outstandingMinor ?? 0) - (a.contract?.outstandingMinor ?? 0) ||
+        (b.extras?.outstandingMinor ?? 0) - (a.extras?.outstandingMinor ?? 0) ||
+        (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0),
     );
 
     return { ok: true, data: filtered };

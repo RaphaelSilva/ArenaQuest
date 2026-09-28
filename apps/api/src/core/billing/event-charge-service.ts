@@ -14,6 +14,7 @@ import type {
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
 import { addDays } from '@arenaquest/shared/domain/billing/billing-cycle';
+import { fromCharge, resolveRailStanding } from '@arenaquest/shared/domain/billing/receivable';
 import type { ControllerResult } from '@api/core/result';
 
 /**
@@ -128,6 +129,29 @@ export interface AudienceCheckResult {
   outsideAudience: string[];
 }
 
+/**
+ * One student's extras rail, resolved from their event charges only (RFC 0015
+ * §4). The labels are `resolveStanding`'s, but `exempt` is unreachable here:
+ * the extras rail has no hold (Resolved #9).
+ */
+export interface ExtrasRailSummary {
+  standing: Entities.Config.BillingStanding;
+  /** Due date of the oldest unpaid live charge already past due; null if none is. */
+  oldestOverdueDate: string | null;
+  /** What is still owed on extras. Never summed with the contract rail. */
+  outstandingMinor: number;
+  /** Live (non-void) charges with a positive balance. */
+  openCharges: number;
+  /** Of `openCharges`, those whose due date has arrived — the same "overdue" as `oldestOverdueDate`. */
+  overdueCharges: number;
+}
+
+export interface ExtrasStandingSummary extends ExtrasRailSummary {
+  userId: string;
+  /** The day the standing was resolved against — `YYYY-MM-DD`. */
+  asOf: string;
+}
+
 export type EventReader = Pick<IEventRepository, 'findById' | 'getAudienceGrants'>;
 export type GroupMemberReader = Pick<IUserGroupRepository, 'listMembers'>;
 export type CurrencyReader = Pick<IBillingRepository, 'listCurrencies'>;
@@ -162,6 +186,30 @@ function conflict(message: string): ControllerResult<never> {
  */
 function isForeignKeyFailure(error: unknown): boolean {
   return error instanceof Error && /FOREIGN KEY/i.test(error.message);
+}
+
+/**
+ * The extras rail of one student, from their charges alone.
+ *
+ * Pure. The hold is **always** `null`: `billing_standing_holds` means "stop
+ * chasing the monthly fee" and never reaches this rail (Resolved #9). Every
+ * item goes through `fromCharge`, so `resolveRailStanding` would throw on an
+ * invoice slipped into the list — the backstop against a merged standing.
+ */
+export function resolveExtrasRail(
+  charges: EventChargeWithBalanceRecord[],
+  asOf: string,
+): ExtrasRailSummary {
+  const resolved = resolveRailStanding('extras', charges.map((charge) => fromCharge(charge)), null, asOf);
+
+  const open = charges.filter(
+    (charge) => charge.status !== ChargeStatus.VOID && charge.balanceMinor > 0,
+  );
+  return {
+    ...resolved,
+    openCharges: open.length,
+    overdueCharges: open.filter((charge) => asOf >= charge.dueDate).length,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -542,6 +590,24 @@ export class EventChargeService {
     });
 
     return { ok: true, data: reversal };
+  }
+
+  // -------------------------------------------------------------------------
+  // Extras standing (RFC 0015 §4)
+  // -------------------------------------------------------------------------
+
+  /**
+   * One student's extras standing, from `listCharges({ userId })` alone. It
+   * never reads an invoice or a hold, so no contract fact can move it and it
+   * can move no contract fact.
+   */
+  async getExtrasStanding(
+    userId: string,
+    asOf?: string,
+  ): Promise<ControllerResult<ExtrasStandingSummary>> {
+    const day = asOf ?? today();
+    const charges = await this.repo.listCharges({ userId });
+    return { ok: true, data: { userId, asOf: day, ...resolveExtrasRail(charges, day) } };
   }
 
   // -------------------------------------------------------------------------
