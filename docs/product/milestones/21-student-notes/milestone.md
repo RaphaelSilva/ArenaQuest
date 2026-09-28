@@ -1,6 +1,6 @@
 # Milestone 21 — Student notes — private and shared topic notes with staff moderation
 
-**Status:** 📝 Draft
+**Status:** ✅ Done
 **Scope:** `apps/api` (notes bounded context in the `engagement` group), `packages/shared` (notes types, port and body limit), `apps/web` (topic Notes panel, "My notes" page, staff surfaces in the catalog and the user backoffice). Derived from [RFC 0016](../../RFCs/0016-student-notes.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: `apps/api/migrations/0028_create_topic_notes.sql` (renumbered if RFC 0015's migration lands first); the new notes files `apps/api/src/{adapters/db/d1-note-repository.ts,controllers/notes.controller.ts,routes/notes.router.ts,routes/me/notes.ts,routes/admin/notes.ts}` and their wiring in `container.ts` (the `engagement` group gains `noteRepo`; no other group changes shape), `routes/index.ts`, `routes/me/index.ts` and `routes/admin/index.ts`; a cursor helper under `apps/api/src/routes/_shared/`; the regenerated `apps/api/openapi.json`; `apps/api/test/**`; the shared additions `packages/shared/{types/entities.ts (Entities.Engagement.Note + Config.NoteVisibility),ports/i-note-repository.ts,ports/index.ts,domain/notes/limits.ts}`; on the web, `apps/web/src/components/catalog/notes/**`, the Notes panel mount in `apps/web/src/app/(protected)/catalog/[id]/page.tsx`, the new `apps/web/src/app/(protected)/notes/**`, a *Notes* section in `apps/web/src/app/(protected)/admin/users/[userId]/page.tsx`, one "My notes" entry in `apps/web/src/components/layout/nav.tsx`, `apps/web/src/lib/notes-api.ts`, the regenerated `apps/web/src/lib/api-types.gen.ts`, and both i18n dictionaries (+ `types.ts`); and, for the closeout only, a new local seed under `apps/api/migrations/seed/`, `CLAUDE.md`, `docs/product/FEATURES.md`, RFC 0016's `Status:` header and its `docs/product/RFCs/README.md` row. It is explicitly **not** an opportunity to: add **peer rating** of notes or any `note_ratings` table (removed from RFC 0016, deferred); award **XP, quests or badges** for notes, or touch `packages/shared/domain/gamification/**` or `xpEngine`; allow **several notes per topic**, titles, folders or tags; give staff an **edit or delete** path on a student's note; give the **`tutor`** role any power beyond a student's; add **anonymous sharing**, comments/threads on notes, real-time collaboration, version history, media attachments or notifications; change **comments** (`comments.controller.ts`, `comments.router.ts`, `Discussion.tsx`, `0022_*`) — including their `403`-vs-`404` inconsistency, which is its own backlog item; or modify `getEffectiveAccessTopicIds`, `d1-enrollment-repository.ts` or `topics.controller.ts`. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
@@ -62,17 +62,17 @@ Out of scope (explicit, from RFC 0016 Non-Goals):
 
 ## 3. Acceptance Criteria
 
-- [ ] A student's `PUT` → `GET` → `DELETE` cycle on a readable topic returns `201`/`200`, the stored note, then `204`; the same calls on a draft, archived or out-of-access topic return `404`.
-- [ ] Another student gets `404` reading a private note directly and never sees it in `GET /v1/topics/{id}/notes`, asserted over both visibilities and with a crafted `cursor`.
-- [ ] An `admin` and a `content_creator` token each list every note on a topic (private included) and every note of one student via `GET /v1/admin/users/{userId}/notes`; any attempt by either to edit or delete another user's note is rejected and the row is unchanged.
-- [ ] Two `PUT`s with the same `baseRevision`, issued within the same second, produce exactly one `200` and one `409 NOTE_STALE`, and the row holds the first body.
-- [ ] Force-unshare by each staff role hides the note from students, increments `revision`, leaves `body` byte-identical, and makes the author's next share return `409 NOTE_MODERATED` until the flag is cleared; a student or tutor calling it gets `403`.
-- [ ] A `tutor` token sees exactly what a student sees on every notes route.
-- [ ] In the browser, the same note open in two tabs never loses text without the student pressing **Keep mine**; the flow is covered by a component test.
-- [ ] `git grep -n "note_ratings\|NoteRating" -- apps packages` returns nothing; no diff under `packages/shared/domain/gamification/`.
+- [x] A student's `PUT` → `GET` → `DELETE` cycle on a readable topic returns `201`/`200`, the stored note, then `204`; the same calls on a draft, archived or out-of-access topic return `404`.
+- [x] Another student gets `404` reading a private note directly and never sees it in `GET /v1/topics/{id}/notes`, asserted over both visibilities and with a crafted `cursor`.
+- [x] An `admin` and a `content_creator` token each list every note on a topic (private included) and every note of one student via `GET /v1/admin/users/{userId}/notes`; any attempt by either to edit or delete another user's note is rejected and the row is unchanged.
+- [x] Two `PUT`s with the same `baseRevision`, issued within the same second, produce exactly one `200` and one `409 NOTE_STALE`, and the row holds the first body.
+- [x] Force-unshare by each staff role hides the note from students, increments `revision`, leaves `body` byte-identical, and makes the author's next share return `409 NOTE_MODERATED` until the flag is cleared; a student or tutor calling it gets `403`.
+- [x] A `tutor` token sees exactly what a student sees on every notes route.
+- [x] In the browser, the same note open in two tabs never loses text without the student pressing **Keep mine**; the flow is covered by a component test.
+- [x] `git grep -n "note_ratings\|NoteRating" -- apps packages` returns nothing; no diff under `packages/shared/domain/gamification/`.
 - [ ] `check-i18n-coverage.js` passes; `NEXT_PUBLIC_LANGUAGE=en` and default `pt` both render the panel with no hardcoded string.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] No diff outside the scope declared in the guardrail.
+- [x] `make lint`, `make test-api`, and `make test-web` pass green.
+- [x] No diff outside the scope declared in the guardrail.
 
 ---
 
@@ -138,8 +138,8 @@ Each task is intended to land as an independent PR with `make lint`, `make test-
 
 - [ ] All tasks marked Done with every acceptance box checked.
 - [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] Closeout note written at `./closeout-analysis.md`.
-- [ ] RFC 0016 status set to `Implemented` in its header and
+- [x] `make lint`, `make test-api`, and `make test-web` pass green.
+- [x] Closeout note written at `./closeout-analysis.md`.
+- [x] RFC 0016 status set to `Implemented` in its header and
       `docs/product/RFCs/README.md`; deferred items remain backlog.
-- [ ] No diff outside the scope declared in the guardrail.
+- [x] No diff outside the scope declared in the guardrail.

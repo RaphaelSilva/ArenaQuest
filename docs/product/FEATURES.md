@@ -159,6 +159,32 @@ through a recursive CTE with request-level caching.
 **Code:** `apps/api/src/adapters/db/d1-enrollment-repository.ts`
 → [M5](./milestones/5-engagement-and-student-progress/milestone.md) · ✅ _(superseded in part by M12 visibility)_
 
+### Student notes
+Each student keeps **one Markdown note per topic** in a Notes panel beside the
+Discussion: an editor with preview and debounced autosave, private by default,
+that the student may **share with the class**. A private note is private among
+students only — `admin` and `content_creator` read every note, read-only, and
+the editor says so before the student writes a word; a `tutor` sees what a
+student sees. Shared notes are listed on the topic newest first with the
+author's name, and *My notes* (`/notes`) reviews every note the student wrote,
+keeping a note on a topic they lost access to readable and deletable but not
+editable. Staff moderate by **force-unshare**, never by editing or deleting:
+the note turns private and cannot be re-shared until staff allow it again, from
+the class list or the per-student *Notes* section of the user backoffice.
+
+No text is lost silently: every write carries the `revision` it was based on
+and lands in one conditional SQL statement, so two tabs saving in the same
+second yield one success and one `409 NOTE_STALE`, and the editor then pauses
+autosave until the student chooses **Load latest** or **Keep mine**. The note
+routes follow the catalog's access gate and answer `404` rather than `403`, and
+their listings are the API's first cursor-paginated ones.
+
+**Code:** `apps/api/src/controllers/notes.controller.ts`, `apps/api/src/adapters/db/d1-note-repository.ts`, `apps/api/src/routes/{notes.router.ts,me/notes.ts,admin/notes.ts,_shared/cursor.ts}`, `apps/web/src/components/catalog/notes/`, `apps/web/src/app/(protected)/notes/`
+→ [M21 Student notes](./milestones/21-student-notes/milestone.md) · [RFC 0016](./RFCs/0016-student-notes.md) · ✅
+_Peer rating of shared notes and XP for notes are deferred (RFC 0016). The user
+backoffice is admin-only in the web, so a `content_creator` reaches the
+per-student notes API but has no page for it yet._
+
 ---
 
 ## 5. Gamification
