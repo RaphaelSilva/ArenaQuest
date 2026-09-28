@@ -26,4 +26,16 @@ describe('StandingBadge', () => {
     expect(screen.getByText(dictEn.admin.billing.standing.exempt)).toBeInTheDocument();
     expect(screen.queryByText(dictEn.admin.billing.standing.delinquent)).not.toBeInTheDocument();
   });
+
+  it('names its rail for assistive tech while showing the standing text', () => {
+    render(
+      <DictProvider value={dictEn}>
+        <StandingBadge standing="delinquent" railLabel={dictEn.admin.billing.rails.extras} />
+      </DictProvider>,
+    );
+    const badge = screen.getByText(dictEn.admin.billing.standing.delinquent);
+    expect(badge).toHaveTextContent(
+      `${dictEn.admin.billing.rails.extras}: ${dictEn.admin.billing.standing.delinquent}`,
+    );
+  });
 });
