@@ -24,6 +24,7 @@ it lives in the linked milestone, and is summarised in
 | [0013](./0013-student-billing-contracts-and-receivables-accounting.md) | Student billing, contracts and receivables accounting | Accepted | [M19](../milestones/19-student-billing-and-receivables/milestone.md) | 2026-09-10 |
 | [0014](./0014-events-board-and-whatsapp-contact.md) | Events board — public listing, access-scoped audiences and per-event WhatsApp contact | ✅ Implemented | [M20](../milestones/20-events-board-public-listing-access-scoped-audience/milestone.md) | 2026-09-16 |
 | [0015](./0015-event-extras-one-off-charges-for-events.md) | Event extras: one-off charges for events | 📝 Draft | [M22](../milestones/22-event-extras-one-off-charges/milestone.md) | 2026-09-27 |
+| [0016](./0016-student-notes.md) | Student notes — private and shared topic notes with staff moderation | Proposed | [M21](../milestones/21-student-notes/milestone.md) | 2026-09-27 |
 
 Milestones 1–7 predate this process and derive directly from
 [`../specification.md`](../specification.md).
