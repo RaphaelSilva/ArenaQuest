@@ -70,7 +70,7 @@ Out of scope (explicit, from RFC 0016 Non-Goals):
 - [x] A `tutor` token sees exactly what a student sees on every notes route.
 - [x] In the browser, the same note open in two tabs never loses text without the student pressing **Keep mine**; the flow is covered by a component test.
 - [x] `git grep -n "note_ratings\|NoteRating" -- apps packages` returns nothing; no diff under `packages/shared/domain/gamification/`.
-- [ ] `check-i18n-coverage.js` passes; `NEXT_PUBLIC_LANGUAGE=en` and default `pt` both render the panel with no hardcoded string.
+- [x] `check-i18n-coverage.js` passes; `NEXT_PUBLIC_LANGUAGE=en` and default `pt` both render the panel with no hardcoded string.
 - [x] `make lint`, `make test-api`, and `make test-web` pass green.
 - [x] No diff outside the scope declared in the guardrail.
 
@@ -136,8 +136,8 @@ Each task is intended to land as an independent PR with `make lint`, `make test-
 
 ## 7. Definition of Done (milestone level)
 
-- [ ] All tasks marked Done with every acceptance box checked.
-- [ ] All milestone-level acceptance criteria in §3 pass.
+- [x] All tasks marked Done with every acceptance box checked.
+- [x] All milestone-level acceptance criteria in §3 pass.
 - [x] `make lint`, `make test-api`, and `make test-web` pass green.
 - [x] Closeout note written at `./closeout-analysis.md`.
 - [x] RFC 0016 status set to `Implemented` in its header and
