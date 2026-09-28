@@ -57,6 +57,7 @@ function statement(versions: BillingSubscription[]): BillingStudentStatement {
       },
     ],
     invoices: [],
+    extras: { standing: 'good', oldestOverdueDate: null, outstandingMinor: 0, charges: [] },
   };
 }
 

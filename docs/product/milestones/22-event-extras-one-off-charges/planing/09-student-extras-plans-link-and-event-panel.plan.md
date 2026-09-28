@@ -24,14 +24,13 @@ Close the three remaining RFC 0015 §8 surfaces:
 | File | Change |
 |---|---|
 | `apps/web/src/lib/admin-billing-api.ts` | `BillingStudentStatement.extras` becomes **required** (the API always sends it). The summary call already exists (`extras.summary`, Task 07). |
-| `apps/web/src/lib/me-billing-api.ts` | Doc comment only (the statement now carries `extras`). |
 | `apps/web/src/components/billing/__tests__/statement-fixture.ts` | `emptyStatement` gains `extras: { standing: 'good', oldestOverdueDate: null, outstandingMinor: 0, charges: [] }`; new `extrasCharge()` fixture helper. |
 | `apps/web/src/app/(protected)/admin/billing/__tests__/student-statement-panel.test.tsx` | Fixture gains the now-required `extras` if it omitted it (type only). |
-| `apps/web/src/app/(protected)/admin/billing/student-statement-panel.tsx` | Drop the `?? absent` fallback only if it no longer compiles; behaviour unchanged. |
+| `apps/web/src/app/(protected)/admin/billing/__tests__/ledger-tab.test.tsx` | Fixture gains the now-required `extras` (type only). |
 | `apps/web/src/app/(protected)/settings/billing/page.tsx` | Extras section. `isEmptyStatement` additionally requires zero charges, so an extras-only buyer sees the contract/invoice sections' own empties instead of "nothing on your account". |
 | `apps/web/src/app/(protected)/settings/billing/__tests__/page.test.tsx` | New cases. |
 | `apps/web/src/app/(protected)/admin/billing/plans-tab.tsx` | Optional `onOpenExtras?: () => void`; renders `<a href="/admin/billing?tab=extras">` after the recurring note; on click with the callback present, `preventDefault()` + callback (in-page tab switch). |
-| `apps/web/src/app/(protected)/admin/billing/page.tsx` | **Deviation (see below).** On mount, reads `?tab=` and `?eventId=` from `window.location.search`; a known tab is selected; `eventId` is passed to `ExtrasTab` as `initialEventId`. Passes `onOpenExtras={() => setTab('extras')}` to `PlansTab`. |
+| `apps/web/src/app/(protected)/admin/billing/page.tsx` | **Deviation (see below).** Reads `?tab=` and `?eventId=` once through `useSearchParams` (default export wrapped in `<Suspense>`, as `admin/access` does); a known tab is the initial tab; `eventId` is passed to `ExtrasTab` as `initialEventId`. Passes `onOpenExtras={() => setTab('extras')}` to `PlansTab`. |
 | `apps/web/src/app/(protected)/admin/billing/extras-tab.tsx` | **Deviation.** Optional `initialEventId?: string` seeds the event selector state. |
 | `apps/web/src/app/(protected)/admin/events/[eventId]/event-charges-panel.tsx` (new) | The read-only panel. |
 | `apps/web/src/app/(protected)/admin/events/[eventId]/page.tsx` | Mount `<EventChargesPanel eventId=… />` under the form, admins only (`canPublish` — the billing API is ADMIN-only; a content creator would get 403). |
@@ -45,9 +44,9 @@ The guardrail lists `plans-tab.tsx` only under `admin/billing`, but the acceptan
 require the links to *open the Extras tab* and *on that event*. The console keeps its tab in
 local state and the Extras tab keeps its event in local state, so no URL can reach either
 without a minimal read of the query string in `page.tsx` and a seed prop on `ExtrasTab`.
-`window.location.search` in a mount effect is used rather than `useSearchParams`, which would
-require a Suspense boundary for the static prerender and a new mock in every page test. No
-behaviour changes when the query is absent.
+`useSearchParams` is read as initial state (a Next `Link` navigation may render before
+`window.location` updates, so reading `window` is unreliable); the page's default export gains
+the Suspense boundary the static prerender requires. No behaviour changes when the query is absent.
 
 ## Contracts
 

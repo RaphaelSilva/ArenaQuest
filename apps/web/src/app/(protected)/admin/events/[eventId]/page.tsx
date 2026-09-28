@@ -10,6 +10,7 @@ import { useDict } from '@web/context/dict-context';
 import { Spinner } from '@web/components/spinner';
 import { EventForm } from '@web/components/admin/events/EventForm';
 import type { AdminEvent } from '@web/lib/admin-events-api';
+import { EventChargesPanel } from './event-charges-panel';
 
 export const runtime = 'edge';
 
@@ -97,6 +98,10 @@ export default function EditAdminEventPage() {
           onReload={() => void load()}
         />
       )}
+
+      {/* Read-only, and admins only: the billing API is ADMIN-guarded, so a
+          content creator would only ever see a refusal here. */}
+      {event && canPublish && <EventChargesPanel eventId={event.id} />}
     </main>
   );
 }

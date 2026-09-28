@@ -323,6 +323,23 @@ export const dictPt = {
     events: {
       title: 'Eventos',
       subtitle: 'Seminários, graduações e treinos abertos — rascunhos inclusive.',
+      charges: {
+        heading: 'Cobranças',
+        note: 'Somente leitura. O preço, as cobranças e seus pagamentos são geridos na aba Extras do console financeiro.',
+        chargedLabel: 'Cobrado',
+        adjustmentsLabel: 'Ajustes',
+        receivedLabel: 'Recebido',
+        outstandingLabel: 'Em aberto',
+        chargeCount: (total: number) => `${total} cobrança(s)`,
+        countsLabel: 'Cobranças por situação',
+        status: {
+          open: 'Em aberto',
+          paid: 'Pagas',
+          void: 'Canceladas',
+        },
+        link: 'Abrir este evento na aba Extras',
+        loadError: 'Não foi possível carregar o resumo das cobranças.',
+      },
       list: {
         newButton: 'Novo evento',
         filterLabel: 'Status',
@@ -1509,6 +1526,7 @@ export const dictPt = {
       },
       plans: {
         heading: 'Catálogo de planos',
+        extrasLink: 'Vai vender um seminário ou outro item avulso? Cobre-o na aba Extras.',
         recurringNote:
           'Um plano é a prateleira recorrente: todo contrato assinado com base nele é faturado novamente a cada período pela rotina diária. Nada aqui vende um item único — um plano criado para um seminário seria cobrado de novo a cada período, indefinidamente.',
         editSafeNote:
@@ -2276,6 +2294,30 @@ export const dictPt = {
         credit: 'Crédito',
         waiver: 'Isenção',
         surcharge: 'Acréscimo',
+      },
+      extras: {
+        heading: 'Extras',
+        intro:
+          'Cobranças avulsas de eventos dos quais você participou. Ficam separadas da sua mensalidade e nunca são somadas a ela.',
+        standing: {
+          good: 'Em dia',
+          due: 'A pagar',
+          delinquent: 'Em atraso',
+          exempt: 'Suspensa',
+        },
+        outstandingLabel: 'Em aberto nos extras',
+        oldestOverdueLabel: 'Em atraso desde',
+        empty: 'Você não tem nenhuma cobrança de evento.',
+        eventDateLabel: 'Data do evento',
+        dueLabel: 'Vencimento',
+        amountLabel: 'Valor',
+        balanceLabel: 'Saldo',
+        status: {
+          open: 'Em aberto',
+          overdue: 'Vencida',
+          paid: 'Paga',
+          void: 'Cancelada',
+        },
       },
     },
   },

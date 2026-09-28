@@ -1,6 +1,10 @@
 import { vi } from 'vitest';
 import type { MyBillingStatement } from '@web/lib/me-billing-api';
-import type { BillingReportCurrency, Standing } from '@web/lib/admin-billing-api';
+import type {
+  BillingReportCurrency,
+  BillingStatementCharge,
+  Standing,
+} from '@web/lib/admin-billing-api';
 
 export const BRL: BillingReportCurrency = { code: 'BRL', exponent: 2, symbol: 'R$' };
 export const JPY: BillingReportCurrency = { code: 'JPY', exponent: 0, symbol: '¥' };
@@ -19,6 +23,37 @@ export function emptyStatement(overrides: Partial<MyBillingStatement> = {}): MyB
     outstandingMinor: 0,
     contractGroups: [],
     invoices: [],
+    // The API always sends the extras rail; never charged reads as this.
+    extras: { standing: 'good', oldestOverdueDate: null, outstandingMinor: 0, charges: [] },
+    ...overrides,
+  };
+}
+
+/** One event charge as the statement carries it: the charge, its event, its ledger. */
+export function extrasCharge(
+  overrides: Partial<BillingStatementCharge> = {},
+): BillingStatementCharge {
+  return {
+    id: 'ch1',
+    eventId: 'e1',
+    userId: 'u1',
+    description: 'Winter Seminar',
+    amountMinor: 25000,
+    currency: 'BRL',
+    termsSource: 'standard',
+    termsNote: '',
+    dueDate: '2026-08-01',
+    graceDays: 5,
+    status: 'open',
+    issuedBy: 'admin-1',
+    issuedAt: '2026-07-01T00:00:00Z',
+    voidedAt: null,
+    voidReason: null,
+    balanceMinor: 25000,
+    adjustments: [],
+    payments: [],
+    eventTitle: 'Winter Seminar',
+    eventStartsAt: '2026-07-18T09:00:00Z',
     ...overrides,
   };
 }

@@ -169,6 +169,19 @@ describe('ExtrasTab', () => {
     };
   });
 
+  it('opens on the event it is handed — the admin event page link', async () => {
+    render(
+      <DictProvider value={dictEn}>
+        <ExtrasTab currency={BRL} nameOf={(id) => id} students={[]} initialEventId="ev-1" />
+      </DictProvider>,
+    );
+    await waitFor(() => expect(summaryReads()).toBe(1));
+    expect(http).toHaveBeenCalledWith('GET', '/admin/billing/event-prices/ev-1');
+    await waitFor(() =>
+      expect(screen.getByLabelText(d.eventLabel)).toHaveValue('ev-1'),
+    );
+  });
+
   it('offers published events only', async () => {
     renderTab();
     const select = await screen.findByLabelText(d.eventLabel);
