@@ -16,6 +16,8 @@ vi.mock('@web/context/auth-context', async () => {
   return { ...actual, useApiClient: () => mockClient };
 });
 
+vi.mock('@web/hooks/use-auth', () => ({ useHasRole: () => false }));
+
 import { NotesPanel } from '../NotesPanel';
 
 const t = dictPt.notes;

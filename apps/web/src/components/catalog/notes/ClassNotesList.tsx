@@ -15,7 +15,7 @@ export type ClassNotesListProps = {
   /** Extra chips for a card (Task 07: staff badges). */
   renderBadges?: (note: ClassNote) => ReactNode;
   /** Footer actions for a card (Task 07: Unshare / Allow sharing again). */
-  renderActions?: (note: ClassNote, reload: () => void) => ReactNode;
+  renderActions?: (note: ClassNote, reload: () => void, update: (patch: Partial<ClassNote>) => void) => ReactNode;
 };
 
 /**
@@ -47,7 +47,7 @@ export function ClassNotesList({ topicId, renderBadges, renderActions }: ClassNo
               date="shared"
               isMine={note.isMine}
               badges={renderBadges?.(note)}
-              actions={renderActions?.(note, pages.reload)}
+              actions={renderActions?.(note, pages.reload, (patch) => pages.update(note.id, patch))}
             />
           </li>
         ))}

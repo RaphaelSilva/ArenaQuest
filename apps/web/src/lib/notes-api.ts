@@ -15,6 +15,12 @@ export type ClassNote = components['schemas']['ClassNote'];
 /** One of the caller's notes on `/me/notes`, with the topic it belongs to. */
 export type AuthoredNote = components['schemas']['AuthoredNote'];
 
+/** A note as the staff routes return it: the moderation audit fields included. */
+export type StaffNote = components['schemas']['StaffNote'];
+
+/** One of a student's notes in the user backoffice, with the topic it belongs to. */
+export type StaffAuthoredNote = components['schemas']['StaffAuthoredNote'];
+
 /** A cursor-paginated page; `nextCursor` is `null` on the last page. */
 export type NotePage<T> = { data: T[]; nextCursor: string | null };
 
@@ -40,6 +46,7 @@ export type SaveNoteResult =
 
 export type NotesApiErrorCode =
   | 'Unauthorized'
+  | 'Forbidden'
   | 'NetworkError'
   | 'NotFound'
   | 'InvalidCursor'
@@ -71,6 +78,7 @@ async function send(
 
 function throwForStatus(res: Response, notFoundMessage: string): never {
   if (res.status === 401) throw new NotesApiError('Unauthorized', 401, 'Unauthorized.');
+  if (res.status === 403) throw new NotesApiError('Forbidden', 403, 'Forbidden.');
   if (res.status === 404) throw new NotesApiError('NotFound', 404, notFoundMessage);
   throw new NotesApiError('Unknown', res.status, `Failed (${res.status})`);
 }
@@ -108,6 +116,26 @@ export function createNotesApi(http: HttpTransport) {
       return (await res.json()) as NotePage<AuthoredNote>;
     },
 
+    /** Staff: a page of every note one student wrote, private included (last edited first). */
+    async listForUser(userId: string, cursor?: string | null): Promise<NotePage<StaffAuthoredNote>> {
+      const res = await send(http, 'GET', withCursor(`/admin/users/${userId}/notes`, cursor));
+      if (!res.ok) throwForListStatus(res, 'Not found.');
+      return (await res.json()) as NotePage<StaffAuthoredNote>;
+    },
+
+    /** Staff: makes a note private and marks it moderated; returns the stored note. */
+    async unshare(noteId: string): Promise<StaffNote> {
+      const res = await send(http, 'POST', `/admin/notes/${noteId}/unshare`);
+      if (!res.ok) throwForStatus(res, 'Note not found.');
+      return (await res.json()) as StaffNote;
+    },
+
+    /** Staff: clears the moderation flag so the author may share again. Does not re-share. */
+    async clearModeration(noteId: string): Promise<void> {
+      const res = await send(http, 'DELETE', `/admin/notes/${noteId}/moderation`);
+      if (res.status === 204 || res.ok) return;
+      throwForStatus(res, 'Note not found.');
+    },
 
     /** The caller's note on the topic, or `null` when there is none. */
     async getMine(topicId: string): Promise<Note | null> {

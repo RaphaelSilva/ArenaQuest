@@ -112,4 +112,41 @@ describe('notes-api', () => {
     const missing = createNotesApi(vi.fn().mockResolvedValue(json(404, { error: 'NotFound' })));
     await expect(missing.listForTopic('t1')).rejects.toMatchObject({ code: 'NotFound' });
   });
+
+  it('listForUser GETs the staff route with the cursor', async () => {
+    const page = { data: [], nextCursor: null };
+    const http = vi.fn().mockImplementation(async () => json(200, page));
+    const api = createNotesApi(http);
+
+    expect(await api.listForUser('u1')).toEqual(page);
+    expect(http).toHaveBeenLastCalledWith('GET', '/admin/users/u1/notes', undefined);
+    await api.listForUser('u1', 'c/1');
+    expect(http).toHaveBeenLastCalledWith('GET', '/admin/users/u1/notes?cursor=c%2F1', undefined);
+  });
+
+  it('unshare POSTs and returns the stored note', async () => {
+    const staff = { ...NOTE, moderated: true, moderatedAt: '2026-09-28 13:00:00', moderatedBy: 's' };
+    const http = vi.fn().mockResolvedValue(json(200, staff));
+    const api = createNotesApi(http);
+
+    expect(await api.unshare('n1')).toEqual(staff);
+    expect(http).toHaveBeenCalledWith('POST', '/admin/notes/n1/unshare', undefined);
+  });
+
+  it('clearModeration DELETEs and resolves on 204', async () => {
+    const http = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    const api = createNotesApi(http);
+
+    await expect(api.clearModeration('n1')).resolves.toBeUndefined();
+    expect(http).toHaveBeenCalledWith('DELETE', '/admin/notes/n1/moderation', undefined);
+  });
+
+  it('staff calls map 403 to Forbidden and 404 to NotFound', async () => {
+    const forbidden = createNotesApi(vi.fn().mockResolvedValue(json(403, { error: 'Forbidden' })));
+    await expect(forbidden.unshare('n1')).rejects.toMatchObject({ code: 'Forbidden', status: 403 });
+    await expect(forbidden.listForUser('u1')).rejects.toBeInstanceOf(NotesApiError);
+
+    const missing = createNotesApi(vi.fn().mockResolvedValue(json(404, { error: 'NotFound' })));
+    await expect(missing.clearModeration('n1')).rejects.toMatchObject({ code: 'NotFound' });
+  });
 });

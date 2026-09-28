@@ -13,6 +13,8 @@ export type NotePages<T> = {
   loadMoreFailed: boolean;
   loadMore: () => void;
   reload: () => void;
+  /** Merges `patch` into the loaded item with this id, in place (no refetch). */
+  update: (id: string, patch: Partial<T>) => void;
 };
 
 /**
@@ -20,7 +22,7 @@ export type NotePages<T> = {
  * page per `loadMore`, appended in the order the API returns them.
  * `fetchPage` must be stable (memoised) — a new identity restarts the list.
  */
-export function useNotePages<T>(fetchPage: (cursor: string | null) => Promise<NotePage<T>>): NotePages<T> {
+export function useNotePages<T extends { id: string }>(fetchPage: (cursor: string | null) => Promise<NotePage<T>>): NotePages<T> {
   const [items, setItems] = useState<T[]>([]);
   const [state, setState] = useState<NotePagesState>('loading');
   const [cursor, setCursor] = useState<string | null>(null);
@@ -78,5 +80,9 @@ export function useNotePages<T>(fetchPage: (cursor: string | null) => Promise<No
     );
   }, [cursor, fetchPage, loadingMore]);
 
-  return { items, state, hasMore: cursor !== null, loadingMore, loadMoreFailed, loadMore, reload };
+  const update = useCallback((id: string, patch: Partial<T>) => {
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  }, []);
+
+  return { items, state, hasMore: cursor !== null, loadingMore, loadMoreFailed, loadMore, reload, update };
 }
