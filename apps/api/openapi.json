@@ -2343,6 +2343,80 @@
         ],
         "type": "object"
       },
+      "StaffAuthoredNote": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StaffNote"
+          },
+          {
+            "properties": {
+              "topicTitle": {
+                "example": "Intro to Algebra",
+                "type": "string"
+              }
+            },
+            "required": [
+              "topicTitle"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "StaffAuthoredNotePage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/StaffAuthoredNote"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "description": "Opaque cursor of the next page; null on the last page",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "StaffNote": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Note"
+          },
+          {
+            "properties": {
+              "moderatedAt": {
+                "description": "When staff force-unshared the note; null when not moderated",
+                "example": null,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "moderatedBy": {
+                "description": "The staff member who force-unshared the note; null when not moderated",
+                "example": null,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "moderatedAt",
+              "moderatedBy"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "Tag": {
         "properties": {
           "id": {
@@ -6079,6 +6153,111 @@
         "summary": "Update Mission",
         "tags": [
           "admin:missions"
+        ]
+      }
+    },
+    "/v1/admin/notes/{id}/moderation": {
+      "delete": {
+        "description": "Lets the author share the note again. It does not re-share it.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Note ID",
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Moderation cleared"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "No note with this ID"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Clear a note's moderation flag (staff)",
+        "tags": [
+          "admin:notes"
+        ]
+      }
+    },
+    "/v1/admin/notes/{id}/unshare": {
+      "post": {
+        "description": "Sets the note private and flags it moderated, recording who and when, and increments `revision` so an open editor gets `NOTE_STALE`. The body is never changed. On a private note it is idempotent in effect (stays private, becomes flagged).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Note ID",
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffNote"
+                }
+              }
+            },
+            "description": "The moderated note"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "No note with this ID"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Force-unshare a note (staff)",
+        "tags": [
+          "admin:notes"
         ]
       }
     },
@@ -10227,6 +10406,71 @@
         "summary": "Revoke User Enrollment",
         "tags": [
           "admin:enrollments"
+        ]
+      }
+    },
+    "/v1/admin/users/{userId}/notes": {
+      "get": {
+        "description": "Every note the user wrote, private included, newest `updatedAt` first, with the topic title and moderation provenance. An unknown user yields an empty page. Pages of 20.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "description": "Author user ID",
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Opaque cursor from a previous page (`nextCursor`); omit for the first page",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffAuthoredNotePage"
+                }
+              }
+            },
+            "description": "One page of the user's notes"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Malformed cursor (`InvalidCursor`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List a user's notes (staff)",
+        "tags": [
+          "admin:notes"
         ]
       }
     },
