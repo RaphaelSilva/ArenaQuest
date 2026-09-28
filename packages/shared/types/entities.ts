@@ -165,6 +165,20 @@ export namespace Entities {
             SURCHARGE = 'surcharge',
         }
 
+        /**
+         * Who may read a student's topic note (RFC 0016 section 3). Constrained by
+         * the `visibility IN ('private','shared')` CHECK on `topic_notes`.
+         *
+         * "Private" means private *among students*: staff (admins and content
+         * creators) can still read it, read-only.
+         */
+        export enum NoteVisibility {
+            /** Only the author and the staff can read it; the default. */
+            PRIVATE = 'private',
+            /** Readable by every student who can read the topic. */
+            SHARED = 'shared',
+        }
+
     }
 
     export namespace Security {
@@ -373,6 +387,31 @@ export namespace Entities {
             label: string;
             order: number;
             createdAt: Date;
+        }
+
+        /**
+         * A student's note on one topic (RFC 0016 section 2) — at most one per
+         * `(topicNodeId, authorId)`.
+         *
+         * `revision` is the concurrency token: it increments on every write, by
+         * anyone (including a staff force-unshare), and a save names the revision
+         * it was based on. `updatedAt` is for display only.
+         */
+        export interface Note {
+            id: string;
+            topicNodeId: string;
+            authorId: string;
+            authorName: string;
+            /** Sanitised Markdown, 1…`NOTE_BODY_MAX` characters. */
+            body: string;
+            visibility: Config.NoteVisibility;
+            revision: number;
+            /** Last time the note became shared; `null` if it never was. */
+            sharedAt: string | null;
+            /** `true` while a staff force-unshare blocks re-sharing. */
+            moderated: boolean;
+            createdAt: string;
+            updatedAt: string;
         }
 
     }
