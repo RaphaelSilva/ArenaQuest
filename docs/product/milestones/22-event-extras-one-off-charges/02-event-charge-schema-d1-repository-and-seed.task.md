@@ -1,6 +1,6 @@
 # Task 02 — Backend: Event-charge schema, D1 repository and local seed (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [22 — Event extras: one-off charges on a separate billing rail](./milestone.md)
 **RFC:** [RFC 0015](../../RFCs/0015-event-extras-one-off-charges-for-events.md)
 **Team:** Backend API
@@ -69,22 +69,22 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The migration applies cleanly to a fresh local D1 after `0027`, and contains no
+- [x] The migration applies cleanly to a fresh local D1 after `0027`, and contains no
       statement against a pre-existing table.
-- [ ] Issuing the same `(event, users)` twice creates each charge once; the second call
+- [x] Issuing the same `(event, users)` twice creates each charge once; the second call
       reports every pair as absorbed and the row count is unchanged.
-- [ ] After a voided charge, issuing again for the same `(event, user)` creates a new live charge.
-- [ ] A payment equal to the balance leaves the charge `paid` in the same batch; a negative
+- [x] After a voided charge, issuing again for the same `(event, user)` creates a new live charge.
+- [x] A payment equal to the balance leaves the charge `paid` in the same batch; a negative
       reversal row brings it back to `open`; a second reversal of the same payment is rejected
       by the unique index.
-- [ ] A ledger write on a `void` charge does not change its status.
-- [ ] Balances returned by list/get equal amount + Σ adjustments − Σ payments.
-- [ ] Deleting a user or an event referenced by a charge fails (`RESTRICT`).
-- [ ] `make db-reset-local` succeeds and the seed produces the four scenarios listed in the
+- [x] A ledger write on a `void` charge does not change its status.
+- [x] Balances returned by list/get equal amount + Σ adjustments − Σ payments.
+- [x] Deleting a user or an event referenced by a charge fails (`RESTRICT`).
+- [x] `make db-reset-local` succeeds and the seed produces the four scenarios listed in the
       Summary; the no-dev-seed guard still passes.
-- [ ] No D1 import leaks into a port or service.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] No D1 import leaks into a port or service.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
