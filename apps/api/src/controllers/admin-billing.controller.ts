@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { Entities } from '@arenaquest/shared/types/entities';
 import type {
+  EventChargeAdjustmentRecord,
+  EventChargePaymentRecord,
+  EventChargeRecord,
+  EventChargeWithBalanceRecord,
+  EventPriceRecord,
   BillingPlanRecord,
   BillingStandingHoldRecord,
   InvoiceAdjustmentRecord,
@@ -23,6 +28,14 @@ import type {
   MovementReport,
   StudentStatement,
 } from '@api/core/billing/accounting-service';
+import {
+  MAX_CHARGE_USERS,
+  type AudienceCheckResult,
+  type EventChargeDetail,
+  type EventChargeService,
+  type EventChargeSummary,
+  type IssueEventChargesResult,
+} from '@api/core/billing/event-charge-service';
 
 /**
  * AdminBillingController — the admin billing lifecycle as `ControllerResult<T>`.
@@ -424,5 +437,156 @@ export class AdminBillingController {
 
   async clearHold(userId: string, actorId: string): Promise<ControllerResult<null>> {
     return this.service.clearHold(userId, actorId);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Extras rail (RFC 0015 §7) — schemas and controller
+// ---------------------------------------------------------------------------
+
+const UserIdsSchema = z
+  .array(z.string().min(1))
+  .min(1)
+  .max(MAX_CHARGE_USERS)
+  .refine((ids) => new Set(ids).size === ids.length, { message: 'userIds must be distinct' });
+
+const SetEventPriceSchema = z.object({
+  amountMinor: z.number().int().min(0),
+  currency: CurrencySchema.optional(),
+  dueInDays: z.number().int().min(0).optional(),
+  graceDays: z.number().int().min(0).optional(),
+});
+
+const IssueEventChargesSchema = z.object({
+  eventId: z.string().min(1),
+  userIds: UserIdsSchema,
+  amountMinor: z.number().int().min(0).optional(),
+  currency: CurrencySchema.optional(),
+  dueDate: IsoDateSchema.optional(),
+  graceDays: z.number().int().min(0).optional(),
+  termsNote: z.string().optional(),
+});
+
+const ListEventChargesQuerySchema = z.object({
+  eventId: z.string().optional(),
+  userId: z.string().optional(),
+  status: z.nativeEnum(Entities.Config.ChargeStatus).optional(),
+});
+
+/** `userIds` travels as one comma-separated query value. */
+const AudienceCheckQuerySchema = z.object({
+  userIds: z
+    .string()
+    .transform((raw) => raw.split(',').map((id) => id.trim()).filter((id) => id.length > 0))
+    .pipe(z.array(z.string()).min(1).max(MAX_CHARGE_USERS)),
+});
+
+/**
+ * AdminEventChargeController — the extras rail's admin surface.
+ *
+ * Same split as `AdminBillingController`: this class owns shape validation and
+ * hands every rule to `EventChargeService`, whose `ControllerResult` it returns
+ * unchanged. Nothing here reads or writes an event, an audience grant or an
+ * enrollment directly.
+ */
+export class AdminEventChargeController {
+  constructor(private readonly service: EventChargeService) {}
+
+  // Price ---------------------------------------------------------------
+
+  async getPrice(eventId: string): Promise<ControllerResult<EventPriceRecord>> {
+    return this.service.getPrice(eventId);
+  }
+
+  async setPrice(
+    eventId: string,
+    body: unknown,
+    actorId: string,
+  ): Promise<ControllerResult<EventPriceRecord>> {
+    const parsed = SetEventPriceSchema.safeParse(body);
+    if (!parsed.success) return invalid(parsed.error);
+    return this.service.setPrice(eventId, parsed.data, actorId);
+  }
+
+  async clearPrice(eventId: string, actorId: string): Promise<ControllerResult<null>> {
+    return this.service.clearPrice(eventId, actorId);
+  }
+
+  // Charges -------------------------------------------------------------
+
+  async listCharges(query: unknown): Promise<ControllerResult<EventChargeWithBalanceRecord[]>> {
+    const parsed = ListEventChargesQuerySchema.safeParse(query ?? {});
+    if (!parsed.success) return invalid(parsed.error);
+    return this.service.listCharges(parsed.data);
+  }
+
+  async getCharge(id: string): Promise<ControllerResult<EventChargeDetail>> {
+    return this.service.getChargeDetail(id);
+  }
+
+  async issueCharges(
+    body: unknown,
+    actorId: string,
+  ): Promise<ControllerResult<IssueEventChargesResult>> {
+    const parsed = IssueEventChargesSchema.safeParse(body);
+    if (!parsed.success) return invalid(parsed.error);
+    return this.service.issueCharges(parsed.data, actorId);
+  }
+
+  async voidCharge(
+    id: string,
+    body: unknown,
+    actorId: string,
+  ): Promise<ControllerResult<EventChargeRecord>> {
+    const parsed = VoidInvoiceSchema.safeParse(body ?? {});
+    if (!parsed.success) return invalid(parsed.error);
+    return this.service.voidCharge(id, parsed.data.reason, actorId);
+  }
+
+  // Ledger --------------------------------------------------------------
+
+  async applyAdjustment(
+    chargeId: string,
+    body: unknown,
+    actorId: string,
+  ): Promise<ControllerResult<EventChargeAdjustmentRecord>> {
+    const parsed = ApplyAdjustmentSchema.safeParse(body);
+    if (!parsed.success) return invalid(parsed.error);
+    return this.service.applyAdjustment(chargeId, parsed.data, actorId);
+  }
+
+  async recordPayment(
+    chargeId: string,
+    body: unknown,
+    actorId: string,
+  ): Promise<ControllerResult<EventChargePaymentRecord>> {
+    const parsed = RecordPaymentSchema.safeParse(body);
+    if (!parsed.success) return invalid(parsed.error);
+    return this.service.recordPayment(chargeId, parsed.data, actorId);
+  }
+
+  async reversePayment(
+    paymentId: string,
+    body: unknown,
+    actorId: string,
+  ): Promise<ControllerResult<EventChargePaymentRecord>> {
+    const parsed = ReversePaymentSchema.safeParse(body ?? {});
+    if (!parsed.success) return invalid(parsed.error);
+    return this.service.reversePayment(paymentId, parsed.data, actorId);
+  }
+
+  // Reads ---------------------------------------------------------------
+
+  async getEventSummary(eventId: string): Promise<ControllerResult<EventChargeSummary>> {
+    return this.service.getEventSummary(eventId);
+  }
+
+  async checkAudience(
+    eventId: string,
+    query: unknown,
+  ): Promise<ControllerResult<AudienceCheckResult>> {
+    const parsed = AudienceCheckQuerySchema.safeParse(query ?? {});
+    if (!parsed.success) return invalid(parsed.error);
+    return this.service.checkAudience(eventId, parsed.data.userIds);
   }
 }

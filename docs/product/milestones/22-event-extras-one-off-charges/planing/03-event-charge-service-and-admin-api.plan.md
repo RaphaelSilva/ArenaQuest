@@ -20,7 +20,7 @@ read-only audience check.
 | `apps/api/src/controllers/admin-billing.controller.ts` | New exported `AdminEventChargeController` (Zod parse → service), in the same file beside `AdminBillingController`. |
 | `apps/api/src/routes/admin/billing.ts` | New `createRoute` definitions + registration; existing routes unchanged. |
 | `apps/api/src/container.ts` | `BillingContext.eventChargeService`, built per request next to `eventChargeRepo`. |
-| `apps/api/test/core/billing/event-charge-service.spec.ts` | Service spec against real D1 (workers pool). |
+| `apps/api/test/db/event-charge-service.spec.ts` | Service spec against real D1 (the workers pool only runs `test/db` and `test/routes`). |
 | `apps/api/test/routes/admin-billing-extras.router.spec.ts` | Route spec: HTTP flow, statuses, role matrix, no-access-side-effect check. |
 
 ### Deviations (forced by the code as it is)
@@ -108,7 +108,7 @@ Query `userIds`: comma-separated, same bounds.
 
 ## Tests → acceptance criteria
 
-Service spec (`test/core/billing/event-charge-service.spec.ts`, real D1, `PRAGMA foreign_keys = ON`):
+Service spec (`test/db/event-charge-service.spec.ts`, real D1, `PRAGMA foreign_keys = ON`):
 
 | AC | Test |
 |---|---|

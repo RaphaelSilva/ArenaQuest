@@ -1,7 +1,10 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
-import { AdminBillingController } from '@api/controllers/admin-billing.controller';
+import {
+  AdminBillingController,
+  AdminEventChargeController,
+} from '@api/controllers/admin-billing.controller';
 import { billingRunDeps } from '@api/core/billing/billing-service';
 import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
 import type { AppContainer } from '@api/container';
@@ -747,6 +750,295 @@ export const clearHoldRoute = createRoute({
 });
 
 // ---------------------------------------------------------------------------
+// Extras rail (RFC 0015 §7)
+//
+// One-off charges for an event, on a ledger of their own. Every route below
+// sits behind this router's `requireRole(ROLES.ADMIN)`, and none of them reads
+// or writes an enrollment or an audience grant: a charge grants nothing, and
+// `outsideAudience` is a warning, never a write. Money stays out of
+// `routes/admin/events.ts`.
+// ---------------------------------------------------------------------------
+
+const ChargeStatusSchema = z.enum(['open', 'paid', 'void']);
+
+const EventIdParamSchema = z.object({
+  eventId: z.string().openapi({ param: { name: 'eventId', in: 'path' }, example: 'event-id' }),
+});
+
+const EventPriceSchema = z
+  .object({
+    eventId: z.string(),
+    amountMinor: MinorUnits,
+    currency: z.string().openapi({ example: 'BRL' }),
+    dueInDays: z.number().int(),
+    graceDays: z.number().int(),
+    updatedBy: z.string(),
+    updatedAt: z.string(),
+  })
+  .openapi('BillingEventPrice');
+
+const EventChargeSchema = z
+  .object({
+    id: z.string(),
+    eventId: z.string(),
+    userId: z.string(),
+    description: z.string(),
+    amountMinor: MinorUnits,
+    currency: z.string(),
+    termsSource: TermsSourceSchema,
+    termsNote: z.string(),
+    dueDate: IsoDate,
+    graceDays: z.number().int(),
+    status: ChargeStatusSchema,
+    issuedBy: z.string(),
+    issuedAt: z.string(),
+    voidedAt: z.string().nullable(),
+    voidReason: z.string().nullable(),
+  })
+  .openapi('BillingEventCharge');
+
+const EventChargeWithBalanceSchema = EventChargeSchema.extend({
+  balanceMinor: MinorUnits,
+}).openapi('BillingEventChargeWithBalance');
+
+const ChargeAdjustmentSchema = z
+  .object({
+    id: z.string(),
+    chargeId: z.string(),
+    kind: AdjustmentKindSchema,
+    amountMinor: MinorUnits,
+    reason: z.string(),
+    appliedBy: z.string(),
+    appliedAt: z.string(),
+  })
+  .openapi('BillingEventChargeAdjustment');
+
+const ChargePaymentSchema = z
+  .object({
+    id: z.string(),
+    chargeId: z.string(),
+    amountMinor: MinorUnits,
+    currency: z.string(),
+    method: PaymentMethodSchema,
+    paidAt: z.string(),
+    externalReference: z.string().nullable(),
+    note: z.string(),
+    reversesId: z.string().nullable(),
+    recordedBy: z.string(),
+    recordedAt: z.string(),
+  })
+  .openapi('BillingEventChargePayment');
+
+const EventChargeDetailSchema = EventChargeWithBalanceSchema.extend({
+  adjustments: z.array(ChargeAdjustmentSchema),
+  payments: z.array(ChargePaymentSchema),
+}).openapi('BillingEventChargeDetail');
+
+const IssueChargesResultSchema = z
+  .object({
+    created: z.array(EventChargeSchema),
+    /** Pairs that already had a live charge; a retry creates nothing. */
+    absorbed: z.array(z.object({ eventId: z.string(), userId: z.string() })),
+    /** Charged users who cannot see a restricted event. A warning only. */
+    outsideAudience: z.array(z.string()),
+  })
+  .openapi('BillingIssueEventChargesResult');
+
+const EventChargeSummarySchema = z
+  .object({
+    eventId: z.string(),
+    currency: z.string(),
+    chargedMinor: MinorUnits,
+    adjustmentsMinor: MinorUnits,
+    receivedMinor: MinorUnits,
+    outstandingMinor: MinorUnits,
+    chargeCount: z.number().int(),
+    counts: z.object({
+      open: z.number().int(),
+      paid: z.number().int(),
+      void: z.number().int(),
+    }),
+  })
+  .openapi('BillingEventChargeSummary');
+
+const AudienceCheckSchema = z
+  .object({
+    eventId: z.string(),
+    audience: z.enum(['public', 'members', 'restricted']),
+    outsideAudience: z.array(z.string()),
+  })
+  .openapi('BillingEventAudienceCheck');
+
+const SetEventPriceBodySchema = z
+  .object({
+    amountMinor: MinorUnits.min(0),
+    /** Optional; must be the tenant's active currency. */
+    currency: z.string().optional().openapi({ example: 'BRL' }),
+    dueInDays: z.number().int().min(0).optional().openapi({ example: 7 }),
+    graceDays: z.number().int().min(0).optional().openapi({ example: 5 }),
+  })
+  .openapi('SetEventPriceBody');
+
+const IssueEventChargesBodySchema = z
+  .object({
+    eventId: z.string().min(1),
+    userIds: z.array(z.string().min(1)).min(1).max(200),
+    amountMinor: MinorUnits.min(0).optional(),
+    currency: z.string().optional(),
+    dueDate: IsoDate.optional(),
+    graceDays: z.number().int().min(0).optional(),
+    termsNote: z.string().optional(),
+  })
+  .openapi('IssueEventChargesBody');
+
+const VoidChargeBodySchema = z
+  .object({ reason: z.string().openapi({ example: 'Seminar cancelled for this student.' }) })
+  .openapi('VoidEventChargeBody');
+
+export const getEventPriceRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/event-prices/{eventId}',
+  summary: "An Event's Price",
+  description: 'The list price of an event, or `404` when the event is not for sale.',
+  request: { params: EventIdParamSchema },
+  responses: { 200: json('Event price', EventPriceSchema), ...ERROR_RESPONSES },
+});
+
+export const setEventPriceRoute = createRoute({
+  ...common,
+  method: 'put',
+  path: '/event-prices/{eventId}',
+  summary: "Set an Event's Price",
+  description:
+    "Creates or replaces the event's price in the tenant's active currency. Charges already issued keep their own snapshot.",
+  request: { params: EventIdParamSchema, ...body(SetEventPriceBodySchema) },
+  responses: { 200: json('Event price set', EventPriceSchema), ...ERROR_RESPONSES },
+});
+
+export const clearEventPriceRoute = createRoute({
+  ...common,
+  method: 'delete',
+  path: '/event-prices/{eventId}',
+  summary: "Clear an Event's Price",
+  description: 'Stops offering the event. Existing charges are untouched.',
+  request: { params: EventIdParamSchema },
+  responses: { 204: { description: 'Price cleared' }, ...ERROR_RESPONSES },
+});
+
+export const listEventChargesRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/charges',
+  summary: 'List Event Charges',
+  request: {
+    query: z.object({
+      eventId: z.string().optional(),
+      userId: z.string().optional(),
+      status: ChargeStatusSchema.optional(),
+    }),
+  },
+  responses: {
+    200: json('Charges with their balances', z.array(EventChargeWithBalanceSchema)),
+    ...ERROR_RESPONSES,
+  },
+});
+
+export const issueEventChargesRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/charges',
+  summary: 'Charge Users for an Event',
+  description:
+    'Issues one charge per user (1–200) for one published event (`409` for draft or archived). Idempotent: a pair with a live charge is reported under `absorbed`. Without `amountMinor` the price is snapshot as standard; any other amount is negotiated and needs a `termsNote`. For a restricted event, `outsideAudience` lists the users who cannot see it — the charge is still issued and no audience row is written.',
+  request: body(IssueEventChargesBodySchema),
+  responses: {
+    201: json('At least one charge created', IssueChargesResultSchema),
+    200: json('Nothing created; every pair was absorbed', IssueChargesResultSchema),
+    ...ERROR_RESPONSES,
+  },
+});
+
+export const getEventChargeRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/charges/{id}',
+  summary: 'An Event Charge with its Ledger',
+  request: { params: IdParamSchema },
+  responses: { 200: json('Charge with its ledger', EventChargeDetailSchema), ...ERROR_RESPONSES },
+});
+
+export const voidEventChargeRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/charges/{id}/void',
+  summary: 'Void an Event Charge',
+  description:
+    'The reason is mandatory. Refused with `409` while the charge has net payments — reverse them first.',
+  request: { params: IdParamSchema, ...body(VoidChargeBodySchema) },
+  responses: { 200: json('Charge voided', EventChargeSchema), ...ERROR_RESPONSES },
+});
+
+export const applyChargeAdjustmentRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/charges/{id}/adjustments',
+  summary: 'Apply an Event Charge Adjustment',
+  description: 'Append-only, signed, non-zero and reasoned. Negative reduces what is owed.',
+  request: { params: IdParamSchema, ...body(ApplyAdjustmentBodySchema) },
+  responses: { 201: json('Adjustment applied', ChargeAdjustmentSchema), ...ERROR_RESPONSES },
+});
+
+export const recordChargePaymentRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/charges/{id}/payments',
+  summary: 'Record an Event Charge Payment',
+  request: { params: IdParamSchema, ...body(RecordPaymentBodySchema) },
+  responses: { 201: json('Payment recorded', ChargePaymentSchema), ...ERROR_RESPONSES },
+});
+
+export const reverseChargePaymentRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/charge-payments/{id}/reverse',
+  summary: 'Reverse an Event Charge Payment',
+  description:
+    'Appends the mirror-image row. A reversal cannot be reversed, and a payment is reversed at most once.',
+  request: { params: IdParamSchema, ...body(ReversePaymentBodySchema) },
+  responses: { 201: json('Reversal recorded', ChargePaymentSchema), ...ERROR_RESPONSES },
+});
+
+export const eventChargeSummaryRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/events/{eventId}/summary',
+  summary: "An Event's Charge Summary",
+  description:
+    'Charged, signed adjustments, received and outstanding over the non-void charges (`chargedMinor + adjustmentsMinor - receivedMinor = outstandingMinor`), plus counts by status.',
+  request: { params: EventIdParamSchema },
+  responses: { 200: json('Event charge summary', EventChargeSummarySchema), ...ERROR_RESPONSES },
+});
+
+export const eventAudienceCheckRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/events/{eventId}/audience-check',
+  summary: 'Check Buyers Against an Event Audience',
+  description:
+    'Read-only: lists the given users a restricted event is not addressed to. Always empty for public and members events.',
+  request: {
+    params: EventIdParamSchema,
+    query: z.object({
+      userIds: z
+        .string()
+        .openapi({ param: { name: 'userIds', in: 'query' }, example: 'user-a,user-b' }),
+    }),
+  },
+  responses: { 200: json('Audience check', AudienceCheckSchema), ...ERROR_RESPONSES },
+});
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -758,6 +1050,7 @@ export function buildAdminBillingRouter(container: AppContainer) {
     // same way, so the manual twin and the cron mail through one code path.
     billingRunDeps(container.infra.mailer, container.identity.users),
   );
+  const extras = new AdminEventChargeController(container.billing.eventChargeService);
 
   const router = new OpenAPIHono({
     defaultHook: (result, c) => {
@@ -904,6 +1197,88 @@ export function buildAdminBillingRouter(container: AppContainer) {
     const { userId } = c.req.valid('param');
     const result = await controller.clearHold(userId, c.get('user').sub);
     return respondNoContent(c, result);
+  });
+
+  // Extras rail (RFC 0015 §7). Same guard as everything above; none of these
+  // handlers touches an enrollment or an audience grant.
+
+  router.openapi(getEventPriceRoute, async (c) => {
+    const { eventId } = c.req.valid('param');
+    const result = await extras.getPrice(eventId);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(setEventPriceRoute, async (c) => {
+    const { eventId } = c.req.valid('param');
+    const result = await extras.setPrice(eventId, c.req.valid('json'), c.get('user').sub);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(clearEventPriceRoute, async (c) => {
+    const { eventId } = c.req.valid('param');
+    const result = await extras.clearPrice(eventId, c.get('user').sub);
+    return respondNoContent(c, result);
+  });
+
+  router.openapi(listEventChargesRoute, async (c) => {
+    const result = await extras.listCharges(c.req.valid('query'));
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(issueEventChargesRoute, async (c) => {
+    const result = await extras.issueCharges(c.req.valid('json'), c.get('user').sub);
+    if (!result.ok) return respondWith(c, result);
+    // A retry that created nothing is a success, not a creation.
+    return result.data.created.length > 0 ? c.json(result.data, 201) : c.json(result.data, 200);
+  });
+
+  router.openapi(getEventChargeRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await extras.getCharge(id);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(voidEventChargeRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await extras.voidCharge(id, c.req.valid('json'), c.get('user').sub);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(applyChargeAdjustmentRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await extras.applyAdjustment(id, c.req.valid('json'), c.get('user').sub);
+    return respondCreated(c, result);
+  });
+
+  router.openapi(recordChargePaymentRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await extras.recordPayment(id, c.req.valid('json'), c.get('user').sub);
+    return respondCreated(c, result);
+  });
+
+  router.openapi(reverseChargePaymentRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await extras.reversePayment(id, c.req.valid('json'), c.get('user').sub);
+    return respondCreated(c, result);
+  });
+
+  router.openapi(eventChargeSummaryRoute, async (c) => {
+    const { eventId } = c.req.valid('param');
+    const result = await extras.getEventSummary(eventId);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(eventAudienceCheckRoute, async (c) => {
+    const { eventId } = c.req.valid('param');
+    const result = await extras.checkAudience(eventId, c.req.valid('query'));
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
   });
 
   return router;
