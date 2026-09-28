@@ -8,6 +8,7 @@ import {
   BTC,
   JPY,
   emptyStatement,
+  extrasCharge,
   makeStatementTransport,
   statementWith,
 } from '@web/components/billing/__tests__/statement-fixture';
@@ -159,5 +160,101 @@ describe('Student statement — invoice detail grouping', () => {
     const row = period.closest('div')?.parentElement as HTMLElement;
     expect(within(row).getByText(d.invoices.paymentsHeading)).toBeInTheDocument();
     expect(within(row).getByText(d.invoices.adjustmentsHeading)).toBeInTheDocument();
+  });
+});
+
+describe('Student statement — the extras rail', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const x = d.extras;
+  const extrasRegion = async () =>
+    within(await screen.findByRole('region', { name: x.heading }));
+
+  // Paid-up contract, one charge past its due date on the extras rail.
+  const withOverdueCharge = () =>
+    statementWith('good', {
+      extras: {
+        standing: 'delinquent',
+        oldestOverdueDate: '2026-08-01',
+        outstandingMinor: 25000,
+        charges: [extrasCharge()],
+      },
+    });
+
+  it('keeps the contract section unchanged and shows the overdue charge apart', async () => {
+    mount(withOverdueCharge);
+
+    // The contract side reads exactly as before.
+    expect(await screen.findByText(d.contracts.openEnded('2026-01-01'))).toBeInTheDocument();
+    expect(screen.getByText(d.invoices.periodValue('2026-07-01', '2026-07-31'))).toBeInTheDocument();
+    expect(screen.getByText('R$ 1,500.00')).toBeInTheDocument();
+
+    const extras = await extrasRegion();
+    expect(extras.getByText(x.standing.delinquent)).toBeInTheDocument();
+    expect(extras.getByText('Winter Seminar')).toBeInTheDocument();
+    expect(extras.getByText(x.status.overdue)).toBeInTheDocument();
+    expect(extras.getByText('2026-07-18')).toBeInTheDocument();
+    expect(extras.getAllByText('2026-08-01').length).toBeGreaterThan(0);
+    expect(extras.getByText(x.outstandingLabel).nextSibling).toHaveTextContent('R$ 250.00');
+    expect(extras.getByText(x.balanceLabel).nextSibling).toHaveTextContent('R$ 250.00');
+    // The extras figure never leaks into the contract section.
+    expect(extras.queryByText(d.contracts.heading)).not.toBeInTheDocument();
+  });
+
+  it('reads a charge not yet due as open, and a settled one as paid', async () => {
+    mount(() =>
+      statementWith('good', {
+        extras: {
+          standing: 'good',
+          oldestOverdueDate: null,
+          outstandingMinor: 25000,
+          charges: [
+            extrasCharge({ id: 'ch1', eventTitle: 'Autumn camp', dueDate: '2026-10-01' }),
+            extrasCharge({
+              id: 'ch2',
+              eventTitle: 'Summer camp',
+              status: 'paid',
+              balanceMinor: 0,
+            }),
+          ],
+        },
+      }),
+    );
+    const extras = await extrasRegion();
+    expect(extras.getByText(x.standing.good)).toBeInTheDocument();
+    expect(extras.getByText(x.status.open)).toBeInTheDocument();
+    expect(extras.getByText(x.status.paid)).toBeInTheDocument();
+    expect(extras.queryByText(x.status.overdue)).not.toBeInTheDocument();
+  });
+
+  it('shows only the empty state for a student with no charge', async () => {
+    mount(() => statementWith('good'));
+    const extras = await extrasRegion();
+    expect(extras.getByText(x.empty)).toBeInTheDocument();
+    expect(extras.queryByText(x.outstandingLabel)).not.toBeInTheDocument();
+    expect(extras.queryByText(x.eventDateLabel)).not.toBeInTheDocument();
+  });
+
+  it('shows an extras-only buyer their charge rather than an empty account', async () => {
+    mount(() =>
+      emptyStatement({
+        extras: {
+          standing: 'due',
+          oldestOverdueDate: null,
+          outstandingMinor: 25000,
+          charges: [extrasCharge({ dueDate: '2026-09-01' })],
+        },
+      }),
+    );
+    const extras = await extrasRegion();
+    expect(extras.getByText('Winter Seminar')).toBeInTheDocument();
+    expect(screen.queryByText(d.emptyStatement)).not.toBeInTheDocument();
+    expect(screen.getByText(d.contracts.empty)).toBeInTheDocument();
+  });
+
+  it('offers no payment affordance on the extras either', async () => {
+    mount(withOverdueCharge);
+    await extrasRegion();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 });

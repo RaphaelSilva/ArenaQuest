@@ -365,11 +365,10 @@ export type BillingStudentStatement = {
   invoices: BillingStatementInvoice[];
   /**
    * The extras rail, beside — never summed into — the contract
-   * `outstandingMinor`. The API always sends it; it is optional in this type
-   * only because statement fixtures predating RFC 0015 still type-check
-   * against it, and a reader treats its absence as "never charged".
+   * `outstandingMinor`. The API always sends it; a student never charged gets
+   * an empty `charges` list and a `good` standing.
    */
-  extras?: BillingStatementExtras;
+  extras: BillingStatementExtras;
 };
 
 export type BillingHold = {

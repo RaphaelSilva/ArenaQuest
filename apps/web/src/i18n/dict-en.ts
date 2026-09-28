@@ -324,6 +324,23 @@ export const dictEn = {
     events: {
       title: 'Events',
       subtitle: 'Seminars, gradings and open sessions — drafts included.',
+      charges: {
+        heading: 'Charges',
+        note: 'Read-only. The price, the charges and their payments are managed on the Extras tab of the billing console.',
+        chargedLabel: 'Charged',
+        adjustmentsLabel: 'Adjustments',
+        receivedLabel: 'Received',
+        outstandingLabel: 'Outstanding',
+        chargeCount: (total: number) => `${total} charge(s)`,
+        countsLabel: 'Charges by status',
+        status: {
+          open: 'Open',
+          paid: 'Paid',
+          void: 'Void',
+        },
+        link: 'Open this event on the Extras tab',
+        loadError: 'The charges summary could not be loaded.',
+      },
       list: {
         newButton: 'New event',
         filterLabel: 'Status',
@@ -1510,6 +1527,7 @@ export const dictEn = {
       },
       plans: {
         heading: 'Plan catalogue',
+        extrasLink: 'Selling a seminar or another one-off item? Charge it on the Extras tab.',
         recurringNote:
           'A plan is the recurring shelf: every contract signed against it is re-invoiced each period by the daily run. Nothing here sells a single item — a plan created for one seminar would be billed again every period, indefinitely.',
         editSafeNote:
@@ -2272,6 +2290,30 @@ export const dictEn = {
         credit: 'Credit',
         waiver: 'Waiver',
         surcharge: 'Surcharge',
+      },
+      extras: {
+        heading: 'Extras',
+        intro:
+          'One-off charges for events you took part in. They are kept apart from your monthly fee and are never added to it.',
+        standing: {
+          good: 'Up to date',
+          due: 'Payment due',
+          delinquent: 'Past due',
+          exempt: 'On hold',
+        },
+        outstandingLabel: 'Outstanding on extras',
+        oldestOverdueLabel: 'Overdue since',
+        empty: 'You have no event charge.',
+        eventDateLabel: 'Event date',
+        dueLabel: 'Due date',
+        amountLabel: 'Amount',
+        balanceLabel: 'Balance',
+        status: {
+          open: 'Open',
+          overdue: 'Overdue',
+          paid: 'Paid',
+          void: 'Void',
+        },
       },
     },
   },
