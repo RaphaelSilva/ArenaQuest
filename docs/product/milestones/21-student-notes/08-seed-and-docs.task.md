@@ -1,6 +1,6 @@
 # Task 08 — Backend: Local seed and documentation closeout (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [21 — Student notes — private and shared topic notes with staff moderation](./milestone.md)
 **RFC:** [RFC 0016](../../RFCs/0016-student-notes.md)
 **Team:** Backend API
@@ -53,16 +53,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make db-reset-local` produces one private, one shared and one moderated note; running
+- [x] `make db-reset-local` produces one private, one shared and one moderated note; running
       `make db-seed-local` again changes nothing.
-- [ ] The no-dev-seed guard rejects the seed for a deployed environment.
-- [ ] `CLAUDE.md` documents the privacy rule, staff read-only access, moderation and the
+- [x] The no-dev-seed guard rejects the seed for a deployed environment.
+- [x] `CLAUDE.md` documents the privacy rule, staff read-only access, moderation and the
       `revision` / `409 NOTE_STALE` contract; `FEATURES.md` lists the feature.
-- [ ] `closeout-analysis.md` exists and walks the milestone's §3 criteria.
-- [ ] RFC 0016 reads `Implemented` in its header and in `docs/product/RFCs/README.md`, with
+- [x] `closeout-analysis.md` exists and walks the milestone's §3 criteria.
+- [x] RFC 0016 reads `Implemented` in its header and in `docs/product/RFCs/README.md`, with
       Milestone 21 linked.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
