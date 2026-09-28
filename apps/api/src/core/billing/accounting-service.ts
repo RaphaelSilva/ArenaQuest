@@ -1,5 +1,11 @@
 import type {
   IBillingRepository,
+  IEventChargeRepository,
+  IEventRepository,
+  ChargeLedgerEntryRecord,
+  EventChargeAdjustmentRecord,
+  EventChargePaymentRecord,
+  EventChargeWithBalanceRecord,
   CurrencyRecord,
   InvoiceWithBalanceRecord,
   InvoiceAdjustmentRecord,
@@ -8,7 +14,9 @@ import type {
   SubscriptionRecord,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
+import type { BillingRail } from '@arenaquest/shared/domain/billing/receivable';
 import type { ControllerResult } from '@api/core/result';
+import { resolveExtrasRail } from '@api/core/billing/event-charge-service';
 
 /**
  * AccountingService — the three views the spreadsheet used to provide
@@ -44,9 +52,20 @@ import type { ControllerResult } from '@api/core/result';
  *    currency's minor unit, and the currency's `exponent` and `symbol` travel
  *    with it so the client can format. No floating point, and no server-side
  *    formatting.
+ *
+ * RFC 0015 adds a second rail, **extras** — one-off event charges on their own
+ * ledger — and one more rule on top of the five:
+ *
+ * 6. **Partition by rail before any arithmetic.** Invoices and their ledger feed
+ *    every pre-existing field, which therefore keeps its contracts-only meaning;
+ *    event charges and their ledger feed a sibling `extras` block. No figure
+ *    adds the two, except the explicitly named `cashReceivedMinor` — money that
+ *    entered the till — which nobody can mistake for a standing or a receivable.
+ *    Both rails still share one currency assertion: a report whose rows span two
+ *    currencies is refused whichever rail they sit on.
  */
 
-const { ContractStatus, InvoiceStatus } = Entities.Config;
+const { ContractStatus, InvoiceStatus, ChargeStatus } = Entities.Config;
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -87,6 +106,27 @@ export interface MovementReport {
    * count of `subscriptions` rows.
    */
   activeStudents: number;
+  /** The extras rail for the same month, from event charges only (RFC 0015 §7). */
+  extras: MovementExtras;
+  /**
+   * `receivedMinor + extras.receivedMinor` — the money that entered the till in
+   * the month across **both** rails. The one cross-rail figure, and a flow of
+   * cash only: it is neither a standing nor a receivable.
+   */
+  cashReceivedMinor: number;
+}
+
+/** The extras rail of a month, keyed on the same date columns as the contract fields. */
+export interface MovementExtras {
+  /** `SUM(event_charges.amount_minor)` for live charges *issued* in the month. */
+  chargedMinor: number;
+  /** Signed charge adjustments *applied* in the month. */
+  adjustmentsMinor: number;
+  /** Signed charge payments *paid* in the month. */
+  receivedMinor: number;
+  chargesIssued: number;
+  /** Positive live-charge balances as at `periodEnd`, recomputed from the rows. */
+  receivableAtCloseMinor: number;
 }
 
 export type AgingBucketKey = '0-30' | '31-60' | '61-90' | '90+';
@@ -108,6 +148,11 @@ export interface AgingBucket {
 export interface AgingReport {
   /** The day the aging is measured at; defaults to today. */
   asOf: string;
+  /**
+   * The rail this aging covers. The two rails are never bucketed together; on
+   * `extras` every "invoice" count below counts event charges.
+   */
+  rail: BillingRail;
   currency: ReportCurrency;
   buckets: AgingBucket[];
   totalMinor: number;
@@ -132,6 +177,29 @@ export interface StatementContractGroup {
   versions: SubscriptionRecord[];
 }
 
+/** One event charge on a statement, with the event it is for and its whole ledger. */
+export interface StatementCharge extends EventChargeWithBalanceRecord {
+  /** The event's current title; the snapshot taken at issue when the event is gone. */
+  eventTitle: string;
+  /** When the event starts (ISO instant); `null` when the event row no longer exists. */
+  eventStartsAt: string | null;
+  adjustments: EventChargeAdjustmentRecord[];
+  payments: EventChargePaymentRecord[];
+}
+
+/**
+ * The extras rail of a statement (RFC 0015 §7). Resolved from event charges
+ * alone and never held: a contract hold does not reach it.
+ */
+export interface StatementExtras {
+  standing: Entities.Config.BillingStanding;
+  /** Due date of the oldest unpaid live charge already past due; null if none is. */
+  oldestOverdueDate: string | null;
+  /** What is still owed on extras. Never summed with the contract `outstandingMinor`. */
+  outstandingMinor: number;
+  charges: StatementCharge[];
+}
+
 export interface StudentStatement {
   userId: string;
   currency: ReportCurrency;
@@ -146,6 +214,8 @@ export interface StudentStatement {
   outstandingMinor: number;
   contractGroups: StatementContractGroup[];
   invoices: StatementInvoice[];
+  /** The extras rail, beside — never inside — the contract figures above. */
+  extras: StatementExtras;
 }
 
 /**
@@ -156,6 +226,20 @@ export interface StudentStatement {
  * file, in the shape `StreakEngine` already established in the container.
  */
 export type UserExistsProbe = (userId: string) => Promise<boolean>;
+
+/** The reading half of the extras ledger — the reports write nothing. */
+export type ExtrasLedgerReader = Pick<IEventChargeRepository, 'listCharges' | 'listLedger'>;
+
+/** What the statement needs of an event: its title and start, by id. */
+export type EventTitleReader = Pick<IEventRepository, 'findById'>;
+
+/** No extras at all — what a deployment without the charge adapter reports. */
+const NO_EXTRAS: ExtrasLedgerReader = {
+  listCharges: async () => [],
+  listLedger: async () => [],
+};
+
+const NO_EVENTS: EventTitleReader = { findById: async () => null };
 
 // ---------------------------------------------------------------------------
 // Dates — every comparison is on a `YYYY-MM-DD` string, in whole days
@@ -245,6 +329,45 @@ class LedgerIndex {
   }
 }
 
+/**
+ * The extras ledger, indexed by charge — `LedgerIndex`'s twin over the sibling
+ * tables. Kept a separate class so no index can ever hold rows of both rails.
+ */
+class ChargeLedgerIndex {
+  private readonly adjustments = new Map<string, EventChargeAdjustmentRecord[]>();
+  private readonly payments = new Map<string, EventChargePaymentRecord[]>();
+
+  constructor(entries: ChargeLedgerEntryRecord[]) {
+    for (const entry of entries) {
+      if (entry.entry === 'adjustment') {
+        push(this.adjustments, entry.adjustment.chargeId, entry.adjustment);
+      } else {
+        push(this.payments, entry.payment.chargeId, entry.payment);
+      }
+    }
+  }
+
+  adjustmentsFor(chargeId: string): EventChargeAdjustmentRecord[] {
+    return this.adjustments.get(chargeId) ?? [];
+  }
+
+  paymentsFor(chargeId: string): EventChargePaymentRecord[] {
+    return this.payments.get(chargeId) ?? [];
+  }
+
+  /** `amount + SUM(adjustments) - SUM(payments)` over rows that had occurred by `asOf`. */
+  balanceAsOf(charge: EventChargeWithBalanceRecord, asOf: string): number {
+    let balance = charge.amountMinor;
+    for (const adjustment of this.adjustmentsFor(charge.id)) {
+      if (dayOf(adjustment.appliedAt) <= asOf) balance += adjustment.amountMinor;
+    }
+    for (const payment of this.paymentsFor(charge.id)) {
+      if (dayOf(payment.paidAt) <= asOf) balance -= payment.amountMinor;
+    }
+    return balance;
+  }
+}
+
 function push<T>(map: Map<string, T[]>, key: string, value: T): void {
   const bucket = map.get(key);
   if (bucket) bucket.push(value);
@@ -278,6 +401,10 @@ export class AccountingService {
   constructor(
     private readonly repo: IBillingRepository,
     private readonly userExists: UserExistsProbe,
+    /** The extras ledger, read-only. Defaults to "no charges" — the RFC 0013 reports. */
+    private readonly charges: ExtrasLedgerReader = NO_EXTRAS,
+    /** Event titles and dates for the statement's charges. */
+    private readonly events: EventTitleReader = NO_EVENTS,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -292,12 +419,15 @@ export class AccountingService {
     const periodStart = `${month}-01`;
     const periodEnd = lastDayOfMonth(month);
 
-    const [invoices, monthEntries, entriesToEnd, subscriptions] = await Promise.all([
-      this.repo.listInvoices({}),
-      this.repo.listLedger({ from: periodStart, to: periodEnd }),
-      this.repo.listLedger({ to: periodEnd }),
-      this.repo.listSubscriptions({}),
-    ]);
+    const [invoices, monthEntries, entriesToEnd, subscriptions, charges, chargeEntriesToEnd] =
+      await Promise.all([
+        this.repo.listInvoices({}),
+        this.repo.listLedger({ from: periodStart, to: periodEnd }),
+        this.repo.listLedger({ to: periodEnd }),
+        this.repo.listSubscriptions({}),
+        this.charges.listCharges({}),
+        this.charges.listLedger({ to: periodEnd }),
+      ]);
 
     // `status = 'void'` is the one status this file reads, and it is read as a
     // decision rather than as a cached balance: a voided invoice, and every
@@ -350,6 +480,11 @@ export class AccountingService {
       codes.add(invoice.currency);
     }
 
+    // The extras rail, computed on its own rows only. Its currency codes join
+    // the same set because `cashReceivedMinor` adds the two rails' cash, and a
+    // report is stated in one currency or refused.
+    const extras = movementExtras(charges, chargeEntriesToEnd, periodStart, periodEnd, codes);
+
     const currency = await this.resolveCurrency(codes);
     if (!currency.ok) return currency;
 
@@ -367,6 +502,8 @@ export class AccountingService {
         outstandingMinor,
         invoicesIssued,
         activeStudents: countActiveStudents(subscriptions, periodStart, periodEnd),
+        extras,
+        cashReceivedMinor: receivedMinor + extras.receivedMinor,
       },
     };
   }
@@ -375,17 +512,45 @@ export class AccountingService {
   // Receivables aging
   // -------------------------------------------------------------------------
 
-  async getReceivablesAging(asOf?: string): Promise<ControllerResult<AgingReport>> {
+  async getReceivablesAging(
+    asOf?: string,
+    rail: BillingRail = 'contract',
+  ): Promise<ControllerResult<AgingReport>> {
     if (asOf !== undefined && !DAY_PATTERN.test(asOf)) {
       return badRequest(`expected asOf as YYYY-MM-DD, received "${asOf}"`);
     }
+    if (rail !== 'contract' && rail !== 'extras') {
+      return badRequest(`expected rail as contract or extras, received "${String(rail)}"`);
+    }
     const day = asOf ?? today();
 
-    const [invoices, entries] = await Promise.all([
-      this.repo.listInvoices({}),
-      this.repo.listLedger({ to: day }),
-    ]);
-    const ledger = new LedgerIndex(entries);
+    // One rail per aging, chosen before any row is read: the two are never
+    // bucketed together, so the contract aging reads no charge and the extras
+    // aging reads no invoice.
+    const open: AgingItem[] = [];
+    if (rail === 'contract') {
+      const [invoices, entries] = await Promise.all([
+        this.repo.listInvoices({}),
+        this.repo.listLedger({ to: day }),
+      ]);
+      const ledger = new LedgerIndex(entries);
+      for (const invoice of invoices) {
+        if (invoice.status === InvoiceStatus.VOID) continue;
+        if (dayOf(invoice.issuedAt) > day) continue;
+        open.push({ ...invoice, balance: ledger.balanceAsOf(invoice, day) });
+      }
+    } else {
+      const [charges, entries] = await Promise.all([
+        this.charges.listCharges({}),
+        this.charges.listLedger({ to: day }),
+      ]);
+      const ledger = new ChargeLedgerIndex(entries);
+      for (const charge of charges) {
+        if (charge.status === ChargeStatus.VOID) continue;
+        if (dayOf(charge.issuedAt) > day) continue;
+        open.push({ ...charge, balance: ledger.balanceAsOf(charge, day) });
+      }
+    }
 
     const codes = new Set<string>();
     const totals = new Map<AgingBucketKey, { total: number; invoices: number; users: Set<string> }>(
@@ -396,22 +561,18 @@ export class AccountingService {
     let invoiceCount = 0;
     const students = new Set<string>();
 
-    for (const invoice of invoices) {
-      if (invoice.status === InvoiceStatus.VOID) continue;
-      if (dayOf(invoice.issuedAt) > day) continue;
+    for (const item of open) {
+      if (item.balance <= 0) continue;
 
-      const balance = ledger.balanceAsOf(invoice, day);
-      if (balance <= 0) continue;
-
-      const slot = totals.get(bucketFor(daysBetween(invoice.dueDate, day)))!;
-      slot.total += balance;
+      const slot = totals.get(bucketFor(daysBetween(item.dueDate, day)))!;
+      slot.total += item.balance;
       slot.invoices += 1;
-      slot.users.add(invoice.userId);
+      slot.users.add(item.userId);
 
-      totalMinor += balance;
+      totalMinor += item.balance;
       invoiceCount += 1;
-      students.add(invoice.userId);
-      codes.add(invoice.currency);
+      students.add(item.userId);
+      codes.add(item.currency);
     }
 
     const currency = await this.resolveCurrency(codes);
@@ -421,6 +582,7 @@ export class AccountingService {
       ok: true,
       data: {
         asOf: day,
+        rail,
         currency: currency.data,
         buckets: BUCKET_BOUNDS.map((bounds) => {
           const slot = totals.get(bounds.bucket)!;
@@ -445,10 +607,14 @@ export class AccountingService {
   async getStudentStatement(userId: string): Promise<ControllerResult<StudentStatement>> {
     if (!(await this.userExists(userId))) return notFound('student not found');
 
-    const [subscriptions, invoices, entries] = await Promise.all([
+    // Every read is keyed on this one `userId` — on both rails — so the
+    // statement can never carry another student's invoice or charge.
+    const [subscriptions, invoices, entries, charges, chargeEntries] = await Promise.all([
       this.repo.listSubscriptions({ userId }),
       this.repo.listInvoices({ userId }),
       this.repo.listLedger({ userId }),
+      this.charges.listCharges({ userId }),
+      this.charges.listLedger({ userId }),
     ]);
     const ledger = new LedgerIndex(entries);
     const asOf = today();
@@ -485,6 +651,8 @@ export class AccountingService {
         };
       });
 
+    const extras = await this.statementExtras(charges, chargeEntries, asOf, codes);
+
     const currency = await this.resolveCurrency(codes);
     if (!currency.ok) return currency;
 
@@ -515,7 +683,65 @@ export class AccountingService {
         outstandingMinor,
         contractGroups,
         invoices: statementInvoices,
+        extras,
       },
+    };
+  }
+
+  /**
+   * The extras rail of one statement, from that student's charges alone.
+   *
+   * Balances are recomputed from the charge ledger as of `asOf`, a voided
+   * charge is listed at zero and counted nowhere, and standing goes through
+   * `resolveExtrasRail` — the same resolver the roster uses, with no hold.
+   */
+  private async statementExtras(
+    charges: EventChargeWithBalanceRecord[],
+    entries: ChargeLedgerEntryRecord[],
+    asOf: string,
+    codes: Set<string>,
+  ): Promise<StatementExtras> {
+    const ledger = new ChargeLedgerIndex(entries);
+
+    const eventIds = [...new Set(charges.map((charge) => charge.eventId))];
+    const events = new Map(
+      await Promise.all(
+        eventIds.map(async (id) => [id, await this.events.findById(id)] as const),
+      ),
+    );
+
+    const listed: StatementCharge[] = charges
+      .slice()
+      .sort((a, b) => compare(a.dueDate, b.dueDate) || compare(a.issuedAt, b.issuedAt))
+      .map((charge) => {
+        const voided = charge.status === ChargeStatus.VOID;
+        if (!voided) {
+          codes.add(charge.currency);
+          for (const payment of ledger.paymentsFor(charge.id)) codes.add(payment.currency);
+        }
+        const event = events.get(charge.eventId) ?? null;
+        return {
+          ...charge,
+          balanceMinor: voided ? 0 : ledger.balanceAsOf(charge, asOf),
+          eventTitle: event?.title ?? charge.description,
+          eventStartsAt: event ? event.startsAt.toISOString() : null,
+          adjustments: ledger
+            .adjustmentsFor(charge.id)
+            .slice()
+            .sort((a, b) => compare(a.appliedAt, b.appliedAt)),
+          payments: ledger
+            .paymentsFor(charge.id)
+            .slice()
+            .sort((a, b) => compare(a.paidAt, b.paidAt)),
+        };
+      });
+
+    const rail = resolveExtrasRail(listed, asOf);
+    return {
+      standing: rail.standing,
+      oldestOverdueDate: rail.oldestOverdueDate,
+      outstandingMinor: rail.outstandingMinor,
+      charges: listed,
     };
   }
 
@@ -556,6 +782,74 @@ export class AccountingService {
     }
     return { ok: true, data: toReportCurrency(currency) };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Rail partitioning
+// ---------------------------------------------------------------------------
+
+/** What the aging needs of a receivable on either rail — one rail per report. */
+interface AgingItem {
+  userId: string;
+  dueDate: string;
+  currency: string;
+  /** Recomputed from the rail's own ledger as of the aging day. */
+  balance: number;
+}
+
+/**
+ * The extras block of a month. Rule 2 holds on this rail too: charged is keyed
+ * off `issued_at`, adjustments off `applied_at`, received off `paid_at`; a void
+ * charge and every ledger row hanging off it count for nothing.
+ */
+function movementExtras(
+  charges: EventChargeWithBalanceRecord[],
+  entriesToEnd: ChargeLedgerEntryRecord[],
+  periodStart: string,
+  periodEnd: string,
+  codes: Set<string>,
+): MovementExtras {
+  const live = new Map(
+    charges.filter((charge) => charge.status !== ChargeStatus.VOID).map((c) => [c.id, c]),
+  );
+
+  let chargedMinor = 0;
+  let chargesIssued = 0;
+  for (const charge of live.values()) {
+    const issuedOn = dayOf(charge.issuedAt);
+    if (issuedOn < periodStart || issuedOn > periodEnd) continue;
+    chargedMinor += charge.amountMinor;
+    chargesIssued += 1;
+    codes.add(charge.currency);
+  }
+
+  let adjustmentsMinor = 0;
+  let receivedMinor = 0;
+  for (const entry of entriesToEnd) {
+    if (dayOf(entry.occurredAt) < periodStart) continue;
+    if (entry.entry === 'adjustment') {
+      const charge = live.get(entry.adjustment.chargeId);
+      if (!charge) continue;
+      adjustmentsMinor += entry.adjustment.amountMinor;
+      codes.add(charge.currency);
+    } else {
+      if (!live.has(entry.payment.chargeId)) continue;
+      receivedMinor += entry.payment.amountMinor;
+      codes.add(entry.payment.currency);
+    }
+  }
+
+  const ledger = new ChargeLedgerIndex(entriesToEnd);
+  let receivableAtCloseMinor = 0;
+  for (const charge of live.values()) {
+    if (dayOf(charge.issuedAt) > periodEnd) continue;
+    const balance = ledger.balanceAsOf(charge, periodEnd);
+    if (balance <= 0) continue;
+    receivableAtCloseMinor += balance;
+    codes.add(charge.currency);
+  }
+
+  return { chargedMinor, adjustmentsMinor, receivedMinor, chargesIssued, receivableAtCloseMinor };
 }
 
 // ---------------------------------------------------------------------------

@@ -37,7 +37,7 @@ export const myBillingRoute = createRoute({
   path: '/billing',
   summary: 'My Billing Statement',
   description:
-    "The caller's own standing, contracts, invoices with their payments, and outstanding total. It takes no parameters: the subject is the authenticated caller and there is no request that names another student. A member with no contract gets an empty statement with standing `good`, not a 404.",
+    "The caller's own standing, contracts, invoices with their payments, and outstanding total. It takes no parameters: the subject is the authenticated caller and there is no request that names another student. A member with no contract gets an empty statement with standing `good`, not a 404. `standing` and `outstandingMinor` are the contract rail only; the sibling `extras` object carries the caller's own event charges with their own standing — the two are never summed.",
   tags: ['me:billing'],
   security: [{ bearerAuth: [] }],
   responses: {
