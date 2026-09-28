@@ -51,9 +51,21 @@ async function advance(ms: number) {
   });
 }
 
+/**
+ * Loads with real timers (RTL `findBy*` polls on them), then freezes the clock:
+ * from here on only `advance()` moves time, so debounce assertions are exact
+ * however slow the run is. `shouldAdvanceTime` is deliberately not used — it
+ * lets wall-clock time leak into the fake clock and fire the debounce early.
+ */
+function freezeClock() {
+  vi.useFakeTimers();
+}
+
 async function renderEditor() {
   render(<MyNoteEditor topicId="t1" />);
-  return screen.findByLabelText(t.editorLabel);
+  const textarea = await screen.findByLabelText(t.editorLabel);
+  freezeClock();
+  return textarea;
 }
 
 function type(textarea: HTMLElement, value: string) {
@@ -65,7 +77,6 @@ const writeText = vi.fn();
 describe('MyNoteEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers({ shouldAdvanceTime: true });
     writeText.mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
   });
@@ -287,7 +298,8 @@ describe('MyNoteEditor', () => {
 
   it('renders the preview through the Markdown viewer', async () => {
     mockGetMine.mockResolvedValue(makeNote({ body: 'the **key** idea' }));
-    await renderEditor();
+    render(<MyNoteEditor topicId="t1" />);
+    await screen.findByLabelText(t.editorLabel);
 
     fireEvent.click(screen.getByRole('button', { name: t.preview }));
     const strong = await screen.findByText('key');
@@ -340,6 +352,7 @@ describe('MyNoteEditor', () => {
       const tabB = within(screen.getByTestId('tab-b'));
       const editorA = await tabA.findByLabelText(t.editorLabel);
       const editorB = await tabB.findByLabelText(t.editorLabel);
+      freezeClock();
 
       type(editorA, 'text from A');
       await advance(DEBOUNCE);
