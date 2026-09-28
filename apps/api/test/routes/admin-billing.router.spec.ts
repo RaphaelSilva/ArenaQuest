@@ -519,3 +519,60 @@ describe('/v1/admin/billing — ADMIN-only on every route', () => {
     expect((await res.json<{ userId: string }>()).userId).toBe(STUDENT_ID);
   });
 });
+
+describe('/v1/admin/billing/invoices/run — the extras rail in the report', () => {
+  it('carries extrasReminders, extrasCrossings and per-rail reminderCounts', async () => {
+    const eventId = crypto.randomUUID();
+    await env.DB
+      .prepare(
+        `INSERT INTO events (id, slug, title, starts_at, status, audience, created_by)
+         VALUES (?, ?, 'Run Seminar', '2031-01-01 19:00:00', 'published', 'members', ?)`,
+      )
+      .bind(eventId, `run-seminar-${eventId}`, ADMIN_ID)
+      .run();
+
+    await jsonOf(
+      await billing('PUT', `/event-prices/${eventId}`, { amountMinor: 8000, graceDays: 2 }),
+      200,
+    );
+    const issued = await jsonOf<{ created: Array<{ id: string }> }>(
+      await billing('POST', '/charges', {
+        eventId,
+        userIds: [SECOND_STUDENT_ID],
+        dueDate: '2031-02-10',
+      }),
+      201,
+    );
+    const chargeId = issued.created[0].id;
+
+    type RunReport = {
+      reminders: Array<{ kind: string }>;
+      extrasReminders: Array<{ chargeId: string; kind: string; description: string; sent: boolean }>;
+      extrasCrossings: Array<{ userId: string; from: string; to: string }>;
+      reminderCounts: {
+        contract: { sent: number; suppressed: number; undeliverable: number };
+        extras: { sent: number; suppressed: number; undeliverable: number };
+      };
+    };
+    const report = await jsonOf<RunReport>(
+      await billing('POST', '/invoices/run', { asOf: '2031-02-10' }),
+      200,
+    );
+
+    const ours = report.extrasReminders.filter((line) => line.chargeId === chargeId);
+    expect(ours).toEqual([
+      expect.objectContaining({ kind: 'extras_due_date', description: 'Run Seminar', sent: true }),
+    ]);
+    expect(report.reminders.every((line) => !line.kind.startsWith('extras_'))).toBe(true);
+    expect(report.extrasCrossings).toContainEqual(
+      expect.objectContaining({ userId: SECOND_STUDENT_ID, from: 'good', to: 'due' }),
+    );
+    expect(report.reminderCounts.extras.suppressed).toBe(0);
+    expect(report.reminderCounts.extras.sent).toBeGreaterThanOrEqual(1);
+    expect(Object.keys(report.reminderCounts.contract).sort()).toEqual([
+      'sent',
+      'suppressed',
+      'undeliverable',
+    ]);
+  });
+});
