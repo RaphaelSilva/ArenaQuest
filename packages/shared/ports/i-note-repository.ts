@@ -136,8 +136,9 @@ export interface INoteRepository {
 
   /**
    * Sets moderation (`adminId` given: force-unshare, marks moderated) or clears it
-   * (`adminId: null`). Either way `revision` is incremented and the body is never
-   * touched. Returns the updated note, or `null` when it does not exist.
+   * (`adminId: null`). Setting forces `private` and increments `revision`, so an open
+   * editor notices on its next save; clearing touches only the moderation flag. The
+   * body is never touched. Returns the updated note, or `null` when it does not exist.
    */
   setModeration(id: string, adminId: string | null): Promise<NoteRecord | null>;
 }
