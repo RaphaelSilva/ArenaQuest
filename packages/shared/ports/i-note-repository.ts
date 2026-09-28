@@ -47,7 +47,7 @@ export interface AuthoredNoteRecord extends NoteRecord {
   topicTitle: string;
   /** The topic's publication status (`draft` · `published` · `archived`). */
   topicStatus: Entities.Config.TopicNodeStatus;
-  /** `true` when the topic is archived, directly or through an archived ancestor. */
+  /** `true` when the topic is archived — the topic row's own archived flag, as the catalog gate checks. */
   topicArchived: boolean;
 }
 
