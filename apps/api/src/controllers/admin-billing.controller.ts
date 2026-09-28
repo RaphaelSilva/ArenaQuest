@@ -207,6 +207,11 @@ const MovementQuerySchema = z.object({
 const AgingQuerySchema = z.object({
   /** The day the aging is measured at; defaults to today in the service. */
   asOf: IsoDateSchema.optional(),
+  /**
+   * The one rail this aging covers (RFC 0015 §7). Absent means `contract`, so
+   * the existing screen keeps meaning exactly what it meant.
+   */
+  rail: z.enum(['contract', 'extras']).optional(),
 });
 
 const StudentParamSchema = z.object({ userId: z.string().min(1) });
@@ -408,7 +413,7 @@ export class AdminBillingController {
   async getReceivablesAging(query: unknown): Promise<ControllerResult<AgingReport>> {
     const parsed = AgingQuerySchema.safeParse(query ?? {});
     if (!parsed.success) return invalid(parsed.error);
-    return this.accounting.getReceivablesAging(parsed.data.asOf);
+    return this.accounting.getReceivablesAging(parsed.data.asOf, parsed.data.rail ?? 'contract');
   }
 
   async getStudentStatement(params: unknown): Promise<ControllerResult<StudentStatement>> {

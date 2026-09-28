@@ -268,12 +268,13 @@ export function buildContainer(env: Env): AppContainer {
   // surface as a 500.
   const userExists = (userId: string) => users.findById(userId).then((user) => user !== null);
   const billingService = new BillingService(billingRepo, userExists, eventChargeRepo);
-  // The statement 404s an unknown student, which is all billing needs from
-  // identity — a probe rather than the repository, as `StreakEngine` does.
-  const accountingService = new AccountingService(billingRepo, userExists);
-
   // Events repo (RFC 0014). The audience rule lives inside it and nowhere else.
   const eventRepo = new D1EventRepository(env.DB);
+
+  // The statement 404s an unknown student, which is all billing needs from
+  // identity — a probe rather than the repository, as `StreakEngine` does. The
+  // extras ledger and the event titles are read-only inputs (RFC 0015 §7).
+  const accountingService = new AccountingService(billingRepo, userExists, eventChargeRepo, eventRepo);
 
   // Extras rail service. It reads the event and its audience grants through
   // their ports, and the active currency through the billing port; it writes
