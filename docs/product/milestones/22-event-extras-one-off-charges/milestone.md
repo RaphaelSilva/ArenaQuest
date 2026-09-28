@@ -130,7 +130,7 @@ Out of scope (explicit, from RFC 0015 Non-Goals):
 | 06 | [Daily run: extras reminders and per-rail crossings](./06-daily-run-extras-reminders-and-crossings.task.md) | 3 | Backend | ✅ Done |
 | 07 | [Admin Extras tab](./07-admin-extras-tab.task.md) | 4 | Frontend | ✅ Done |
 | 08 | [Two-rail roster, reports and statement panel](./08-two-rail-roster-reports-and-statement.task.md) | 4 | Frontend | ✅ Done |
-| 09 | [Student extras, plans-tab link and event charges panel](./09-student-extras-plans-link-and-event-panel.task.md) | 4 | Frontend | ☐ Open |
+| 09 | [Student extras, plans-tab link and event charges panel](./09-student-extras-plans-link-and-event-panel.task.md) | 4 | Frontend | ✅ Done |
 | 10 | [Seed, docs and rollout closeout](./10-seed-docs-and-rollout.task.md) | 5 | Backend | ☐ Open |
 
 Dependency graph:
