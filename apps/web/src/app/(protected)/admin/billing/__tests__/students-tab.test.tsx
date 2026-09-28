@@ -12,33 +12,49 @@ import type { SignableStudent } from '../sign-contract-dialog';
 
 const BRL: BillingReportCurrency = { code: 'BRL', exponent: 2, symbol: 'R$' };
 
+function contract(
+  overrides: Partial<NonNullable<BillingRosterEntry['contract']>> = {},
+): NonNullable<BillingRosterEntry['contract']> {
+  return {
+    id: 'c1',
+    groupId: 'cg1',
+    status: 'active',
+    nextDueDate: '2026-10-10',
+    negotiatedTerms: false,
+    standing: 'good',
+    oldestOverdueDate: null,
+    outstandingMinor: 0,
+    ...overrides,
+  };
+}
+
 const delinquent: BillingRosterEntry = {
   userId: 'u1',
   asOf: '2026-09-01',
-  standing: 'delinquent',
-  oldestOverdueDate: '2026-07-10',
-  outstandingMinor: 150000,
-  contractId: 'c1',
-  contractGroupId: 'cg1',
-  contractStatus: 'active',
   currency: 'BRL',
-  nextDueDate: '2026-10-10',
-  negotiatedTerms: true,
+  contract: contract({
+    standing: 'delinquent',
+    oldestOverdueDate: '2026-07-10',
+    outstandingMinor: 150000,
+    negotiatedTerms: true,
+  }),
+  extras: null,
   hold: null,
 };
 
 const held: BillingRosterEntry = {
   userId: 'u2',
   asOf: '2026-09-01',
-  standing: 'exempt',
-  oldestOverdueDate: '2026-06-10',
-  outstandingMinor: 90000,
-  contractId: 'c2',
-  contractGroupId: 'cg2',
-  contractStatus: 'active',
   currency: 'BRL',
-  nextDueDate: null,
-  negotiatedTerms: false,
+  contract: contract({
+    id: 'c2',
+    groupId: 'cg2',
+    standing: 'exempt',
+    oldestOverdueDate: '2026-06-10',
+    outstandingMinor: 90000,
+    nextDueDate: null,
+  }),
+  extras: null,
   hold: {
     userId: 'u2',
     reason: 'Injured until March.',
@@ -48,7 +64,44 @@ const held: BillingRosterEntry = {
   },
 };
 
-const NAMES: Record<string, string> = { u1: 'Alice Doe', u2: 'Bruno Lima' };
+/** RFC 0015 isolation case: the monthly fee is paid up, an extra slipped. */
+const paidUpWithLateExtra: BillingRosterEntry = {
+  userId: 'u4',
+  asOf: '2026-09-01',
+  currency: 'BRL',
+  contract: contract({ id: 'c4', groupId: 'cg4' }),
+  extras: {
+    standing: 'delinquent',
+    oldestOverdueDate: '2026-08-01',
+    outstandingMinor: 25000,
+    openCharges: 2,
+    overdueCharges: 1,
+  },
+  hold: null,
+};
+
+/** A buyer with no contract at all: listed only because of a charge. */
+const extrasOnly: BillingRosterEntry = {
+  userId: 'u5',
+  asOf: '2026-09-01',
+  currency: 'BRL',
+  contract: null,
+  extras: {
+    standing: 'due',
+    oldestOverdueDate: null,
+    outstandingMinor: 40000,
+    openCharges: 1,
+    overdueCharges: 0,
+  },
+  hold: null,
+};
+
+const NAMES: Record<string, string> = {
+  u1: 'Alice Doe',
+  u2: 'Bruno Lima',
+  u4: 'Diego Reis',
+  u5: 'Elisa Prado',
+};
 
 /**
  * The signing picker's candidates come from the admin user list, so `u3` — who
@@ -87,6 +140,18 @@ function renderTab() {
 }
 
 const d = dictEn.admin.billing.students;
+const standingDict = dictEn.admin.billing.standing;
+const rails = dictEn.admin.billing.rails;
+
+/** The table row whose student cell names `name`. */
+function rowOf(name: string) {
+  return screen.getByText(name).closest('tr') as HTMLElement;
+}
+
+/** The cells of a row, in column order: student, monthly fee, extras, terms, actions. */
+function cellsOf(name: string) {
+  return within(rowOf(name)).getAllByRole('cell');
+}
 
 describe('StudentsTab', () => {
   beforeEach(() => {
@@ -94,7 +159,7 @@ describe('StudentsTab', () => {
     // Path-aware: the signing dialog reads the plan catalogue and the active
     // contracts from the same client, and roster rows are not plans.
     http = makeTransport((_method, path) =>
-      path.includes('/students') ? [delinquent, held] : [],
+      path.includes('/students') ? [delinquent, held, paidUpWithLateExtra, extrasOnly] : [],
     );
     client = { adminBilling: createAdminBillingApi(http as unknown as HttpTransport) };
   });
@@ -102,48 +167,114 @@ describe('StudentsTab', () => {
   it('lists the roster with the standing the API resolved', async () => {
     renderTab();
     expect(await screen.findByText('Alice Doe')).toBeInTheDocument();
-    // Scoped to the table: the standing filter renders the same labels as options.
-    const table = within(screen.getByRole('table'));
-    expect(table.getByText(dictEn.admin.billing.standing.delinquent)).toBeInTheDocument();
-    expect(table.getByText(dictEn.admin.billing.standing.exempt)).toBeInTheDocument();
-    expect(screen.getByText('2026-07-10')).toBeInTheDocument();
-    expect(screen.getByText(d.negotiated)).toBeInTheDocument();
+    const [, fee] = cellsOf('Alice Doe');
+    expect(within(fee).getByText(standingDict.delinquent)).toBeInTheDocument();
+    expect(within(fee).getByText(d.oldestOverdue('2026-07-10'))).toBeInTheDocument();
+    expect(within(cellsOf('Bruno Lima')[1]).getByText(standingDict.exempt)).toBeInTheDocument();
+    expect(within(rowOf('Alice Doe')).getByText(d.negotiated)).toBeInTheDocument();
   });
 
-  it('round-trips the standing filter to the API instead of filtering the cached list', async () => {
+  it('shows a paid-up monthly fee beside a delinquent extra, never merged', async () => {
+    renderTab();
+    await screen.findByText('Diego Reis');
+    const [, fee, extras] = cellsOf('Diego Reis');
+
+    expect(within(fee).getByText(standingDict.good)).toBeInTheDocument();
+    expect(fee).toHaveTextContent(`${rails.contract}: ${standingDict.good}`);
+    expect(within(fee).getByText('R$ 0.00')).toBeInTheDocument();
+
+    expect(within(extras).getByText(standingDict.delinquent)).toBeInTheDocument();
+    expect(extras).toHaveTextContent(`${rails.extras}: ${standingDict.delinquent}`);
+    expect(within(extras).getByText('R$ 250.00')).toBeInTheDocument();
+    expect(within(extras).getByText(d.extrasCounts(1, 2))).toBeInTheDocument();
+  });
+
+  it('lists an extras-only buyer with "no contract" and their resolved extras badge', async () => {
+    renderTab();
+    await screen.findByText('Elisa Prado');
+    const [, fee, extras, terms] = cellsOf('Elisa Prado');
+
+    expect(within(fee).getByText(d.noContract)).toBeInTheDocument();
+    expect(within(extras).getByText(standingDict.due)).toBeInTheDocument();
+    expect(within(extras).getByText('R$ 400.00')).toBeInTheDocument();
+    expect(terms).toHaveTextContent(d.none);
+    // A hold is contract-only, so there is nothing to hold on this row.
+    expect(
+      screen.queryByRole('button', { name: d.holdAriaLabel('Elisa Prado') }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a dash on the extras rail of someone never charged', async () => {
+    renderTab();
+    await screen.findByText('Alice Doe');
+    expect(cellsOf('Alice Doe')[2]).toHaveTextContent(d.none);
+  });
+
+  it('keeps one total per rail and never a merged one', async () => {
+    renderTab();
+    await screen.findByText('Alice Doe');
+    // Monthly fees: 150000 + 90000 (held, still counted) + 0.
+    expect(screen.getByText(d.contractTotalOutstanding).parentElement).toHaveTextContent(
+      'R$ 2,400.00',
+    );
+    // Extras: 25000 + 40000.
+    expect(screen.getByText(d.extrasTotalOutstanding).parentElement).toHaveTextContent(
+      'R$ 650.00',
+    );
+    // 2,400 + 650 is shown nowhere.
+    expect(screen.queryByText('R$ 3,050.00')).not.toBeInTheDocument();
+  });
+
+  it('round-trips each rail filter to the API independently', async () => {
     renderTab();
     await screen.findByText('Alice Doe');
     http.mockClear();
 
-    fireEvent.change(screen.getByLabelText(d.filterLabel), { target: { value: 'delinquent' } });
-
+    fireEvent.change(screen.getByLabelText(d.contractFilterLabel), {
+      target: { value: 'delinquent' },
+    });
     await waitFor(() =>
-      expect(http).toHaveBeenCalledWith('GET', '/admin/billing/students?standing=delinquent'),
+      expect(http).toHaveBeenCalledWith(
+        'GET',
+        '/admin/billing/students?contractStanding=delinquent',
+      ),
+    );
+
+    fireEvent.change(screen.getByLabelText(d.extrasFilterLabel), {
+      target: { value: 'delinquent' },
+    });
+    await waitFor(() =>
+      expect(http).toHaveBeenCalledWith(
+        'GET',
+        '/admin/billing/students?contractStanding=delinquent&extrasStanding=delinquent',
+      ),
+    );
+
+    fireEvent.change(screen.getByLabelText(d.contractFilterLabel), { target: { value: '' } });
+    await waitFor(() =>
+      expect(http).toHaveBeenCalledWith('GET', '/admin/billing/students?extrasStanding=delinquent'),
     );
   });
 
-  it('sends `standing=exempt` for the held filter', async () => {
+  it('sends `contractStanding=exempt` for the held filter and offers no held extras filter', async () => {
     renderTab();
     await screen.findByText('Alice Doe');
     http.mockClear();
 
-    fireEvent.change(screen.getByLabelText(d.filterLabel), { target: { value: 'exempt' } });
+    fireEvent.change(screen.getByLabelText(d.contractFilterLabel), { target: { value: 'exempt' } });
 
     await waitFor(() =>
-      expect(http).toHaveBeenCalledWith('GET', '/admin/billing/students?standing=exempt'),
+      expect(http).toHaveBeenCalledWith('GET', '/admin/billing/students?contractStanding=exempt'),
     );
+    const extrasFilter = screen.getByLabelText(d.extrasFilterLabel);
+    expect(
+      within(extrasFilter).queryByRole('option', { name: standingDict.exempt }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows a held student with their reason and who set it', async () => {
     renderTab();
     expect(await screen.findByText(d.heldBy('Injured until March.', 'admin-9'))).toBeInTheDocument();
-  });
-
-  it('keeps a held balance in the total on screen — a hold stops the chasing, not the debt', async () => {
-    renderTab();
-    await screen.findByText('Alice Doe');
-    // 150000 + 90000 minor units: the held student is still counted.
-    expect(screen.getByText('R$ 2,400.00')).toBeInTheDocument();
   });
 
   it('refuses to set a hold without a reason', async () => {

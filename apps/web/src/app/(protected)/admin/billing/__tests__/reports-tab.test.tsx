@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DictProvider } from '@web/context/dict-context';
 import { dictEn } from '@web/i18n/dict-en';
@@ -20,10 +20,19 @@ const movement = {
   outstandingMinor: 150000,
   invoicesIssued: 3,
   activeStudents: 2,
+  extras: {
+    chargedMinor: 40000,
+    adjustmentsMinor: -5000,
+    receivedMinor: 15000,
+    chargesIssued: 2,
+    receivableAtCloseMinor: 20000,
+  },
+  cashReceivedMinor: 115000,
 };
 
 const aging = {
   asOf: '2026-09-01',
+  rail: 'contract',
   currency: JPY,
   buckets: [
     { bucket: '0-30', fromDaysPastDue: 0, toDaysPastDue: 30, invoiceCount: 1, studentCount: 1, totalMinor: 50000 },
@@ -37,6 +46,7 @@ const aging = {
 };
 
 let client: { adminBilling: ReturnType<typeof createAdminBillingApi> };
+let http: ReturnType<typeof vi.fn>;
 let conflict = false;
 
 vi.mock('@web/context/auth-context', async () => {
@@ -45,7 +55,7 @@ vi.mock('@web/context/auth-context', async () => {
 });
 
 function makeClient() {
-  const http = vi.fn(async (_method: string, path: string) => {
+  http = vi.fn(async (_method: string, path: string) => {
     if (conflict) {
       return {
         ok: false,
@@ -56,13 +66,17 @@ function makeClient() {
     return {
       ok: true,
       status: 200,
-      json: async () => (path.includes('movement') ? movement : aging),
+      json: async () =>
+        path.includes('movement')
+          ? movement
+          : { ...aging, rail: path.includes('rail=extras') ? 'extras' : 'contract' },
     } as unknown as Response;
   });
   return { adminBilling: createAdminBillingApi(http as unknown as HttpTransport) };
 }
 
 const d = dictEn.admin.billing.reports;
+const rails = dictEn.admin.billing.rails;
 
 function renderTab() {
   return render(
@@ -85,6 +99,50 @@ describe('ReportsTab', () => {
     expect(await screen.findByText('¥ 250,000')).toBeInTheDocument();
     expect(screen.getByText('¥ 100,000')).toBeInTheDocument();
     expect(screen.getByText(d.movement.period('2026-08-01', '2026-08-31'))).toBeInTheDocument();
+  });
+
+  it('renders movement as three separate groups: contract, extras and cash received', async () => {
+    renderTab();
+    const contract = within(await screen.findByRole('region', { name: d.movement.contractHeading }));
+    const extras = within(screen.getByRole('region', { name: d.movement.extrasHeading }));
+    const cash = within(screen.getByRole('region', { name: d.movement.cashHeading }));
+
+    // Contract fields keep their meaning: received is the monthly fees only.
+    expect(contract.getByText(d.movement.received).nextSibling).toHaveTextContent('¥ 100,000');
+    expect(contract.getByText(d.movement.invoicesIssued)).toBeInTheDocument();
+
+    expect(extras.getByText(d.movement.charged).nextSibling).toHaveTextContent('¥ 40,000');
+    expect(extras.getByText(d.movement.received).nextSibling).toHaveTextContent('¥ 15,000');
+    expect(extras.getByText(d.movement.receivableAtClose).nextSibling).toHaveTextContent('¥ 20,000');
+    expect(extras.getByText(d.movement.chargesIssued).nextSibling).toHaveTextContent('2');
+
+    // The till total is the only cross-rail figure, and it is labelled as cash.
+    expect(cash.getByText('¥ 115,000')).toBeInTheDocument();
+    expect(cash.getByText(d.movement.cashNote)).toBeInTheDocument();
+    expect(screen.getAllByText('¥ 115,000')).toHaveLength(1);
+  });
+
+  it('opens aging on the contract rail and refetches with `rail=extras` on switch', async () => {
+    renderTab();
+    await screen.findByText(d.aging.buckets['0-30']);
+    expect(http).toHaveBeenCalledWith('GET', '/admin/billing/reports/aging?rail=contract');
+    const railGroup = within(screen.getByRole('group', { name: d.aging.railLabel }));
+    expect(railGroup.getByRole('button', { name: rails.contract })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByText(d.aging.columns.invoices)).toBeInTheDocument();
+
+    fireEvent.click(railGroup.getByRole('button', { name: rails.extras }));
+
+    await waitFor(() =>
+      expect(http).toHaveBeenCalledWith('GET', '/admin/billing/reports/aging?rail=extras'),
+    );
+    expect(await screen.findByText(d.aging.columns.charges)).toBeInTheDocument();
+    expect(railGroup.getByRole('button', { name: rails.extras })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('renders the four aging buckets with the API totals', async () => {

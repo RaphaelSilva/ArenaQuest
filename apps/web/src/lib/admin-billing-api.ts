@@ -21,6 +21,12 @@ export type PaymentMethod = 'cash' | 'pix' | 'bank_transfer' | 'card' | 'gateway
 export type Standing = 'good' | 'due' | 'delinquent' | 'exempt';
 export type AgingBucketKey = '0-30' | '31-60' | '61-90' | '90+';
 
+/**
+ * The two billing rails (RFC 0015 §2): contract invoices and event charges.
+ * They are resolved, reported and aged apart — never merged into one figure.
+ */
+export type BillingRail = 'contract' | 'extras';
+
 export type BillingPlan = {
   id: string;
   name: string;
@@ -298,6 +304,22 @@ export type BillingMovementReport = {
   outstandingMinor: number;
   invoicesIssued: number;
   activeStudents: number;
+  /** The extras rail of the month, from event charges only. */
+  extras: BillingMovementExtras;
+  /**
+   * Cash that entered the till in the month, both rails. The one cross-rail
+   * figure the API states — not a receivable and not a standing.
+   */
+  cashReceivedMinor: number;
+};
+
+export type BillingMovementExtras = {
+  chargedMinor: number;
+  /** Signed: negative reduces what is owed. */
+  adjustmentsMinor: number;
+  receivedMinor: number;
+  chargesIssued: number;
+  receivableAtCloseMinor: number;
 };
 
 export type BillingAgingBucket = {
@@ -311,6 +333,8 @@ export type BillingAgingBucket = {
 
 export type BillingAgingReport = {
   asOf: string;
+  /** The one rail bucketed; on `extras` the invoice counts count event charges. */
+  rail: BillingRail;
   currency: BillingReportCurrency;
   buckets: BillingAgingBucket[];
   totalMinor: number;
@@ -339,6 +363,13 @@ export type BillingStudentStatement = {
   outstandingMinor: number;
   contractGroups: BillingStatementContractGroup[];
   invoices: BillingStatementInvoice[];
+  /**
+   * The extras rail, beside — never summed into — the contract
+   * `outstandingMinor`. The API always sends it; it is optional in this type
+   * only because statement fixtures predating RFC 0015 still type-check
+   * against it, and a reader treats its absence as "never charged".
+   */
+  extras?: BillingStatementExtras;
 };
 
 export type BillingHold = {
@@ -349,28 +380,52 @@ export type BillingHold = {
   setAt: string;
 };
 
+/** The contract rail of one roster line: RFC 0013's standing, from invoices only. */
+export type BillingRosterContract = {
+  id: string;
+  groupId: string;
+  status: ContractStatus;
+  nextDueDate: string | null;
+  negotiatedTerms: boolean;
+  standing: Standing;
+  oldestOverdueDate: string | null;
+  outstandingMinor: number;
+};
+
+/** The extras rail of one roster line: from event charges only, never held. */
+export type BillingRosterExtras = {
+  standing: Standing;
+  oldestOverdueDate: string | null;
+  outstandingMinor: number;
+  /** Live charges with a positive balance. */
+  openCharges: number;
+  /** Of those, the ones whose due date has arrived. */
+  overdueCharges: number;
+};
+
 /**
- * One roster line. `standing` is resolved by the API on every read — it is
- * never recomputed here. Nothing on this row gates access: a `delinquent` line
- * changes no permission.
+ * One roster line (RFC 0015 §4): two rails side by side and no top-level
+ * standing or total. `contract` is null for an extras-only buyer; `extras` is
+ * null for someone never charged. Both standings are resolved by the API on
+ * every read — never recomputed here — and nothing on this row gates access.
  */
 export type BillingRosterEntry = {
   userId: string;
   asOf: string;
-  standing: Standing;
-  oldestOverdueDate: string | null;
-  outstandingMinor: number;
-  contractId: string;
-  contractGroupId: string;
-  contractStatus: ContractStatus;
   currency: string;
-  nextDueDate: string | null;
-  negotiatedTerms: boolean;
+  contract: BillingRosterContract | null;
+  extras: BillingRosterExtras | null;
   hold: BillingHold | null;
 };
 
-/** `standing=exempt` is the held filter — a hold is the only way to reach it. */
+/**
+ * The two filters are independent. `contractStanding=exempt` is the held
+ * filter — a hold applies to the contract rail only.
+ */
 export type RosterQuery = {
+  contractStanding?: Standing;
+  extrasStanding?: Standing;
+  /** @deprecated The server's alias of `contractStanding`. */
   standing?: Standing;
   asOf?: string;
 };
@@ -499,6 +554,21 @@ export type BillingEventAudienceCheck = {
   eventId: string;
   audience: 'public' | 'members' | 'restricted';
   outsideAudience: string[];
+};
+
+/** One event charge on a statement: the charge, its event, and its whole ledger. */
+export type BillingStatementCharge = BillingEventChargeDetail & {
+  eventTitle: string;
+  /** When the event starts; null when the event no longer exists. */
+  eventStartsAt: string | null;
+};
+
+/** The extras rail of a statement: its own standing and its own outstanding. */
+export type BillingStatementExtras = {
+  standing: Standing;
+  oldestOverdueDate: string | null;
+  outstandingMinor: number;
+  charges: BillingStatementCharge[];
 };
 
 export class AdminBillingApiError extends Error {
@@ -697,16 +767,17 @@ export function createAdminBillingApi(http: HttpTransport) {
         );
       },
 
-      aging(asOf?: string): Promise<BillingAgingReport> {
+      /** Without `rail` the server ages the contract rail. */
+      aging(asOf?: string, rail?: BillingRail): Promise<BillingAgingReport> {
         return get<BillingAgingReport>(
-          `${BASE}/reports/aging${queryString({ asOf })}`,
+          `${BASE}/reports/aging${queryString({ asOf, rail })}`,
           'BILLING_AGING_REPORT_FAILED',
         );
       },
     },
 
     students: {
-      /** The standing filter is a server parameter, never a local array filter. */
+      /** Both standing filters are server parameters, never a local array filter. */
       roster(query: RosterQuery = {}): Promise<BillingRosterEntry[]> {
         return get<BillingRosterEntry[]>(
           `${BASE}/students${queryString(query)}`,

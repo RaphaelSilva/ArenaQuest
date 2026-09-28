@@ -4,8 +4,11 @@ import { DictProvider } from '@web/context/dict-context';
 import { dictEn } from '@web/i18n/dict-en';
 import { createAdminBillingApi } from '@web/lib/admin-billing-api';
 import type {
+  BillingStatementCharge,
+  BillingStatementExtras,
   BillingStudentStatement,
   BillingSubscription,
+  Standing,
 } from '@web/lib/admin-billing-api';
 import type { HttpTransport } from '@web/lib/api-client';
 import { makeTransport } from './test-transport';
@@ -57,6 +60,36 @@ function statement(versions: BillingSubscription[]): BillingStudentStatement {
   };
 }
 
+function charge(overrides: Partial<BillingStatementCharge> = {}): BillingStatementCharge {
+  return {
+    id: 'ch1',
+    eventId: 'e1',
+    userId: 'u1',
+    description: 'Winter Seminar',
+    amountMinor: 30000,
+    currency: 'BRL',
+    termsSource: 'standard',
+    termsNote: '',
+    dueDate: '2026-08-01',
+    graceDays: 5,
+    status: 'open',
+    issuedBy: 'admin-1',
+    issuedAt: '2026-07-01T00:00:00Z',
+    voidedAt: null,
+    voidReason: null,
+    balanceMinor: 25000,
+    adjustments: [],
+    payments: [],
+    eventTitle: 'Winter Seminar',
+    eventStartsAt: '2026-07-18T13:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function withExtras(extras: BillingStatementExtras): BillingStudentStatement {
+  return { ...statement([version()]), extras };
+}
+
 let payload: BillingStudentStatement;
 let http: ReturnType<typeof makeTransport>;
 let client: { adminBilling: ReturnType<typeof createAdminBillingApi> };
@@ -68,7 +101,10 @@ vi.mock('@web/context/auth-context', async () => {
 
 const onClose = vi.fn();
 
-function renderPanel(onSignContract?: (userId: string) => void) {
+function renderPanel(
+  onSignContract?: (userId: string) => void,
+  contractStanding?: Standing | null,
+) {
   return render(
     <DictProvider value={dictEn}>
       <StudentStatementPanel
@@ -76,6 +112,7 @@ function renderPanel(onSignContract?: (userId: string) => void) {
         studentName="Alice Doe"
         onClose={onClose}
         onSignContract={onSignContract}
+        contractStanding={contractStanding}
       />
     </DictProvider>,
   );
@@ -275,5 +312,62 @@ describe('StudentStatementPanel', () => {
 
     expect(await screen.findByText(d.loadError)).toBeInTheDocument();
     expect(screen.queryByText(d.currentTermsHeading)).not.toBeInTheDocument();
+  });
+
+  describe('two rails', () => {
+    const rails = dictEn.admin.billing.rails;
+    const standingDict = dictEn.admin.billing.standing;
+
+    it('shows the contract and the extras apart, each with its own badge', async () => {
+      payload = withExtras({
+        standing: 'delinquent',
+        oldestOverdueDate: '2026-08-01',
+        outstandingMinor: 25000,
+        charges: [charge()],
+      });
+      renderPanel(undefined, 'good');
+
+      const extras = within(await screen.findByRole('region', { name: rails.extras }));
+      expect(extras.getByText(standingDict.delinquent)).toBeInTheDocument();
+      expect(extras.getByText('Winter Seminar')).toBeInTheDocument();
+      expect(extras.getByText('2026-07-18')).toBeInTheDocument();
+      expect(extras.getByText('2026-08-01', { selector: 'td' })).toBeInTheDocument();
+      expect(extras.getByText(dictEn.admin.billing.extras.charges.status.open)).toBeInTheDocument();
+      expect(extras.getByText(d.extrasOutstanding).nextSibling).toHaveTextContent('R$ 250.00');
+
+      // The contract badge sits outside the extras region, and names its rail.
+      const contractBadge = screen.getByText(standingDict.good);
+      expect(contractBadge.closest('section[aria-label]')).toBeNull();
+      expect(contractBadge).toHaveTextContent(`${rails.contract}: ${standingDict.good}`);
+    });
+
+    it('says "no contract" for an extras-only buyer and still renders the extras', async () => {
+      payload = {
+        ...statement([]),
+        contractGroups: [],
+        extras: {
+          standing: 'due',
+          oldestOverdueDate: null,
+          outstandingMinor: 30000,
+          charges: [charge({ balanceMinor: 30000 })],
+        },
+      };
+      renderPanel(undefined, null);
+
+      expect(await screen.findByText(d.noContract)).toBeInTheDocument();
+      const extras = within(screen.getByRole('region', { name: rails.extras }));
+      // "Due" is also a column header; the badge is the one naming its rail.
+      const badges = extras
+        .getAllByText(standingDict.due)
+        .filter((el) => el.textContent === `${rails.extras}: ${standingDict.due}`);
+      expect(badges).toHaveLength(1);
+    });
+
+    it('reads a statement with no extras block as never charged', async () => {
+      renderPanel();
+      const extras = within(await screen.findByRole('region', { name: rails.extras }));
+      expect(extras.getByText(d.extrasEmpty)).toBeInTheDocument();
+      expect(extras.getByText(standingDict.good)).toBeInTheDocument();
+    });
   });
 });
