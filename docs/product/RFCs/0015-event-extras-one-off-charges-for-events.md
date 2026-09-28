@@ -530,7 +530,8 @@ the rest of the billing router.
 
 ## Implementation Plan
 
-Total **~7.5 dev days**, as a new milestone (M21) derived from this RFC.
+Total **~7.5 dev days**, as milestone [M22](../milestones/22-event-extras-one-off-charges/milestone.md)
+derived from this RFC (M21 is reserved by RFC 0016).
 
 ### Phase 0 — Domain and contracts (~1 d)
 `Entities.Billing.EventPrice/EventCharge`, `Config.ChargeStatus`, the
