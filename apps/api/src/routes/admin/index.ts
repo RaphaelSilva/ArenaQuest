@@ -14,6 +14,7 @@ import { buildAdminEnrollmentsRouter } from './enrollments';
 import { buildAdminGroupsRouter } from './groups';
 import { buildAdminBillingRouter } from './billing';
 import { buildAdminEventsRouter } from './events';
+import { buildAdminNotesRouter } from './notes';
 import type { AppContainer } from '@api/container';
 
 export function buildAdminRouter(container: AppContainer) {
@@ -22,6 +23,13 @@ export function buildAdminRouter(container: AppContainer) {
   // Apply root level authentication and role checks once for the entire sub-app
   app.use('*', authGuard, requireRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR));
 
+  // Staff notes (RFC 0016). MUST stay registered before '/users': the users
+  // router applies `requireRole(ROLES.ADMIN)` to '/users/*', which would also
+  // catch 'GET /users/{userId}/notes' and 403 a content creator. Hono runs
+  // handlers in registration order and this one responds, so the later
+  // '/users/*' middleware never runs for that path. Guarded by a spec asserting
+  // a content creator gets 200 there (test/routes/admin-notes.router.spec.ts).
+  app.route('/', buildAdminNotesRouter(container));
   app.route('/users', buildAdminUsersRouter(container));
   app.route('/topics', buildAdminTopicsRouter(container));
   app.route('/tasks', buildAdminTasksRouter(container));

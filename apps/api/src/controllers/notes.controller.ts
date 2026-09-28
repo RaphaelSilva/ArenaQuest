@@ -33,6 +33,15 @@ export type ClassNote = Note & { isMine: boolean };
 /** A note in the author's "My notes" listing. */
 export type AuthoredNote = Note & { topicTitle: string; topicAccessible: boolean };
 
+/**
+ * A note as staff see it: moderation provenance included, because the user
+ * backoffice shows who force-unshared a note and when.
+ */
+export type StaffNote = Note & { moderatedAt: string | null; moderatedBy: string | null };
+
+/** A note in the staff per-student listing. */
+export type StaffAuthoredNote = StaffNote & { topicTitle: string };
+
 export interface NotePage<T> {
   data: T[];
   /** Decoded key of the next page; the route encodes it. `null` on the last page. */
@@ -76,6 +85,11 @@ export function toNote(record: NoteRecord): Note {
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };
+}
+
+/** {@link toNote} plus the moderation provenance only staff are shown. */
+export function toStaffNote(record: NoteRecord): StaffNote {
+  return { ...toNote(record), moderatedAt: record.moderatedAt, moderatedBy: record.moderatedBy };
 }
 
 /**
@@ -248,5 +262,51 @@ export class NotesController {
         nextCursor: page.nextCursor,
       },
     };
+  }
+
+  // -------------------------------------------------------------------------
+  // Staff (RFC 0016 §3). The `/v1/admin` umbrella admits `admin` and
+  // `content_creator` only, so these methods add no role check of their own.
+  // There is deliberately no staff method that edits or deletes a note body.
+  // -------------------------------------------------------------------------
+
+  /**
+   * `GET /admin/users/{userId}/notes` — every note one user wrote, private
+   * included, newest `updatedAt` first. An unknown user is simply an empty page:
+   * the listing reveals nothing a staff member could not already see.
+   */
+  async listByAuthorForStaff(
+    userId: string,
+    cursor: NoteCursorKey | null,
+  ): Promise<ControllerResult<NotePage<StaffAuthoredNote>>> {
+    const page = await this.notes.listByAuthor(userId, { cursor, limit: NOTES_PAGE_SIZE });
+    return {
+      ok: true,
+      data: {
+        data: page.data.map((record) => ({ ...toStaffNote(record), topicTitle: record.topicTitle })),
+        nextCursor: page.nextCursor,
+      },
+    };
+  }
+
+  /**
+   * `POST /admin/notes/{id}/unshare` — force-unshare: the note becomes (or
+   * stays) private and flagged, `revision` is bumped so an open editor gets
+   * `NOTE_STALE`, and the body is untouched.
+   */
+  async unshare(noteId: string, staffId: string): Promise<ControllerResult<StaffNote>> {
+    const record = await this.notes.setModeration(noteId, staffId);
+    if (!record) return NOT_FOUND;
+    return { ok: true, data: toStaffNote(record) };
+  }
+
+  /**
+   * `DELETE /admin/notes/{id}/moderation` — lifts the flag so the author may
+   * share again. It never re-shares on the author's behalf.
+   */
+  async clearModeration(noteId: string): Promise<ControllerResult<null>> {
+    const record = await this.notes.setModeration(noteId, null);
+    if (!record) return NOT_FOUND;
+    return { ok: true, data: null };
   }
 }

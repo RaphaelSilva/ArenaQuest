@@ -356,3 +356,86 @@ describe('NotesController.listMine', () => {
     expect(enrollment.getEffectiveAccessTopicIds).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Staff (Task 04)
+// ---------------------------------------------------------------------------
+
+describe('NotesController.listByAuthorForStaff', () => {
+  it('returns every note with topic title and moderation provenance, passing the cursor through', async () => {
+    const row: AuthoredNoteRecord = {
+      ...note({ moderated: true, moderatedAt: '2026-09-28 11:00:00', moderatedBy: ADMIN.userId }),
+      topicTitle: 'Published',
+      topicStatus: Entities.Config.TopicNodeStatus.PUBLISHED,
+      topicArchived: false,
+    };
+    const next = { sortKey: '2026-09-28 10:00:00', id: 'note-1' };
+    const { controller, notes, enrollment } = build(
+      makeNotes({ listByAuthor: vi.fn(async () => ({ data: [row], nextCursor: next })) }),
+    );
+    const cursor = { sortKey: '2026-09-29 00:00:00', id: 'z' };
+    const result = await controller.listByAuthorForStaff(STUDENT.userId, cursor);
+    expect(notes.listByAuthor).toHaveBeenCalledWith(STUDENT.userId, { cursor, limit: NOTES_PAGE_SIZE });
+    expect(enrollment.getEffectiveAccessTopicIds).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        data: [
+          {
+            ...note({ moderated: true }),
+            moderatedAt: '2026-09-28 11:00:00',
+            moderatedBy: ADMIN.userId,
+            topicTitle: 'Published',
+          },
+        ],
+        nextCursor: next,
+      },
+    });
+    if (result.ok) expect(result.data.data[0]).not.toHaveProperty('topicStatus');
+  });
+
+  it('answers an empty page for an unknown user', async () => {
+    const { controller } = build();
+    expect(await controller.listByAuthorForStaff('nobody', null)).toEqual({
+      ok: true,
+      data: { data: [], nextCursor: null },
+    });
+  });
+});
+
+describe('NotesController.unshare', () => {
+  it('sets moderation with the staff id and returns the note with provenance', async () => {
+    const moderated = note({
+      revision: 3,
+      moderated: true,
+      moderatedAt: '2026-09-28 11:00:00',
+      moderatedBy: CREATOR.userId,
+    });
+    const { controller, notes } = build(makeNotes({ setModeration: vi.fn(async () => moderated) }));
+    const result = await controller.unshare('note-1', CREATOR.userId);
+    expect(notes.setModeration).toHaveBeenCalledWith('note-1', CREATOR.userId);
+    expect(result).toEqual({
+      ok: true,
+      data: { ...note({ revision: 3, moderated: true }), moderatedAt: '2026-09-28 11:00:00', moderatedBy: CREATOR.userId },
+    });
+  });
+
+  it('answers 404 NotFound on an unknown id', async () => {
+    const { controller } = build();
+    expect(await controller.unshare('missing', ADMIN.userId)).toEqual({ ok: false, status: 404, error: 'NotFound' });
+  });
+});
+
+describe('NotesController.clearModeration', () => {
+  it('clears moderation (adminId null) and returns no content', async () => {
+    const { controller, notes } = build(makeNotes({ setModeration: vi.fn(async () => note()) }));
+    expect(await controller.clearModeration('note-1')).toEqual({ ok: true, data: null });
+    expect(notes.setModeration).toHaveBeenCalledWith('note-1', null);
+    expect(notes.saveMine).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 NotFound on an unknown id', async () => {
+    const { controller } = build();
+    expect(await controller.clearModeration('missing')).toEqual({ ok: false, status: 404, error: 'NotFound' });
+  });
+});

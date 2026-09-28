@@ -213,6 +213,15 @@ export const AuthoredNoteSchema = NoteSchema.extend({
   }),
 }).openapi('AuthoredNote');
 
+export const StaffNoteSchema = NoteSchema.extend({
+  moderatedAt: z.string().nullable().openapi({ description: 'When staff force-unshared the note; null when not moderated', example: null }),
+  moderatedBy: z.string().nullable().openapi({ description: 'The staff member who force-unshared the note; null when not moderated', example: null }),
+}).openapi('StaffNote');
+
+export const StaffAuthoredNoteSchema = StaffNoteSchema.extend({
+  topicTitle: z.string().openapi({ example: 'Intro to Algebra' }),
+}).openapi('StaffAuthoredNote');
+
 const nextCursorField = z.string().nullable().openapi({
   description: 'Opaque cursor of the next page; null on the last page',
   example: null,
@@ -227,6 +236,11 @@ export const AuthoredNotePageSchema = z.object({
   data: z.array(AuthoredNoteSchema),
   nextCursor: nextCursorField,
 }).openapi('AuthoredNotePage');
+
+export const StaffAuthoredNotePageSchema = z.object({
+  data: z.array(StaffAuthoredNoteSchema),
+  nextCursor: nextCursorField,
+}).openapi('StaffAuthoredNotePage');
 
 export const SaveNoteBodySchema = z.object({
   body: z.string().openapi({ description: 'Markdown; sanitised and trimmed, then must be 1..NOTE_BODY_MAX characters', example: 'My note' }),

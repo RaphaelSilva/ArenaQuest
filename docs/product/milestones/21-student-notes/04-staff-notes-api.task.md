@@ -1,6 +1,6 @@
 # Task 04 — Backend: Staff notes API — per-student list and moderation (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [21 — Student notes — private and shared topic notes with staff moderation](./milestone.md)
 **RFC:** [RFC 0016](../../RFCs/0016-student-notes.md)
 **Team:** Backend API
@@ -65,21 +65,21 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] An `admin` token and a `content_creator` token each list a student's notes (private
+- [x] An `admin` token and a `content_creator` token each list a student's notes (private
       included), unshare a shared note, and clear its moderation.
-- [ ] A student token and a tutor token calling any of the three routes receive `403`.
-- [ ] After unshare the note's `body` is byte-identical, `visibility` is `private`,
+- [x] A student token and a tutor token calling any of the three routes receive `403`.
+- [x] After unshare the note's `body` is byte-identical, `visibility` is `private`,
       `moderated` is true and `revision` is one higher; it is absent from the student
       class listing.
-- [ ] The author's `PUT` with `visibility: shared` returns `409 NOTE_MODERATED` until the
+- [x] The author's `PUT` with `visibility: shared` returns `409 NOTE_MODERATED` until the
       flag is cleared, then succeeds.
-- [ ] An author `PUT` sent with the pre-moderation `revision` returns `409 NOTE_STALE`.
-- [ ] No route in the diff lets staff change a note's body or delete it.
-- [ ] No provider-specific (D1/R2) import leaks into the controller.
-- [ ] Validation, auth, not-found and conflict branches each return the correct
+- [x] An author `PUT` sent with the pre-moderation `revision` returns `409 NOTE_STALE`.
+- [x] No route in the diff lets staff change a note's body or delete it.
+- [x] No provider-specific (D1/R2) import leaks into the controller.
+- [x] Validation, auth, not-found and conflict branches each return the correct
       `ControllerResult` status and are covered by a test.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
