@@ -114,7 +114,8 @@ Out of scope (explicit, from RFC 0021 Non-Goals):
 
 **Guard and reset**
 - `check-no-dev-seed.ts` also matches demo user ids for every label and the
-  `*.demo.invalid` e-mail domain.
+  `*.demo.invalid` e-mail domain, enforced for production targets (staging may hold the
+  demo; its deploys keep the dev-seed check only).
 - `make db-reset-staging LABEL=` (confirms, naming the database) records a bookmark,
   drops every non-`sqlite_%`/`_cf_%` table including `d1_migrations`, re-applies
   migrations and runs the demo seed; the `database_id` is unchanged.
@@ -191,7 +192,7 @@ Out of scope (explicit, from RFC 0021 Non-Goals):
 | 10 | [Migration lint: additive and frozen](./10-migration-lint.task.md) | 3 | Backend | ☐ Open |
 | 11 | [Generated `previews` blocks and preview secrets](./11-wrangler-previews-block.task.md) | 3 | Backend | ☐ Open |
 | 12 | [Deploy CLI `--preview` mode, Make targets and workflow](./12-deploy-cli-preview-mode.task.md) | 3 | Backend | ☐ Open |
-| 13 | [Preview banner](./13-preview-banner--frontend.task.md) | 3 | Frontend | ☐ Open |
+| 13 | [Preview banner](./13-preview-banner-frontend.task.md) | 3 | Frontend | ☐ Open |
 | 14 | [Demo extensions: events, billing, tasks, comments](./14-seed-demo-extensions.task.md) | 4 | Backend | ☐ Open |
 
 Dependency graph:
@@ -205,6 +206,7 @@ Dependency graph:
         │ └──► 14
         └────► 07
 04,05,06,07 ──► 08 ──► 09
+               08 ──► 14
 ```
 
 **Recommended execution order:** `01` → `02` → `03` → `04` → `05` → `06` → `07` →
