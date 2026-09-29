@@ -1735,6 +1735,7 @@ export const dictPt = {
   },
   catalog: {
     redesign: {
+      topicTagsLabel: 'Tags do tópico',
       statsSubtopics: 'Subtópicos',
       statsMedia: 'Mídias',
       statsTotal: 'Total no ramo',
