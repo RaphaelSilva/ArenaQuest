@@ -67,6 +67,9 @@ export function AdminSidebar() {
     { label: dict.layout.adminSidebar.players, href: '/admin/players', requiredRoles: [ROLES.ADMIN] },
     { label: dict.layout.adminSidebar.groups, href: '/admin/groups', requiredRoles: [ROLES.ADMIN] },
     { label: dict.layout.adminSidebar.access, href: '/admin/access', requiredRoles: [ROLES.ADMIN] },
+    // ADMIN only — the bucket view crosses every topic and event, drafts and
+    // restricted events included (RFC 0018 Alternative 5).
+    { label: dict.layout.adminSidebar.storage, href: '/admin/storage', requiredRoles: [ROLES.ADMIN] },
     {
       // ADMIN only — never CONTENT_CREATOR — matching the API's own guard on
       // `/v1/admin/billing/*`.
