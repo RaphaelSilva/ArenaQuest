@@ -1,6 +1,6 @@
 # Task 04 — Frontend: Admin storage browser page (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [25 — Admin storage browser and orphan audit](./milestone.md)
 **RFC:** [RFC 0018](../../RFCs/0018-admin-storage-browser-and-orphan-audit.md)
 **Team:** Frontend Web
@@ -72,21 +72,21 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Opening `/admin/storage` as admin requests `/browse` with `prefix=''` and renders the root
+- [x] Opening `/admin/storage` as admin requests `/browse` with `prefix=''` and renders the root
       folders; clicking `topics/` then a topic folder requests those prefixes and shows the topic
       title in the folder row and the breadcrumb.
-- [ ] Each object row shows name, size, date, the badge for its status (stale pending visually
+- [x] Each object row shows name, size, date, the badge for its status (stale pending visually
       distinct) and an owner link to `/admin/topics` or `/admin/events/<id>`.
-- [ ] "Load more" appears only when `nextCursor` is present and requests the next page with it.
-- [ ] Selecting a row requests `/object` and shows references, key, hint and an inline preview
+- [x] "Load more" appears only when `nextCursor` is present and requests the next page with it.
+- [x] Selecting a row requests `/object` and shows references, key, hint and an inline preview
       of an image, a PDF and a video from the presigned URL.
-- [ ] The *Storage* sidebar item is absent and `/admin/storage` redirects for a
+- [x] The *Storage* sidebar item is absent and `/admin/storage` redirects for a
       `content_creator` session (RTL test).
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and `dict-pt.ts`;
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and `dict-pt.ts`;
       `check-i18n-coverage.js` passes.
-- [ ] The surface is responsive and keyboard-usable, including the drawer.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] The surface is responsive and keyboard-usable, including the drawer.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

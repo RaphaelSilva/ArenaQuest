@@ -332,6 +332,1779 @@ export interface paths {
         };
         trace?: never;
     };
+    "/v1/admin/billing/holds/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hold a Student Standing
+         * @description Suppresses an alert, never a permission and never a total: the reported standing becomes `exempt` and the student leaves the delinquency listing and the reminder mail, while their balance stays in the movement report, the aging report and their statement. The reason is mandatory and the acting admin is recorded, so a temporary hold cannot quietly become permanent. An `expiresAt` needs nothing to run — the day after it passes the underlying standing is reported again.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SetBillingHoldBody"];
+                };
+            };
+            responses: {
+                /** @description Hold set */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingStandingHold"] & Record<string, never>;
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Clear a Standing Hold
+         * @description Removes the hold. The debt it kept out of the listing was never touched.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Hold cleared */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Invoices */
+        get: {
+            parameters: {
+                query?: {
+                    status?: "open" | "paid" | "void";
+                    from?: string;
+                    to?: string;
+                    userId?: string;
+                    subscriptionId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Invoices with their balances */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingInvoiceWithBalance"][];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Issue an Ad-hoc Invoice
+         * @description Snapshots the contract's terms — never the plan's. A zero amount settles at issue.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IssueInvoiceBody"];
+                };
+            };
+            responses: {
+                /** @description Invoice issued */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingInvoice"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/invoices/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run the Billing Cycle
+         * @description Issues the period's invoices, sends the two student notices, digests the admins on standing crossings and asserts each open invoice's cached status. It writes no adjustment of any kind and repairs no status.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RunInvoiceCycleBody"];
+                };
+            };
+            responses: {
+                /** @description The run report */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingRunReport"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/invoices/{id}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply an Invoice Adjustment
+         * @description Append-only. Negative reduces what is owed; nothing accrues a fee on its own.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ApplyAdjustmentBody"];
+                };
+            };
+            responses: {
+                /** @description Adjustment applied */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingInvoiceAdjustment"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/invoices/{id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a Payment */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RecordPaymentBody"];
+                };
+            };
+            responses: {
+                /** @description Payment recorded */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingPayment"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/invoices/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Void an Invoice
+         * @description The reason is mandatory. The acting admin is recorded in the audit event.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["VoidInvoiceBody"];
+                };
+            };
+            responses: {
+                /** @description Invoice voided */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingInvoice"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/payments/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reverse a Payment
+         * @description Appends the mirror-image row; the original is never updated or deleted.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ReversePaymentBody"];
+                };
+            };
+            responses: {
+                /** @description Reversal recorded */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingPayment"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Billing Plans
+         * @description The price list. Freely editable — a signed contract snapshots its terms.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    archived?: "true" | "false";
+                    cycle?: "monthly" | "quarterly" | "yearly";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Plans */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingPlan"][];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Create a Billing Plan */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateBillingPlanBody"];
+                };
+            };
+            responses: {
+                /** @description Plan created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingPlan"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/plans/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit a Billing Plan
+         * @description Editing the shelf is safe: every signed contract and every issued invoice carries its own snapshot of the terms.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateBillingPlanBody"];
+                };
+            };
+            responses: {
+                /** @description Plan updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingPlan"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/admin/billing/reports/aging": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Receivables Aging
+         * @description Open balances bucketed 0-30 / 31-60 / 61-90 / 90+ by days past each invoice's own due date. Boundaries are exclusive: 30 days past due and 31 days past due land in different buckets.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    asOf?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Receivables aging */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingAgingReport"];
+                    };
+                };
+                /** @description Validation failed — a malformed month or asOf */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The report would span two currencies; totals are never converted */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/reports/movement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Monthly Movement
+         * @description Billed, received and outstanding for one month, recomputed from the ledger rows. Billed is keyed off the invoice's issue date and the adjustment's applied date; received is keyed off the payment's paid date — a payment in September against an August invoice is September's received and August's billed.
+         */
+        get: {
+            parameters: {
+                query: {
+                    month: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Monthly movement */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingMovementReport"];
+                    };
+                };
+                /** @description Validation failed — a malformed month or asOf */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The report would span two currencies; totals are never converted */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Student Billing Roster
+         * @description Every student with a contract, with their standing resolved from their invoices rather than read from a column: outstanding balance, oldest overdue date, next due date and whether the terms were negotiated. `standing=exempt` is the held filter — a hold is the only way to reach it. Reporting only: nothing here gates a student's access.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    standing?: "good" | "due" | "delinquent" | "exempt";
+                    asOf?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The roster */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingRosterEntry"][];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/students/{userId}/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A Student's Statement
+         * @description The student's contracts with their chains, invoices with their adjustments and payments, the outstanding total, and the two derived membership dates: "student since" spans every contract group, "current membership since" is the root of the group now active.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Student statement */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingStudentStatement"];
+                    };
+                };
+                /** @description Validation failed — a malformed month or asOf */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Student not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The report would span two currencies; totals are never converted */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Contracts */
+        get: {
+            parameters: {
+                query?: {
+                    userId?: string;
+                    planId?: string;
+                    status?: "active" | "paused" | "cancelled" | "superseded";
+                    contractGroupId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Contracts */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingSubscription"][];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Sign a Contract
+         * @description Snapshots the plan's amount, currency, cycle and grace days onto the contract. Negotiated terms require termsSource 'negotiated' and a termsNote.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SignContractBody"];
+                };
+            };
+            responses: {
+                /** @description Contract signed */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingSubscription"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/subscriptions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a Contract Lifecycle
+         * @description Pause, resume or cancel only. Terms move through POST /subscriptions/{id}/amend.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ChangeContractLifecycleBody"];
+                };
+            };
+            responses: {
+                /** @description Contract updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingSubscription"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/admin/billing/subscriptions/{id}/amend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Amend a Contract
+         * @description Closes the live version to superseded and opens a new active one in the same contract group.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AmendContractBody"];
+                };
+            };
+            responses: {
+                /** @description Contract amended */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingSubscription"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List every event
+         * @description Drafts, published and archived alike, newest start first. This is the authoring board; the audience rule that scopes `GET /v1/events` deliberately does not apply.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    status?: "draft" | "published" | "archived";
+                    limit?: string;
+                    offset?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The events page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AdminEvent"][];
+                            limit: number;
+                            offset: number;
+                            total: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create an event draft
+         * @description Always creates a `draft`: publishing is a separate, admin-only transition on `PATCH /{id}`. An explicit `slug` is honoured and a collision answers `409`; an omitted one is derived from the title, once.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        audience?: "public" | "members" | "restricted";
+                        contactLabel?: string;
+                        content?: string;
+                        /**
+                         * Format: date-time
+                         * @example 2026-10-10T13:00:00.000Z
+                         */
+                        endsAt?: string | null;
+                        location?: string;
+                        slug?: string;
+                        /**
+                         * Format: date-time
+                         * @example 2026-10-10T13:00:00.000Z
+                         */
+                        startsAt: string;
+                        summary?: string;
+                        timezone?: string;
+                        title: string;
+                        whatsappMessage?: string | null;
+                        whatsappNumber?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The created draft */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminEvent"];
+                    };
+                };
+                /** @description Malformed payload */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The explicit slug is already taken */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/events/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch an event, including its status transitions
+         * @description Renaming never re-derives the slug — a link already circulating keeps working. Supplying `slug` moves it explicitly and a collision answers `409`. `status: "published"` additionally requires the `admin` role; `archived` does not.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        audience?: "public" | "members" | "restricted";
+                        contactLabel?: string;
+                        content?: string;
+                        /**
+                         * Format: date-time
+                         * @example 2026-10-10T13:00:00.000Z
+                         */
+                        endsAt?: string | null;
+                        location?: string;
+                        slug?: string;
+                        /**
+                         * Format: date-time
+                         * @example 2026-10-10T13:00:00.000Z
+                         */
+                        startsAt?: string;
+                        /** @enum {string} */
+                        status?: "draft" | "published" | "archived";
+                        summary?: string;
+                        timezone?: string;
+                        title?: string;
+                        whatsappMessage?: string | null;
+                        whatsappNumber?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The patched event */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminEvent"];
+                    };
+                };
+                /** @description Malformed payload */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Publishing requires the admin role */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No such event */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The explicit slug is already taken */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/admin/events/{id}/audience": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the whole audience grant set
+         * @description Whole-set, never additive: a group or user absent from the payload loses its grant. An unknown id answers `422` rather than a foreign-key failure.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["EventAudienceGrants"];
+                };
+            };
+            responses: {
+                /** @description The grant set now in force */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EventAudienceGrants"];
+                    };
+                };
+                /** @description No such event */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description An unknown group or user id */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/events/{id}/flyer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove the flyer
+         * @description Clears the flyer columns and deletes the object. This is the only `DELETE` on this router: an event itself is removed by archiving it.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Flyer removed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No such event */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/events/{id}/flyer/finalize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm an uploaded flyer
+         * @description Reads the stored object's real size and compares it against the ceiling. Over it, the object is deleted and the flyer stays `pending` (`422 FileTooLarge`); an object that never landed answers `422 NotUploaded`. On success the flyer a previous upload displaced is deleted from storage.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The event with its flyer now `ready` */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminEvent"];
+                    };
+                };
+                /** @description No such event */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not uploaded, over the ceiling, or nothing pending */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/events/{id}/flyer/presign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorise a flyer upload
+         * @description Returns a short-lived presigned `PUT`. A non-image type and a declared size over the shared image ceiling are both refused `422`. The ceiling is re-checked against the stored bytes at finalize.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description An event flyer must be one of: image/jpeg, image/png, image/webp.
+                         * @example image/jpeg
+                         * @enum {string}
+                         */
+                        contentType: "application/pdf" | "video/mp4" | "image/jpeg" | "image/png" | "image/webp";
+                        fileName: string;
+                        sizeBytes: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description The upload URL and the pending flyer */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EventFlyerPresign"];
+                    };
+                };
+                /** @description No such event */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an image, or larger than the ceiling */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/groups": {
         parameters: {
             query?: never;
@@ -1741,6 +3514,265 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/v1/admin/storage/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit one page of the bucket
+         * @description Walks up to `limit` keys flat and returns only the non-`linked` ones. Stateless: follow `nextCursor`.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Audit page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageAuditResponse"];
+                    };
+                };
+                /** @description Validation failed or invalid cursor */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/audit/missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find references whose object is gone
+         * @description Checks up to `limit` live references and returns those whose object does not exist.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Missing-object page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageAuditMissingResponse"];
+                    };
+                };
+                /** @description Validation failed or invalid cursor */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/browse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Browse one storage folder
+         * @description Delimited sub-folders (labelled with their topic / event) and the classified objects directly under `prefix`.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    prefix?: string;
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One folder page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageBrowseResponse"];
+                    };
+                };
+                /** @description Validation failed or invalid cursor */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/object": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inspect one stored object
+         * @description Head, references, classification and a presigned download URL valid for 5 minutes.
+         */
+        get: {
+            parameters: {
+                query: {
+                    key: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Object detail */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageObjectDetail"];
+                    };
+                };
+                /** @description Validation failed or invalid cursor */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No object under that key */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/admin/tasks": {
@@ -4244,6 +6276,246 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List events the caller may see
+         * @description Audience-scoped board. Without a token this is the published, `public` set; with one it additionally contains `members` events and the `restricted` events granted to that user or to one of their groups. One endpoint serves both — the client never declares what it may see.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    scope?: "upcoming" | "past";
+                    limit?: string;
+                    offset?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The slice of the board this caller may see */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /**
+                                 * @example public
+                                 * @enum {string}
+                                 */
+                                audience: "public" | "members" | "restricted";
+                                /** @example null */
+                                endsAt: string | null;
+                                /** @example true */
+                                hasFlyer: boolean;
+                                /** @example a1b2c3d4-e5f6-7890-1234-567890abcdef */
+                                id: string;
+                                /** @example Dojo central */
+                                location: string;
+                                /** @example seminario-de-verao */
+                                slug: string;
+                                /** @example 2026-10-10T13:00:00.000Z */
+                                startsAt: string;
+                                /** @example Open mat with a visiting instructor. */
+                                summary: string;
+                                /** @example America/Sao_Paulo */
+                                timezone: string;
+                                /** @example Seminário de verão */
+                                title: string;
+                            }[];
+                            /** @example 50 */
+                            limit: number;
+                            /** @example 0 */
+                            offset: number;
+                            /**
+                             * @example upcoming
+                             * @enum {string}
+                             */
+                            scope: "upcoming" | "past";
+                            /** @example 3 */
+                            total: number;
+                        };
+                    };
+                };
+                /** @description Malformed query parameter */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/events/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one event by slug
+         * @description Returns the event with its sanitised Markdown body and its resolved contact block. An event the caller may not see answers `404`, byte-identical to a slug that does not exist.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    slug: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The event */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @example public
+                             * @enum {string}
+                             */
+                            audience: "public" | "members" | "restricted";
+                            contact: {
+                                /** @example  */
+                                label: string;
+                                /** @example  */
+                                message: string;
+                                /** @example 5519999991155 */
+                                number: string;
+                            } | null;
+                            /**
+                             * @example ## Programme
+                             *
+                             *     ...
+                             */
+                            content: string;
+                            /** @example null */
+                            endsAt: string | null;
+                            /** @example true */
+                            hasFlyer: boolean;
+                            /** @example a1b2c3d4-e5f6-7890-1234-567890abcdef */
+                            id: string;
+                            /** @example Dojo central */
+                            location: string;
+                            /** @example seminario-de-verao */
+                            slug: string;
+                            /** @example 2026-10-10T13:00:00.000Z */
+                            startsAt: string;
+                            /** @example Open mat with a visiting instructor. */
+                            summary: string;
+                            /** @example America/Sao_Paulo */
+                            timezone: string;
+                            /** @example Seminário de verão */
+                            title: string;
+                        };
+                    };
+                };
+                /** @description No such event, or not visible to this caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/events/{slug}/flyer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Redirect to the event flyer
+         * @description Redirects to a freshly minted presigned GET (TTL 1h). The route itself is the stable URL — safe to paste into a chat or an `og:image` tag — while the bucket stays private and the audience check runs on every hit.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    slug: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Redirect to the presigned flyer URL */
+                302: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No such event, not visible to this caller, or no flyer */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Too Many Requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/leaderboard": {
         parameters: {
             query?: never;
@@ -4349,6 +6621,52 @@ export interface paths {
                     content: {
                         "application/json": unknown[] | null;
                     };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Billing Statement
+         * @description The caller's own standing, contracts, invoices with their payments, and outstanding total. It takes no parameters: the subject is the authenticated caller and there is no request that names another student. A member with no contract gets an empty statement with standing `good`, not a 404.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The caller’s statement */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MyBillingStatement"];
+                    };
+                };
+                /** @description Unauthenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
             };
         };
@@ -5403,6 +7721,389 @@ export interface components {
             /** @example some-activation-token */
             token: string;
         };
+        AdminEvent: {
+            /** @enum {string} */
+            audience: "public" | "members" | "restricted";
+            audienceGrants?: components["schemas"]["EventAudienceGrants"];
+            contactLabel: string;
+            content: string;
+            createdAt: string;
+            createdBy: string;
+            endsAt: string | null;
+            flyer: {
+                key: string | null;
+                name: string | null;
+                sizeBytes: number | null;
+                /** @enum {string} */
+                status: "none" | "pending" | "ready";
+                type: string | null;
+            };
+            id: string;
+            location: string;
+            slug: string;
+            startsAt: string;
+            /** @enum {string} */
+            status: "draft" | "published" | "archived";
+            summary: string;
+            timezone: string;
+            title: string;
+            updatedAt: string;
+            whatsappMessage: string | null;
+            whatsappNumber: string;
+        };
+        AmendContractBody: {
+            /** @example 15000 */
+            amountMinor?: number;
+            /**
+             * @example monthly
+             * @enum {string}
+             */
+            cycle?: "monthly" | "quarterly" | "yearly";
+            dueDay?: number;
+            graceDays?: number;
+            /** @example 2026-01-01 */
+            startDate: string;
+            /** @example Scholarship agreed for 2026. */
+            termsNote: string;
+            /**
+             * @example standard
+             * @enum {string}
+             */
+            termsSource?: "standard" | "negotiated";
+        };
+        ApplyAdjustmentBody: {
+            /** @example -5000 */
+            amountMinor: number;
+            /** @enum {string} */
+            kind: "discount" | "credit" | "waiver" | "surcharge";
+            reason: string;
+        };
+        BillingAgingBucket: {
+            /** @enum {string} */
+            bucket: "0-30" | "31-60" | "61-90" | "90+";
+            fromDaysPastDue: number | null;
+            invoiceCount: number;
+            studentCount: number;
+            toDaysPastDue: number | null;
+            /** @example 15000 */
+            totalMinor: number;
+        };
+        BillingAgingReport: {
+            /** @example 2026-01-01 */
+            asOf: string;
+            buckets: components["schemas"]["BillingAgingBucket"][];
+            currency: components["schemas"]["BillingReportCurrency"];
+            invoiceCount: number;
+            studentCount: number;
+            /** @example 15000 */
+            totalMinor: number;
+        };
+        BillingInvoice: {
+            /** @example 15000 */
+            amountMinor: number;
+            currency: string;
+            /** @example 2026-01-01 */
+            dueDate: string;
+            graceDays: number;
+            id: string;
+            issuedAt: string;
+            /** @example 2026-01-01 */
+            periodEnd: string;
+            /** @example 2026-01-01 */
+            periodStart: string;
+            /** @enum {string} */
+            status: "open" | "paid" | "void";
+            subscriptionId: string;
+            userId: string;
+            voidReason: string | null;
+            voidedAt: string | null;
+        };
+        BillingInvoiceAdjustment: {
+            /** @example 15000 */
+            amountMinor: number;
+            appliedAt: string;
+            appliedBy: string;
+            id: string;
+            invoiceId: string;
+            /** @enum {string} */
+            kind: "discount" | "credit" | "waiver" | "surcharge";
+            reason: string;
+        };
+        BillingInvoiceWithBalance: components["schemas"]["BillingInvoice"] & {
+            /** @example 15000 */
+            balanceMinor: number;
+        };
+        BillingMovementReport: {
+            activeStudents: number;
+            /** @example 15000 */
+            adjustmentsMinor: number;
+            /** @example 15000 */
+            billedMinor: number;
+            currency: components["schemas"]["BillingReportCurrency"];
+            /** @example 15000 */
+            invoicedMinor: number;
+            invoicesIssued: number;
+            /** @example 2026-08 */
+            month: string;
+            /** @example 15000 */
+            outstandingMinor: number;
+            /** @example 2026-01-01 */
+            periodEnd: string;
+            /** @example 2026-01-01 */
+            periodStart: string;
+            /** @example 15000 */
+            receivedMinor: number;
+        };
+        BillingPayment: {
+            /** @example 15000 */
+            amountMinor: number;
+            currency: string;
+            externalReference: string | null;
+            id: string;
+            invoiceId: string;
+            /** @enum {string} */
+            method: "cash" | "pix" | "bank_transfer" | "card" | "gateway" | "other";
+            note: string;
+            paidAt: string;
+            recordedAt: string;
+            recordedBy: string;
+            reversesId: string | null;
+        };
+        BillingPlan: {
+            /** @example 15000 */
+            amountMinor: number;
+            archived: boolean;
+            createdAt: string;
+            /** @example BRL */
+            currency: string;
+            /**
+             * @example monthly
+             * @enum {string}
+             */
+            cycle: "monthly" | "quarterly" | "yearly";
+            description: string;
+            graceDays: number;
+            id: string;
+            name: string;
+            scopeTopicId: string | null;
+            updatedAt: string;
+        };
+        BillingReportCurrency: {
+            /** @example BRL */
+            code: string;
+            /** @example 2 */
+            exponent: number;
+            /** @example R$ */
+            symbol: string;
+        };
+        BillingRosterEntry: {
+            /** @example 2026-01-01 */
+            asOf: string;
+            contractGroupId: string;
+            contractId: string;
+            /** @enum {string} */
+            contractStatus: "active" | "paused" | "cancelled" | "superseded";
+            /** @example BRL */
+            currency: string;
+            hold: components["schemas"]["BillingStandingHold"];
+            negotiatedTerms: boolean;
+            /** @example 2026-01-01 */
+            nextDueDate: string | null;
+            /** @example 2026-01-01 */
+            oldestOverdueDate: string | null;
+            /** @example 15000 */
+            outstandingMinor: number;
+            /**
+             * @example delinquent
+             * @enum {string}
+             */
+            standing: "good" | "due" | "delinquent" | "exempt";
+            userId: string;
+        };
+        BillingRunReport: {
+            absorbed: number;
+            adminsNotified: number;
+            /** @example 2026-01-01 */
+            asOf: string;
+            crossings: {
+                currency: string;
+                /**
+                 * @example delinquent
+                 * @enum {string}
+                 */
+                from: "good" | "due" | "delinquent" | "exempt";
+                /** @example 2026-01-01 */
+                oldestOverdueDate: string | null;
+                /** @example 15000 */
+                outstandingMinor: number;
+                /**
+                 * @example delinquent
+                 * @enum {string}
+                 */
+                to: "good" | "due" | "delinquent" | "exempt";
+                userId: string;
+            }[];
+            divergences: {
+                /** @example 15000 */
+                balanceMinor: number;
+                /** @enum {string} */
+                cachedStatus: "open" | "paid" | "void";
+                /** @enum {string} */
+                expectedStatus: "open" | "paid" | "void";
+                invoiceId: string;
+                userId: string;
+            }[];
+            eligibleContracts: number;
+            issued: {
+                /** @example 15000 */
+                amountMinor: number;
+                currency: string;
+                /** @example 2026-01-01 */
+                dueDate: string;
+                invoiceId: string;
+                /** @example 2026-01-01 */
+                periodStart: string;
+                /** @enum {string} */
+                status: "open" | "paid" | "void";
+                subscriptionId: string;
+                userId: string;
+            }[];
+            mailsSent: number;
+            reminders: {
+                /** @example 15000 */
+                balanceMinor: number;
+                currency: string;
+                /** @example 2026-01-01 */
+                dueDate: string;
+                invoiceId: string;
+                /** @enum {string} */
+                kind: "due_date" | "grace_lapsed";
+                sent: boolean;
+                suppressedByHold: boolean;
+                /** @example 2026-01-01 */
+                triggerOn: string;
+                userId: string;
+            }[];
+            /** @example 2026-01-01 */
+            since: string;
+            suppressedByHold: {
+                /** @example 15000 */
+                outstandingMinor: number;
+                userId: string;
+            }[];
+        };
+        BillingStandingHold: {
+            /** @example 2026-01-01 */
+            expiresAt: string | null;
+            reason: string;
+            setAt: string;
+            setBy: string;
+            userId: string;
+        } | null;
+        BillingStatementContractGroup: {
+            contractGroupId: string;
+            /** @example 2026-01-01 */
+            endDate: string | null;
+            /** @example 2026-01-01 */
+            startDate: string;
+            /** @enum {string} */
+            status: "active" | "paused" | "cancelled" | "superseded";
+            versions: components["schemas"]["BillingSubscription"][];
+        };
+        BillingStatementInvoice: components["schemas"]["BillingInvoiceWithBalance"] & {
+            adjustments: components["schemas"]["BillingInvoiceAdjustment"][];
+            payments: components["schemas"]["BillingPayment"][];
+        };
+        BillingStudentStatement: {
+            contractGroups: components["schemas"]["BillingStatementContractGroup"][];
+            currency: components["schemas"]["BillingReportCurrency"];
+            /** @example 2026-01-01 */
+            currentMembershipSince: string | null;
+            invoices: components["schemas"]["BillingStatementInvoice"][];
+            /** @example 15000 */
+            outstandingMinor: number;
+            /** @example 2026-01-01 */
+            studentSince: string | null;
+            userId: string;
+        };
+        BillingSubscription: {
+            /** @example 15000 */
+            amountMinor: number;
+            contractGroupId: string;
+            currency: string;
+            /**
+             * @example monthly
+             * @enum {string}
+             */
+            cycle: "monthly" | "quarterly" | "yearly";
+            dueDay: number;
+            /** @example 2026-01-01 */
+            endDate: string | null;
+            graceDays: number;
+            id: string;
+            planId: string;
+            signedAt: string;
+            signedBy: string;
+            /** @example 2026-01-01 */
+            startDate: string;
+            /** @enum {string} */
+            status: "active" | "paused" | "cancelled" | "superseded";
+            supersedesId: string | null;
+            termsNote: string;
+            /**
+             * @example standard
+             * @enum {string}
+             */
+            termsSource: "standard" | "negotiated";
+            updatedAt: string;
+            userId: string;
+        };
+        ChangeContractLifecycleBody: {
+            /**
+             * @example pause
+             * @enum {string}
+             */
+            action: "pause" | "resume" | "cancel";
+            /** @example 15000 */
+            amountMinor?: number;
+            /**
+             * @example monthly
+             * @enum {string}
+             */
+            cycle?: "monthly" | "quarterly" | "yearly";
+            dueDay?: number;
+            /** @example 2026-01-01 */
+            endDate?: string;
+            graceDays?: number;
+        };
+        ClassifiedObject: {
+            contentType: string | null;
+            /**
+             * @description Set only when `status` is `orphan`.
+             * @example row-gone
+             * @enum {string|null}
+             */
+            hint: "owner-topic-gone" | "owner-event-gone" | "row-gone" | "unknown-shape" | null;
+            /** @example topics/3f2c…/9a1b…-lesson.pdf */
+            key: string;
+            /**
+             * @description Last path segment of the key.
+             * @example 9a1b…-lesson.pdf
+             */
+            name: string;
+            references: components["schemas"]["StorageReference"][];
+            size: number;
+            /** @description Only ever true for `pending`: older than the 24 h grace window. */
+            stale: boolean;
+            /**
+             * @description Server-side classification of a stored object.
+             * @example linked
+             * @enum {string}
+             */
+            status: "linked" | "pending" | "displaced" | "deleted-row" | "orphan";
+            /** @example 2026-09-29T12:00:00.000Z */
+            uploadedAt: string;
+        };
         Comment: {
             /** @example This topic was very helpful! */
             body: string | null;
@@ -5458,12 +8159,58 @@ export interface components {
             /** @example 100 */
             xpReward?: number;
         };
+        CreateBillingPlanBody: {
+            /** @example 15000 */
+            amountMinor: number;
+            /** @example BRL */
+            currency: string;
+            /**
+             * @example monthly
+             * @enum {string}
+             */
+            cycle: "monthly" | "quarterly" | "yearly";
+            description?: string;
+            /** @example 5 */
+            graceDays: number;
+            name: string;
+            scopeTopicId?: string | null;
+        };
         /** @description Standard error response body with optional metadata fields */
         ErrorBody: {
             /** @description Error code or message */
             error: string;
         } & {
             [key: string]: unknown;
+        };
+        EventAudienceGrants: {
+            /** @default [] */
+            groupIds: string[];
+            /** @default [] */
+            userIds: string[];
+        };
+        EventFlyerPresign: {
+            expiresInSeconds: number;
+            flyer: {
+                key: string | null;
+                name: string | null;
+                sizeBytes: number | null;
+                /** @enum {string} */
+                status: "none" | "pending" | "ready";
+                type: string | null;
+            };
+            maxBytes: number;
+            uploadUrl: string;
+        };
+        EventFlyerStorageReference: {
+            eventId: string;
+            flyerName: string | null;
+            /** @enum {string} */
+            flyerStatus: "none" | "pending" | "ready";
+            key: string;
+            /** @enum {string} */
+            kind: "event-flyer" | "event-flyer-displaced";
+            slug: string;
+            title: string;
         };
         ForgotPasswordRequest: {
             /**
@@ -5479,6 +8226,19 @@ export interface components {
             status: string;
             timestamp: string;
             version: string;
+        };
+        IssueInvoiceBody: {
+            /** @example 15000 */
+            amountMinor?: number;
+            /** @example 2026-01-01 */
+            dueDate?: string;
+            /** @example 2026-01-01 */
+            periodEnd?: string;
+            /** @example 2026-01-01 */
+            periodStart?: string;
+            /** @example 2026-01-01 */
+            referenceDate?: string;
+            subscriptionId: string;
         };
         LoginRequest: {
             /**
@@ -5547,6 +8307,52 @@ export interface components {
              */
             url: string;
         };
+        MediaStorageReference: {
+            /** @example 2026-09-29T12:00:00.000Z */
+            createdAt: string;
+            key: string;
+            /** @enum {string} */
+            kind: "media";
+            mediaId: string;
+            /** @example Lesson One.pdf */
+            originalName: string;
+            sizeBytes: number;
+            /**
+             * @description The status of the media.
+             * @example ready
+             * @enum {string}
+             */
+            status: "pending" | "ready" | "deleted";
+            topic: {
+                id: string;
+                /**
+                 * @description The status of the topic node.
+                 * @example published
+                 * @enum {string}
+                 */
+                status: "draft" | "published" | "archived";
+                title: string;
+            } | null;
+            topicId: string;
+            /** @example application/pdf */
+            type: string;
+            uploader: {
+                id: string;
+                name: string;
+            } | null;
+            uploaderId: string;
+        };
+        MyBillingStatement: components["schemas"]["BillingStudentStatement"] & {
+            /** @example 2026-03-01 */
+            asOf: string;
+            /** @example 2026-02-10 */
+            oldestOverdueDate: string | null;
+            /**
+             * @example delinquent
+             * @enum {string}
+             */
+            standing: "good" | "due" | "delinquent" | "exempt";
+        };
         PlayerProgression: {
             badges: {
                 badgeId: string;
@@ -5566,6 +8372,17 @@ export interface components {
                 rankTitle: string;
                 totalXp: number;
             };
+        };
+        RecordPaymentBody: {
+            /** @example 15000 */
+            amountMinor: number;
+            currency?: string;
+            externalReference?: string | null;
+            /** @enum {string} */
+            method: "cash" | "pix" | "bank_transfer" | "card" | "gateway" | "other";
+            note?: string;
+            /** @example 2026-01-01 */
+            paidAt?: string;
         };
         RegisterRequest: {
             /**
@@ -5594,6 +8411,93 @@ export interface components {
             /** @example some-reset-token */
             token: string;
         };
+        ReversePaymentBody: {
+            /** @example 2026-01-01 */
+            paidAt?: string;
+            /** @example Cheque bounced. */
+            reason: string;
+        };
+        RunInvoiceCycleBody: {
+            /** @example 2026-01-01 */
+            asOf?: string;
+            /** @example 2026-01-01 */
+            since?: string;
+        };
+        SetBillingHoldBody: {
+            /** @example 2026-01-01 */
+            expiresAt?: string | null;
+            /** @example Injured; agreed to pause chasing until March. */
+            reason: string;
+        };
+        SignContractBody: {
+            /** @example 15000 */
+            amountMinor?: number;
+            /**
+             * @example monthly
+             * @enum {string}
+             */
+            cycle?: "monthly" | "quarterly" | "yearly";
+            /** @example 10 */
+            dueDay: number;
+            graceDays?: number;
+            planId: string;
+            /** @example 2026-01-01 */
+            startDate: string;
+            termsNote?: string;
+            /**
+             * @example standard
+             * @enum {string}
+             */
+            termsSource?: "standard" | "negotiated";
+            userId: string;
+        };
+        StorageAuditMissingResponse: {
+            items: components["schemas"]["StorageMissingObject"][];
+            nextCursor?: string;
+            /** @description Number of references checked for this page. */
+            scanned: number;
+        };
+        StorageAuditResponse: {
+            nextCursor?: string;
+            /** @description Only the non-`linked` objects of the page. */
+            objects: components["schemas"]["ClassifiedObject"][];
+            /** @description Number of keys walked for this page. */
+            scanned: number;
+        };
+        StorageBrowseResponse: {
+            folders: components["schemas"]["StorageFolder"][];
+            nextCursor?: string;
+            objects: components["schemas"]["ClassifiedObject"][];
+            prefix: string;
+        };
+        StorageFolder: {
+            /** @description Last segment of the prefix, without the delimiter. */
+            name: string;
+            /** @description The topic / event a `topics/<id>/` or `events/<id>/` folder belongs to, when it exists. */
+            owner: {
+                id: string;
+                /** @enum {string} */
+                kind: "topic" | "event";
+                title: string;
+            } | null;
+            /** @description True for an owner-shaped folder whose topic / event no longer exists. */
+            ownerGone: boolean;
+            /** @example topics/3f2c…/ */
+            prefix: string;
+        };
+        StorageMissingObject: {
+            key: string;
+            reference: components["schemas"]["StorageReference"];
+            /** @enum {string} */
+            status: "missing-object";
+        };
+        StorageObjectDetail: components["schemas"]["ClassifiedObject"] & {
+            /** @description Presigned GET URL, valid for 5 minutes. */
+            downloadUrl: string;
+            /** @example 2026-09-29T12:05:00.000Z */
+            downloadUrlExpiresAt: string;
+        };
+        StorageReference: components["schemas"]["MediaStorageReference"] | components["schemas"]["EventFlyerStorageReference"];
         Tag: {
             /**
              * Format: uuid
@@ -5720,6 +8624,20 @@ export interface components {
             /** @example 200 */
             xpReward?: number;
         };
+        UpdateBillingPlanBody: {
+            /** @example 15000 */
+            amountMinor?: number;
+            archived?: boolean;
+            /**
+             * @example monthly
+             * @enum {string}
+             */
+            cycle?: "monthly" | "quarterly" | "yearly";
+            description?: string;
+            graceDays?: number;
+            name?: string;
+            scopeTopicId?: string | null;
+        };
         /** @description Validation error response with Zod issues */
         ValidationErrorBody: {
             /**
@@ -5742,6 +8660,10 @@ export interface components {
              *     ]
              */
             issues: unknown[];
+        };
+        VoidInvoiceBody: {
+            /** @example Issued to the wrong student. */
+            reason: string;
         };
         XpAdjustmentBody: {
             /** @example 50 */
