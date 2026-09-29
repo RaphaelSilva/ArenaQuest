@@ -1733,6 +1733,7 @@ export const dictEn = {
   },
   catalog: {
     redesign: {
+      topicTagsLabel: 'Topic tags',
       statsSubtopics: 'Subtopics',
       statsMedia: 'Media',
       statsTotal: 'Total in branch',

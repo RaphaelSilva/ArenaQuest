@@ -1,6 +1,7 @@
 'use client';
 
 import type { TopicNode, TopicWithMedia } from '@web/lib/topics-api';
+import { TagChip } from './TagChip';
 import { useDict } from '@web/context/dict-context';
 
 type Props = {
@@ -65,6 +66,18 @@ export function TopicHeader({ topic, trail, totalInBranch }: Props) {
           >
             {topic.title}
           </h1>
+          {topic.tags && topic.tags.length > 0 && (
+            <ul
+              aria-label={dict.catalog.redesign.topicTagsLabel}
+              className="mt-3 flex list-none flex-wrap gap-2 p-0"
+            >
+              {topic.tags.map((tag) => (
+                <li key={tag.id}>
+                  <TagChip label={tag.name} href={`/catalog?tag=${encodeURIComponent(tag.slug)}`} />
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Right: Stats (on md+) or horizontal chips (mobile) */}
