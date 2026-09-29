@@ -1,7 +1,7 @@
 # RFC 0021: Release-candidate previews on staging and a reproducible demo seed
 
 **Date:** 2026-09-29
-**Status:** Draft
+**Status:** Proposed
 **Revised:** 2026-09-29 (open questions 1–5 resolved)
 **Author:** raphaelsilva
 **Affected:**
