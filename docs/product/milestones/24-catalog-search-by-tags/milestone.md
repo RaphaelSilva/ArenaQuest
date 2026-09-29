@@ -107,7 +107,7 @@ Out of scope (explicit, from RFC 0017 Non-Goals and Resolved Decisions):
 | 02 | [Tag authoring API](./02-tag-authoring-api.task.md) | 1 | Backend | ✅ Done |
 | 03 | [Catalog search matcher and sidebar](./03-catalog-search-matcher-and-sidebar.task.md) | 1 | Frontend | ✅ Done |
 | 04 | [Topic page tag chips](./04-topic-page-tag-chips.task.md) | 2 | Frontend | ✅ Done |
-| 05 | [Admin tag combobox](./05-admin-tag-combobox.task.md) | 2 | Frontend | ☐ Open |
+| 05 | [Admin tag combobox](./05-admin-tag-combobox.task.md) | 2 | Frontend | ✅ Done |
 | 06 | [Importer README tags](./06-importer-readme-tags.task.md) | 2 | Backend | ☐ Open |
 | 07 | [Local seed, docs and closeout](./07-local-seed-docs-and-closeout.task.md) | 3 | Backend | ☐ Open |
 
