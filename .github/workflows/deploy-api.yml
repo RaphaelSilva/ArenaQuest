@@ -76,21 +76,13 @@ jobs:
       - name: Build shared
         run: pnpm turbo build --filter @arenaquest/shared
 
-      - name: Run D1 Migrations (Staging)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: apps/api
-          command: d1 migrations apply arenaquest-db-staging --remote --env staging
-
-      - name: Deploy Worker (Staging)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: apps/api
-          command: deploy --env staging
+      # Same release path as the production matrix: the deploy CLI resolves the
+      # arenaquest profile, runs the no-dev-seed guard, migrates D1 and deploys.
+      - name: Deploy API (Staging)
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: node scripts/cloudflare/deploy.mjs --label arenaquest -e staging --yes --scope api
 
   # ────────────────────────────────────────────────────────────────────────────
   # 3. Deploy Production — one matrixed job over every label; runs only on main.
