@@ -166,7 +166,9 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/content/import-media.test.mjs \
 		scripts/content/drive-source.test.mjs \
 		scripts/media/convert-skipped.test.mjs \
-		scripts/git/worktree.test.mjs
+		scripts/git/worktree.test.mjs \
+		scripts/demo/ids.test.mjs \
+		scripts/demo/dataset.test.mjs
 
 test-api: ## Run apps/api tests (Vitest + Cloudflare Workers pool)
 	pnpm turbo test --filter api
