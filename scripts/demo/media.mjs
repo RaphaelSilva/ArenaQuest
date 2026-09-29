@@ -25,19 +25,26 @@
  * Only keys this module derives are ever read or written; nothing else in the
  * bucket is listed, linked or touched.
  *
- * I/O goes through two injectable functions so the tests stub both:
+ * The bucket is reached through `{ get, put }`: `createR2` spawns `wrangler r2
+ * object` (remote), `openLocalR2` serves the local store in-process through
+ * wrangler's `getPlatformProxy` (much faster than one process per object).
+ *
+ * I/O goes through injectable functions so the tests stub them:
  *   run(argv)   → Promise<{ status, stdout: Buffer, stderr: string }>  (wrangler)
+ *   getPlatformProxy(options) → { env: { R2 }, dispose }  (local)
  *   fetchImpl   the global `fetch` (Node honours HTTPS_PROXY only with
  *               NODE_USE_ENV_PROXY=1; set it behind a proxy).
  *
- * Stdlib only; runs on Node 20.
+ * Stdlib only, plus the api package's wrangler for the local bucket (imported
+ * lazily, only when a local seed opens it); the module itself loads on Node 20.
  */
 
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { validateMediaFile } from '../content/import-media.mjs';
 import { parseJsonc } from '../label.mjs';
@@ -145,14 +152,18 @@ export function localBucketName(repoRoot = ROOT) {
 }
 
 /**
- * `{ bucket, args, concurrency }` for the seed target (`resolveTarget` in
- * seed-demo.mjs). Local wrangler processes share one on-disk miniflare store and
- * fail with "internal error" when they overlap, so local runs one at a time.
+ * `{ bucket, args, concurrency, local }` for the seed target (`resolveTarget` in
+ * seed-demo.mjs). A local target is served in-process by `openLocalR2` (one
+ * Miniflare over the same on-disk store), so it runs as parallel as a remote
+ * one; `args` still names the equivalent wrangler flags, for the log line.
  */
 export function mediaTarget(target, { repoRoot = ROOT } = {}) {
-  if (!target.remote) return { bucket: localBucketName(repoRoot), args: ['--local'], concurrency: 1 };
+  if (!target.remote) {
+    const persist = target.persistTo ? ['--persist-to', target.persistTo] : [];
+    return { bucket: localBucketName(repoRoot), args: ['--local', ...persist], concurrency: DEFAULT_CONCURRENCY, local: true, persistTo: target.persistTo ?? null };
+  }
   if (!target.bucket) throw new Error(`the ${target.env} target has no R2 bucket (environments.${target.env}.r2.bucket)`);
-  return { bucket: target.bucket, args: ['--remote'], concurrency: DEFAULT_CONCURRENCY };
+  return { bucket: target.bucket, args: ['--remote'], concurrency: DEFAULT_CONCURRENCY, local: false };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -201,6 +212,70 @@ export function createR2({ bucket, args }, run = runWrangler) {
       }
     },
   };
+}
+
+/**
+ * The state root `wrangler … --local` uses when no `--persist-to` is given: it is
+ * resolved next to `apps/api/wrangler.jsonc` (what `make dev-api` serves).
+ */
+export function defaultLocalPersistTo(repoRoot = ROOT) {
+  return join(repoRoot, 'apps', 'api', '.wrangler', 'state');
+}
+
+/** wrangler's `getPlatformProxy`, from the api package's pinned wrangler. */
+export async function loadGetPlatformProxy(repoRoot = ROOT) {
+  const apiRequire = createRequire(join(repoRoot, 'apps', 'api', 'package.json'));
+  const wrangler = await import(pathToFileURL(apiRequire.resolve('wrangler')).href);
+  if (typeof wrangler.getPlatformProxy !== 'function') throw new Error('the installed wrangler no longer exports getPlatformProxy');
+  return wrangler.getPlatformProxy;
+}
+
+/**
+ * The api Worker's local bindings (`env.DB`, `env.R2`, …) in this process —
+ * wrangler's `getPlatformProxy` over the same on-disk store `wrangler … --local
+ * --persist-to <persistTo>` reads and writes (`<persistTo>/v3`). Returns the
+ * proxy; call `dispose()` before another wrangler process opens the store.
+ * Remote bindings are off and the `Request.cf` download is skipped (R2/D1 never
+ * need it), so starting it makes no network request.
+ */
+export async function localPlatformProxy({ persistTo = null, repoRoot = ROOT, getPlatformProxy = null } = {}) {
+  process.env.CLOUDFLARE_CF_FETCH_ENABLED ??= 'false';
+  const start = getPlatformProxy ?? (await loadGetPlatformProxy(repoRoot));
+  const root = resolve(persistTo ?? defaultLocalPersistTo(repoRoot));
+  return start({
+    configPath: join(repoRoot, 'apps', 'api', 'wrangler.jsonc'),
+    persist: { path: join(root, 'v3') },
+    remoteBindings: false,
+  });
+}
+
+/** The `createR2` interface over an R2 binding (`env.R2` of the platform proxy). */
+export function bindingR2(binding) {
+  return {
+    async get(key) {
+      const object = await binding.get(key);
+      return object ? Buffer.from(await object.arrayBuffer()) : null;
+    },
+    async put(key, file, contentType) {
+      await binding.put(key, readFileSync(file), { httpMetadata: { contentType } });
+    },
+  };
+}
+
+/**
+ * The local bucket in-process: the `createR2` interface plus `dispose()`. One
+ * Miniflare replaces a `wrangler r2 object` process per object (27 objects took
+ * ~1.5 min to check and ~4 min to upload serially). `bucket` must be the one
+ * bound as `R2` — the only local bucket the seed writes.
+ */
+export async function openLocalR2({ bucket, persistTo = null, repoRoot = ROOT, getPlatformProxy = null }) {
+  if (bucket !== localBucketName(repoRoot)) throw new Error(`the local bucket is "${localBucketName(repoRoot)}", not "${bucket}"`);
+  const proxy = await localPlatformProxy({ persistTo, repoRoot, getPlatformProxy });
+  if (!proxy.env?.R2) {
+    await proxy.dispose();
+    throw new Error('the local platform proxy has no R2 binding');
+  }
+  return { ...bindingR2(proxy.env.R2), dispose: () => proxy.dispose() };
 }
 
 /** Run `fn` over `items`, at most `limit` at a time; rejects on the first failure. */

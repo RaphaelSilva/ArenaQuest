@@ -255,6 +255,28 @@ rows). Type and size are re-checked against the bytes **on disk** through
 `validateMediaFile`, the single preflight both plan builders share — a manifest
 is another route to the upload, not a way around a limit.
 
+**Demo seed (RFC 0021):**
+```bash
+AQ_DEMO_PASSWORD=… make db-seed-demo-local LABEL=budo          # local replica (DRY_RUN=1: SQL + plan only)
+AQ_DEMO_PASSWORD=… make db-seed-demo-staging LABEL=budo        # remote staging (prompts; CONFIRM=1 skips)
+node scripts/demo/ci-check.mjs                                  # the CI check, offline
+```
+Both targets forward to `scripts/demo/seed-demo.mjs` (`LABEL` defaults to
+`arenaquest`); the dataset is `scripts/demo/dataset/base.json` plus an optional
+`config/labels/<label>/demo.json`. **There is no production variant**: the CLI
+refuses `-e production` (and any production-named D1/bucket) before writing
+anything, and the production deploy guard rejects a database holding a
+`*.demo.invalid` account. `AQ_DEMO_PASSWORD` is read from the environment only.
+The run is idempotent (deterministic ids; a re-run changes no row count). The
+local bucket is written in-process through wrangler's `getPlatformProxy`
+(`--persist-to <dir>` retargets a local run, D1 and R2 alike). Labels share
+group names and tag slugs, so one local replica holds one label's demo.
+The CI job *Demo seed check* (`.github/workflows/ci.yml`, Node 22 for wrangler)
+applies every migration to a throwaway D1, seeds each label twice and asserts
+RFC 0021's counts, the media objects' SHA-256, the student XP/badges and
+`user_xp` = ledger — offline, with media from `scripts/demo/fixtures/` and a
+generated password — so a migration that breaks the demo fails its PR.
+
 Renamed targets (`db-migrations-dev` → `db-migrate-local`, `db-seed-dev` →
 `db-seed-local`, `create-db` → `create-db-prod`, ...) still work as deprecated
 aliases that print a pointer. Use the new names.

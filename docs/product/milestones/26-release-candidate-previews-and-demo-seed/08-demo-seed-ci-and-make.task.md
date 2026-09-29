@@ -1,6 +1,6 @@
 # Task 08 — Backend: Demo seed CI job and Makefile targets (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -55,16 +55,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make db-seed-demo-local LABEL=budo` seeds the local replica; `DRY_RUN=1` only writes
+- [x] `make db-seed-demo-local LABEL=budo` seeds the local replica; `DRY_RUN=1` only writes
       the SQL and plan.
-- [ ] `make db-seed-demo-staging LABEL=budo` prompts naming the staging database;
+- [x] `make db-seed-demo-staging LABEL=budo` prompts naming the staging database;
       `CONFIRM=1` skips the prompt.
-- [ ] There is no `db-seed-demo-prod` target.
-- [ ] The CI job passes on the current migrations and fails on a scratch branch whose new
-      migration drops a column the demo writes.
-- [ ] The CI job makes no network request to a media source.
-- [ ] `make lint`, `make test-api`, `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] There is no `db-seed-demo-prod` target.
+- [x] The CI job passes on the current migrations and fails on a scratch branch whose new
+      migration drops a column the demo writes. _(Verified locally with `node scripts/demo/ci-check.mjs`, including a scratch `DROP COLUMN` migration; the first GitHub Actions run is pending.)_
+- [x] The CI job makes no network request to a media source.
+- [x] `make lint`, `make test-api`, `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
@@ -73,3 +73,16 @@ Out:
 3. Push and watch the CI job; on a scratch branch add a breaking migration and watch it fail.
 4. `make help` shows the two targets with their descriptions.
 5. `git diff --stat` confirms only scope-guardrail files changed.
+
+## Implementation notes
+
+- `scripts/demo/ci-check.mjs` migrates a throwaway store once, copies it per label, seeds each label twice and
+  asserts counts, XP (350/950/0), `user_xp` = ledger and zero row-count drift on the second run. It makes **no network
+  request** (verified inside a loopback-only network namespace). ~57 s for all three labels.
+- Fixtures are the real pinned NASA files (2.3 MB total), so no CI-only manifest override exists.
+- **Scope extensions (approved in the plan):** the local R2 path in `scripts/demo/media.mjs` now uses wrangler's
+  `getPlatformProxy` in one process (a converged local re-seed went from ~1.5 min to ~8 s); `seed-demo.mjs` gained
+  `--persist-to`; the Makefile guard targets now pass `--target staging|production`.
+- The `demo-seed` job runs on **Node 22**: wrangler 4.144 requires Node ≥ 22 (its launcher exits 1 on Node 20).
+- Two labels cannot share one local replica (same demo group name / tag slugs → UNIQUE violation). Run
+  `make db-reset-local` before switching `LABEL`; each deployed label has its own D1, so remote targets are unaffected.

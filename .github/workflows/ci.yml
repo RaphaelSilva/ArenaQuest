@@ -75,3 +75,35 @@ jobs:
             echo "Enforcing breaking change checks..."
             ~/.oasdiff/bin/oasdiff breaking base-openapi.json apps/api/openapi.json
           fi
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Demo seed check (RFC 0021) — every migration applied to a fresh local D1,
+  # the demo seed run twice per label, the success-criteria counts and the
+  # user_xp ledger asserted. A migration that breaks the demo fails its PR.
+  # Local and offline: throwaway stores, media from scripts/demo/fixtures, a
+  # password generated inside the script — no secret, no media download.
+  # ────────────────────────────────────────────────────────────────────────────
+  demo-seed:
+    name: Demo seed check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      # Node 22, not the repo's 20: this job runs the wrangler CLI
+      # (`d1 migrations apply` / `d1 execute`), whose engines require >= 22.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Seed the demo twice per label and assert
+        run: node scripts/demo/ci-check.mjs
