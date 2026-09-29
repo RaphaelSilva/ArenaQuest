@@ -123,7 +123,7 @@
 				"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 				"R2_PUBLIC_BASE": "",
 				"R2_BUCKET_NAME": "budo-media-staging",
-				"MAIL_DRIVER": "resend",
+				"MAIL_DRIVER": "console",
 				"MAIL_FROM": "Budo Staging <noreply@budo.app>",
 				"WEB_BASE_URL": "https://budo-web-staging.pages.dev",
 				// "GOOGLE_CLIENT_ID": it was setted manually in Cloudflare dashboard, because we don't want to expose it in the repo.
@@ -213,7 +213,7 @@
 				"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 				"R2_PUBLIC_BASE": "",
 				"R2_BUCKET_NAME": "spaziord-media-staging",
-				"MAIL_DRIVER": "resend",
+				"MAIL_DRIVER": "console",
 				"MAIL_FROM": "SpazioRD Staging <noreply@spaziord.app>",
 				"WEB_BASE_URL": "https://spaziord-web-staging.pages.dev",
 				"GOOGLE_REDIRECT_URI": "https://api-staging.spaziord.com.br/auth/google/callback",
@@ -301,7 +301,7 @@
 				"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 				"R2_PUBLIC_BASE": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 				"R2_BUCKET_NAME": "arenaquest-media-staging",
-				"MAIL_DRIVER": "resend",
+				"MAIL_DRIVER": "console",
 				"MAIL_FROM": "ArenaQuest Staging <noreply@arenaquest.app>",
 				"WEB_BASE_URL": "https://arenaquest-web-staging.pages.dev",
 				// Google OAuth — replace with your staging OAuth client values.

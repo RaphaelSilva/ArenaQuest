@@ -26,7 +26,7 @@
       "kv":   { "binding": "RATE_LIMIT_KV", "id": "c75ab14e35164e22b7c6eb3581969295" },
       "r2":   { "bucket": "budo-media-staging", "s3Endpoint": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com" },
       "cookieSameSite": "None",
-      "mail": { "driver": "resend", "from": "Budo Staging <noreply@budo.app>" }
+      "mail": { "driver": "console", "from": "Budo Staging <noreply@budo.app>" }
     },
     "production": {
       "apiHost":      "api-budo.spaziord.com.br",

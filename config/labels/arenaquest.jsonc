@@ -24,7 +24,7 @@
       "kv":   { "binding": "RATE_LIMIT_KV", "id": "c697147935024190ada81e743c3479d9" },
       "r2":   { "bucket": "arenaquest-media-staging", "s3Endpoint": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com", "publicBase": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com" },
       "cookieSameSite": "None",
-      "mail": { "driver": "resend", "from": "ArenaQuest Staging <noreply@arenaquest.app>" }
+      "mail": { "driver": "console", "from": "ArenaQuest Staging <noreply@arenaquest.app>" }
     },
     "production": {
       "apiHost":      "api.arenaquest.app",
