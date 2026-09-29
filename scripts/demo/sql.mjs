@@ -37,6 +37,7 @@
  */
 
 import { demoEmail, demoId } from './ids.mjs';
+import { buildMediaPlan } from './media.mjs';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Literals & statement helpers (exported for the sections of later tasks)
@@ -264,10 +265,39 @@ export const enrollmentsSection = {
 };
 
 /**
- * The seed, in foreign-key order. Later tasks append here:
- * media (05) after `topics`, gamification (06) and extensions (14) at the end.
+ * One `ready` row per (topic, manifest file) — see media.mjs for the id and key.
+ * The CLI executes this SQL only after every object was uploaded and confirmed,
+ * so `ready` here never describes a missing object.
  */
-export const SECTIONS = [usersSection, groupsSection, tagsSection, topicsSection, enrollmentsSection];
+export const mediaSection = {
+  name: 'media',
+  build(dataset, ctx) {
+    const plan = buildMediaPlan(dataset, ctx);
+    const statements = plan.map((entry) =>
+      upsert(
+        'media',
+        {
+          id: entry.id,
+          topic_node_id: entry.topicId,
+          uploaded_by: entry.uploadedBy,
+          storage_key: entry.key,
+          original_name: entry.file.fileName,
+          type: entry.file.type,
+          size_bytes: entry.file.sizeBytes,
+          status: 'ready',
+        },
+        { touch: 'updated_at' },
+      ),
+    );
+    return { statements, counts: { media: plan.length } };
+  },
+};
+
+/**
+ * The seed, in foreign-key order. Later tasks append here:
+ * gamification (06) and extensions (14) at the end.
+ */
+export const SECTIONS = [usersSection, groupsSection, tagsSection, topicsSection, mediaSection, enrollmentsSection];
 
 // ════════════════════════════════════════════════════════════════════════════
 // Assembly

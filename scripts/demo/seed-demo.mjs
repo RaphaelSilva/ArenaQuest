@@ -8,7 +8,11 @@
  * Pipeline: parse → resolve the target from the label profile → refuse anything
  * production → check AQ_DEMO_PASSWORD → load + validate the dataset (Task 03) →
  * build ONE SQL file (`.arenaquest/demo-<label>-<env>.sql`, gitignored) with
- * `sql.mjs` → confirm a remote write → `wrangler d1 execute --file` → summary.
+ * `sql.mjs` → resolve every media object (media.mjs: exists / cached / download)
+ * → confirm a remote write → fetch, validate, upload and confirm the missing
+ * objects → `wrangler d1 execute --file` → summary. The SQL (whose `media` rows
+ * are `ready`) runs only once every object is in the bucket; any media failure
+ * aborts before it.
  *
  * Target (resolved like the deploy CLI, `scripts/cloudflare/deploy.mjs`):
  *   local    → `arenaquest-db --local`, the one local replica every label
@@ -28,7 +32,12 @@
  * carries its PBKDF2 hash, never the value. A dry run without it writes a
  * placeholder hash no password verifies against.
  *
- * `--dry-run` writes the SQL file and stops. A re-run converges (see sql.mjs).
+ * Media bucket: local → the top-level `R2` bucket of `apps/api/wrangler.jsonc`
+ * (`--local`); staging → the profile's `environments.staging.r2.bucket` (`--remote`).
+ *
+ * `--dry-run` writes the SQL file, prints the per-object media plan (reading the
+ * bucket, never downloading from a manifest URL or uploading) and stops. A
+ * re-run converges (see sql.mjs) and uploads nothing.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -44,6 +53,7 @@ import log from '../lib/log.mjs';
 import { loadDataset, renderTopicMarkdown, readSampleTopic } from './dataset.mjs';
 import { hashPassword } from './hash.mjs';
 import { listLabels } from './ids.mjs';
+import { buildMediaPlan, createR2, defaultCacheDir, formatMediaPlan, materialiseMedia, mediaTarget, resolveMediaPlan, runWrangler } from './media.mjs';
 import { buildSeedSql, demoContext } from './sql.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -203,7 +213,30 @@ function usage() {
   console.log(`Usage: ${PASSWORD_VAR}=… node scripts/demo/seed-demo.mjs --label <label> -e local|staging [--dry-run] [--yes]`);
 }
 
-export async function main(argv = process.argv.slice(2), envVars = process.env) {
+function runSqlFile(command) {
+  // Output is captured: `--local` echoes one JSON result per statement (hundreds
+  // of lines). It is shown only when the run fails.
+  return spawnSync(command[0], command.slice(1), {
+    cwd: ROOT,
+    stdio: ['inherit', 'pipe', 'pipe'],
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+}
+
+/**
+ * `deps` exists for the tests: `runR2` (wrangler for R2, see media.mjs),
+ * `fetchImpl`, `executeSql(command)` (the d1 execute), `cacheDir`, `sqlFile`, `dataset`.
+ */
+export async function main(argv = process.argv.slice(2), envVars = process.env, deps = {}) {
+  const {
+    runR2 = runWrangler,
+    fetchImpl = globalThis.fetch,
+    executeSql = runSqlFile,
+    cacheDir = defaultCacheDir(),
+    sqlFile = null,
+    dataset: datasetOverride = null,
+  } = deps;
   const args = parseSeedArgs(argv);
   if (args.help) {
     usage();
@@ -215,7 +248,7 @@ export async function main(argv = process.argv.slice(2), envVars = process.env) 
   const password = readPassword(envVars, args);
 
   log.heading(`Demo seed — ${args.label} → ${target.env} (${target.database}${target.remote ? `, env ${target.wranglerEnv}` : ', local'})`);
-  const dataset = loadDataset(args.label);
+  const dataset = datasetOverride ?? loadDataset(args.label);
   const template = readSampleTopic();
   const ctx = demoContext({
     label: args.label,
@@ -225,30 +258,39 @@ export async function main(argv = process.argv.slice(2), envVars = process.env) 
   });
   const { sql, summary } = buildSeedSql(dataset, ctx);
 
-  const file = sqlFilePath(args.label, args.env);
+  const file = sqlFile ?? sqlFilePath(args.label, args.env);
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, sql, { mode: 0o600 });
   log.ok(`wrote ${relative(ROOT, file)}`);
   if (password === null) log.warn(`${PASSWORD_VAR} unset: the file carries a placeholder hash nobody can log in with`);
 
+  const bucket = mediaTarget(target);
+  const r2 = createR2(bucket, runR2);
+  log.info(`checking ${summary.find((row) => row.entity === 'media')?.rows ?? 0} media objects in R2 "${bucket.bucket}" (${bucket.args.join(' ')})`);
+  const resolved = await resolveMediaPlan(buildMediaPlan(dataset, ctx), { r2, cacheDir, concurrency: bucket.concurrency });
+  const planLines = formatMediaPlan(resolved);
+
   if (args.dryRun) {
+    for (const line of planLines) log.info(`media ${line}`);
     for (const line of formatSummary(summary)) log.info(`would upsert ${line}`);
-    log.ok('dry run: nothing executed');
+    log.ok('dry run: nothing downloaded, uploaded or executed');
     return 0;
   }
 
   if (target.remote) await confirmRemote(target, args.label, args);
 
+  const media = await materialiseMedia(resolved, {
+    r2,
+    cacheDir,
+    fetchImpl,
+    concurrency: bucket.concurrency,
+    onUpload: (entry) => log.ok(`uploaded ${entry.key} (${entry.manifestKey})`),
+  });
+  log.ok(`media objects: ${media.uploaded} uploaded, ${media.skipped} already present`);
+
   const command = wranglerCommand(target, file);
   log.info(`running wrangler d1 execute ${target.database} ${target.wranglerArgs.join(' ')} --file ${relative(ROOT, file)}`);
-  // Output is captured: `--local` echoes one JSON result per statement (hundreds
-  // of lines). It is shown only when the run fails.
-  const result = spawnSync(command[0], command.slice(1), {
-    cwd: ROOT,
-    stdio: ['inherit', 'pipe', 'pipe'],
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-  });
+  const result = executeSql(command);
   if (result.error) throw result.error;
   if (result.status !== 0) {
     process.stderr.write(`${result.stdout ?? ''}${result.stderr ?? ''}`);
