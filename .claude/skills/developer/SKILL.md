@@ -46,6 +46,7 @@ Never invent topology. Compute it from the task's source folder.
   - **Milestone:** candidate `feature/m<N>/candidate` (one per milestone, cut from `main`); task `feature/m<N>/<task_slug>.task` (cut from candidate).
   - **Backlog:** task `feature/backlog/<topic>/<task_slug>.task` (cut from `main`, no candidate).
   - **Epic:** candidate `feature/epic/<epic_name>/candidate` (cut from `main`); task `feature/epic/<epic_name>/<task_slug>.task` (cut from epic candidate).
+    `<epic_name>` = the epic folder name — `<YYYY-MM-DD>-<subject>` for epics written with `write-epic` (e.g. `feature/epic/2026-09-29-e2e-test-phase/candidate`).
 - **Chained mode** (`chained`/`stacked`, milestone/epic only — backlog unsupported):
   subject branch `feature/m<N>/<subject_slug>` cut from `main` (`<subject_slug>` =
   milestone folder name minus leading `<number>-`). First task cuts from the subject;

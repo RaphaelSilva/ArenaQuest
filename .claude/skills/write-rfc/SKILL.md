@@ -35,6 +35,9 @@ backlog/epic structure → task files (`write-tasks`) — until it is ready for 
 | A new RFC (and everything derived from it) | `docs/rfc-<NNNN>-<slug>` | `.worktrees/rfc-<NNNN>-<slug>` |
 | Planning with no new RFC (backlog/epic item, milestone for an already-merged RFC) | `docs/<slug>` | `.worktrees/docs-<slug>` |
 
+An epic is scaffolded with the `write-epic` skill (date-keyed, `docs/product/epics/<YYYY-MM-DD>-<subject>/`),
+either from an RFC in the same planning worktree or on its own `docs/epic-<subject>` branch.
+
 1. **Pick the number.** `new-rfc.mjs` numbers from the directory, so derive
    `<NNNN>` from the trunk *and* from RFC branches still in flight, or two open PRs
    collide on the same number:
