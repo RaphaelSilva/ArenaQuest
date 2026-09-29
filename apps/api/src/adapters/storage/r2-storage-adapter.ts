@@ -112,6 +112,11 @@ export class R2StorageAdapter implements IStorageAdapter {
     return this.toStorageObject(obj);
   }
 
+  /** Implemented in M23 Task 02 (ranged GetObject of the leading bytes). */
+  async readHead(_key: string, _bytes: number): Promise<Uint8Array | null> {
+    throw new Error('R2StorageAdapter.readHead: not implemented');
+  }
+
   async getPresignedUploadUrl(key: string, options?: PresignedUrlOptions): Promise<string> {
     const expiresIn = options?.expiresInSeconds ?? 3600;
     const command = new PutObjectCommand({

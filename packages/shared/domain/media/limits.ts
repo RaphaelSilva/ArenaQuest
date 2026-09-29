@@ -79,3 +79,43 @@ export function isImageMediaType(contentType: string): contentType is ImageMedia
 export function mediaSizeLimitFor(contentType: string): number | null {
   return isAllowedMediaType(contentType) ? MEDIA_SIZE_LIMIT_BYTES[contentType] : null;
 }
+
+// ---------------------------------------------------------------------------
+// Student submissions (RFC 0020 section 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every content type a student submission accepts: the course table plus
+ * `video/quicktime`, so an iPhone recording uploads as-is (RFC 0020 section 4).
+ *
+ * Derived from ALLOWED_MEDIA_TYPES rather than restated, so a change to the
+ * course table flows here automatically. Backoffice media and the importer do
+ * NOT accept `video/quicktime` — they keep reading ALLOWED_MEDIA_TYPES.
+ */
+export const SUBMISSION_MEDIA_TYPES = [...ALLOWED_MEDIA_TYPES, 'video/quicktime'] as const;
+
+/** One of the content types a submission accepts. */
+export type SubmissionMediaType = (typeof SUBMISSION_MEDIA_TYPES)[number];
+
+/**
+ * The video subset of SUBMISSION_MEDIA_TYPES. Videos are bounded by the
+ * env-configured SUBMISSIONS_VIDEO_MAX_BYTES; images and PDF keep
+ * `mediaSizeLimitFor`.
+ */
+export const SUBMISSION_VIDEO_TYPES = [
+  'video/mp4',
+  'video/quicktime',
+] as const satisfies readonly SubmissionMediaType[];
+
+/** A submission video content type. */
+export type SubmissionVideoType = (typeof SUBMISSION_VIDEO_TYPES)[number];
+
+/** Narrows an arbitrary string to a content type a submission accepts. */
+export function isSubmissionMediaType(contentType: string): contentType is SubmissionMediaType {
+  return (SUBMISSION_MEDIA_TYPES as readonly string[]).includes(contentType);
+}
+
+/** Narrows an arbitrary string to a submission video type. */
+export function isSubmissionVideoType(contentType: string): contentType is SubmissionVideoType {
+  return (SUBMISSION_VIDEO_TYPES as readonly string[]).includes(contentType);
+}

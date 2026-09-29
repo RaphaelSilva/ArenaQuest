@@ -73,6 +73,32 @@ export namespace Entities {
             DELETED = 'deleted',
         }
 
+        /**
+         * Lifecycle of a student submission (RFC 0020 §1, §8). Constrained by the
+         * `status IN ('pending','ready','removed')` CHECK on `topic_submissions`.
+         * `removed` is an admin tombstone: the object is gone, the row stays for its
+         * author and the staff audit trail, outside every quota.
+         */
+        export enum SubmissionStatus {
+            PENDING = 'pending',
+            READY = 'ready',
+            REMOVED = 'removed',
+        }
+
+        /**
+         * Who may see a student-authored item: only its author and staff (`private`)
+         * or also the topic's readers (`shared`). The vocabulary of RFC 0016 (notes)
+         * and RFC 0020 (submissions); constrained by `visibility IN ('private','shared')`.
+         *
+         * Deliberately NOT {@link TopicVisibility} / {@link EventAudience}: those gate
+         * content, this gates a student's own work. Student notes (RFC 0016) should
+         * reuse this enum rather than declare a second `private | shared` pair.
+         */
+        export enum ShareVisibility {
+            PRIVATE = 'private',
+            SHARED = 'shared',
+        }
+
         export enum ProgressStatus {
             NOT_STARTED = 'not_started',
             IN_PROGRESS = 'in_progress',
@@ -373,6 +399,39 @@ export namespace Entities {
             label: string;
             order: number;
             createdAt: Date;
+        }
+
+        /**
+         * A student's demonstration on a topic (RFC 0020): one file plus title and
+         * description. Lives in `topic_submissions`, never in `media`, so no course
+         * reader can surface it. The storage key is deliberately absent — it is never
+         * shown to anyone; URLs are signed at the route layer.
+         */
+        export interface Submission {
+            id: string;
+            topicNodeId: string;
+            authorId: string;
+            /** Display name joined from `users.name`. */
+            authorName: string;
+            /** 1…SUBMISSION_TITLE_MAX characters. */
+            title: string;
+            /** Sanitised Markdown, ≤ SUBMISSION_DESCRIPTION_MAX; '' when empty or removed. */
+            description: string;
+            originalName: string;
+            /** One of SUBMISSION_MEDIA_TYPES. */
+            contentType: string;
+            /** Declared at presign, verified at finalize. */
+            sizeBytes: number;
+            status: Config.SubmissionStatus;
+            visibility: Config.ShareVisibility;
+            /** ISO-8601; null while private. */
+            sharedAt: string | null;
+            /** True while a staff force-unshare blocks re-sharing. */
+            moderated: boolean;
+            /** ISO-8601; null unless status is `removed`. */
+            removedAt: string | null;
+            createdAt: string;
+            updatedAt: string;
         }
 
     }
