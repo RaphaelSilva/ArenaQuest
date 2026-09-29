@@ -1,6 +1,6 @@
 # Task 04 — Backend: Seed CLI: users, groups, topics, enrollments, tags (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -66,18 +66,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `seed-demo --label budo -e local` on a freshly migrated replica creates 6 users with the
+- [x] `seed-demo --label budo -e local` on a freshly migrated replica creates 6 users with the
       expected roles, 1 group with 2 members, 21 topics (3 roots, depth 3), 2 tags and the two
       enrollments; a second run leaves every row count unchanged.
-- [ ] `demo.admin@budo.demo.invalid` logs in on `make dev` with `AQ_DEMO_PASSWORD`.
-- [ ] As student-1 the catalog shows Root 1 and Root 2 (not the private lesson, not Root 3);
+- [x] `demo.admin@budo.demo.invalid` logs in on `make dev` with `AQ_DEMO_PASSWORD`.
+- [x] As student-1 the catalog shows Root 1 and Root 2 (not the private lesson, not Root 3);
       as student-3 it shows Root 1 and Root 3 without the draft module.
-- [ ] `-e production`, and `-e staging` with a profile whose staging D1 equals a production
+- [x] `-e production`, and `-e staging` with a profile whose staging D1 equals a production
       D1 name, exit non-zero before writing any file.
-- [ ] A non-dry run without `AQ_DEMO_PASSWORD` exits non-zero with a message naming the
+- [x] A non-dry run without `AQ_DEMO_PASSWORD` exits non-zero with a message naming the
       variable.
-- [ ] `make test-scripts` and `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `make test-scripts` and `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
@@ -89,3 +89,16 @@ Out:
 4. Try `-e production` and a run without the variable.
 5. `make test-scripts && make lint`; `git diff --stat` confirms only scope-guardrail files
    changed.
+
+## Implementation notes
+
+- Extension point for Tasks 05/06/14: a section is `{ name, build(dataset, ctx) → { statements, counts } }`;
+  `SECTIONS` in `scripts/demo/sql.mjs` is ordered by foreign keys (users, groups, tags, topics, enrollments).
+- `sanitizeMarkdown` is the shared TS util transpiled in memory with the workspace `typescript` (CI runs Node 20,
+  which cannot import `.ts`), so the seed stores exactly what the API would.
+- The local replica is addressed as `arenaquest-db --local` for every label (the label only picks the dataset);
+  it is exempt from the production-name refusal because it is never addressed remotely.
+- `password_hash` is rewritten on every run (fresh salt) — re-running with a new `AQ_DEMO_PASSWORD` rotates it.
+- A demo row colliding with a non-demo row (same e-mail, tag slug or group name) fails the run instead of adopting it.
+- Verified locally: first and second run give identical counts; demo admin, student-1 and student-3 catalogs match
+  the criteria through the API (`make dev-api`). Staging exercised by `--dry-run` only.
