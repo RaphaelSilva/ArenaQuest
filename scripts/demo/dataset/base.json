@@ -1,0 +1,482 @@
+{
+  "$comment": "Demo baseline (RFC 0021 §3.2–3.4). Keys are stable identifiers, not ids: scripts/demo/ids.mjs derives every id from <label>:<entity>:<key>. No password, hash or secret belongs here. Validated by scripts/demo/dataset.mjs.",
+  "language": "en",
+  "users": [
+    {
+      "key": "admin",
+      "name": "Demo Admin",
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "key": "creator",
+      "name": "Demo Creator",
+      "roles": [
+        "content_creator"
+      ]
+    },
+    {
+      "key": "tutor",
+      "name": "Demo Tutor",
+      "roles": [
+        "tutor"
+      ]
+    },
+    {
+      "key": "student-1",
+      "name": "Demo Student One",
+      "roles": [
+        "student"
+      ]
+    },
+    {
+      "key": "student-2",
+      "name": "Demo Student Two",
+      "roles": [
+        "student"
+      ]
+    },
+    {
+      "key": "student-3",
+      "name": "Demo Student Three",
+      "roles": [
+        "student"
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "key": "demo-class",
+      "name": "Demo class",
+      "description": "Demo students reached by the group grant on Root 2.",
+      "members": [
+        "student-1",
+        "student-2"
+      ]
+    }
+  ],
+  "tags": [
+    {
+      "key": "demo",
+      "name": "Demo",
+      "slug": "demo"
+    },
+    {
+      "key": "beginner",
+      "name": "Beginner",
+      "slug": "beginner"
+    }
+  ],
+  "topics": [
+    {
+      "key": "root-1",
+      "parent": null,
+      "title": "Root 1 — Foundations",
+      "order": 0,
+      "status": "published",
+      "visibility": "public",
+      "estimatedMinutes": 120,
+      "tags": [
+        "demo"
+      ]
+    },
+    {
+      "key": "root-1/module-1",
+      "parent": "root-1",
+      "title": "Module 1.1",
+      "order": 0,
+      "status": "published",
+      "visibility": "public",
+      "estimatedMinutes": 45,
+      "tags": []
+    },
+    {
+      "key": "root-1/module-1/lesson-1",
+      "parent": "root-1/module-1",
+      "title": "Lesson 1.1.1",
+      "order": 0,
+      "status": "published",
+      "visibility": "public",
+      "estimatedMinutes": 15,
+      "tags": [
+        "beginner"
+      ]
+    },
+    {
+      "key": "root-1/module-1/lesson-2",
+      "parent": "root-1/module-1",
+      "title": "Lesson 1.1.2",
+      "order": 1,
+      "status": "published",
+      "visibility": "public",
+      "estimatedMinutes": 20,
+      "tags": [
+        "beginner"
+      ]
+    },
+    {
+      "key": "root-1/module-2",
+      "parent": "root-1",
+      "title": "Module 1.2",
+      "order": 1,
+      "status": "published",
+      "visibility": "public",
+      "estimatedMinutes": 45,
+      "tags": []
+    },
+    {
+      "key": "root-1/module-2/lesson-1",
+      "parent": "root-1/module-2",
+      "title": "Lesson 1.2.1",
+      "order": 0,
+      "status": "published",
+      "visibility": "public",
+      "estimatedMinutes": 15,
+      "tags": [
+        "beginner"
+      ]
+    },
+    {
+      "key": "root-1/module-2/lesson-2",
+      "parent": "root-1/module-2",
+      "title": "Lesson 1.2.2",
+      "order": 1,
+      "status": "published",
+      "visibility": "public",
+      "estimatedMinutes": 20,
+      "tags": [
+        "beginner"
+      ]
+    },
+    {
+      "key": "root-2",
+      "parent": null,
+      "title": "Root 2 — Class Track",
+      "order": 1,
+      "status": "published",
+      "visibility": "restricted",
+      "estimatedMinutes": 120,
+      "tags": [
+        "demo"
+      ]
+    },
+    {
+      "key": "root-2/module-1",
+      "parent": "root-2",
+      "title": "Module 2.1",
+      "order": 0,
+      "status": "published",
+      "visibility": "restricted",
+      "estimatedMinutes": 45,
+      "tags": []
+    },
+    {
+      "key": "root-2/module-1/lesson-1",
+      "parent": "root-2/module-1",
+      "title": "Lesson 2.1.1",
+      "order": 0,
+      "status": "published",
+      "visibility": "restricted",
+      "estimatedMinutes": 15,
+      "tags": [
+        "beginner"
+      ]
+    },
+    {
+      "key": "root-2/module-1/lesson-2",
+      "parent": "root-2/module-1",
+      "title": "Lesson 2.1.2",
+      "order": 1,
+      "status": "published",
+      "visibility": "restricted",
+      "estimatedMinutes": 20,
+      "tags": []
+    },
+    {
+      "key": "root-2/module-2",
+      "parent": "root-2",
+      "title": "Module 2.2",
+      "order": 1,
+      "status": "published",
+      "visibility": "restricted",
+      "estimatedMinutes": 45,
+      "tags": []
+    },
+    {
+      "key": "root-2/module-2/lesson-1",
+      "parent": "root-2/module-2",
+      "title": "Lesson 2.2.1",
+      "order": 0,
+      "status": "published",
+      "visibility": "restricted",
+      "estimatedMinutes": 15,
+      "tags": []
+    },
+    {
+      "key": "root-2/module-2/lesson-2",
+      "parent": "root-2/module-2",
+      "title": "Lesson 2.2.2",
+      "order": 1,
+      "status": "published",
+      "visibility": "private",
+      "estimatedMinutes": 20,
+      "tags": []
+    },
+    {
+      "key": "root-3",
+      "parent": null,
+      "title": "Root 3 — Personal Track",
+      "order": 2,
+      "status": "published",
+      "visibility": "restricted",
+      "estimatedMinutes": 120,
+      "tags": [
+        "demo"
+      ]
+    },
+    {
+      "key": "root-3/module-1",
+      "parent": "root-3",
+      "title": "Module 3.1",
+      "order": 0,
+      "status": "published",
+      "visibility": "restricted",
+      "estimatedMinutes": 45,
+      "tags": []
+    },
+    {
+      "key": "root-3/module-1/lesson-1",
+      "parent": "root-3/module-1",
+      "title": "Lesson 3.1.1",
+      "order": 0,
+      "status": "published",
+      "visibility": "restricted",
+      "estimatedMinutes": 15,
+      "tags": [
+        "beginner"
+      ]
+    },
+    {
+      "key": "root-3/module-1/lesson-2",
+      "parent": "root-3/module-1",
+      "title": "Lesson 3.1.2",
+      "order": 1,
+      "status": "published",
+      "visibility": "restricted",
+      "estimatedMinutes": 20,
+      "tags": []
+    },
+    {
+      "key": "root-3/module-2",
+      "parent": "root-3",
+      "title": "Module 3.2",
+      "order": 1,
+      "status": "draft",
+      "visibility": "restricted",
+      "estimatedMinutes": 45,
+      "tags": []
+    },
+    {
+      "key": "root-3/module-2/lesson-1",
+      "parent": "root-3/module-2",
+      "title": "Lesson 3.2.1",
+      "order": 0,
+      "status": "draft",
+      "visibility": "restricted",
+      "estimatedMinutes": 15,
+      "tags": []
+    },
+    {
+      "key": "root-3/module-2/lesson-2",
+      "parent": "root-3/module-2",
+      "title": "Lesson 3.2.2",
+      "order": 1,
+      "status": "draft",
+      "visibility": "restricted",
+      "estimatedMinutes": 20,
+      "tags": []
+    }
+  ],
+  "enrollments": [
+    {
+      "key": "root-2@demo-class",
+      "topic": "root-2",
+      "group": "demo-class",
+      "grantedBy": "admin"
+    },
+    {
+      "key": "root-3@student-3",
+      "topic": "root-3",
+      "user": "student-3",
+      "grantedBy": "admin"
+    }
+  ],
+  "media": {
+    "uploadedBy": "creator",
+    "manifest": [
+      {
+        "key": "sample-image",
+        "fileName": "apollo-17-blue-marble.jpg",
+        "type": "image/jpeg",
+        "sizeBytes": 181294,
+        "url": "https://images-assets.nasa.gov/image/as17-148-22727/as17-148-22727~medium.jpg",
+        "sha256": "a68408d781f529434e210cf261c43fb529754659e300bbc9385a71441ecc0a83",
+        "license": "public-domain",
+        "source": "NASA/JSC — View of the Earth seen by the Apollo 17 crew (as17-148-22727); NASA media guidelines, US Government work"
+      },
+      {
+        "key": "sample-pdf",
+        "fileName": "rassor-fact-sheet.pdf",
+        "type": "application/pdf",
+        "sizeBytes": 313857,
+        "url": "https://ntrs.nasa.gov/api/citations/20150022134/downloads/20150022134.pdf",
+        "sha256": "5de2d24d9732954cc72bad276fc375c24b73be6b64a0c3f0358224107166bb0b",
+        "license": "public-domain",
+        "source": "NASA/KSC — RASSOR - Regolith Advanced Surface Systems Operations Robot (NTRS 20150022134, GOV_PUBLIC_USE_PERMITTED)"
+      },
+      {
+        "key": "sample-video",
+        "fileName": "lvsa-arrival-timelapse.mp4",
+        "type": "video/mp4",
+        "sizeBytes": 1828846,
+        "url": "https://images-assets.nasa.gov/video/KSC-20240907-MH-CMS01_0001-LVSA_Arrival_Timelapse-M8898/KSC-20240907-MH-CMS01_0001-LVSA_Arrival_Timelapse-M8898~mobile.mp4",
+        "sha256": "459029d098c3937723722ebf45b8f811a91beece3e5b0ac90794c01352992d46",
+        "license": "public-domain",
+        "source": "NASA/Christopher Swanson — LVSA Arrival Timelapse (KSC, 2024); NASA media guidelines, US Government work"
+      }
+    ],
+    "assign": {
+      "root-1": [
+        "sample-image"
+      ],
+      "root-1/module-1": [
+        "sample-pdf"
+      ],
+      "root-1/module-1/lesson-1": [
+        "sample-video"
+      ],
+      "root-1/module-1/lesson-2": [
+        "sample-image",
+        "sample-pdf"
+      ],
+      "root-1/module-2": [
+        "sample-pdf"
+      ],
+      "root-1/module-2/lesson-1": [
+        "sample-video"
+      ],
+      "root-1/module-2/lesson-2": [
+        "sample-image",
+        "sample-pdf"
+      ],
+      "root-2": [
+        "sample-image"
+      ],
+      "root-2/module-1": [
+        "sample-pdf"
+      ],
+      "root-2/module-1/lesson-1": [
+        "sample-video"
+      ],
+      "root-2/module-1/lesson-2": [
+        "sample-image",
+        "sample-pdf"
+      ],
+      "root-2/module-2": [
+        "sample-pdf"
+      ],
+      "root-2/module-2/lesson-1": [
+        "sample-video"
+      ],
+      "root-2/module-2/lesson-2": [
+        "sample-image",
+        "sample-pdf"
+      ],
+      "root-3": [
+        "sample-image"
+      ],
+      "root-3/module-1": [
+        "sample-pdf"
+      ],
+      "root-3/module-1/lesson-1": [
+        "sample-video"
+      ],
+      "root-3/module-1/lesson-2": [
+        "sample-image",
+        "sample-pdf"
+      ],
+      "root-3/module-2": [
+        "sample-pdf"
+      ],
+      "root-3/module-2/lesson-1": [
+        "sample-video"
+      ],
+      "root-3/module-2/lesson-2": [
+        "sample-image",
+        "sample-pdf"
+      ]
+    }
+  },
+  "gamification": {
+    "students": [
+      {
+        "user": "student-1",
+        "completedTopics": [
+          "root-1/module-1/lesson-1"
+        ],
+        "badges": [
+          "alicerce-solido"
+        ],
+        "adminAdjustments": [],
+        "streakDays": 3,
+        "quests": [
+          {
+            "slug": "weekly-topic",
+            "current": 1
+          }
+        ],
+        "expectedTotalXp": 350
+      },
+      {
+        "user": "student-2",
+        "completedTopics": [
+          "root-2/module-1/lesson-1",
+          "root-2/module-1/lesson-2"
+        ],
+        "badges": [
+          "alicerce-solido"
+        ],
+        "adminAdjustments": [
+          500
+        ],
+        "streakDays": 0,
+        "quests": [],
+        "expectedTotalXp": 950
+      },
+      {
+        "user": "student-3",
+        "completedTopics": [],
+        "badges": [],
+        "adminAdjustments": [],
+        "streakDays": 0,
+        "quests": [],
+        "expectedTotalXp": 0
+      }
+    ],
+    "missions": [
+      {
+        "key": "first-topic",
+        "title": "Complete your first topic",
+        "description": "Finish any lesson within the next two weeks.",
+        "predicateKind": "complete_topic",
+        "params": {
+          "count": 1
+        },
+        "badge": "tecnica-afiada",
+        "activeDays": 14,
+        "xpReward": 100
+      }
+    ]
+  }
+}
