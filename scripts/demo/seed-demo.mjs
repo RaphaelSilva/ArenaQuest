@@ -4,6 +4,7 @@
  * (RFC 0021 §3).
  *
  *   AQ_DEMO_PASSWORD=… node scripts/demo/seed-demo.mjs --label <label> -e local|staging [--dry-run] [--yes]
+ *                      [--persist-to <dir>]   (local only: a throwaway store, e.g. the CI check)
  *
  * Pipeline: parse → resolve the target from the label profile → refuse anything
  * production → check AQ_DEMO_PASSWORD → load + validate the dataset (Task 03) →
@@ -17,7 +18,8 @@
  *
  * Target (resolved like the deploy CLI, `scripts/cloudflare/deploy.mjs`):
  *   local    → `arenaquest-db --local`, the one local replica every label
- *              shares (the label only picks the dataset);
+ *              shares (the label only picks the dataset); `--persist-to <dir>`
+ *              points it (D1 and R2 alike) at another on-disk store;
  *   staging  → the profile's `environments.staging.d1.name`, `--remote --env <label>-staging`.
  *
  * Production is unreachable by construction, and the refusal runs before any
@@ -33,8 +35,9 @@
  * carries its PBKDF2 hash, never the value. A dry run without it writes a
  * placeholder hash no password verifies against.
  *
- * Media bucket: local → the top-level `R2` bucket of `apps/api/wrangler.jsonc`
- * (`--local`); staging → the profile's `environments.staging.r2.bucket` (`--remote`).
+ * Media bucket: local → the top-level `R2` bucket of `apps/api/wrangler.jsonc`,
+ * served in-process (media.mjs `openLocalR2`); staging → the profile's
+ * `environments.staging.r2.bucket` (`wrangler r2 object … --remote`).
  *
  * `--dry-run` writes the SQL file, prints the per-object media plan (reading the
  * bucket, never downloading from a manifest URL or uploading) and stops. A
@@ -44,7 +47,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs as nodeParseArgs } from 'node:util';
@@ -55,7 +58,17 @@ import { loadDataset, renderTopicMarkdown, readSampleTopic } from './dataset.mjs
 import { checkXpConsistency, readGamificationReference, xpConsistencyQuery } from './gamification.mjs';
 import { hashPassword } from './hash.mjs';
 import { listLabels } from './ids.mjs';
-import { buildMediaPlan, createR2, defaultCacheDir, formatMediaPlan, materialiseMedia, mediaTarget, resolveMediaPlan, runWrangler } from './media.mjs';
+import {
+  buildMediaPlan,
+  createR2,
+  defaultCacheDir,
+  formatMediaPlan,
+  materialiseMedia,
+  mediaTarget,
+  openLocalR2,
+  resolveMediaPlan,
+  runWrangler,
+} from './media.mjs';
 import { buildSeedSql, demoContext } from './sql.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -82,6 +95,7 @@ export function parseSeedArgs(argv) {
         env: { type: 'string', short: 'e' },
         'dry-run': { type: 'boolean' },
         yes: { type: 'boolean' },
+        'persist-to': { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
       allowPositionals: false,
@@ -97,7 +111,18 @@ export function parseSeedArgs(argv) {
   if (!ENVS.includes(values.env)) {
     throw new Error(`-e/--env must be one of ${ENVS.join('|')} (got ${values.env === undefined ? 'nothing' : `"${values.env}"`})`);
   }
-  return { label: values.label, env: values.env, dryRun: Boolean(values['dry-run']), yes: Boolean(values.yes) };
+  const persistTo = values['persist-to'];
+  if (persistTo !== undefined) {
+    if (values.env !== 'local') throw new Error('--persist-to only applies to -e local');
+    if (persistTo.trim() === '') throw new Error('--persist-to needs a directory');
+  }
+  return {
+    label: values.label,
+    env: values.env,
+    dryRun: Boolean(values['dry-run']),
+    yes: Boolean(values.yes),
+    ...(persistTo === undefined ? {} : { persistTo }),
+  };
 }
 
 /** Every production D1 name and R2 bucket across `profiles` (`{ label: profile }`). */
@@ -116,15 +141,19 @@ export function productionResources(profiles) {
  * Where the seed goes: `{ env, remote, database, wranglerArgs }`. Throws — before
  * anything is written or spawned — on production or a production-named resource.
  */
-export function resolveTarget({ label, env, profiles }) {
+export function resolveTarget({ label, env, profiles, persistTo = null }) {
   if (env === 'production') throw new Error('refusing -e production: the demo seed never writes to production');
   if (!ENVS.includes(env)) throw new Error(`unknown environment "${env}" (expected ${ENVS.join('|')})`);
   const profile = profiles[label];
   if (!profile) throw new Error(`profile not found: config/labels/${label}.jsonc`);
 
   if (env === 'local') {
-    return { env, remote: false, database: LOCAL_DATABASE, wranglerArgs: ['--local'] };
+    if (!persistTo) return { env, remote: false, database: LOCAL_DATABASE, wranglerArgs: ['--local'] };
+    // Absolute: wrangler runs from apps/api and resolves a relative path there.
+    const dir = resolve(persistTo);
+    return { env, remote: false, database: LOCAL_DATABASE, persistTo: dir, wranglerArgs: ['--local', '--persist-to', dir] };
   }
+  if (persistTo) throw new Error('--persist-to only applies to -e local');
 
   const staging = profile.environments?.staging;
   const database = staging?.d1?.name;
@@ -254,7 +283,7 @@ async function confirmRemote(target, label, { yes }) {
 }
 
 function usage() {
-  console.log(`Usage: ${PASSWORD_VAR}=… node scripts/demo/seed-demo.mjs --label <label> -e local|staging [--dry-run] [--yes]`);
+  console.log(`Usage: ${PASSWORD_VAR}=… node scripts/demo/seed-demo.mjs --label <label> -e local|staging [--dry-run] [--yes] [--persist-to <dir>]`);
 }
 
 function runSqlFile(command) {
@@ -269,13 +298,16 @@ function runSqlFile(command) {
 }
 
 /**
- * `deps` exists for the tests: `runR2` (wrangler for R2, see media.mjs),
- * `fetchImpl`, `executeSql(command)` (the d1 execute, also used for the
- * read-only XP check), `cacheDir`, `sqlFile`, `dataset`, `now`.
+ * `deps` exists for the tests and the CI check (ci-check.mjs): `runR2`
+ * (wrangler for the remote bucket), `openLocalR2(bucket)` (the local bucket,
+ * `{ get, put, dispose? }`), `fetchImpl`, `executeSql(command)` (the d1
+ * execute, also used for the read-only XP check), `cacheDir`, `sqlFile`,
+ * `dataset`, `now`. Returns 0, or throws.
  */
 export async function main(argv = process.argv.slice(2), envVars = process.env, deps = {}) {
   const {
     runR2 = runWrangler,
+    openLocalR2: openLocal = (bucket) => openLocalR2(bucket),
     fetchImpl = globalThis.fetch,
     executeSql = runSqlFile,
     cacheDir = defaultCacheDir(),
@@ -290,10 +322,11 @@ export async function main(argv = process.argv.slice(2), envVars = process.env, 
   }
 
   // Refusals first: nothing is written or spawned before these pass.
-  const target = resolveTarget({ label: args.label, env: args.env, profiles: loadAllProfiles() });
+  const target = resolveTarget({ label: args.label, env: args.env, profiles: loadAllProfiles(), persistTo: args.persistTo });
   const password = readPassword(envVars, args);
 
-  log.heading(`Demo seed — ${args.label} → ${target.env} (${target.database}${target.remote ? `, env ${target.wranglerEnv}` : ', local'})`);
+  const where = target.remote ? `, env ${target.wranglerEnv}` : `, local${target.persistTo ? ` at ${target.persistTo}` : ''}`;
+  log.heading(`Demo seed — ${args.label} → ${target.env} (${target.database}${where})`);
   const dataset = datasetOverride ?? loadDataset(args.label);
   const template = readSampleTopic();
   const ctx = demoContext({
@@ -313,27 +346,33 @@ export async function main(argv = process.argv.slice(2), envVars = process.env, 
   if (password === null) log.warn(`${PASSWORD_VAR} unset: the file carries a placeholder hash nobody can log in with`);
 
   const bucket = mediaTarget(target);
-  const r2 = createR2(bucket, runR2);
-  log.info(`checking ${summary.find((row) => row.entity === 'media')?.rows ?? 0} media objects in R2 "${bucket.bucket}" (${bucket.args.join(' ')})`);
-  const resolved = await resolveMediaPlan(buildMediaPlan(dataset, ctx), { r2, cacheDir, concurrency: bucket.concurrency });
-  const planLines = formatMediaPlan(resolved);
+  const r2 = bucket.local ? await openLocal(bucket) : createR2(bucket, runR2);
+  // The local store is served in-process; it is closed before wrangler opens it.
+  let media;
+  try {
+    log.info(`checking ${summary.find((row) => row.entity === 'media')?.rows ?? 0} media objects in R2 "${bucket.bucket}" (${bucket.args.join(' ')})`);
+    const resolved = await resolveMediaPlan(buildMediaPlan(dataset, ctx), { r2, cacheDir, concurrency: bucket.concurrency });
+    const planLines = formatMediaPlan(resolved);
 
-  if (args.dryRun) {
-    for (const line of planLines) log.info(`media ${line}`);
-    for (const line of formatSummary(summary)) log.info(`would upsert ${line}`);
-    log.ok('dry run: nothing downloaded, uploaded or executed');
-    return 0;
+    if (args.dryRun) {
+      for (const line of planLines) log.info(`media ${line}`);
+      for (const line of formatSummary(summary)) log.info(`would upsert ${line}`);
+      log.ok('dry run: nothing downloaded, uploaded or executed');
+      return 0;
+    }
+
+    if (target.remote) await confirmRemote(target, args.label, args);
+
+    media = await materialiseMedia(resolved, {
+      r2,
+      cacheDir,
+      fetchImpl,
+      concurrency: bucket.concurrency,
+      onUpload: (entry) => log.ok(`uploaded ${entry.key} (${entry.manifestKey})`),
+    });
+  } finally {
+    await r2.dispose?.();
   }
-
-  if (target.remote) await confirmRemote(target, args.label, args);
-
-  const media = await materialiseMedia(resolved, {
-    r2,
-    cacheDir,
-    fetchImpl,
-    concurrency: bucket.concurrency,
-    onUpload: (entry) => log.ok(`uploaded ${entry.key} (${entry.manifestKey})`),
-  });
   log.ok(`media objects: ${media.uploaded} uploaded, ${media.skipped} already present`);
 
   const command = wranglerCommand(target, file);
