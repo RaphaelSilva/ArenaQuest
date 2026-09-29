@@ -1,6 +1,6 @@
 # Task 07 — Frontend: Delete orphan action in the browser (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [25 — Admin storage browser and orphan audit](./milestone.md)
 **RFC:** [RFC 0018](../../RFCs/0018-admin-storage-browser-and-orphan-audit.md)
 **Team:** Frontend Web
@@ -63,19 +63,19 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The *Delete* action appears only for `orphan` and `deleted-row` objects, and is disabled
+- [x] The *Delete* action appears only for `orphan` and `deleted-row` objects, and is disabled
       with a visible reason for those uploaded less than 24 h ago.
-- [ ] Confirming issues `DELETE /v1/admin/storage/object` with the object's key; cancelling
+- [x] Confirming issues `DELETE /v1/admin/storage/object` with the object's key; cancelling
       issues no request.
-- [ ] On success the row leaves the folder listing and the scan results, and the group totals
+- [x] On success the row leaves the folder listing and the scan results, and the group totals
       decrease by its size.
-- [ ] On `409` the dialog shows the reason derived from the returned classification and the row's
+- [x] On `409` the dialog shows the reason derived from the returned classification and the row's
       badge updates to it.
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and `dict-pt.ts`;
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and `dict-pt.ts`;
       `check-i18n-coverage.js` passes.
-- [ ] The dialog is keyboard-usable, focus-trapped and closes on Escape.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] The dialog is keyboard-usable, focus-trapped and closes on Escape.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
