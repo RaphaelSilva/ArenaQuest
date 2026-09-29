@@ -1,9 +1,9 @@
-# Milestone 23 — Admin storage browser and orphan audit
+# Milestone 25 — Admin storage browser and orphan audit
 
 **Status:** 📝 Draft
 **Scope:** `packages/shared` (storage port folder listing, new storage-reference port, key-owner registry), `apps/api` (read-only D1 resolution adapter, admin-only `/v1/admin/storage/*` router and controller, guarded orphan delete), `apps/web` (admin-only `/admin/storage` page, sidebar item, i18n). Derived from [RFC 0018](../../RFCs/0018-admin-storage-browser-and-orphan-audit.md).
 
-> **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: `packages/shared/ports/i-storage-adapter.ts` (the `listObjects` options object, `prefixes`, `StorageObject.contentType`) and the matching `apps/api/src/adapters/storage/r2-storage-adapter.ts`; the two existing `listObjects` test doubles in `apps/api/test/controllers/{topics,admin-media}.controller.spec.ts`; the new files `packages/shared/ports/i-storage-reference-repository.ts` (plus its re-export in `ports/index.ts`), `packages/shared/domain/storage/key-owners.ts`, `apps/api/src/adapters/db/d1-storage-reference-repository.ts`, `apps/api/src/controllers/admin-storage.controller.ts`, `apps/api/src/routes/admin/storage.ts`, `apps/api/test/storage/**`; the wiring lines in `apps/api/src/routes/admin/index.ts` and `apps/api/src/container.ts`; new schemas in `apps/api/src/openapi/components/entities.ts`; the new `apps/web/src/lib/admin-storage-api.ts`, `apps/web/src/app/(protected)/admin/storage/**`, `apps/web/src/components/admin/storage/**`, one item in `apps/web/src/components/layout/admin-sidebar.tsx`, the regenerated `apps/web/src/lib/api-types.gen.ts` and both i18n dictionaries; and, for the closeout only, `docs/product/FEATURES.md`, RFC 0018's `Status:` header and its README row. It is explicitly **not** an opportunity to: **upload, rename or move objects** from this page (the topic media uploader and the RFC 0014 flyer flow keep owning writes); **open the page to `content_creator`** in any form; add a **scheduled garbage collector** or any Cron Trigger; **fix the root causes** of drift (`deleteMedia`'s swallowed `.catch`, the displaced-flyer delete, `ON DELETE CASCADE` on `media`, the repositories' hard `delete`) — they are made visible here and fixed in separate backlog items; write to **any DB row** (no status change, no hard-delete of `pending` or `deleted` media rows); add a **migration** (no `storage_objects` inventory, no audit table, no index on `media.storage_key` unless the §3 latency criterion fails and it is filed as its own task); or build a **cross-tenant** view. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
+> **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: `packages/shared/ports/i-storage-adapter.ts` (the `listObjects` options object, `prefixes`, `StorageObject.contentType`) and the matching `apps/api/src/adapters/storage/r2-storage-adapter.ts`; the two existing `listObjects` test doubles in `apps/api/test/controllers/{topics,admin-media}.controller.spec.ts`; the new files `packages/shared/ports/i-storage-reference-repository.ts` (plus its re-export in `ports/index.ts`), `packages/shared/domain/storage/key-owners.ts`, `apps/api/src/adapters/db/d1-storage-reference-repository.ts`, `apps/api/src/controllers/admin-storage.controller.ts`, `apps/api/src/routes/admin/storage.ts`, `apps/api/test/storage/**`; the wiring lines in `apps/api/src/routes/admin/index.ts` and `apps/api/src/container.ts`; new schemas in `apps/api/src/openapi/components/entities.ts` and the regenerated `apps/api/openapi.json`; the new `apps/web/src/lib/admin-storage-api.ts`, `apps/web/src/app/(protected)/admin/storage/**`, `apps/web/src/components/admin/storage/**`, one item in `apps/web/src/components/layout/admin-sidebar.tsx`, the regenerated `apps/web/src/lib/api-types.gen.ts` and both i18n dictionaries; and, for the closeout only, `docs/product/FEATURES.md`, RFC 0018's `Status:` header and its README row, and — only if the §3 latency criterion fails — one backlog task file under `docs/product/backlog/` for the `media.storage_key` index. It is explicitly **not** an opportunity to: **upload, rename or move objects** from this page (the topic media uploader and the RFC 0014 flyer flow keep owning writes); **open the page to `content_creator`** in any form; add a **scheduled garbage collector** or any Cron Trigger; **fix the root causes** of drift (`deleteMedia`'s swallowed `.catch`, the displaced-flyer delete, `ON DELETE CASCADE` on `media`, the repositories' hard `delete`) — they are made visible here and fixed in separate backlog items; write to **any DB row** (no status change, no hard-delete of `pending` or `deleted` media rows); add a **migration** (no `storage_objects` inventory, no audit table, no index on `media.storage_key` unless the §3 latency criterion fails and it is filed as its own task); or build a **cross-tenant** view. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
 
 ---
 
@@ -90,17 +90,15 @@ Out of scope (explicit, from RFC 0018 Non-Goals):
 
 ## 5. Task Breakdown
 
-Planned breakdown — the `.task.md` files are authored next with `write-tasks`, which keeps this table in sync.
-
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
 | 01 | [Storage port folder listing and key-owner registry](./01-storage-port-folder-listing-and-key-owner-registry.task.md) | 0 | Backend | ☐ Open |
 | 02 | [Storage reference port and D1 resolver](./02-storage-reference-port-and-d1-resolver.task.md) | 1 | Backend | ☐ Open |
-| 03 | [Admin storage API: browse, object, audit](./03-admin-storage-api-browse-object-audit.task.md) | 1 | Backend | ☐ Open |
-| 04 | [Admin storage browser page](./04-admin-storage-browser-page--frontend.task.md) | 1 | Frontend | ☐ Open |
-| 05 | [Orphan and missing-file scan panel](./05-orphan-and-missing-file-scan-panel--frontend.task.md) | 1 | Frontend | ☐ Open |
+| 03 | [Admin storage API: browse, object and audit](./03-admin-storage-api-browse-object-audit.task.md) | 1 | Backend | ☐ Open |
+| 04 | [Admin storage browser page](./04-admin-storage-browser-page.task.md) | 1 | Frontend | ☐ Open |
+| 05 | [Orphan and missing-file scan panel](./05-orphan-and-missing-file-scan-panel.task.md) | 1 | Frontend | ☐ Open |
 | 06 | [Guarded orphan delete API](./06-guarded-orphan-delete-api.task.md) | 2 | Backend | ☐ Open |
-| 07 | [Delete orphan action in the browser](./07-delete-orphan-action--frontend.task.md) | 2 | Frontend | ☐ Open |
+| 07 | [Delete orphan action in the browser](./07-delete-orphan-action.task.md) | 2 | Frontend | ☐ Open |
 | 08 | [Docs and rollout closeout](./08-docs-and-rollout-closeout.task.md) | 3 | Backend | ☐ Open |
 
 Dependency graph:
@@ -110,14 +108,14 @@ Dependency graph:
                    │         │
                    └──► 06 ──┴──► 07
                                    │
-                    04, 05, 07 ────┴──► 08
+                        05, 07 ────┴──► 08
 ```
 
 **Recommended execution order:** `01` → `02` → `03` → `04` → `05` → `06` → `07` → `08`.
 
 Phase 1 (`01`–`05`) is read-only and shippable on its own: after it merges, admins can browse and audit with no way to delete. Phase 2 (`06`–`07`) adds the only write.
 
-Each task is intended to land as an independent PR into the `feature/m23/candidate` branch with `make lint`, `make test-api`, and `make test-web` passing.
+Each task is intended to land as an independent PR into the `feature/m25/candidate` branch with `make lint`, `make test-api`, and `make test-web` passing.
 
 ---
 
