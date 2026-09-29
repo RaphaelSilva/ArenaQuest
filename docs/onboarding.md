@@ -187,6 +187,11 @@ Adding a brand is one line in each workflow's `strategy.matrix.include` plus a
 new `config/labels/<label>.jsonc` — no copied job stanza and no new deploy
 config store.
 
+**Staging sends no real e-mail.** Every label's staging profile uses `mail.driver: "console"`
+(RFC 0021 §2.5): activation, password-reset and notification mails are written to the Worker log
+instead of an inbox. Read them — and their links — with
+`pnpm --filter api exec wrangler tail --env <label>-staging`. Production keeps `resend`.
+
 ### Bringing up a new tenant
 
 Deploy assumes the tenant already exists. Creating it is the provisioner's job:
