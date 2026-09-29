@@ -39,3 +39,13 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 # Must match one of the Authorised Redirect URIs configured in the Google Console.
 GOOGLE_REDIRECT_URI=http://localhost:8787/auth/google/callback
+
+# Student submissions (RFC 0020 section 3). All four are optional: an ABSENT var
+# takes the default shown; a PRESENT but invalid one (not a positive integer, a
+# switch other than true/false, or a video limit above the storage limit) makes
+# every submission endpoint answer 500 SUBMISSION_CONFIG_INVALID — never a
+# silent fallback. Uncomment to override locally.
+# SUBMISSIONS_PER_TOPIC_MAX=10
+# SUBMISSIONS_STORAGE_PER_STUDENT_BYTES=1073741824
+# SUBMISSIONS_VIDEO_MAX_BYTES=262144000
+# SUBMISSIONS_SHARING_ENABLED=true

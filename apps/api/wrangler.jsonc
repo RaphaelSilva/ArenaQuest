@@ -127,7 +127,13 @@
 				"MAIL_FROM": "Budo Staging <noreply@budo.app>",
 				"WEB_BASE_URL": "https://budo-web-staging.pages.dev",
 				// "GOOGLE_CLIENT_ID": it was setted manually in Cloudflare dashboard, because we don't want to expose it in the repo.
-				"GOOGLE_REDIRECT_URI": "https://api-budo-staging.spaziord.com.br/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api-budo-staging.spaziord.com.br/auth/google/callback",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,
@@ -174,7 +180,13 @@
 				// `wrangler deploy`, which replaces the whole vars set, cannot silently drop it.
 				// The matching GOOGLE_CLIENT_SECRET stays a Worker secret.
 				"GOOGLE_CLIENT_ID": "63847537881-4fudig0vngk2ll8u2pt4lkoijnppuv79.apps.googleusercontent.com",
-				"GOOGLE_REDIRECT_URI": "https://api.taibudo.com/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api.taibudo.com/auth/google/callback",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,
@@ -217,7 +229,13 @@
 				"MAIL_FROM": "SpazioRD Staging <noreply@spaziord.app>",
 				"WEB_BASE_URL": "https://spaziord-web-staging.pages.dev",
 				"GOOGLE_REDIRECT_URI": "https://api-staging.spaziord.com.br/auth/google/callback",
-				"GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
+				"GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,
@@ -262,7 +280,13 @@
 				// `wrangler deploy`, which replaces the whole vars set, cannot silently drop it.
 				// The matching GOOGLE_CLIENT_SECRET stays a Worker secret.
 				"GOOGLE_CLIENT_ID": "63847537881-4fudig0vngk2ll8u2pt4lkoijnppuv79.apps.googleusercontent.com",
-				"GOOGLE_REDIRECT_URI": "https://api.spaziord.app/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api.spaziord.app/auth/google/callback",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,
@@ -307,7 +331,13 @@
 				// Google OAuth — replace with your staging OAuth client values.
 				// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET --env staging`
 				// "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
-				"GOOGLE_REDIRECT_URI": "https://api-staging.raphael-1d2.workers.dev/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api-staging.raphael-1d2.workers.dev/auth/google/callback",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,
@@ -350,7 +380,13 @@
 				// Google OAuth — replace with your staging OAuth client values.
 				// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET --env staging`
 				// "GOOGLE_CLIENT_ID": it was setted manually in Cloudflare dashboard, because we don't want to expose it in the repo.
-				"GOOGLE_REDIRECT_URI": "https://api.arenaquest.app/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api.arenaquest.app/auth/google/callback",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,
@@ -396,7 +432,13 @@
 				// Google OAuth — replace with your staging OAuth client values.
 				// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET --env staging`
 				//"GOOGLE_CLIENT_ID": "",
-				"GOOGLE_REDIRECT_URI": "https://api-staging.raphael-1d2.workers.dev/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api-staging.raphael-1d2.workers.dev/auth/google/callback",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,

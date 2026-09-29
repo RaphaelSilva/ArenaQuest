@@ -112,9 +112,19 @@ export class R2StorageAdapter implements IStorageAdapter {
     return this.toStorageObject(obj);
   }
 
-  /** Implemented in M23 Task 02 (ranged GetObject of the leading bytes). */
-  async readHead(_key: string, _bytes: number): Promise<Uint8Array | null> {
-    throw new Error('R2StorageAdapter.readHead: not implemented');
+  /**
+   * Ranged read of the leading bytes (RFC 0020 section 5) through the native
+   * binding — the equivalent of `GetObject` with `Range: bytes=0-(bytes-1)`,
+   * without a signed S3 round-trip. The rest of the object is never fetched.
+   * Shorter objects return what they have; a missing key returns null.
+   */
+  async readHead(key: string, bytes: number): Promise<Uint8Array | null> {
+    if (!Number.isInteger(bytes) || bytes <= 0) {
+      throw new Error('R2StorageAdapter.readHead: bytes must be a positive integer');
+    }
+    const obj = await this.bucket.get(key, { range: { offset: 0, length: bytes } });
+    if (!obj) return null;
+    return new Uint8Array(await obj.arrayBuffer());
   }
 
   async getPresignedUploadUrl(key: string, options?: PresignedUrlOptions): Promise<string> {
