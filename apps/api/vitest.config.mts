@@ -17,6 +17,7 @@ export default defineConfig({
 						"test/db/**/*.spec.ts",
 						"test/routes/**/*.spec.ts",
 						"test/index.spec.ts",
+						"test/storage/**/*.spec.ts",
 					],
 					exclude: [
 						"test/routes/parse-cookie-samesite.spec.ts",

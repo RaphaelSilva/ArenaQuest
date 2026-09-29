@@ -74,7 +74,7 @@ function makeStorageAdapter(overrides: Partial<IStorageAdapter> = {}): IStorageA
     getPresignedUploadUrl: vi.fn(async () => 'https://storage.example.com/upload'),
     getPresignedDownloadUrl: vi.fn(async () => 'https://storage.example.com/download'),
     getPublicUrl: vi.fn(() => 'https://storage.example.com/public'),
-    listObjects: vi.fn(async () => ({ objects: [] })),
+    listObjects: vi.fn(async () => ({ objects: [], prefixes: [] })),
     ...overrides,
   };
 }
