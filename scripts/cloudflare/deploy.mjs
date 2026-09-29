@@ -91,18 +91,20 @@ function wranglerEnvName(label, env) {
 }
 
 /**
- * Build the guard-no-dev-seed preflight command. Runs the existing, unmodified
+ * Build the guard-no-dev-seed preflight command. Runs
  * `apps/api/scripts/check-no-dev-seed.ts` against the resolved D1 database.
  * `--env` is passed only for staging (matching the Makefile, which omits it for
- * production).
+ * production). `--target` is always passed explicitly: in `production` mode the
+ * guard also rejects demo accounts (RFC 0021 §3.6), which staging may hold.
  */
 function guardCommand({ d1Name, env, wranglerEnv }) {
   const argv = [
     'pnpm', '--filter', 'api', 'exec', 'tsx', 'scripts/check-no-dev-seed.ts',
-    '--db', d1Name,
+    '--db', d1Name, '--target', env,
   ];
   if (env === 'staging') argv.push('--env', wranglerEnv);
-  return { title: `Guard: no dev-seed in ${d1Name}`, argv };
+  const what = env === 'production' ? 'dev-seed or demo accounts' : 'dev-seed';
+  return { title: `Guard (${env}): no ${what} in ${d1Name}`, argv };
 }
 
 /**
