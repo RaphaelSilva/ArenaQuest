@@ -3,7 +3,7 @@
 **Status:** Planning
 **Scope:** `apps/api` (submissions bounded context in the `engagement` group, env-configured quotas, daily sweep), `packages/shared` (submission types, port, limits, storage-port additions), `apps/web` (topic *Demonstrations* button, the per-topic Demonstrations page with *Mine* / *Class* / *All* tabs and viewer, "My demonstrations" page, backoffice section), `config/deployment.schema.jsonc`. Derived from [RFC 0020](../../RFCs/0020-student-submissions.md).
 
-> **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: `apps/api/migrations/0030_create_topic_submissions.sql` (renumbered if M21's or M22's migration shifts the sequence); the new submissions files `apps/api/src/{core/submissions/config.ts,adapters/db/d1-submission-repository.ts,controllers/submissions.controller.ts,routes/submissions.router.ts,routes/me/submissions.ts,routes/admin/submissions.ts,jobs/sweep-pending-submissions.ts}`; `readHead` and `deletePrefix` added to `apps/api/src/adapters/storage/r2-storage-adapter.ts` (no existing method changes); the `sanitizeFileName` move out of `apps/api/src/controllers/admin-media.controller.ts` (import change only, behaviour identical); the single `deletePrefix` call added to the controller that performs a user hard-delete; the sweep call added to `scheduled()` in `apps/api/src/index.ts` (billing untouched); wiring in `container.ts` (the `engagement` group gains `submissionRepo`, one new `rl:submissions:` limiter; no other group changes shape), `routes/index.ts`, `routes/me/index.ts`, `routes/admin/index.ts`; the cursor helper under `apps/api/src/routes/_shared/` if M21 has not landed it; the four `SUBMISSIONS_*` vars in every `env.*.vars` block of `apps/api/wrangler.jsonc`, in `apps/api/.dev.vars.example` and in `config/deployment.schema.jsonc`; the regenerated `apps/api/openapi.json`; `apps/api/test/**`; the shared additions `packages/shared/{types/entities.ts (Entities.Engagement.Submission + Config.SubmissionStatus),domain/media/limits.ts (SUBMISSION_MEDIA_TYPES, SUBMISSION_VIDEO_TYPES — appended, nothing existing edited),domain/submissions/limits.ts,ports/i-submission-repository.ts,ports/i-storage-adapter.ts (two methods appended),ports/index.ts,utils/sanitize-file-name.ts}`; on the web, `apps/web/src/components/catalog/submissions/**`, the *Demonstrations* button in `apps/web/src/app/(protected)/catalog/[id]/page.tsx`, the new `apps/web/src/app/(protected)/catalog/[id]/submissions/**` and `apps/web/src/app/(protected)/submissions/**`, a *Submissions* section in `apps/web/src/app/(protected)/admin/users/[userId]/page.tsx`, one "My demonstrations" entry in `apps/web/src/components/layout/nav.tsx`, `apps/web/src/lib/submissions-api.ts`, the regenerated `apps/web/src/lib/api-types.gen.ts`, and both i18n dictionaries (+ `types.ts`); and, for the closeout only, a new local seed under `apps/api/migrations/seed/`, `CLAUDE.md`, `docs/product/FEATURES.md`, RFC 0020's `Status:` header and its `docs/product/RFCs/README.md` row. It is explicitly **not** an opportunity to: add **staff review, grading, corrections or a "reviewed" status** on submissions (the next RFC); add **server-side transcoding**, thumbnails, Cloudflare Stream or any `ffmpeg` path; **copy** submissions between topics, or let **staff move** them; support **several files per submission**; award **XP, quests or badges**, or touch `packages/shared/domain/gamification/**`; give the **`tutor`** role any power beyond a student's; add **comments, likes, notifications** or in-browser recording; accept **`video/quicktime` for backoffice media** or change `ALLOWED_MEDIA_TYPES`, `MEDIA_SIZE_LIMIT_BYTES`, `admin-media.controller.ts` behaviour, `scripts/content/import-media.mjs` or `scripts/media/convert-skipped.mjs`; store any submission in the **`media` table** or under the `topics/` key prefix; change `TopicsController`, `getEffectiveAccessTopicIds` or `d1-enrollment-repository.ts`; or change RFC 0016's notes files. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
+> **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: `apps/api/migrations/0030_create_topic_submissions.sql` (renumbered if M21's or M22's migration shifts the sequence); the new submissions files `apps/api/src/{core/submissions/config.ts,adapters/db/d1-submission-repository.ts,controllers/submissions.controller.ts,routes/submissions.router.ts,routes/me/submissions.ts,routes/admin/submissions.ts,jobs/sweep-pending-submissions.ts}`; `readHead` added to `apps/api/src/adapters/storage/r2-storage-adapter.ts` (no existing method changes); the `sanitizeFileName` move out of `apps/api/src/controllers/admin-media.controller.ts` (import change only, behaviour identical); the sweep call added to `scheduled()` in `apps/api/src/index.ts` (billing untouched); wiring in `container.ts` (the `engagement` group gains `submissionRepo`, one new `rl:submissions:` limiter; no other group changes shape), `routes/index.ts`, `routes/me/index.ts`, `routes/admin/index.ts`; the cursor helper under `apps/api/src/routes/_shared/` if M21 has not landed it; the four `SUBMISSIONS_*` vars in every `env.*.vars` block of `apps/api/wrangler.jsonc`, in `apps/api/.dev.vars.example` and in `config/deployment.schema.jsonc`; the regenerated `apps/api/openapi.json`; `apps/api/test/**`; the shared additions `packages/shared/{types/entities.ts (Entities.Engagement.Submission + Config.SubmissionStatus),domain/media/limits.ts (SUBMISSION_MEDIA_TYPES, SUBMISSION_VIDEO_TYPES — appended, nothing existing edited),domain/submissions/limits.ts,ports/i-submission-repository.ts,ports/i-storage-adapter.ts (`readHead` appended),ports/index.ts,utils/sanitize-file-name.ts}`; on the web, `apps/web/src/components/catalog/submissions/**`, the *Demonstrations* button in `apps/web/src/app/(protected)/catalog/[id]/page.tsx`, the new `apps/web/src/app/(protected)/catalog/[id]/submissions/**` and `apps/web/src/app/(protected)/submissions/**`, a *Submissions* section in `apps/web/src/app/(protected)/admin/users/[userId]/page.tsx`, one "My demonstrations" entry in `apps/web/src/components/layout/nav.tsx`, `apps/web/src/lib/submissions-api.ts`, the regenerated `apps/web/src/lib/api-types.gen.ts`, and both i18n dictionaries (+ `types.ts`); and, for the closeout only, a new local seed under `apps/api/migrations/seed/`, `CLAUDE.md`, `docs/product/FEATURES.md`, RFC 0020's `Status:` header and its `docs/product/RFCs/README.md` row. It is explicitly **not** an opportunity to: add **staff review, grading, corrections or a "reviewed" status** on submissions (the next RFC); add **server-side transcoding**, thumbnails, Cloudflare Stream or any `ffmpeg` path; **copy** submissions between topics, or let **staff move** them; support **several files per submission**; award **XP, quests or badges**, or touch `packages/shared/domain/gamification/**`; give the **`tutor`** role any power beyond a student's; add **comments, likes, notifications** or in-browser recording; accept **`video/quicktime` for backoffice media** or change `ALLOWED_MEDIA_TYPES`, `MEDIA_SIZE_LIMIT_BYTES`, `admin-media.controller.ts` behaviour, `scripts/content/import-media.mjs` or `scripts/media/convert-skipped.mjs`; store any submission in the **`media` table** or under the `topics/` key prefix; change `TopicsController`, `getEffectiveAccessTopicIds` or `d1-enrollment-repository.ts`; add a user **hard-delete** path or change `routes/admin/users.ts`; or change RFC 0016's notes files. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
 
 ---
 
@@ -11,7 +11,7 @@
 
 - **A `topic_submissions` entity, separate from course media.** One file plus title and description, many per student per topic, in its own table and under `submissions/{authorId}/…`, so no reader of `media` can ever surface a student upload (RFC §1, §2, Alternatives §1).
 - **Upload straight from a phone, iPhone `.mov` included.** `presign → PUT → finalize` as in the backoffice, accepting `SUBMISSION_MEDIA_TYPES` (course types + `video/quicktime`), with a playback fallback when a browser cannot decode HEVC (RFC §4, §5).
-- **Untrusted-uploader hardening.** Finalize checks the stored length, type and file signature; a per-user upload rate limit; a daily sweep of abandoned uploads; `deletePrefix` on account hard-delete (RFC §5, §9).
+- **Untrusted-uploader hardening.** Finalize checks the stored length, type and file signature; a per-user upload rate limit; a daily sweep of abandoned uploads (RFC §5, §9).
 - **Quotas and sharing configured per label and environment.** `SUBMISSIONS_PER_TOPIC_MAX` (10), `SUBMISSIONS_STORAGE_PER_STUDENT_BYTES` (1 GiB), `SUBMISSIONS_VIDEO_MAX_BYTES` (250 MB), `SUBMISSIONS_SHARING_ENABLED` (`true`), enforced atomically in SQL and exposed to the web through a summary endpoint (RFC §3).
 - **Students manage their own work.** Edit title/description/visibility, delete, and **move one or several submissions to another readable topic** — metadata-only, quota-checked on the target, reset to private (RFC §6).
 - **Privacy among students, visibility for staff.** Private by default; shared ones are readable by the topic's readers; staff read everything, force-unshare, and `admin` removes, leaving a *"Removido pela equipe"* tombstone (RFC §7, §8).
@@ -61,7 +61,7 @@ Out of scope (explicit, from RFC 0020 Non-Goals):
 
 **Housekeeping**
 - The daily `scheduled()` run deletes `pending` rows older than 24 h and their objects, in batches of 100, logging only a count.
-- A user hard-delete also deletes every object under `submissions/{userId}/`.
+- Deactivating a user leaves their submissions in place; their shared ones stay listed with their name.
 
 **Web**
 - The topic page shows a **Demonstrações** button with *"N minhas · M da turma"* (class count hidden when sharing is off); staff see **Demonstrações dos alunos** with the total.
@@ -89,7 +89,7 @@ Out of scope (explicit, from RFC 0020 Non-Goals):
 - [ ] With `SUBMISSIONS_SHARING_ENABLED=false`, sharing returns `409 SUBMISSION_SHARING_DISABLED`, `scope=class` is empty and previously shared rows are `404` to other students; with `true` again they are listed unchanged.
 - [ ] Both staff roles read every submission and force-unshare; only `admin` removes; after removal R2 has no object, the author's `scope=mine` shows the tombstone, and the quota no longer counts it; students and tutors get `403` on every `/v1/admin/submissions*` route.
 - [ ] A `pending` row created 25 h ago and its object are gone after `scheduled()` runs; a 1 h-old one is untouched.
-- [ ] A user hard-delete leaves no object under `submissions/{userId}/`, and deleting a staff user who moderated or removed a submission succeeds (`moderated_by` / `removed_by` become `NULL`).
+- [ ] Deleting a `users` row of a staff member who moderated or removed a submission succeeds at the database level, and `moderated_by` / `removed_by` become `NULL`.
 - [ ] In a component test, the class viewer steps with **next** across a page boundary, and a `MEDIA_ERR_SRC_NOT_SUPPORTED` error renders the Download fallback.
 - [ ] A file over the video limit is rejected in the browser before any presign request is sent (asserted on the mocked client).
 - [ ] `git grep -n "topic_submissions" -- apps/api/src/controllers/topics.controller.ts apps/api/src/controllers/admin-media.controller.ts` returns nothing; no diff to `ALLOWED_MEDIA_TYPES` or `MEDIA_SIZE_LIMIT_BYTES`; no diff under `packages/shared/domain/gamification/`.
@@ -102,7 +102,7 @@ Out of scope (explicit, from RFC 0020 Non-Goals):
 ## 4. Specific Stack
 
 - **Backend:** Cloudflare Workers + Hono; per-request adapters built in `buildApp(env)`; `D1SubmissionRepository` joins the `engagement` group; controllers return `ControllerResult<T>` from `src/core/result.ts`. **Validation is `@hono/zod-openapi` `createRoute` + Zod at the route layer — not `@ValidateBody`/`@Body` decorators, which do not exist in this codebase** (`docs/product/backlog/refactoring/07-validatebody-documentation-drift.task.md`). `authGuard` on every route; `/v1/admin` already admits `admin` and `content_creator`, and the remove route adds an `admin`-only check. Quota and move guards are single conditional statements read through D1's `meta.changes`; the move runs as one `db.batch`. `KvRateLimiter` keyed by user id, prefix `rl:submissions:`, 30/hour. `sanitizeMarkdown` on write. `openapi.json` regenerated with `pnpm dump-openapi`.
-- **Storage:** R2 through the S3 API: presigned PUT signing `ContentType` + `ContentLength` (existing), `HeadObject` (existing), and the new `readHead` (`GetObject` with `Range: bytes=0-31`) and `deletePrefix` (`ListObjectsV2` + `DeleteObjects`, pages of 1 000). Signed GET URLs only, TTL 3600 s, `Cache-Control: private, no-store`.
+- **Storage:** R2 through the S3 API: presigned PUT signing `ContentType` + `ContentLength` (existing), `HeadObject` (existing), and the new `readHead` (`GetObject` with `Range: bytes=0-31`). Signed GET URLs only, TTL 3600 s, `Cache-Control: private, no-store`.
 - **Shared:** `Entities.Engagement.Submission`, `Entities.Config.SubmissionStatus`; `SUBMISSION_MEDIA_TYPES` / `SUBMISSION_VIDEO_TYPES` appended to `domain/media/limits.ts`; `domain/submissions/limits.ts` (text limits + env defaults); ports `i-submission-repository.ts` and two methods on `i-storage-adapter.ts`; `utils/sanitize-file-name.ts`. No Cloudflare types in shared.
 - **Database:** D1 migration `0030_create_topic_submissions.sql` — one table, three indexes, `ON DELETE SET NULL` on the staff references. No change to any existing table.
 - **Config:** `wrangler.jsonc` `vars` per environment; `.dev.vars.example`; `config/deployment.schema.jsonc` (RFC 0007 preflight).
@@ -113,36 +113,35 @@ Out of scope (explicit, from RFC 0020 Non-Goals):
 
 ## 5. Task Breakdown
 
-Task files are authored next with **`write-tasks`**; the table below is filled once they exist. Planned slicing — each one PR, backend and frontend never sharing a file:
-
-1. *Shared contracts* (Backend, Ph 0) — entity, status, media-type additions, text limits and env defaults, repository port, storage-port methods, `sanitizeFileName` move.
-2. *Config, schema and repository* (Backend, Ph 1) — `core/submissions/config.ts`, the vars in `wrangler.jsonc` / `.dev.vars.example` / deployment schema, migration `0030`, `D1SubmissionRepository`, R2 `readHead` / `deletePrefix`.
-3. *Student upload API* (Backend, Ph 2) — presign, finalize with signature check, patch, delete, summary, rate limiter.
-4. *Student read and move API* (Backend, Ph 2) — `scope=mine|class`, single read, `GET /v1/me/submissions`, move, sharing switch on reads.
-5. *Staff API and housekeeping* (Backend, Ph 3) — `scope=all`, per-student list, unshare / moderation / remove → tombstone, sweep in `scheduled()`, `deletePrefix` on user hard-delete, OpenAPI.
-6. *Demonstrations page — Mine tab and upload* (Frontend, Ph 4) — topic button, page shell and tabs, upload form, progress, cards, edit, delete, tombstones.
-7. *Class tab, viewer and direct link* (Frontend, Ph 4) — grid, full-screen viewer with previous/next and swipe, `.mov` fallback, `[sid]` route, Copy link.
-8. *Move and My demonstrations* (Frontend, Ph 4) — move dialog, select mode, `/submissions` page, nav entry.
-9. *Staff surfaces* (Frontend, Ph 4) — *Todos* tab, moderation and remove actions, backoffice section.
-10. *Seed and documentation closeout* (Backend, Ph 5).
+Each task is one independent PR with one owner and one review surface. Backend and frontend never share a file: RFC Phase 4 (web) lands as four Frontend tasks (`06`–`09`), and the closeout is its own Backend task (`10`).
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [<title>](./01-<slug>.task.md) | 0 | Backend | ☐ Open |
+| 01 | [Submission contracts — entity, media types, limits and ports](./01-shared-contracts.task.md) | 0 | Backend | ☐ Open |
+| 02 | [Submission config, schema and D1 repository](./02-config-schema-and-repository.task.md) | 1 | Backend | ☐ Open |
+| 03 | [Student upload API — presign, finalize, edit, delete and summary](./03-student-upload-api.task.md) | 2 | Backend | ☐ Open |
+| 04 | [Student read and move API](./04-student-read-and-move-api.task.md) | 2 | Backend | ☐ Open |
+| 05 | [Staff submissions API, tombstone and housekeeping](./05-staff-api-and-housekeeping.task.md) | 3 | Backend | ☐ Open |
+| 06 | [Demonstrations page — Mine tab and upload](./06-mine-tab-and-upload-web.task.md) | 4 | Frontend | ☐ Open |
+| 07 | [Class tab, full-screen viewer and direct link](./07-class-tab-and-viewer-web.task.md) | 4 | Frontend | ☐ Open |
+| 08 | [Move dialog and My demonstrations page](./08-move-and-my-demonstrations-web.task.md) | 4 | Frontend | ☐ Open |
+| 09 | [Staff submission surfaces](./09-staff-surfaces-web.task.md) | 4 | Frontend | ☐ Open |
+| 10 | [Local seed and documentation closeout](./10-seed-and-docs.task.md) | 5 | Backend | ☐ Open |
 
-Dependency graph (planned):
+Dependency graph:
 
 ```
 01 ──► 02 ──► 03 ──► 04 ──► 05
                │      │      │
-               ▼      ▼      │
-              06 ──► 07      │
-               │      │      │
                ▼      ▼      ▼
-              08 ──────────► 09 ──► 10
+              06 ──► 07 ──► 09 ──► 10
+               │                    ▲
+               └─────► 08 ──────────┘
 ```
 
-**Recommended execution order:** `01` → `02` → `03` → `04` → `05` → `06` → `07` → `08` → `09` → `10`. The backend ships first behind routes no page calls yet; `06` needs only the upload API (`03`) and can start while `04`–`05` are in review; `07` and `08` need the read and move API (`04`); `09` needs the staff API (`05`); `10` is last because its closeout asserts the milestone is complete.
+(`08` also needs `04`; `10` also needs `05`.)
+
+**Recommended execution order:** `01` → `02` → `03` → `04` → `05` → `06` → `07` → `08` → `09` → `10`. The backend (`01`–`05`) ships first behind routes no page calls yet. `06` needs only the upload API (`03`) and can run in parallel with `04`–`05`, mocking `scope=mine` until `04` lands; `07` and `08` need the read and move API (`04`) and the page shell (`06`), and can run in parallel; `09` needs the staff API (`05`) and the viewer (`07`). `10` is written last, because its closeout note and the RFC status change assert the milestone is complete.
 
 Each task is intended to land as an independent PR with `make lint`,
 `make test-api`, and `make test-web` passing.

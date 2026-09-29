@@ -9,9 +9,9 @@
 - `packages/shared/types/entities.ts` (new `Entities.Engagement.Submission`, `Config.SubmissionStatus`; reuses the `'private' | 'shared'` visibility of RFC 0016)
 - `packages/shared/domain/media/limits.ts` (adds `SUBMISSION_MEDIA_TYPES` — the course table plus `video/quicktime` — in the same single source of truth)
 - `packages/shared/domain/submissions/limits.ts` (new — title/description lengths and the defaults of the env-configured quotas)
-- `packages/shared/ports/i-submission-repository.ts` (new port), `packages/shared/ports/i-storage-adapter.ts` (`readHead`, `deletePrefix`), `packages/shared/ports/index.ts`
+- `packages/shared/ports/i-submission-repository.ts` (new port), `packages/shared/ports/i-storage-adapter.ts` (`readHead`), `packages/shared/ports/index.ts`
 - `apps/api/src/core/submissions/config.ts` (new — parses and validates the `SUBMISSIONS_*` env vars)
-- `apps/api/src/adapters/db/d1-submission-repository.ts` (new adapter), `apps/api/src/adapters/storage/r2-storage-adapter.ts` (`readHead`, `deletePrefix`)
+- `apps/api/src/adapters/db/d1-submission-repository.ts` (new adapter), `apps/api/src/adapters/storage/r2-storage-adapter.ts` (`readHead`)
 - `apps/api/src/controllers/submissions.controller.ts` (new — ownership, visibility, quota, upload lifecycle, move, moderation, removal)
 - `apps/api/src/routes/submissions.router.ts` (new — topic-scoped student routes), `apps/api/src/routes/me/submissions.ts` (new — cross-topic list, quota, move), `apps/api/src/routes/admin/submissions.ts` (new — staff)
 - `apps/api/src/jobs/sweep-pending-submissions.ts` (new) and `apps/api/src/index.ts` `scheduled()` (wiring)
@@ -206,8 +206,8 @@ Key: `submissions/{authorId}/{uuid}-{sanitizeFileName(originalName)}`.
 
 - **No topic id in the key.** A move (§6) is then a metadata-only `UPDATE`: no copy, no second
   object, no window where the file exists twice or not at all.
-- **Author first** — everything a student uploaded is one prefix, which makes account deletion
-  (§9) a single `deletePrefix`.
+- **Author first** — everything a student uploaded is one prefix, so a future account purge
+  (§9) or a per-student audit is a single prefix listing.
 - **Separate from `topics/…`**, so course and student content can get different bucket-level
   rules later (e.g. retention).
 - Built server-side; the client never chooses it. `sanitizeFileName` moves from
@@ -400,9 +400,13 @@ rules live in `SubmissionsController`.
   new cron). For each `pending` row older than 24 h (the presigned PUT expires after 1 h), it
   deletes the object if present, then the row, in batches of 100, and logs a count — never file
   names.
-- **Account deletion.** `ON DELETE CASCADE` removes rows on a user hard-delete but not objects;
-  the hard-delete path also calls `storage.deletePrefix('submissions/{userId}/')`
-  (`ListObjectsV2` + `DeleteObjects` in pages of 1 000).
+- **Account deletion.** No API route hard-deletes users today: `DELETE /v1/admin/users/{id}`
+  deactivates the account (`routes/admin/users.ts:214`) and nothing calls
+  `IUserRepository.delete`. A deactivated author's submissions stay, as their notes do under
+  RFC 0016 — shared ones keep showing with their name. `ON DELETE CASCADE` covers the rows if a
+  hard delete is ever added; that future path must also delete the `submissions/{userId}/`
+  prefix, which the author-first key (§2) makes a single call. No storage method is added for it
+  now, since it would have no caller.
 
 ### 10. HTTP surface
 
@@ -458,7 +462,7 @@ export interface ISubmissionRepository {
 }
 ```
 
-`IStorageAdapter` gains `readHead(key, bytes)` (ranged GET) and `deletePrefix(prefix)`. The
+`IStorageAdapter` gains `readHead(key, bytes)` (ranged GET). The
 controller checks the requested `scope` against roles (`all` is staff-only) and passes
 `sharingEnabled` so `class` returns nothing when the label switch is off. Instantiated per request in the
 container's `engagement` slice, next to `commentRepo` and RFC 0016's `noteRepo`; the parsed
@@ -570,8 +574,8 @@ of RFC 0016 except for the shared cursor helper.
 
 ### Phase 0 — Shared foundations (~0.5 d)
 `Entities.Engagement.Submission`, `Config.SubmissionStatus`, `SUBMISSION_MEDIA_TYPES`,
-`domain/submissions/limits.ts`, `ISubmissionRepository`, `IStorageAdapter.readHead` and
-`deletePrefix`, `sanitizeFileName` moved to shared.
+`domain/submissions/limits.ts`, `ISubmissionRepository`, `IStorageAdapter.readHead`,
+`sanitizeFileName` moved to shared.
 
 ### Phase 1 — Config, schema and repository (~1.5 d)
 `core/submissions/config.ts` with its tests (absent → default, invalid → error); `SUBMISSIONS_*`
@@ -586,9 +590,9 @@ quota endpoint; topic listing and `GET /v1/me/submissions`; per-user rate limite
 table of §7 as tests; proof that `GET /v1/topics/{id}` never contains a submission; a real
 QuickTime fixture passing finalize and a renamed text file failing it.
 
-### Phase 3 — Staff API, tombstone, sweep, account deletion (~1 d)
+### Phase 3 — Staff API, tombstone, sweep (~1 d)
 `/v1/admin/users/{userId}/submissions`, unshare / clear moderation (both staff roles), remove
-→ tombstone (admin only); sweep wired into `scheduled()`; `deletePrefix` on user hard-delete;
+→ tombstone (admin only); sweep wired into `scheduled()`;
 OpenAPI schemas and regenerated `api-types.gen.ts`.
 
 ### Phase 4 — Web (~2.5–3 d)
@@ -614,7 +618,7 @@ sharing-disabled rendering and the playback fallback.
 | A misconfigured quota var silently falls back to a default | Present-but-invalid is an error (`500 SUBMISSION_CONFIG_INVALID`); the RFC 0007 preflight catches a bad sharing switch before deploy |
 | Upload/delete loops churn R2 operations | 30 presigns/hour per user (`rl:submissions:`) |
 | Large phone videos on slow mobile networks | Progress bar, cancel, retry re-presigns; 250 MB per-file default is tunable per label; multipart upload deferred |
-| Hard-deleted user leaves orphaned objects | Author-first key prefix + `deletePrefix` on hard delete |
+| A future user hard-delete leaves orphaned objects | None exists today (deactivation only); the author-first prefix makes the future cleanup one call, noted in §9 |
 | R2 delete fails while deleting or removing | Object deleted before the row changes; failure answers `502` and the action is retried |
 | Migration number collides with RFC 0015/0016 | `0030` chosen; whichever lands out of order renumbers, noted in **Affected** |
 
