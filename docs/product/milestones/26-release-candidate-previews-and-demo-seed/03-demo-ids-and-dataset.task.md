@@ -1,6 +1,6 @@
 # Task 03 — Backend: Demo ids and baseline dataset (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -62,16 +62,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The same `<label>:<entity>:<key>` always yields the same id; different labels yield
+- [x] The same `<label>:<entity>:<key>` always yields the same id; different labels yield
       different ids; every id matches the UUID v5 format.
-- [ ] Loading `base.json` for `budo` yields 6 users, 1 group, 21 topics (3 roots, depth 3),
+- [x] Loading `base.json` for `budo` yields 6 users, 1 group, 21 topics (3 roots, depth 3),
       2 tags and a media mapping covering all 21 topics.
-- [ ] The loader rejects: an unknown role, an unknown badge/quest slug, a disallowed MIME
+- [x] The loader rejects: an unknown role, an unknown badge/quest slug, a disallowed MIME
       type, a tree deeper or shallower than 3, and a topic with no media — each with a
       message naming the offending entry.
-- [ ] `sample-topic.md` contains every basic-syntax element listed in the Summary.
-- [ ] `make test-scripts` green including the new specs; `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `sample-topic.md` contains every basic-syntax element listed in the Summary.
+- [x] `make test-scripts` green including the new specs; `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
@@ -80,3 +80,14 @@ Out:
 3. Render `sample-topic.md` in the local web catalog once Task 04 lands (visual check).
 4. `make test-scripts && make lint`.
 5. `git diff --stat` confirms only scope-guardrail files changed.
+
+## Implementation notes
+
+- The mission predicate is `complete_topic` (the evaluator's vocabulary), not `topic_completed`
+  as RFC 0021 §3.4 words it — the evaluator would silently skip the latter.
+- `root-3/module-2` is `draft` **and so are its two lessons**: the catalog filters each topic on its
+  own status, so published children of a draft module would still show. 18 of 21 topics are published.
+- Every node under Root 1 is `public`: the access resolver does not cascade `public` to children
+  (grants do cascade).
+- Demo e-mails follow `demo.<userKey>@<label>.demo.invalid` (e.g. `demo.student-1@budo.demo.invalid`).
+- Demo media are three NASA public-domain files (image, PDF, MP4), SHA-256 pinned in `base.json`.
