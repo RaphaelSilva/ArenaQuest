@@ -180,7 +180,7 @@ Out of scope (explicit, from RFC 0021 Non-Goals):
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [Wrangler ≥ 4.135 and staging deploys through the CLI](./01-wrangler-bump-and-staging-ci-via-cli.task.md) | 0 | Backend | ☐ Open |
+| 01 | [Wrangler ≥ 4.135 and staging deploys through the CLI](./01-wrangler-bump-and-staging-ci-via-cli.task.md) | 0 | Backend | ✅ Done |
 | 02 | [Staging profiles: console mail driver and spaziord webOrigin](./02-staging-profile-mail-and-origin.task.md) | 0 | Backend | ☐ Open |
 | 03 | [Demo ids and baseline dataset](./03-demo-ids-and-dataset.task.md) | 1 | Backend | ☐ Open |
 | 04 | [Seed CLI: users, groups, topics, enrollments, tags](./04-seed-demo-cli-core.task.md) | 1 | Backend | ☐ Open |

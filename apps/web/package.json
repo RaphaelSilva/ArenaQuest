@@ -37,6 +37,6 @@
     "typescript": "^5",
     "vercel": "^47.0.4",
     "vitest": "~3.2.0",
-    "wrangler": "^4.82.2"
+    "wrangler": "^4.144.0"
   }
 }

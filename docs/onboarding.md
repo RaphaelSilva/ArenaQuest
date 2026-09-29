@@ -180,6 +180,9 @@ never prompted for:
   (JWT_SECRET, R2_*, …) are never read — they persist on the Worker across
   deploys.
 
+The staging CI jobs use the same path: `deploy-api.yml` / `deploy-web.yml` run
+`deploy.mjs --label arenaquest -e staging --yes --scope api|web`, guard included.
+
 Adding a brand is one line in each workflow's `strategy.matrix.include` plus a
 new `config/labels/<label>.jsonc` — no copied job stanza and no new deploy
 config store.
