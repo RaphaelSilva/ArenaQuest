@@ -1,6 +1,6 @@
 # Task 02 — Backend: Submission config, schema and D1 repository (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md)
 **Team:** Backend API
@@ -73,26 +73,31 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The parser returns the defaults when all vars are absent, the given values when valid,
+- [x] The parser returns the defaults when all vars are absent, the given values when valid,
       and an error naming the var for `abc`, `0`, `-1`, `SHARING=yes`, or a video limit above
       the storage limit.
 - [ ] Every `env.*.vars` block in `wrangler.jsonc` declares the four vars; the deployment
       preflight passes with them and fails with `SUBMISSIONS_SHARING_ENABLED=maybe`.
-- [ ] `make db-migrate-local` applies `0030` cleanly on a fresh replica and on one that
+      _Partially met: the vars are declared in every block and the schema carries the
+      `enum`, but `scripts/label.mjs check` / `scripts/deploy/core.mjs` do not enforce `enum`
+      on optional keys, so `maybe` is only rejected at runtime by `core/submissions/config.ts`
+      (`500 SUBMISSION_CONFIG_INVALID`). Enforcing it needs a script change outside this
+      milestone's guardrail — tracked as a separate follow-up._
+- [x] `make db-migrate-local` applies `0030` cleanly on a fresh replica and on one that
       already holds data; no existing table's schema changes.
-- [ ] Two concurrent quota-guarded inserts at `limit − 1` produce exactly one row; an insert
+- [x] Two concurrent quota-guarded inserts at `limit − 1` produce exactly one row; an insert
       crossing the byte quota inserts nothing; removed rows are ignored by both counts.
-- [ ] A batched move of 3 ids into a topic with 2 free slots moves the first 2 and refuses the
+- [x] A batched move of 3 ids into a topic with 2 free slots moves the first 2 and refuses the
       third with `quota`; moved rows are `private` with `shared_at` cleared, `moderated_at`
       kept and `storage_key` unchanged; pending, removed, foreign and same-topic ids are
       refused with their reasons.
-- [ ] `mine` / `class` / `all` listings return exactly the rows RFC §7 allows, newest first,
+- [x] `mine` / `class` / `all` listings return exactly the rows RFC §7 allows, newest first,
       paginated by an opaque cursor; `class` returns nothing when told sharing is off.
-- [ ] Deleting a `users` row referenced by `moderated_by` / `removed_by` succeeds and nulls
+- [x] Deleting a `users` row referenced by `moderated_by` / `removed_by` succeeds and nulls
       those columns.
-- [ ] `readHead` returns exactly the requested leading bytes from a Miniflare R2 object.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `readHead` returns exactly the requested leading bytes from a Miniflare R2 object.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
