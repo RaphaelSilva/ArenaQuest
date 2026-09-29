@@ -230,7 +230,7 @@ chore(infra): upgrade wrangler to v4
 ## 🛠️ Local Development Setup
 
 **Prerequisites:**
-- Node.js ≥ 20
+- Node.js ≥ 22
 - pnpm ≥ 9
 
 ```bash
