@@ -93,7 +93,7 @@ Out of scope (explicit, from RFC 0018 Non-Goals):
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
 | 01 | [Storage port folder listing and key-owner registry](./01-storage-port-folder-listing-and-key-owner-registry.task.md) | 0 | Backend | ✅ Done |
-| 02 | [Storage reference port and D1 resolver](./02-storage-reference-port-and-d1-resolver.task.md) | 1 | Backend | ☐ Open |
+| 02 | [Storage reference port and D1 resolver](./02-storage-reference-port-and-d1-resolver.task.md) | 1 | Backend | ✅ Done |
 | 03 | [Admin storage API: browse, object and audit](./03-admin-storage-api-browse-object-audit.task.md) | 1 | Backend | ☐ Open |
 | 04 | [Admin storage browser page](./04-admin-storage-browser-page.task.md) | 1 | Frontend | ☐ Open |
 | 05 | [Orphan and missing-file scan panel](./05-orphan-and-missing-file-scan-panel.task.md) | 1 | Frontend | ☐ Open |
