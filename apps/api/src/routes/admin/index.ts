@@ -4,6 +4,7 @@ import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { buildAdminUsersRouter } from './users';
 import { buildAdminTopicsRouter } from './topics';
+import { buildAdminTagsRouter } from './tags';
 import { buildAdminTasksRouter } from './tasks';
 import { buildAdminBadgesRouter } from './badges';
 import { buildAdminMissionsRouter } from './missions';
@@ -24,6 +25,8 @@ export function buildAdminRouter(container: AppContainer) {
 
   app.route('/users', buildAdminUsersRouter(container));
   app.route('/topics', buildAdminTopicsRouter(container));
+  // No stricter guard: tag lookup serves every role that may author a topic.
+  app.route('/tags', buildAdminTagsRouter(container));
   app.route('/tasks', buildAdminTasksRouter(container));
   app.route('/badges', buildAdminBadgesRouter(container));
   app.route('/missions', buildAdminMissionsRouter(container));
