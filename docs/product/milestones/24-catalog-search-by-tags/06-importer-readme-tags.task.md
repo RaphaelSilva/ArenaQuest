@@ -1,6 +1,6 @@
 # Task 06 — Backend: Importer README tags (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [24 — Catalog search by tags](./milestone.md)
 **RFC:** [RFC 0017](../../RFCs/0017-catalog-search-by-tags.md)
 **Team:** Backend API
@@ -59,17 +59,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A README with `"tags": ["Soco", "Kihon"]` produces a create request carrying
+- [x] A README with `"tags": ["Soco", "Kihon"]` produces a create request carrying
       `tags: ["Soco", "Kihon"]` (asserted through the injected `fetchImpl`).
-- [ ] A dry run prints the planned tags for that topic and performs no request that writes.
-- [ ] Re-running over an unchanged tree whose topic already carries `soco` and `kihon`
+- [x] A dry run prints the planned tags for that topic and performs no request that writes.
+- [x] Re-running over an unchanged tree whose topic already carries `soco` and `kihon`
       performs zero write requests, including when the README spells them `SOCO` / `kihon`.
-- [ ] Adding a tag to the README triggers exactly one `PATCH` for that topic.
-- [ ] `"tags": "soco"` and `"tags": [1]` each yield a warning and no `tags` in the request.
-- [ ] The parity test passes for every row of `packages/shared/domain/tags/slugify.fixtures.json`.
-- [ ] `make test-scripts` (the importer's `node --test` suite) and `make test-api` are
+- [x] Adding a tag to the README triggers exactly one `PATCH` for that topic.
+- [x] `"tags": "soco"` and `"tags": [1]` each yield a warning and no `tags` in the request.
+- [x] The parity test passes for every row of `packages/shared/domain/tags/slugify.fixtures.json`.
+- [x] `make test-scripts` (the importer's `node --test` suite) and `make test-api` are
       green; the script lints clean.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
