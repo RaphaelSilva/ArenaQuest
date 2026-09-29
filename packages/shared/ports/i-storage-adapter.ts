@@ -164,4 +164,17 @@ export interface IStorageAdapter {
    * @param limit   - Maximum number of results to return (default: 100)
    */
   listObjects(prefix: string, cursor?: string, limit?: number): Promise<ListObjectsResult>;
+
+  /**
+   * Read the first `bytes` bytes of an object without downloading the rest
+   * (a ranged GET, `Range: bytes=0-(bytes-1)`). Used by submission finalize to
+   * check the file signature against the declared type (RFC 0020 section 5).
+   *
+   * Resolves to fewer than `bytes` bytes when the object is shorter, and to
+   * `null` when the key does not exist.
+   *
+   * @param key   - Storage key
+   * @param bytes - Number of leading bytes to read (> 0; callers use 32)
+   */
+  readHead(key: string, bytes: number): Promise<Uint8Array | null>;
 }

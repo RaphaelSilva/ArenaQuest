@@ -6,6 +6,7 @@ import {
   ALLOWED_MEDIA_TYPES,
   MEDIA_SIZE_LIMIT_BYTES,
 } from '@arenaquest/shared/domain/media/limits';
+import { sanitizeFileName } from '@arenaquest/shared/utils/sanitize-file-name';
 
 
 // ---------------------------------------------------------------------------
@@ -28,16 +29,8 @@ export const PresignSchema = z.object({
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Converts an arbitrary filename into a safe, lowercase, hyphenated slug. */
-export function sanitizeFileName(name: string): string {
-  const slug = name
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]/g, '-')
-    .replace(/-{2,}/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 100);
-  return slug || 'file';
-}
+/** Moved to `@arenaquest/shared/utils/sanitize-file-name` (RFC 0020 §2); re-exported for existing importers. */
+export { sanitizeFileName };
 
 // ---------------------------------------------------------------------------
 // Result payload types
