@@ -2,6 +2,7 @@
 
 **Date:** 2026-09-29
 **Status:** Draft
+**Revised:** 2026-09-29 (open questions 1–5 resolved)
 **Author:** raphaelsilva
 **Affected:**
 - `scripts/demo/seed-demo.mjs` (new — the demo seed CLI: builds deterministic SQL + uploads demo media, targets `local` or `staging`, refuses `production`)
@@ -19,6 +20,7 @@
 - `.github/workflows/preview-candidate.yml` (new — `workflow_dispatch` over label × candidate)
 - `.github/workflows/deploy-api.yml`, `deploy-web.yml` (staging job goes through the deploy CLI, so the guard runs)
 - `Makefile` (`deploy-preview-staging`, `db-seed-demo-local`, `db-seed-demo-staging`, `db-reset-staging`)
+- `config/labels/*.jsonc` (staging `mail.driver` → `console`; spaziord staging `webOrigin` fixed)
 - `docs/onboarding.md` (preview + demo runbook)
 
 ---
@@ -75,7 +77,7 @@ media, enrollments or gamification rows at all.
 - Per-preview data isolation (a database per candidate) — rejected; the Time Travel
   bookmark in §2.4 is the undo instead.
 - Google OAuth on preview URLs — Google does not accept wildcard redirect URIs; out of
-  scope until needed (§ Open Questions).
+  scope until needed (Resolved Decisions, OQ4).
 - A production data clone / anonymisation pipeline — a possible later source for the
   demo, not part of this RFC.
 - Changing the XP rules themselves (`xp-config.ts`) — the demo only *seeds state*
@@ -178,9 +180,11 @@ Prerequisite: the staging `webOrigin` must be the Pages host (fix spaziord, §Ph
 each preview API has its own session; staging already uses `SameSite=None`. Nothing to
 change.
 
-**URLs baked into the API.** `WEB_BASE_URL` (links in e-mails) stays the staging web
-origin in the `previews` block. Per-preview override is an open question; the only
-effect is that an activation e-mail sent from a preview links to staging web.
+**URLs baked into the API.** `WEB_BASE_URL` (links in e-mails) stays the **staging
+web origin** in the `previews` block — no per-preview override (Resolved Decision).
+An activation or reset link produced from a preview opens staging web; both share the
+same database, so the token is valid there. Since staging mails go to the Worker log
+(§2.5), the link is read from `wrangler tail`, not from an inbox.
 
 **Naming.** `<candidate>` is `[a-z0-9-]{1,20}`, validated by the CLI; the default is
 derived from the branch (`feature/m21/candidate` → `m21`).
@@ -191,7 +195,8 @@ branch deployments. Run after the candidate merges.
 
 **CI.** `.github/workflows/preview-candidate.yml`, `workflow_dispatch` with inputs
 `label` (or `all` → matrix `[arenaquest, spaziord, budo]`) and `candidate`, calling the
-same CLI. Manual by default (open question on automation).
+same CLI. **Manual only** (Resolved Decision): a preview — and therefore a migration
+of the shared staging D1 — happens only when someone asks for it, never on push.
 
 A small **preview banner** in the web (`APP_PREVIEW`/`NEXT_PUBLIC_PREVIEW_NAME` set)
 shows `preview m21 · <short sha>` so testers always know what they are looking at.
@@ -227,6 +232,16 @@ Before migrating, the preview CLI records the D1 Time Travel bookmark and prints
 restore command (`wrangler d1 time-travel restore <db> --bookmark <b>`). Time Travel is
 included in the free plan, so this is the cheap "undo a bad test" path; the full reset
 (§4) is the "start over" path.
+
+#### 2.5 Staging sends no real e-mail
+
+Every label's staging profile switches `mail.driver` from `resend` to `console`
+(already an allowed value in `config/deployment.schema.jsonc:54`); `container.ts:267`
+then wires `ConsoleMailAdapter`, so activation/reset/notification mails — including
+the preview's, which inherits the staging vars — are written to the Worker log instead
+of an inbox. Demo addresses (`.demo.invalid`) never bounce, no real person is mailed
+from a shared test database, and `RESEND_API_KEY` is no longer required for staging
+(its `requiredWhen: MAIL_DRIVER=resend` gate turns off). Production is unchanged.
 
 ### 3. Demo seed
 
@@ -344,12 +359,13 @@ asserts it after execution. One **mission** (active window: now → +14 days,
 `topic_completed` count 1, rewarding badge *tecnica-afiada*) is created so missions are
 testable too.
 
-#### 3.5 Beyond the baseline (proposed, see Open Questions)
+#### 3.5 Beyond the baseline
 
-The dataset format already supports these; they ship in Phase 4 unless descoped:
+All four areas are **in scope** (Resolved Decision) and ship in Phase 4:
 
 - **Events** — one per audience (`public`, `members`, `restricted` → *Demo class*),
-  one past and one upcoming, relative dates. Mirrors `seed/0003_events_local.sql`.
+  one past and one upcoming, relative dates; `flyer_status='none'` (no flyer object
+  needed). Mirrors `seed/0003_events_local.sql`.
 - **Billing** — one monthly plan and one free plan; student-1 and student-2 subscribed
   (one invoice paid, one open). Mirrors `seed/0002_billing_local.sql`.
 - **Tasks** — one published task with three stages linked to Root 1 lessons, so the
@@ -415,6 +431,7 @@ Total **~9 dev days**.
   output parsing.
 - Staging jobs in `deploy-api.yml`/`deploy-web.yml` call the deploy CLI (guard runs).
 - Fix the spaziord staging `webOrigin` so the preview wildcard covers its Pages host.
+- Staging profiles: `mail.driver` → `console` (§2.5); regenerate `wrangler.jsonc`.
 
 ### Phase 1 — Demo seed, baseline (~3 d)
 - `ids.mjs`, `base.json`, `sample-topic.md`, `seed-demo.mjs` (users, groups, topics,
@@ -435,7 +452,8 @@ Total **~9 dev days**.
 - Preview banner in the web (i18n keys in both dictionaries).
 
 ### Phase 4 — Demo beyond the baseline (~1 d)
-- Events, billing, tasks, comments (§3.5), as decided in Open Questions.
+- Events, billing, tasks, comments (§3.5); the CI seed test asserts their row counts
+  and that the stage check-in and comment quests start from the seeded state.
 
 ## Tradeoffs & Risks
 
@@ -464,23 +482,16 @@ Total **~9 dev days**.
   URL; logging in as `demo.admin` on the web preview works (CORS + cookie), media play,
   and the live staging URLs keep serving the previous version.
 - **P3** A PR adding a `DROP COLUMN` migration fails CI unless marked `@contract`.
-- **P4** Events board shows one event per audience for the matching demo user.
+- **P0** A password-reset request on staging produces no Resend call; the reset link
+  appears in `wrangler tail`.
+- **P4** Events board shows one event per audience for the matching demo user; the
+  billing page shows one paid and one open invoice; student-3 checking in a task stage
+  earns 20 XP; the demo lesson shows a comment thread with a reply and a like.
 
 ## Open Questions
 
-1. **Automatic previews?** Manual (`workflow_dispatch`) only, or also on every push to
-   `feature/m*/candidate`? Automatic means every push migrates staging. — owner:
-   raphaelsilva
-2. **Phase 4 scope.** Events, billing, tasks, comments — all four in the baseline, or
-   only some? — owner: raphaelsilva
-3. **Per-preview `WEB_BASE_URL`.** Is it worth overriding so e-mail links from a preview
-   open the preview web (needs a per-preview var), or is staging web acceptable? —
-   owner: lead architect
-4. **Google OAuth on previews.** Deferred until needed; the likely answer is one fixed
-   preview name registered as a redirect URI. — owner: raphaelsilva
-5. **E-mail on staging.** Staging uses the Resend driver; demo addresses are
-   undeliverable (`.invalid`). Should staging switch to a log driver instead? — owner:
-   raphaelsilva
+None open. Questions 1–5 were answered on 2026-09-29 and moved below; Google OAuth on
+previews stays out of scope until a candidate needs it.
 
 ## Resolved Decisions
 
@@ -493,6 +504,17 @@ Total **~9 dev days**.
 - **2026-09-29 — Baseline dataset** (raphaelsilva): one user per role and ≥ 3 students;
   3 topics with sub-topics to 3 levels; basic-syntax markdown on every topic; ≥ 1 media
   per topic (own objects reused, public sources otherwise); minimal gamification.
+- **2026-09-29 — OQ1: previews are manual only** (raphaelsilva): `make
+  deploy-preview-staging` or `workflow_dispatch`; no preview on push, so the shared
+  staging D1 is migrated only on request.
+- **2026-09-29 — OQ2: demo includes events, billing, tasks and comments**
+  (raphaelsilva): all four ship in Phase 4 (§3.5).
+- **2026-09-29 — OQ3: `WEB_BASE_URL` stays staging web on previews** (raphaelsilva):
+  no per-preview var; e-mail links open staging web against the same database.
+- **2026-09-29 — OQ4: Google OAuth on previews deferred** (raphaelsilva): not needed
+  now; if it becomes needed, one fixed preview name is registered as a redirect URI.
+- **2026-09-29 — OQ5: staging mails go to the log** (raphaelsilva): staging
+  `mail.driver = console` for every label (§2.5).
 
 ## References
 
