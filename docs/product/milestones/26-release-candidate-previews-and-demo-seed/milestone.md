@@ -183,7 +183,7 @@ Out of scope (explicit, from RFC 0021 Non-Goals):
 | 01 | [Wrangler ≥ 4.135 and staging deploys through the CLI](./01-wrangler-bump-and-staging-ci-via-cli.task.md) | 0 | Backend | ✅ Done |
 | 02 | [Staging profiles: console mail driver and spaziord webOrigin](./02-staging-profile-mail-and-origin.task.md) | 0 | Backend | ✅ Done |
 | 03 | [Demo ids and baseline dataset](./03-demo-ids-and-dataset.task.md) | 1 | Backend | ✅ Done |
-| 04 | [Seed CLI: users, groups, topics, enrollments, tags](./04-seed-demo-cli-core.task.md) | 1 | Backend | ☐ Open |
+| 04 | [Seed CLI: users, groups, topics, enrollments, tags](./04-seed-demo-cli-core.task.md) | 1 | Backend | ✅ Done |
 | 05 | [Seed media: manifest, cache, R2 upload](./05-seed-demo-media.task.md) | 1 | Backend | ☐ Open |
 | 06 | [Seed gamification state](./06-seed-demo-gamification.task.md) | 1 | Backend | ☐ Open |
 | 07 | [Guard recognises demo accounts](./07-guard-demo-accounts.task.md) | 1 | Backend | ☐ Open |
