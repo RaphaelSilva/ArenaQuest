@@ -96,7 +96,7 @@ Out of scope (explicit, from RFC 0018 Non-Goals):
 | 02 | [Storage reference port and D1 resolver](./02-storage-reference-port-and-d1-resolver.task.md) | 1 | Backend | ✅ Done |
 | 03 | [Admin storage API: browse, object and audit](./03-admin-storage-api-browse-object-audit.task.md) | 1 | Backend | ✅ Done |
 | 04 | [Admin storage browser page](./04-admin-storage-browser-page.task.md) | 1 | Frontend | ✅ Done |
-| 05 | [Orphan and missing-file scan panel](./05-orphan-and-missing-file-scan-panel.task.md) | 1 | Frontend | ☐ Open |
+| 05 | [Orphan and missing-file scan panel](./05-orphan-and-missing-file-scan-panel.task.md) | 1 | Frontend | ✅ Done |
 | 06 | [Guarded orphan delete API](./06-guarded-orphan-delete-api.task.md) | 2 | Backend | ☐ Open |
 | 07 | [Delete orphan action in the browser](./07-delete-orphan-action.task.md) | 2 | Frontend | ☐ Open |
 | 08 | [Docs and rollout closeout](./08-docs-and-rollout-closeout.task.md) | 3 | Backend | ☐ Open |
