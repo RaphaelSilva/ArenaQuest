@@ -377,8 +377,10 @@ All four areas are **in scope** (Resolved Decision) and ship in Phase 4:
 
 `check-no-dev-seed.ts` learns a second matcher: it imports `scripts/demo/ids.mjs`,
 computes the demo user ids for **every** label, and also matches the
-`@*.demo.invalid` e-mail domain. `deploy.mjs` already runs the guard before every
-production deploy, so a production database holding a demo account fails the release.
+`@*.demo.invalid` e-mail domain. The demo matcher is **enforced for production targets
+only** — staging legitimately holds the demo, so staging and preview deploys keep the
+dev-seed check alone. `deploy.mjs` already runs the guard before every production deploy,
+so a production database holding a demo account fails the release.
 
 ### 4. Disposable staging: `db-reset-staging`
 
