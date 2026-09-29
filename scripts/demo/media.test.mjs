@@ -20,12 +20,14 @@ import {
   buildMediaPlan,
   cachePath,
   createR2,
+  defaultLocalPersistTo,
   ensureCached,
   formatMediaPlan,
   localBucketName,
   materialiseMedia,
   mediaStorageKey,
   mediaTarget,
+  openLocalR2,
   resolveMediaPlan,
   sanitizeFileName,
 } from './media.mjs';
@@ -133,11 +135,19 @@ test('media rows are ready, owned by the demo creator and keyed like the plan', 
 
 test('the local bucket is the top-level R2 binding; staging needs its profile bucket', () => {
   assert.equal(localBucketName(), 'arenaquest-media');
-  assert.deepEqual(mediaTarget({ remote: false }), { bucket: 'arenaquest-media', args: ['--local'], concurrency: 1 });
+  assert.deepEqual(mediaTarget({ remote: false }), { bucket: 'arenaquest-media', args: ['--local'], concurrency: 4, local: true, persistTo: null });
+  assert.deepEqual(mediaTarget({ remote: false, persistTo: '/tmp/state' }), {
+    bucket: 'arenaquest-media',
+    args: ['--local', '--persist-to', '/tmp/state'],
+    concurrency: 4,
+    local: true,
+    persistTo: '/tmp/state',
+  });
   assert.deepEqual(mediaTarget({ remote: true, env: 'staging', bucket: 'budo-media-staging' }), {
     bucket: 'budo-media-staging',
     args: ['--remote'],
     concurrency: 4,
+    local: false,
   });
   assert.throws(() => mediaTarget({ remote: true, env: 'staging' }), /no R2 bucket/);
 });
@@ -156,6 +166,55 @@ test('createR2 maps "no such key" to null, other failures to an error, and passe
   assert.deepEqual(await r2.get('ok'), Buffer.from('x'));
   await r2.put('k', '/tmp/f', 'image/jpeg');
   assert.deepEqual(seen.at(-1), ['r2', 'object', 'put', 'b/k', '--local', '--file', '/tmp/f', '--content-type', 'image/jpeg']);
+});
+
+/** A stand-in for wrangler's `getPlatformProxy`: records its options, serves an in-memory `R2`. */
+function fakePlatformProxy() {
+  const objects = new Map();
+  const seen = { options: null, disposed: 0 };
+  const R2 = {
+    async get(key) {
+      const bytes = objects.get(key);
+      return bytes ? { arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length) } : null;
+    },
+    async put(key, value, options) {
+      objects.set(key, Buffer.from(value));
+      seen.lastPut = { key, contentType: options?.httpMetadata?.contentType };
+    },
+  };
+  const getPlatformProxy = async (options) => {
+    seen.options = options;
+    return { env: { R2 }, dispose: async () => void (seen.disposed += 1) };
+  };
+  return { getPlatformProxy, objects, seen };
+}
+
+test('openLocalR2 serves the local bucket in-process over <persistTo>/v3, and only that bucket', async () => {
+  const dir = scratch();
+  const file = join(dir, 'a.jpg');
+  writeFileSync(file, IMAGE);
+  const { getPlatformProxy, seen } = fakePlatformProxy();
+  const r2 = await openLocalR2({ bucket: 'arenaquest-media', persistTo: join(dir, 'state'), getPlatformProxy });
+  assert.equal(seen.options.persist.path, join(dir, 'state', 'v3'), 'the layout `wrangler --persist-to` uses');
+  assert.equal(seen.options.remoteBindings, false);
+  assert.equal(seen.options.configPath, join(ROOT, 'apps', 'api', 'wrangler.jsonc'));
+  assert.equal(await r2.get('topics/t/m-a.jpg'), null);
+  await r2.put('topics/t/m-a.jpg', file, 'image/jpeg');
+  assert.deepEqual(seen.lastPut, { key: 'topics/t/m-a.jpg', contentType: 'image/jpeg' });
+  assert.deepEqual(await r2.get('topics/t/m-a.jpg'), IMAGE);
+  await r2.dispose();
+  assert.equal(seen.disposed, 1);
+
+  await assert.rejects(() => openLocalR2({ bucket: 'budo-media-staging', getPlatformProxy }), /local bucket is "arenaquest-media"/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('without --persist-to the local proxy uses the store wrangler --local defaults to', async () => {
+  const { getPlatformProxy, seen } = fakePlatformProxy();
+  const r2 = await openLocalR2({ bucket: 'arenaquest-media', getPlatformProxy });
+  assert.equal(seen.options.persist.path, join(defaultLocalPersistTo(), 'v3'));
+  assert.equal(defaultLocalPersistTo(), join(ROOT, 'apps', 'api', '.wrangler', 'state'));
+  await r2.dispose();
 });
 
 // ── validation ──────────────────────────────────────────────────────────────
@@ -264,21 +323,14 @@ async function runMain({ failPut = () => false, fetchTable, r2 = memoryR2({ fail
   const dir = scratch();
   const { dataset, fetchTable: table } = syntheticDataset();
   const executed = [];
-  const run = async (argv) => {
-    const key = argv[3].slice(argv[3].indexOf('/') + 1);
-    if (argv[2] === 'get') {
-      const bytes = await r2.get(key);
-      return bytes ? { status: 0, stdout: bytes, stderr: '' } : { status: 1, stdout: Buffer.alloc(0), stderr: 'The specified key does not exist.' };
-    }
-    try {
-      await r2.put(key, argv[argv.indexOf('--file') + 1], argv[argv.indexOf('--content-type') + 1]);
-      return { status: 0, stdout: Buffer.alloc(0), stderr: '' };
-    } catch (error) {
-      return { status: 1, stdout: Buffer.alloc(0), stderr: error.message };
-    }
-  };
+  let disposed = 0;
+  let disposedBeforeSql = null;
   const deps = {
-    runR2: run,
+    // The local target's bucket, in memory (the real one is openLocalR2).
+    openLocalR2: async (bucket) => {
+      assert.equal(bucket.local, true);
+      return { get: r2.get, put: r2.put, dispose: async () => void (disposed += 1) };
+    },
     fetchImpl: stubFetch(fetchTable ?? table).fetchImpl,
     executeSql: (command) => {
       if (command.includes('--command')) {
@@ -288,6 +340,7 @@ async function runMain({ failPut = () => false, fetchTable, r2 = memoryR2({ fail
         return { status: 0, stdout: JSON.stringify([{ results, success: true }]), stderr: '' };
       }
       executed.push(command);
+      disposedBeforeSql = disposed;
       return { status: 0, stdout: '', stderr: '' };
     },
     cacheDir: join(dir, 'cache'),
@@ -296,9 +349,9 @@ async function runMain({ failPut = () => false, fetchTable, r2 = memoryR2({ fail
   };
   try {
     const code = await main(['--label', 'budo', '-e', 'local'], { AQ_DEMO_PASSWORD: 'throwaway' }, deps);
-    return { code, executed, r2, dir };
+    return { code, executed, r2, dir, disposed, disposedBeforeSql };
   } catch (error) {
-    return { error, executed, r2, dir };
+    return { error, executed, r2, dir, disposed };
   }
 }
 
@@ -307,6 +360,7 @@ test('main: an upload failure aborts before the SQL runs', async () => {
   const result = await runMain({ failPut: () => ++puts === 5 });
   assert.match(result.error?.message ?? '', /put .* failed/);
   assert.equal(result.executed.length, 0, 'no media row may be written without its object');
+  assert.equal(result.disposed, 1, 'the local store is closed on failure too');
   rmSync(result.dir, { recursive: true, force: true });
 });
 
@@ -324,6 +378,7 @@ test('main: objects first, then one d1 execute; a re-run uploads nothing', async
   const first = await runMain();
   assert.equal(first.code, 0, first.error?.message);
   assert.equal(first.executed.length, 1);
+  assert.equal(first.disposedBeforeSql, 1, 'the local store is closed before wrangler runs the SQL');
   assert.match(readFileSync(join(first.dir, 'seed.sql'), 'utf8'), /INSERT INTO media/);
   const uploads = first.r2.calls.put.length;
   assert.ok(uploads > 0);
