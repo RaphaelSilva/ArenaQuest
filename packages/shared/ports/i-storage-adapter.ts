@@ -62,13 +62,33 @@ export interface StorageObject {
   size: number;
   /** Last modification timestamp. */
   lastModified: Date;
+  /** Content MIME type the object was stored with, when the provider reports it. */
+  contentType?: string;
   /** Attached metadata. */
   metadata?: StorageObjectMetadata;
+}
+
+/** Options for a listObjects call. */
+export interface ListObjectsOptions {
+  /** Pagination cursor from a previous call's `nextCursor`. */
+  cursor?: string;
+  /** Maximum number of entries per page. Defaults to 100; adapters cap it at 1000. */
+  limit?: number;
+  /**
+   * Groups keys sharing the next path segment into `prefixes` ("sub-folders")
+   * instead of returning them as objects — typically `/`. Omit for a flat listing.
+   */
+  delimiter?: string;
 }
 
 /** Result of a listObjects call. */
 export interface ListObjectsResult {
   objects: StorageObject[];
+  /**
+   * Common prefixes directly under the requested prefix, each ending with the
+   * delimiter. Always `[]` when no delimiter was passed.
+   */
+  prefixes: string[];
   /** Cursor for fetching the next page (undefined when no more results). */
   nextCursor?: string;
 }
@@ -157,11 +177,15 @@ export interface IStorageAdapter {
   getPublicUrl(key: string): string;
 
   /**
-   * List objects under a given key prefix with optional pagination.
+   * List objects under a given key prefix with optional pagination and
+   * folder-style grouping.
+   *
+   * A page may hold fewer than `limit` entries and still not be the last one:
+   * callers must keep paging while `nextCursor` is present and stop only when
+   * it is absent — never on a short page.
    *
    * @param prefix  - Key prefix to filter by (e.g. `topics/abc123/`)
-   * @param cursor  - Pagination cursor from a previous call
-   * @param limit   - Maximum number of results to return (default: 100)
+   * @param options - Cursor, page size (default 100, max 1000) and delimiter
    */
-  listObjects(prefix: string, cursor?: string, limit?: number): Promise<ListObjectsResult>;
+  listObjects(prefix: string, options?: ListObjectsOptions): Promise<ListObjectsResult>;
 }

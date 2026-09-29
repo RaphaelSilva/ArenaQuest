@@ -240,11 +240,11 @@ describe('R2StorageAdapter', () => {
         await adapter.putObject(`page/item-${i}.txt`, String(i));
       }
 
-      const page1 = await adapter.listObjects('page/', undefined, 3);
+      const page1 = await adapter.listObjects('page/', { limit: 3 });
       expect(page1.objects).toHaveLength(3);
       expect(page1.nextCursor).toBeDefined();
 
-      const page2 = await adapter.listObjects('page/', page1.nextCursor, 3);
+      const page2 = await adapter.listObjects('page/', { cursor: page1.nextCursor, limit: 3 });
       expect(page2.objects).toHaveLength(2);
       expect(page2.nextCursor).toBeUndefined();
     });
