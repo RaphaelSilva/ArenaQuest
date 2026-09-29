@@ -1,6 +1,6 @@
 # Task 05 — Backend: Seed media: manifest, cache, R2 upload (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -64,13 +64,13 @@ Out:
 ## Acceptance Criteria
 
 - [ ] After `seed-demo -e local`, every one of the 21 topics has ≥ 1 `ready` media and each
-      presigned URL returned by `GET /v1/topics/{id}` downloads the file (200).
-- [ ] A second run uploads nothing (plan shows every object as "exists").
-- [ ] A manifest entry with a wrong SHA-256 aborts the run and no `media` row is written.
-- [ ] A disallowed or oversized file is refused by `validateMediaFile` with the entry named.
-- [ ] Every key matches `topics/<topicId>/<mediaId>-<name>`.
-- [ ] `make test-scripts` and `make lint` green.
-- [ ] No diff outside the scope guardrail.
+      presigned URL returned by `GET /v1/topics/{id}` downloads the file (200). _(Partly verified: 27 `ready` rows over all 21 topics, every object present and SHA-256-checked in the local bucket, and the API returns presigned URLs with the expected keys. The 200 download needs real R2 credentials — `.dev.vars` has empty keys — so it is pending until the first staging seed.)_
+- [x] A second run uploads nothing (plan shows every object as "exists").
+- [x] A manifest entry with a wrong SHA-256 aborts the run and no `media` row is written.
+- [x] A disallowed or oversized file is refused by `validateMediaFile` with the entry named.
+- [x] Every key matches `topics/<topicId>/<mediaId>-<name>`.
+- [x] `make test-scripts` and `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
@@ -81,3 +81,14 @@ Out:
 4. Corrupt one SHA-256 in a scratch copy of the dataset and confirm the abort.
 5. `make test-scripts && make lint`; `git diff --stat` confirms only scope-guardrail files
    changed.
+
+## Implementation notes
+
+- 27 media rows (some topics carry two files), all `ready`; keys `topics/<topicId>/<mediaId>-<name>` with the API's
+  `sanitizeFileName` rule (parity test).
+- Order in `seed-demo`: write SQL → check bucket → confirm (remote) → download/upload what is missing → `d1 execute`.
+  Any media failure aborts before the SQL runs. Uploads are read back and SHA-256 checked.
+- Local wrangler R2 calls run serially (parallel local calls hit a wrangler internal error); remote runs 4 at a time.
+  A first local run takes ~4 min, a converged re-run ~1.5 min — relevant for the Task 08 CI job.
+- Behind a proxy, Node's `fetch` needs `NODE_USE_ENV_PROXY=1` to honour `HTTPS_PROXY`.
+- `--dry-run` still reads the bucket to report `exists`, so a staging dry run needs remote R2 credentials.
