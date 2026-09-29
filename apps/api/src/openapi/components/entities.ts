@@ -181,3 +181,95 @@ export const UpdateBadgeBodySchema = z.object({
 
 
 
+// ---------------------------------------------------------------------------
+// Admin storage browser (RFC 0018 / M25)
+// ---------------------------------------------------------------------------
+
+export const StorageStatusSchema = z
+  .enum(['linked', 'pending', 'displaced', 'deleted-row', 'orphan'])
+  .openapi({ description: 'Server-side classification of a stored object.', example: 'linked' });
+
+export const StorageOrphanHintSchema = z
+  .enum(['owner-topic-gone', 'owner-event-gone', 'row-gone', 'unknown-shape'])
+  .openapi({ description: 'Why an `orphan` has no owner, read from the key shape.', example: 'row-gone' });
+
+export const MediaStorageReferenceSchema = z.object({
+  kind: z.literal('media'),
+  key: z.string(),
+  mediaId: z.string(),
+  status: MediaStatusSchema,
+  originalName: z.string().openapi({ example: 'Lesson One.pdf' }),
+  type: z.string().openapi({ example: 'application/pdf' }),
+  sizeBytes: z.number().int(),
+  uploaderId: z.string(),
+  uploader: z.object({ id: z.string(), name: z.string() }).nullable(),
+  topicId: z.string(),
+  topic: z.object({ id: z.string(), title: z.string(), status: TopicNodeStatusSchema }).nullable(),
+  createdAt: z.string().openapi({ example: '2026-09-29T12:00:00.000Z' }),
+}).openapi('MediaStorageReference');
+
+export const EventFlyerStorageReferenceSchema = z.object({
+  kind: z.enum(['event-flyer', 'event-flyer-displaced']),
+  key: z.string(),
+  eventId: z.string(),
+  title: z.string(),
+  slug: z.string(),
+  flyerStatus: z.enum(['none', 'pending', 'ready']),
+  flyerName: z.string().nullable(),
+}).openapi('EventFlyerStorageReference');
+
+export const StorageReferenceSchema = z
+  .union([MediaStorageReferenceSchema, EventFlyerStorageReferenceSchema])
+  .openapi('StorageReference');
+
+export const ClassifiedObjectSchema = z.object({
+  key: z.string().openapi({ example: 'topics/3f2c…/9a1b…-lesson.pdf' }),
+  name: z.string().openapi({ description: 'Last path segment of the key.', example: '9a1b…-lesson.pdf' }),
+  size: z.number().int(),
+  uploadedAt: z.string().openapi({ example: '2026-09-29T12:00:00.000Z' }),
+  contentType: z.string().nullable(),
+  status: StorageStatusSchema,
+  stale: z.boolean().openapi({ description: 'Only ever true for `pending`: older than the 24 h grace window.' }),
+  hint: StorageOrphanHintSchema.nullable().openapi({ description: 'Set only when `status` is `orphan`.' }),
+  references: z.array(StorageReferenceSchema),
+}).openapi('ClassifiedObject');
+
+export const StorageFolderSchema = z.object({
+  prefix: z.string().openapi({ example: 'topics/3f2c…/' }),
+  name: z.string().openapi({ description: 'Last segment of the prefix, without the delimiter.' }),
+  owner: z
+    .object({ kind: z.enum(['topic', 'event']), id: z.string(), title: z.string() })
+    .nullable()
+    .openapi({ description: 'The topic / event a `topics/<id>/` or `events/<id>/` folder belongs to, when it exists.' }),
+  ownerGone: z.boolean().openapi({ description: 'True for an owner-shaped folder whose topic / event no longer exists.' }),
+}).openapi('StorageFolder');
+
+export const StorageBrowseResponseSchema = z.object({
+  prefix: z.string(),
+  folders: z.array(StorageFolderSchema),
+  objects: z.array(ClassifiedObjectSchema),
+  nextCursor: z.string().optional(),
+}).openapi('StorageBrowseResponse');
+
+export const StorageObjectDetailSchema = ClassifiedObjectSchema.extend({
+  downloadUrl: z.string().openapi({ description: 'Presigned GET URL, valid for 5 minutes.' }),
+  downloadUrlExpiresAt: z.string().openapi({ example: '2026-09-29T12:05:00.000Z' }),
+}).openapi('StorageObjectDetail');
+
+export const StorageAuditResponseSchema = z.object({
+  objects: z.array(ClassifiedObjectSchema).openapi({ description: 'Only the non-`linked` objects of the page.' }),
+  scanned: z.number().int().openapi({ description: 'Number of keys walked for this page.' }),
+  nextCursor: z.string().optional(),
+}).openapi('StorageAuditResponse');
+
+export const StorageMissingObjectSchema = z.object({
+  key: z.string(),
+  status: z.literal('missing-object'),
+  reference: StorageReferenceSchema,
+}).openapi('StorageMissingObject');
+
+export const StorageAuditMissingResponseSchema = z.object({
+  items: z.array(StorageMissingObjectSchema),
+  scanned: z.number().int().openapi({ description: 'Number of references checked for this page.' }),
+  nextCursor: z.string().optional(),
+}).openapi('StorageAuditMissingResponse');

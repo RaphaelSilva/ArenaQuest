@@ -1,6 +1,6 @@
 # Task 03 — Backend: Admin storage API: browse, object and audit (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [25 — Admin storage browser and orphan audit](./milestone.md)
 **RFC:** [RFC 0018](../../RFCs/0018-admin-storage-browser-and-orphan-audit.md)
 **Team:** Backend API
@@ -71,24 +71,24 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `/browse?prefix=topics/` returns one folder per topic, each labelled with its topic title,
+- [x] `/browse?prefix=topics/` returns one folder per topic, each labelled with its topic title,
       and a folder for a deleted topic flagged as gone.
-- [ ] `/browse` on a topic folder classifies each fixture object with the status and hint listed
+- [x] `/browse` on a topic folder classifies each fixture object with the status and hint listed
       in the milestone's §2; `stale` is set only on the pending object older than 24 h.
-- [ ] `/browse?prefix=topics` (no trailing slash) returns `400`.
-- [ ] `/object` returns references, classification and a presigned URL for a known key, and
+- [x] `/browse?prefix=topics` (no trailing slash) returns `400`.
+- [x] `/object` returns references, classification and a presigned URL for a known key, and
       `404` for an unknown key.
-- [ ] `/audit` over the fixtures returns every non-`linked` object and none of the `linked`
+- [x] `/audit` over the fixtures returns every non-`linked` object and none of the `linked`
       ones, with `scanned` equal to the number of keys walked; following `nextCursor` reaches
       the end.
-- [ ] `/audit/missing` returns exactly the `ready` row whose object was never put.
-- [ ] Each route returns `401` without a token and `403` for `content_creator` and `student`
+- [x] `/audit/missing` returns exactly the `ready` row whose object was never put.
+- [x] Each route returns `401` without a token and `403` for `content_creator` and `student`
       tokens.
-- [ ] No D1 or R2 import in the controller; the storage and reference ports are its only
+- [x] No D1 or R2 import in the controller; the storage and reference ports are its only
       dependencies.
-- [ ] `apps/api/openapi.json` is regenerated and matches the routes.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] `apps/api/openapi.json` is regenerated and matches the routes.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
