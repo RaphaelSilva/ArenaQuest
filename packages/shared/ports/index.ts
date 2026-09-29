@@ -1,4 +1,5 @@
 export * from './i-storage-adapter';
+export * from './i-storage-reference-repository';
 export * from './i-auth-adapter';
 export * from './i-user-repository';
 export * from './i-refresh-token-repository';
