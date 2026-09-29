@@ -1,7 +1,8 @@
 # RFC 0018: Admin storage browser and orphan audit
 
 **Date:** 2026-09-29
-**Status:** Draft
+**Status:** Proposed
+**Revised:** 2026-09-29
 **Author:** raphaelsilva
 **Affected:**
 - `packages/shared/ports/i-storage-adapter.ts` (`listObjects` gains an options object with `delimiter`; result gains `prefixes`)
@@ -268,7 +269,7 @@ time**:
 Otherwise it answers `409 Conflict` with the current classification. Every deletion emits a
 structured log line (`storage.orphan.deleted`, key, size, admin user id). Stale `pending`
 rows are **not** deletable here in Phase 2 — their cleanup changes a DB row too and belongs
-to the owning flow (Open Questions).
+to the owning flow (Resolved Decisions, 2026-09-29).
 
 ### 7. Frontend (`/admin/storage`)
 
@@ -357,14 +358,19 @@ tests for the 409 paths (still referenced, too recent, key reappeared as a pendi
 
 ## Open Questions
 
-1. **Stale `pending` cleanup** — should the owning flows (media uploader, flyer) get a
-   "discard pending upload" action, or should Phase 2 delete the object *and* hard-delete the
-   row? Owner: product owner + lead architect.
-2. **Grace window** — is 24 h right, and should it be configurable per environment?
-3. **Audit trail** — is a structured log line enough, or do deletions need a persisted admin
-   audit table (none exists today)?
-4. **Should `deleted-row` rows be hard-deleted** once their object is gone, or kept for
-   history?
+None — all resolved on 2026-09-29 (below).
+
+## Resolved Decisions
+
+- **2026-09-29 — Stale `pending` uploads are shown, not cleaned** (product owner). The browser
+  flags them `stale`; a "discard pending upload" action belongs to the owning flows (media
+  uploader, flyer) and is a separate backlog item. This RFC writes no DB row.
+- **2026-09-29 — Grace window is a fixed 24 h** (product owner). A constant in
+  `packages/shared/domain/storage/key-owners.ts`, not a per-environment binding.
+- **2026-09-29 — A structured log line is the audit trail** (product owner).
+  `storage.orphan.deleted` (key, size, admin id); no audit table, no migration.
+- **2026-09-29 — `deleted` media rows are kept** (product owner). Deleting a `deleted-row`
+  object removes the object only; the soft-deleted row stays as history.
 
 ## References
 
