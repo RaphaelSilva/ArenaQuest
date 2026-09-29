@@ -9,6 +9,7 @@ import { Spinner } from '@web/components/spinner';
 import { StorageBreadcrumb } from '@web/components/admin/storage/storage-breadcrumb';
 import { StorageListing } from '@web/components/admin/storage/storage-listing';
 import { StorageObjectDrawer } from '@web/components/admin/storage/storage-object-drawer';
+import { StorageScanPanel } from '@web/components/admin/storage/storage-scan-panel';
 import { useStorageFolder } from '@web/components/admin/storage/use-storage-folder';
 import { useStorageObject } from '@web/components/admin/storage/use-storage-object';
 
@@ -56,6 +57,8 @@ export default function AdminStoragePage() {
         </h1>
         <p className="max-w-3xl text-sm text-zinc-600 dark:text-zinc-400">{d.subtitle}</p>
       </div>
+
+      <StorageScanPanel selectedKey={selectedKey} onSelectObject={setSelectedKey} />
 
       <StorageBreadcrumb prefix={folder.prefix} titles={folder.titles} onNavigate={folder.navigate} />
 
