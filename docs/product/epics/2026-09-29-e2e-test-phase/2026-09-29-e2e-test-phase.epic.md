@@ -343,15 +343,15 @@ below; each wave is shippable on its own. Total **~7 dev days**.
 
 | # | Task | Team | Depends on | Status |
 |---|---|---|---|---|
-| 01 | E2E workspace, stack boot and fresh-D1 global setup (`e2e/`, `.dev.vars.e2e`, `0100_e2e_fixtures.sql`, Makefile targets) | infra | — | 📝 Open |
+| 01 | E2E workspace, stack boot and fresh-D1 global setup (`e2e/`, `.dev.vars.e2e`, `0100_e2e_fixtures.sql`, Makefile targets) | backend | — | 📝 Open |
 | 02 | Fixtures (role `storageState`, typed API client, `uniq()`) and page objects for login / catalog / events | frontend | 01 | 📝 Open |
 | 03 | Smoke journeys J1, J2, J5, J9 (`@smoke`) + missing `aria-label`s they need | frontend | 02 | 📝 Open |
-| 04 | CI gate: `.github/workflows/e2e.yml`, browser cache, failure artifacts, required check | infra | 03 | 📝 Open |
+| 04 | CI gate: `.github/workflows/e2e.yml`, browser cache, failure artifacts, required check | backend | 03 | 📝 Open |
 | 05 | Console-mail reader + journeys J3 (register → activate) and J4 (password reset) | frontend | 02 | 📝 Open |
 | 06 | Local-R2 PUT interception + journey J6 (media upload → viewer) | frontend | 02 | 📝 Open |
 | 07 | Journeys J7 (task authoring → student) and J8 (enrollment → check-in → dashboard); close the three `test-debt` tasks | frontend | 02 | 📝 Open |
 | 08 | Journey J10 (admin user management, last-admin guard) | frontend | 02 | 📝 Open |
-| 09 | Hardening & process: nightly Firefox/WebKit + `pt` run, flaky tracking, `make doctor` check, docs, E2E-task convention | infra | 04 | 📝 Open |
+| 09 | Hardening & process: nightly Firefox/WebKit + `pt` run, flaky tracking, `make doctor` check, docs, E2E-task convention | backend | 04 | 📝 Open |
 
 **Waves**
 - **Wave 0 — Workspace & boot (~1.5 d):** 01. Exit: an empty spec opening `/` passes via `make e2e`.

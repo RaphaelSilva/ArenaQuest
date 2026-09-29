@@ -1,6 +1,6 @@
 ---
 name: write-tasks
-description: Break an ArenaQuest milestone.md into its numbered .task.md files — the RFC→milestone→tasks step downstream of write-feature. Use whenever the user wants to generate, scaffold, or break a milestone into tasks, split a feature into backend/frontend tasks, write the task breakdown, fill a milestone's §5 task table, or validate task files. Keeps backend and frontend in separate files, names them NN-<slug>.task.md, and keeps the milestone's §5 table in sync.
+description: Break an ArenaQuest milestone.md — or an epic's <date>-<subject>.epic.md — into its numbered .task.md files, the step downstream of write-feature / write-epic. Use whenever the user wants to generate, scaffold, or break a milestone or an epic into tasks, split a feature into backend/frontend tasks, write the task breakdown, fill a milestone's §5 task table or an epic's Task Breakdown table, or validate task files. Keeps backend and frontend in separate files, names them NN-<slug>.task.md, and keeps the parent's task table in sync.
 ---
 
 In ArenaQuest, a **milestone** (`docs/product/milestones/<N>-<slug>/milestone.md`,
@@ -17,6 +17,11 @@ Task Breakdown table in sync. Two dependency-free Node scripts back it:
 - **`check-task.mjs`** — validates task files against the standard and checks that
   every task file appears in the milestone's §5 table. Non-zero exit on a hard
   violation, so it drops into a pre-commit hook or CI.
+
+The same scripts serve **epics** (`docs/product/epics/<YYYY-MM-DD>-<subject>/`,
+scaffolded by `write-epic`): pass `--epic` instead of `--milestone`, and the task
+files land in the epic folder next to its `.epic.md` — see *Scaffold the tasks
+for an epic*.
 
 Paths below are **relative to the repo root**. Run the scripts from the repo root
 with Node (stdlib only — no install).
@@ -119,6 +124,35 @@ Each run prints the created path on stdout and, on stderr, the **ready-to-paste
    `| # | Task File | Phase | Team | Status |` table, then update the dependency
    graph and the recommended execution order to match.
 
+## Scaffold the tasks for an epic
+
+Same scripts, same task standard — only the parent changes. Read the epic's
+Goals, Proposed Approach and Acceptance Criteria (its Task Breakdown table is the
+plan), then:
+
+```bash
+node .claude/skills/write-tasks/new-task.mjs \
+  --epic e2e-test-phase --team backend \
+  --title "E2E workspace and stack boot"
+
+node .claude/skills/write-tasks/new-task.mjs \
+  --epic 2026-09-29-e2e-test-phase --team frontend \
+  --title "Smoke journeys" --depends 01
+```
+
+- `--epic` accepts the folder stem, a subject fragment (`e2e-test-phase`), or a
+  path; `--epic-dir` overrides `docs/product/epics`. `--milestone` and `--epic`
+  are mutually exclusive.
+- The header carries `**Epic:** [<Title>](./<stem>.epic.md)` instead of
+  `**Milestone:**`. The `**RFC:**` line is copied from the epic's
+  `**Derived from:**` line (first RFC link); a standalone epic (`—`) gets none,
+  which `check-task.mjs` reports as an advisory warning only.
+- The printed row has the epic table's shape,
+  `| # | Task | Team | Depends on | Status |` — replace the planned row (whose
+  title is not yet a link) with it, and keep the waves in sync.
+- A legacy epic folder with no `*.epic.md` (e.g. `design-system/`) is refused —
+  scaffold its `.epic.md` with `write-epic` first.
+
 ## Validate
 
 Check one milestone's tasks **and** that its §5 table is in sync:
@@ -127,7 +161,13 @@ Check one milestone's tasks **and** that its §5 table is in sync:
 node .claude/skills/write-tasks/check-task.mjs --milestone 13
 ```
 
-Check specific task files, or every modern milestone:
+Check one epic's tasks and its Task Breakdown table the same way:
+
+```bash
+node .claude/skills/write-tasks/check-task.mjs --epic e2e-test-phase
+```
+
+Check specific task files, or every modern milestone **and** every epic:
 
 ```bash
 node .claude/skills/write-tasks/check-task.mjs docs/product/milestones/13-white-label-branding/01-*.task.md
@@ -136,8 +176,9 @@ node .claude/skills/write-tasks/check-task.mjs
 
 Output: `✓` clean, `⚠` advisory (exit 0), `✗` hard violation (exit 1).
 **ERROR** = bad filename, missing/mismatched `# Task NN —` heading, missing
-`**Status:**`/`**Milestone:**`/`**Team:**`, a wrong Team value, a missing `## `
-section, no Scope guardrail, or a task file absent from the §5 table.
+`**Status:**`/`**Milestone:**` (or `**Epic:**`)/`**Team:**`, a wrong Team value, a
+missing `## ` section, no Scope guardrail, or a task file not linked from the §5
+table (milestone) or the Task Breakdown table (epic).
 **warn** = missing RFC link, no gate command (`make test-api`/`test-web`) in
 Acceptance Criteria, no "No diff outside" line, no `git diff` in Verification, a
 cross-layer path in the guardrail (backend touching `apps/web/`, or frontend
@@ -157,6 +198,9 @@ missing file.
 - **`new-task.mjs` refuses to overwrite.** Re-running with the same title is safe;
   it errors rather than clobbering. Use `--order`/`--slug` to place a task
   deliberately (e.g. inserting between existing ones).
+- **An epic's planned rows are not links yet.** `write-epic` lets you plan the
+  table as `| 01 | <title> | …` before any file exists; once a task file exists,
+  its row must link it (`[title](./01-slug.task.md)`) or the sync check fails.
 - **Numbering reads the folder, not the table.** The next `NN` is the highest
   leading integer across `NN-*.task.md` files + 1, so a deleted file leaves a gap
   unless you pass `--order`.
@@ -175,5 +219,7 @@ missing file.
 
 - **`write-feature`** — the upstream step. Produces the `milestone.md` this skill
   breaks down, and leaves §5 stubbed for this skill to fill.
+- **`write-epic`** — the alternative upstream step for date-keyed epics; its
+  folder receives the task files when you pass `--epic`.
 - **`write-rfc`** — two steps upstream. Produces the RFC the milestone derives
   from and that each task's `**RFC:**` line links back to.

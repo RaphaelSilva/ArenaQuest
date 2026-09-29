@@ -120,11 +120,20 @@ table.
 ## Task files
 
 Tasks sit next to the epic as `NN-<slug>.task.md` — backend and frontend in
-separate files, the same content standard as milestone tasks (see `write-tasks`).
-`write-tasks`' scripts currently resolve **milestone** folders only, so for an
-epic copy `template-backend.md` / `template-frontend.md` from
-`.claude/skills/write-tasks/`, set the header's parent link to the epic file, and
-keep the epic's Task Breakdown table in sync (`check-epic.mjs` warns on drift).
+separate files, the same standard as milestone tasks. Scaffold them with
+`write-tasks`, passing `--epic` instead of `--milestone`:
+
+```bash
+node .claude/skills/write-tasks/new-task.mjs --epic <subject> --team backend|frontend \
+     --title "..." [--depends 01,02]
+node .claude/skills/write-tasks/check-task.mjs --epic <subject>
+```
+
+The header links back with `**Epic:** [<Title>](./<stem>.epic.md)` and inherits
+the epic's RFC link. Each run prints the Task Breakdown row to paste; once a task
+file exists its row must link it, or `check-task.mjs --epic` fails. Teams are
+`backend` or `frontend` only — plan infrastructure work (CI, Makefile, tooling)
+under the side it mostly serves.
 
 ## Gotchas
 
