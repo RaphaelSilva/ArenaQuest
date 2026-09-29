@@ -168,7 +168,10 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/media/convert-skipped.test.mjs \
 		scripts/git/worktree.test.mjs \
 		scripts/demo/ids.test.mjs \
-		scripts/demo/dataset.test.mjs
+		scripts/demo/dataset.test.mjs \
+		scripts/demo/hash.test.mjs \
+		scripts/demo/sql.test.mjs \
+		scripts/demo/seed-demo.test.mjs
 
 test-api: ## Run apps/api tests (Vitest + Cloudflare Workers pool)
 	pnpm turbo test --filter api
