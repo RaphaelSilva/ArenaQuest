@@ -2422,6 +2422,71 @@
         ],
         "type": "object"
       },
+      "StorageDeleteConflict": {
+        "properties": {
+          "error": {
+            "enum": [
+              "StorageObjectNotDeletable"
+            ],
+            "type": "string"
+          },
+          "object": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassifiedObject"
+              },
+              {
+                "description": "The classification read during this request."
+              }
+            ]
+          },
+          "reason": {
+            "description": "`not-deletable-status`: not `orphan` / `deleted-row`. `within-grace-window`: uploaded less than 24 h ago.",
+            "enum": [
+              "not-deletable-status",
+              "within-grace-window"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "error",
+          "reason",
+          "object"
+        ],
+        "type": "object"
+      },
+      "StorageDeleteResponse": {
+        "properties": {
+          "deleted": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "status": {
+            "description": "Classification the object had when it was removed.",
+            "enum": [
+              "orphan",
+              "deleted-row"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "deleted",
+          "key",
+          "size",
+          "status"
+        ],
+        "type": "object"
+      },
       "StorageFolder": {
         "properties": {
           "name": {
@@ -7180,6 +7245,65 @@
       }
     },
     "/v1/admin/storage/object": {
+      "delete": {
+        "description": "Re-classifies the key at request time and removes the object only when it is `orphan` or `deleted-row` and was uploaded more than 24 h ago. Anything else answers `409` with the current classification and leaves the object in place. Storage only: no database row is changed.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "example": "topics/3f2c…/9a1b…-lesson.pdf",
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageDeleteResponse"
+                }
+              }
+            },
+            "description": "Object removed"
+          },
+          "400": {
+            "description": "Validation failed or invalid cursor"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "No object under that key"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageDeleteConflict"
+                }
+              }
+            },
+            "description": "Not safe to delete right now"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete an orphaned object",
+        "tags": [
+          "admin:storage"
+        ]
+      },
       "get": {
         "description": "Head, references, classification and a presigned download URL valid for 5 minutes.",
         "parameters": [
