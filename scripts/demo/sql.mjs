@@ -34,9 +34,12 @@
  *   email(userKey)    demo e-mail
  *   passwordHash      one `pbkdf2:…` hash, shared by every demo user
  *   renderTopic(title) topic markdown, already sanitised
+ *   now               the run's clock reading (gamification dates are relative to it)
+ *   gamification      the rules the gamification rows follow (readGamificationReference)
  */
 
 import { demoEmail, demoId } from './ids.mjs';
+import { buildGamification, ledgerSumExpression } from './gamification.mjs';
 import { buildMediaPlan } from './media.mjs';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -121,7 +124,7 @@ export function roleIdExpression(name) {
  * are supplied by the caller (the CLI hashes `AQ_DEMO_PASSWORD` and imports the
  * shared sanitiser); `renderMarkdown(title)` renders the sample topic.
  */
-export function demoContext({ label, passwordHash, sanitizeMarkdown, renderMarkdown }) {
+export function demoContext({ label, passwordHash, sanitizeMarkdown, renderMarkdown, now = null, gamification = null }) {
   if (typeof passwordHash !== 'string' || passwordHash.length === 0) throw new TypeError('demoContext: passwordHash is required');
   if (typeof sanitizeMarkdown !== 'function') throw new TypeError('demoContext: sanitizeMarkdown is required');
   if (typeof renderMarkdown !== 'function') throw new TypeError('demoContext: renderMarkdown is required');
@@ -131,6 +134,8 @@ export function demoContext({ label, passwordHash, sanitizeMarkdown, renderMarkd
     id: (entity, key) => demoId(label, entity, key),
     email: (userKey) => demoEmail(label, userKey),
     renderTopic: (title) => sanitizeMarkdown(renderMarkdown(title)),
+    now,
+    gamification,
   };
 }
 
@@ -294,10 +299,45 @@ export const mediaSection = {
 };
 
 /**
- * The seed, in foreign-key order. Later tasks append here:
- * gamification (06) and extensions (14) at the end.
+ * Progress, XP ledger, badges, streak, quest progress and the mission — see
+ * gamification.mjs for the rows and why each table is keyed as it is. Needs
+ * `ctx.now` and `ctx.gamification`.
  */
-export const SECTIONS = [usersSection, groupsSection, tagsSection, topicsSection, mediaSection, enrollmentsSection];
+export const gamificationSection = {
+  name: 'gamification',
+  build(dataset, ctx) {
+    const { rows } = buildGamification(dataset, ctx);
+    const statements = [
+      ...rows.topic_progress.map((row) =>
+        upsert('topic_progress', row, { key: ['user_id', 'topic_node_id'], insertOnly: ['id'], touch: 'updated_at' }),
+      ),
+      ...rows.xp_events.map((row) =>
+        upsert('xp_events', row, { key: ['user_id', 'source_kind', 'idempotency_key'], insertOnly: ['id'] }),
+      ),
+      ...rows.user_badges.map((row) => upsert('user_badges', row, { key: ['user_id', 'badge_id'], insertOnly: ['id'] })),
+      // After the ledger: the read model is its sum, computed where the ledger is.
+      ...rows.user_xp.map((row) =>
+        upsert('user_xp', { user_id: row.user_id, total_xp: raw(ledgerSumExpression(row.user_id)) }, { key: ['user_id'], touch: 'updated_at' }),
+      ),
+      ...rows.user_streak.map((row) => upsert('user_streak', row, { key: ['user_id'], touch: 'updated_at' })),
+      ...rows.quest_progress.map((row) =>
+        upsert('quest_progress', row, {
+          key: ['user_id', 'quest_id', 'period_key'],
+          insertOnly: ['current_value', 'target_value', 'completed', 'completed_at'],
+        }),
+      ),
+      ...rows.missions.map((row) => upsert('missions', row, { touch: 'updated_at' })),
+    ];
+    const counts = Object.fromEntries(Object.entries(rows).map(([table, list]) => [table, list.length]));
+    return { statements, counts };
+  },
+};
+
+/**
+ * The seed, in foreign-key order. Later tasks append here:
+ * extensions (14) at the end.
+ */
+export const SECTIONS = [usersSection, groupsSection, tagsSection, topicsSection, mediaSection, enrollmentsSection, gamificationSection];
 
 // ════════════════════════════════════════════════════════════════════════════
 // Assembly

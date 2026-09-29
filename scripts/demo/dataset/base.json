@@ -445,10 +445,11 @@
           "root-2/module-1/lesson-2"
         ],
         "badges": [
-          "alicerce-solido"
+          "alicerce-solido",
+          "levantador-bronze"
         ],
         "adminAdjustments": [
-          500
+          200
         ],
         "streakDays": 0,
         "quests": [],
