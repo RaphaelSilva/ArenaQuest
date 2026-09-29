@@ -1,6 +1,6 @@
 # Milestone 24 — Catalog search by tags
 
-**Status:** 📝 Draft
+**Status:** ✅ Done
 **Scope:** `packages/shared` (text normaliser, tag slugify, `ITagRepository.list` filter), `apps/api` (tag authoring on admin topics, `GET /v1/admin/tags`), `apps/web` (catalog sidebar matcher, `?tag=` filter, tag chips, admin tag combobox), `scripts/content` (README `tags` key). Derived from [RFC 0017](../../RFCs/0017-catalog-search-by-tags.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: the new files `packages/shared/domain/search/{normalize.ts,index.ts}` and `packages/shared/domain/tags/{slugify.ts,index.ts}` (plus their tests, `slugify.fixtures.json` and re-exports); `packages/shared/ports/i-tag-repository.ts` **only** to add an optional `q` to `list(opts)`; `apps/api/src/adapters/db/d1-tag-repository.ts` (`upsertMany` → `ON CONFLICT(slug) DO NOTHING`, `list` slug-prefix filter); `apps/api/src/controllers/admin-topics.controller.ts` and `apps/api/src/routes/admin/topics.ts` (`tags` names on create/update, `UNKNOWN_TAG`); the new `apps/api/src/routes/admin/tags.ts` (plus an optional `apps/api/src/controllers/admin-tags.controller.ts`) and its wiring in `apps/api/src/routes/admin/index.ts` / the container; `apps/api/src/openapi/components/entities.ts` only for the new request/response schemas; the new `apps/web/src/lib/catalog-search.ts` and `apps/web/src/lib/admin-tags-api.ts`; `apps/web/src/lib/admin-topics-api.ts` (`tags` field); `apps/web/src/components/catalog/{CatalogSidebar,TopicTreeNode,MobileSearchBar}.tsx` and a new tag-chip component under `apps/web/src/components/catalog/`; `apps/web/src/app/(protected)/catalog/[id]/page.tsx` (or the component it renders the topic header with) **only** to list the topic's tags; `apps/web/src/app/(protected)/admin/topics/page.tsx` and a new combobox component under `apps/web/src/components/admin/`; both i18n dictionaries; `scripts/content/import-media.mjs` and `import-media.test.mjs` (README fence `tags`); and, for the closeout only, a new local seed `apps/api/migrations/seed/0004_catalog_tags_local.sql` and its line in the `Makefile` `db-seed-local` target, `docs/product/FEATURES.md`, the `CLAUDE.md` importer paragraph, RFC 0017's `Status:` header and its README row. It is explicitly **not** an opportunity to: search topic `content` (RFC Resolved #3); add a server-side search endpoint, `LIKE` query or FTS5 table; add fuzzy/typo-tolerant matching or a fuzzy-search dependency; make tags inherit from parent to child (Resolved #2); filter the catalog home grid `catalog/page.tsx` (Resolved #4); build a tag administration screen (rename, merge, delete); add a migration or change the `tags` / `topic_node_tags` schema; search tasks, events or media; or change what `GET /v1/topics` returns or who may read it. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
@@ -69,23 +69,23 @@ Out of scope (explicit, from RFC 0017 Non-Goals and Resolved Decisions):
 
 ## 3. Acceptance Criteria
 
-- [ ] Unit tests for `normalizeText`, `tokenize` and `slugify` cover `Chūdan`/`Jō`, en-dash, double spaces, NFC vs NFD input and an all-punctuation name.
-- [ ] `matchTopic` unit tests pass for every row of RFC 0017's *Motivation* table (`chudan`, `tsuki chudan`, `kata  basica`, `soco` via tag, `faixa amarela` via tag).
-- [ ] The existing `catalog-sidebar.test.tsx` and `CatalogSidebar.test.tsx` suites pass unchanged (no regression on title search).
-- [ ] Sidebar test: a topic matched only by tag renders its tag chip; a topic matched by title renders none.
-- [ ] Sidebar test: `?tag=soco` shows the tagged topic and its ancestors, not an untagged sibling; its children render under it but a child without the tag shows no chip (no inheritance).
-- [ ] Sidebar test: typing does not trigger any additional `topics.list()` call.
-- [ ] API test: `PATCH` with `tags: ["CHUDAN"]` when `{name:'Chūdan', slug:'chudan'}` exists links that tag and `tags.name` is still `Chūdan`; `SELECT COUNT(*) FROM tags` is unchanged.
-- [ ] API test: `tagIds: ["<unknown>"]` returns `422 UNKNOWN_TAG` and `topic_node_tags` is unchanged.
-- [ ] API test: `tags` + `tagIds` together returns `400`; `tags: ["!!!"]` returns `400`.
-- [ ] API test: `GET /v1/admin/tags?q=chu` returns `chudan` for `admin` and `content_creator`, `403` for `student`.
-- [ ] API test: a student listing `GET /v1/topics` does not receive a tagged topic outside their effective-access set (search surface bounded by enrollment).
-- [ ] Web test: the admin combobox adds an existing tag, creates a new one on Enter, removes a chip, and submits `tags: string[]` with no IDs.
-- [ ] Importer: a dry run over a README with `"tags": ["soco"]` plans the tag; a second real run on an unchanged tree performs zero writes.
-- [ ] `check-i18n-coverage.js` passes; `dict-en.ts` / `dict-pt.ts` keys are identical.
-- [ ] No new file under `apps/api/migrations/` other than the local seed `seed/0004_catalog_tags_local.sql`.
-- [ ] `make lint`, `make test-api` and `make test-web` pass green.
-- [ ] No diff outside the files listed in the guardrail.
+- [x] Unit tests for `normalizeText`, `tokenize` and `slugify` cover `Chūdan`/`Jō`, en-dash, double spaces, NFC vs NFD input and an all-punctuation name.
+- [x] `matchTopic` unit tests pass for every row of RFC 0017's *Motivation* table (`chudan`, `tsuki chudan`, `kata  basica`, `soco` via tag, `faixa amarela` via tag).
+- [x] The existing `catalog-sidebar.test.tsx` and `CatalogSidebar.test.tsx` suites pass unchanged (no regression on title search).
+- [x] Sidebar test: a topic matched only by tag renders its tag chip; a topic matched by title renders none.
+- [x] Sidebar test: `?tag=soco` shows the tagged topic and its ancestors, not an untagged sibling; its children render under it but a child without the tag shows no chip (no inheritance).
+- [x] Sidebar test: typing does not trigger any additional `topics.list()` call.
+- [x] API test: `PATCH` with `tags: ["CHUDAN"]` when `{name:'Chūdan', slug:'chudan'}` exists links that tag and `tags.name` is still `Chūdan`; `SELECT COUNT(*) FROM tags` is unchanged.
+- [x] API test: `tagIds: ["<unknown>"]` returns `422 UNKNOWN_TAG` and `topic_node_tags` is unchanged.
+- [x] API test: `tags` + `tagIds` together returns `400`; `tags: ["!!!"]` returns `400`.
+- [x] API test: `GET /v1/admin/tags?q=chu` returns `chudan` for `admin` and `content_creator`, `403` for `student`.
+- [x] API test: a student listing `GET /v1/topics` does not receive a tagged topic outside their effective-access set (search surface bounded by enrollment).
+- [x] Web test: the admin combobox adds an existing tag, creates a new one on Enter, removes a chip, and submits `tags: string[]` with no IDs.
+- [x] Importer: a dry run over a README with `"tags": ["soco"]` plans the tag; a second real run on an unchanged tree performs zero writes.
+- [x] `check-i18n-coverage.js` passes; `dict-en.ts` / `dict-pt.ts` keys are identical.
+- [x] No new file under `apps/api/migrations/` other than the local seed `seed/0004_catalog_tags_local.sql`.
+- [x] `make lint`, `make test-api` and `make test-web` pass green.
+- [x] No diff outside the files listed in the guardrail.
 
 ---
 
@@ -109,7 +109,7 @@ Out of scope (explicit, from RFC 0017 Non-Goals and Resolved Decisions):
 | 04 | [Topic page tag chips](./04-topic-page-tag-chips.task.md) | 2 | Frontend | ✅ Done |
 | 05 | [Admin tag combobox](./05-admin-tag-combobox.task.md) | 2 | Frontend | ✅ Done |
 | 06 | [Importer README tags](./06-importer-readme-tags.task.md) | 2 | Backend | ✅ Done |
-| 07 | [Local seed, docs and closeout](./07-local-seed-docs-and-closeout.task.md) | 3 | Backend | ☐ Open |
+| 07 | [Local seed, docs and closeout](./07-local-seed-docs-and-closeout.task.md) | 3 | Backend | ✅ Done |
 
 Dependency graph:
 
@@ -149,10 +149,10 @@ branch with `make lint`, `make test-api`, and `make test-web` passing.
 
 ## 7. Definition of Done (milestone level)
 
-- [ ] All tasks marked Done with every acceptance box checked.
-- [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] Closeout note written at `./closeout-analysis.md`.
-- [ ] RFC 0017 status set to `Implemented` in its header and
+- [x] All tasks marked Done with every acceptance box checked.
+- [x] All milestone-level acceptance criteria in §3 pass.
+- [x] `make lint`, `make test-api`, and `make test-web` pass green.
+- [x] Closeout note written at `./closeout-analysis.md`.
+- [x] RFC 0017 status set to `Implemented` in its header and
       `docs/product/RFCs/README.md`; deferred items remain backlog.
-- [ ] No diff outside the scope declared in the guardrail.
+- [x] No diff outside the scope declared in the guardrail.
