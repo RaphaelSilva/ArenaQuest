@@ -1,6 +1,6 @@
 # Task 06 — Backend: Seed gamification state (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -60,16 +60,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] After a local seed, student-1 shows 350 XP / level 3, one badge, a 3-day streak and
+- [x] After a local seed, student-1 shows 350 XP / level 3, one badge, a 3-day streak and
       `weekly-topic` 1/2; student-2 shows 950 XP / level 4; student-3 shows 0 XP.
 - [ ] As student-2, completing one more published lesson in the app raises the total to
-      1050 and the dashboard shows level 5.
-- [ ] As student-1, re-completing the already-completed lesson awards no XP.
-- [ ] As student-3, completing a first lesson awards 100 XP plus *alicerce-solido*, and the
+      1050 and the dashboard shows level 5. _(Level 5 is reached, but not at exactly 1050: the same completion also pays the daily/weekly topic quests, the active demo mission and its badge — 950 → 2130. Exact 1050 is impossible while the seeded mission is active; the weekly-quest overpayment comes from a pre-existing evaluator bug, see notes.)_
+- [x] As student-1, re-completing the already-completed lesson awards no XP.
+- [x] As student-3, completing a first lesson awards 100 XP plus *alicerce-solido*, and the
       active mission completes with *tecnica-afiada*.
-- [ ] The post-run assertion passes, and fails in a test where a ledger row is removed.
-- [ ] `make test-scripts` and `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] The post-run assertion passes, and fails in a test where a ledger row is removed.
+- [x] `make test-scripts` and `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
@@ -79,3 +79,20 @@ Out:
 3. Re-run the seed after those actions and confirm it converges without errors.
 4. `make test-scripts && make lint`; `git diff --stat` confirms only scope-guardrail files
    changed.
+
+## Implementation notes
+
+- **Student-2's seeded badges differ from the RFC table.** At 950 XP without `levantador-bronze` (awarded at 500 XP)
+  the first login re-evaluates badges and jumps to 1250 / L5 — a state the engine never leaves. The dataset gives
+  student-2 `alicerce-solido` + `levantador-bronze` and an admin adjustment of **200** (2×100 + 250 + 300 + 200 = 950,
+  still L4). The seed now refuses any dataset whose badges are unearned under the rules.
+- Source kinds follow what the engine writes: `topic` for a completion and `badge_award` for a badge (not
+  `topic_complete` / `badge`). The admin adjustment uses the stable key `admin_adjustment:<demo id>:v1` (the real
+  controller uses a random key).
+- A re-seed never duplicates: progress, ledger and badge rows reuse the row the app wrote for the same fact;
+  `user_xp` is recomputed from the ledger in SQL; existing quest progress is never overwritten.
+- **Pre-existing engine bug (not fixed here):** `quest-evaluator.ts` reads `predicate_params.target`, but migration
+  0019 stores `count`, so any quest a student has not started has target 1 — `weekly-topic` pays 500 XP on the first
+  completion. Filed as a separate task.
+- Verified locally via `make dev-api`: student-1 re-completion → no XP; student-2 → level 5 (2130 XP);
+  student-3 first completion → 100 + `alicerce-solido` + mission badge `tecnica-afiada` (plus quests, `levantador-bronze`).
