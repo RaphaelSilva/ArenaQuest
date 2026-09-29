@@ -20,27 +20,38 @@
 --   * "soco" / "#soco"           -> "Oi Zuki" only through its tag (no title match)
 --   * "#faixa-amarela"           -> "9º Kyu" only through its tag
 
+-- Id map (the API validates ids as UUIDs, so these are fixed, synthetic v4-shaped values):
+--   24000000-0000-4000-8000-000000000001  topic  Karate Kihon
+--   24000000-0000-4000-8000-000000000002  topic  Graduação
+--   24000000-0000-4000-8000-000000000003  topic  Chūdan Tsuki
+--   24000000-0000-4000-8000-000000000004  topic  Kata Básica
+--   24000000-0000-4000-8000-000000000005  topic  Oi Zuki
+--   24000000-0000-4000-8000-000000000006  topic  9º Kyu
+--   24000000-0000-4000-8000-000000000101  tag    Soco
+--   24000000-0000-4000-8000-000000000102  tag    Kihon
+--   24000000-0000-4000-8000-000000000103  tag    Faixa Amarela
+--
 -- ---------------------------------------------------------------------------
 -- Topics
 -- ---------------------------------------------------------------------------
 INSERT OR IGNORE INTO topic_nodes
   (id, parent_id, title, content, status, visibility, sort_order, estimated_minutes, archived)
 VALUES
-  ('seed-topic-karate-kihon', NULL, 'Karate Kihon',
+  ('24000000-0000-4000-8000-000000000001', NULL, 'Karate Kihon',
    'Basic techniques of karate.', 'published', 'public', 1, 60, 0),
-  ('seed-topic-graduacao', NULL, 'Graduação',
+  ('24000000-0000-4000-8000-000000000002', NULL, 'Graduação',
    'Belt requirements.', 'published', 'public', 2, 30, 0);
 
 INSERT OR IGNORE INTO topic_nodes
   (id, parent_id, title, content, status, visibility, sort_order, estimated_minutes, archived)
 VALUES
-  ('seed-topic-chudan-tsuki', 'seed-topic-karate-kihon', 'Chūdan Tsuki',
+  ('24000000-0000-4000-8000-000000000003', '24000000-0000-4000-8000-000000000001', 'Chūdan Tsuki',
    'Middle-level thrust. Keep the hips square.', 'published', 'public', 1, 20, 0),
-  ('seed-topic-kata-basica', 'seed-topic-karate-kihon', 'Kata Básica',
+  ('24000000-0000-4000-8000-000000000004', '24000000-0000-4000-8000-000000000001', 'Kata Básica',
    'The first kata of the syllabus.', 'published', 'public', 2, 25, 0),
-  ('seed-topic-oi-zuki', 'seed-topic-karate-kihon', 'Oi Zuki',
+  ('24000000-0000-4000-8000-000000000005', '24000000-0000-4000-8000-000000000001', 'Oi Zuki',
    'Stepping punch. Findable only through its tag.', 'published', 'public', 3, 15, 0),
-  ('seed-topic-9-kyu', 'seed-topic-graduacao', '9º Kyu',
+  ('24000000-0000-4000-8000-000000000006', '24000000-0000-4000-8000-000000000002', '9º Kyu',
    'Requirements for the yellow belt.', 'published', 'public', 1, 30, 0);
 
 -- ---------------------------------------------------------------------------
@@ -48,17 +59,17 @@ VALUES
 -- ---------------------------------------------------------------------------
 INSERT OR IGNORE INTO tags (id, name, slug)
 VALUES
-  ('seed-tag-soco', 'Soco', 'soco'),
-  ('seed-tag-kihon', 'Kihon', 'kihon'),
-  ('seed-tag-faixa-amarela', 'Faixa Amarela', 'faixa-amarela');
+  ('24000000-0000-4000-8000-000000000101', 'Soco', 'soco'),
+  ('24000000-0000-4000-8000-000000000102', 'Kihon', 'kihon'),
+  ('24000000-0000-4000-8000-000000000103', 'Faixa Amarela', 'faixa-amarela');
 
 -- ---------------------------------------------------------------------------
 -- Topic <-> tag links
 -- ---------------------------------------------------------------------------
 INSERT OR IGNORE INTO topic_node_tags (topic_node_id, tag_id)
 VALUES
-  ('seed-topic-chudan-tsuki', 'seed-tag-kihon'),
-  ('seed-topic-chudan-tsuki', 'seed-tag-soco'),
-  ('seed-topic-kata-basica', 'seed-tag-kihon'),
-  ('seed-topic-oi-zuki', 'seed-tag-soco'),
-  ('seed-topic-9-kyu', 'seed-tag-faixa-amarela');
+  ('24000000-0000-4000-8000-000000000003', '24000000-0000-4000-8000-000000000102'),
+  ('24000000-0000-4000-8000-000000000003', '24000000-0000-4000-8000-000000000101'),
+  ('24000000-0000-4000-8000-000000000004', '24000000-0000-4000-8000-000000000102'),
+  ('24000000-0000-4000-8000-000000000005', '24000000-0000-4000-8000-000000000101'),
+  ('24000000-0000-4000-8000-000000000006', '24000000-0000-4000-8000-000000000103');
