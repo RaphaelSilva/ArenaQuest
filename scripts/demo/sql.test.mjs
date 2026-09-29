@@ -77,7 +77,7 @@ test('every statement is an upsert; nothing deletes, updates bare, or opens a tr
   assert.doesNotMatch(sql, /^\s*(DELETE|DROP|BEGIN|COMMIT|UPDATE)\b/im);
 });
 
-test('summary counts: 6 users, 6 roles, 1 group, 2 members, 21 topics, 2 tags, 2 enrollments', () => {
+test('summary counts: 6 users, 6 roles, 1 group, 2 members, 21 topics, 2 tags, 27 media, 2 enrollments', () => {
   const counts = Object.fromEntries(summary.map((row) => [row.entity, row.rows]));
   assert.deepEqual(counts, {
     users: 6,
@@ -87,6 +87,7 @@ test('summary counts: 6 users, 6 roles, 1 group, 2 members, 21 topics, 2 tags, 2
     tags: 2,
     topic_nodes: 21,
     topic_node_tags: dataset.topics.reduce((n, t) => n + t.tags.length, 0),
+    media: Object.values(dataset.media.assign).reduce((n, keys) => n + keys.length, 0),
     enrollments_user: 1,
     enrollments_user_group: 1,
   });
@@ -150,7 +151,7 @@ test('the build is deterministic for a fixed ctx, and label-scoped', () => {
 });
 
 test('sections compose in order and later tasks can append their own', () => {
-  assert.deepEqual(SECTIONS.map((s) => s.name), ['users', 'groups', 'tags', 'topics', 'enrollments']);
+  assert.deepEqual(SECTIONS.map((s) => s.name), ['users', 'groups', 'tags', 'topics', 'media', 'enrollments']);
   const extra = { name: 'extra', build: () => ({ statements: [link('x_links', { a: 'b' })], counts: { x_links: 1 } }) };
   const out = buildSeedSql(dataset, ctx, [...SECTIONS, extra]);
   assert.ok(out.sql.trimEnd().endsWith("ON CONFLICT(a) DO NOTHING;"));
