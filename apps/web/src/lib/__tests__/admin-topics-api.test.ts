@@ -52,3 +52,25 @@ describe('createAdminTopicsApi — update', () => {
     await expect(api.update('topic-abc', { visibility: 'public' })).rejects.toThrow('Not found');
   });
 });
+
+describe('createAdminTopicsApi — tags by name', () => {
+  it('passes tags through in the PATCH body', async () => {
+    const http = vi.fn().mockResolvedValueOnce(makeResponse({ jsonData: {} }));
+    const api = createAdminTopicsApi(http as unknown as HttpTransport);
+    await api.update('topic-abc', { tags: ['Chūdan', 'Kihon novo'] });
+    const [, , opts] = http.mock.calls[0];
+    const body = JSON.parse((opts as { body: string }).body);
+    expect(body.tags).toEqual(['Chūdan', 'Kihon novo']);
+    expect(body).not.toHaveProperty('tagIds');
+  });
+
+  it('passes tags through in the POST body', async () => {
+    const http = vi.fn().mockResolvedValueOnce(makeResponse({ jsonData: {} }));
+    const api = createAdminTopicsApi(http as unknown as HttpTransport);
+    await api.create({ title: 'Kata', tags: ['Chūdan'] });
+    expect(http).toHaveBeenCalledWith('POST', '/admin/topics', expect.anything());
+    const [, , opts] = http.mock.calls[0];
+    const body = JSON.parse((opts as { body: string }).body);
+    expect(body.tags).toEqual(['Chūdan']);
+  });
+});

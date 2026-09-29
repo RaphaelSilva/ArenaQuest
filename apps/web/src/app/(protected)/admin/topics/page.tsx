@@ -13,6 +13,7 @@ import type { Media } from '@web/lib/admin-media-api';
 import { MediaUploader } from '@web/components/admin/MediaUploader';
 import { useTopicMediaTarget } from '@web/components/admin/use-topic-media-target';
 import { MediaList } from '@web/components/admin/MediaList';
+import { TagCombobox, type TagChipValue } from '@web/components/admin/TagCombobox';
 import { Spinner } from '@web/components/spinner';
 import { Button, Badge } from '@web/components/design-system';
 import { useDict } from '@web/context/dict-context';
@@ -261,7 +262,7 @@ export default function AdminTopicsPage() {
   const [detailStatus, setDetailStatus] = useState<'draft' | 'published' | 'archived'>('draft');
   const [detailVisibility, setDetailVisibility] = useState<'public' | 'restricted' | 'private'>('restricted');
   const [detailMinutes, setDetailMinutes] = useState(0);
-  const [detailTagIds, setDetailTagIds] = useState('');
+  const [detailTags, setDetailTags] = useState<TagChipValue[]>([]);
   const [detailPrereqIds, setDetailPrereqIds] = useState('');
   const [detailError, setDetailError] = useState('');
   const [detailSaving, setDetailSaving] = useState(false);
@@ -298,6 +299,11 @@ export default function AdminTopicsPage() {
     if (canAccess) refresh();
   }, [canAccess, refresh]);
 
+  const searchTags = useCallback(
+    (q: string) => client.adminTags.list({ q, limit: 10 }),
+    [client],
+  );
+
   // ---------------------------------------------------------------------------
   // Active nodes (pending reorder or actual)
   // ---------------------------------------------------------------------------
@@ -317,7 +323,7 @@ export default function AdminTopicsPage() {
       setDetailStatus('draft');
       setDetailVisibility('restricted');
       setDetailMinutes(0);
-      setDetailTagIds('');
+      setDetailTags([]);
       setDetailPrereqIds('');
       setDetailMedia([]);
       return;
@@ -327,7 +333,7 @@ export default function AdminTopicsPage() {
     setDetailStatus(selectedNode.status);
     setDetailVisibility(selectedNode.visibility ?? 'restricted');
     setDetailMinutes(selectedNode.estimatedMinutes);
-    setDetailTagIds(selectedNode.tags.map((t) => t.id).join(', '));
+    setDetailTags(selectedNode.tags.map((t) => ({ name: t.name, isNew: false })));
     setDetailPrereqIds(selectedNode.prerequisiteIds.join(', '));
     
     // Load media
@@ -478,10 +484,6 @@ export default function AdminTopicsPage() {
     setDetailError('');
     setDetailSaving(true);
     try {
-      const tagIds = detailTagIds
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
       const prereqIds = detailPrereqIds
         .split(',')
         .map((s) => s.trim())
@@ -492,7 +494,7 @@ export default function AdminTopicsPage() {
         status: detailStatus,
         visibility: detailVisibility,
         estimatedMinutes: detailMinutes,
-        tagIds,
+        tags: detailTags.map((t) => t.name),
         prerequisiteIds: prereqIds,
       });
       await refresh();
@@ -948,21 +950,19 @@ export default function AdminTopicsPage() {
 
               <div>
                 <label htmlFor="dp-tags" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  {d.detail.tagIdsLabel} <span className="font-normal text-zinc-400">{d.detail.tagIdsHint}</span>
+                  {d.detail.tagsLabel}
                 </label>
-                <input
+                <TagCombobox
                   id="dp-tags"
-                  type="text"
-                  value={detailTagIds}
-                  onChange={(e) => setDetailTagIds(e.target.value)}
-                  placeholder={d.detail.tagIdsPlaceholder}
-                  className="w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+                  value={detailTags}
+                  onChange={setDetailTags}
+                  searchTags={searchTags}
                 />
               </div>
 
               <div>
                 <label htmlFor="dp-prereqs" className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  {d.detail.prereqIdsLabel} <span className="font-normal text-zinc-400">{d.detail.tagIdsHint}</span>
+                  {d.detail.prereqIdsLabel} <span className="font-normal text-zinc-400">{d.detail.prereqIdsHint}</span>
                 </label>
                 <input
                   id="dp-prereqs"
