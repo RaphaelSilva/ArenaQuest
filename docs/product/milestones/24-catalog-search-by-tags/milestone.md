@@ -1,4 +1,4 @@
-# Milestone 23 — Catalog search by tags
+# Milestone 24 — Catalog search by tags
 
 **Status:** 📝 Draft
 **Scope:** `packages/shared` (text normaliser, tag slugify, `ITagRepository.list` filter), `apps/api` (tag authoring on admin topics, `GET /v1/admin/tags`), `apps/web` (catalog sidebar matcher, `?tag=` filter, tag chips, admin tag combobox), `scripts/content` (README `tags` key). Derived from [RFC 0017](../../RFCs/0017-catalog-search-by-tags.md).
@@ -129,7 +129,7 @@ become searchable), so they can reach `main` before the authoring half. `02` cha
 `upsertMany` semantics and adds request fields but no response change, so it is safe
 to deploy ahead of `05`.
 
-Each task is intended to land as an independent PR into the `feature/m23/candidate`
+Each task is intended to land as an independent PR into the `feature/m24/candidate`
 branch with `make lint`, `make test-api`, and `make test-web` passing.
 
 ---
@@ -143,7 +143,7 @@ branch with `make lint`, `make test-api`, and `make test-web` passing.
 5. **`admin` and `content_creator` both create tags** — no role split on the vocabulary. *(owner, 2026-09-29)*
 6. **Client-side search over the existing payload** — `GET /v1/topics` already carries tags (bulk-loaded, no N+1); no new read endpoint for students. *(RFC Design §2, Alternatives)*
 7. **No migration** — the `tags` / `topic_node_tags` schema from `0005` is sufficient; this milestone stays out of the `0028` contention between RFC 0015 and RFC 0016. *(recorded at scaffolding, 2026-09-29)*
-8. **Milestone numbered 23** — next after M22 (RFC 0015). *(recorded at scaffolding, 2026-09-29)*
+8. **Milestone numbered 24** — M23 is already claimed by in-flight planning branches (RFC 0018 admin storage browser, RFC 0020 student submissions). *(recorded at scaffolding, 2026-09-29)*
 
 ---
 
