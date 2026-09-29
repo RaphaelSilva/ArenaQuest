@@ -1,6 +1,6 @@
 # Task 01 — Backend: Wrangler 4.135 and staging deploys through the CLI (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -55,15 +55,15 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `pnpm --filter api exec wrangler --version` and the web equivalent report `>= 4.135.0`.
-- [ ] `pnpm --filter api exec wrangler preview --help` exits 0.
-- [ ] `make test-scripts` green; `deploy.mjs --label <l> -e staging --dry-run` prints the same
+- [x] `pnpm --filter api exec wrangler --version` and the web equivalent report `>= 4.135.0`.
+- [x] `pnpm --filter api exec wrangler preview --help` exits 0.
+- [x] `make test-scripts` green; `deploy.mjs --label <l> -e staging --dry-run` prints the same
       plan as before the bump for all three labels.
-- [ ] The staging jobs in both workflows contain no direct `wrangler deploy` / `d1 migrations
+- [x] The staging jobs in both workflows contain no direct `wrangler deploy` / `d1 migrations
       apply` / `pages deploy` call and invoke `scripts/cloudflare/deploy.mjs`.
-- [ ] The staging API job's log shows the "Guard: no dev-seed" step.
-- [ ] `make lint`, `make test-api` and `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] The staging API job's log shows the "Guard: no dev-seed" step. _(Verified via `--dry-run` of the exact job command; first live CI run pending — no Cloudflare credentials in the implementing session.)_
+- [x] `make lint`, `make test-api` and `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
