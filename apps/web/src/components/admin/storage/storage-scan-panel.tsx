@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Spinner } from '@web/components/spinner';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
 import type { ClassifiedObject, StorageMissingObject } from '@web/lib/admin-storage-api';
+import { StorageDeleteButton } from './storage-delete-action';
 import { StorageOwnerCell } from './storage-owner-cell';
 import { StorageStatusBadge } from './storage-status-badge';
 import { HINT_KEY, STATUS_KEY, formatBytes } from './storage-format';
@@ -30,19 +31,31 @@ const missingBytes = (row: StorageMissingObject): number =>
 const BUTTON =
   'inline-flex items-center gap-2 rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800';
 
+/** Lets the page keep the orphan results in step with a delete made anywhere. */
+export type StorageScanHandle = {
+  /** Drops a deleted object; its group count, bytes and the reclaimable total drop with it. */
+  removeObject: (key: string) => void;
+  /** Re-files an object under the classification the server just returned. */
+  replaceObject: (object: ClassifiedObject) => void;
+};
+
 export type StorageScanPanelProps = {
   selectedKey: string | null;
   /** Opens the Task 04 detail drawer for this key. */
   onSelectObject: (key: string) => void;
+  /** Opens the delete confirmation for an `orphan` / `deleted-row` result. */
+  onDeleteObject?: (object: ClassifiedObject) => void;
+  ref?: Ref<StorageScanHandle>;
 };
 
 /**
  * Whole-bucket audit, driven page by page from the browser (RFC 0018 §5):
  * "Scan for orphans" walks `/audit`, "Check for missing files" walks
  * `/audit/missing`. Only one scan runs at a time; starting one discards the
- * other's results. Read-only — nothing here deletes or changes a row.
+ * other's results. The only write is the per-object *Delete* on `orphan` /
+ * `deleted-row` results, which the page confirms and the server re-checks.
  */
-export function StorageScanPanel({ selectedKey, onSelectObject }: StorageScanPanelProps) {
+export function StorageScanPanel({ selectedKey, onSelectObject, onDeleteObject, ref }: StorageScanPanelProps) {
   const d = useDict().adminStorage.scan;
   const client = useApiClient();
   const [mode, setMode] = useState<Mode | null>(null);
@@ -64,6 +77,16 @@ export function StorageScanPanel({ selectedKey, onSelectObject }: StorageScanPan
 
   const orphans = useStorageScan(fetchOrphans);
   const missing = useStorageScan(fetchMissing);
+  const { updateItems } = orphans;
+  useImperativeHandle(
+    ref,
+    () => ({
+      removeObject: (key) => updateItems((items) => items.filter((o) => o.key !== key)),
+      replaceObject: (object) => updateItems((items) => items.map((o) => (o.key === object.key ? object : o))),
+    }),
+    [updateItems],
+  );
+
   const active = mode === 'missing' ? missing : mode === 'orphans' ? orphans : null;
   const running = active?.status === 'running';
 
@@ -170,6 +193,7 @@ export function StorageScanPanel({ selectedKey, onSelectObject }: StorageScanPan
           finished={orphans.status === 'done'}
           selectedKey={selectedKey}
           onSelectObject={onSelectObject}
+          onDeleteObject={onDeleteObject}
         />
       )}
       {mode === 'missing' && missing.status !== 'idle' && (
@@ -184,11 +208,13 @@ function OrphanResults({
   finished,
   selectedKey,
   onSelectObject,
+  onDeleteObject,
 }: {
   objects: ClassifiedObject[];
   finished: boolean;
   selectedKey: string | null;
   onSelectObject: (key: string) => void;
+  onDeleteObject?: (object: ClassifiedObject) => void;
 }) {
   const d = useDict().adminStorage;
 
@@ -245,9 +271,12 @@ function OrphanResults({
                 >
                   {object.key}
                 </button>
-                <span className="shrink-0 text-xs text-zinc-600 dark:text-zinc-400">
-                  {formatBytes(object.size)}
-                  {object.hint && <> · {d.hint[HINT_KEY[object.hint]]}</>}
+                <span className="flex shrink-0 flex-wrap items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                  <span>
+                    {formatBytes(object.size)}
+                    {object.hint && <> · {d.hint[HINT_KEY[object.hint]]}</>}
+                  </span>
+                  {onDeleteObject && <StorageDeleteButton object={object} onDelete={onDeleteObject} compact />}
                 </span>
               </li>
             ))}

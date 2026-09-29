@@ -115,8 +115,16 @@ export function useStorageScan<T>(fetchPage: ScanPageFetcher<T>) {
     setState(idle);
   }, [halt]);
 
+  /**
+   * Rewrites the accumulated results in place (a deleted object dropped, a
+   * refused one re-classified). The run, its cursor and `scanned` are untouched.
+   */
+  const updateItems = useCallback((update: (items: T[]) => T[]) => {
+    setState((current) => ({ ...current, items: update(current.items) }));
+  }, []);
+
   // Leaving the page stops the run.
   useEffect(() => halt, [halt]);
 
-  return { ...state, start, stop, retry, reset };
+  return { ...state, start, stop, retry, reset, updateItems };
 }
