@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { loadDataset, renderTopicMarkdown } from './dataset.mjs';
+import { readGamificationReference } from './gamification.mjs';
 import { demoEmail, demoId } from './ids.mjs';
 import { loadSanitizeMarkdown } from './seed-demo.mjs';
 import {
@@ -21,6 +22,8 @@ import {
 } from './sql.mjs';
 
 const HASH = 'pbkdf2:100000:00000000000000000000000000000000:' + 'a'.repeat(64);
+const NOW = new Date('2026-09-29T10:00:00Z');
+const GAMIFICATION = readGamificationReference();
 const dataset = loadDataset('budo');
 const sanitizeMarkdown = await loadSanitizeMarkdown();
 const ctx = demoContext({
@@ -28,6 +31,8 @@ const ctx = demoContext({
   passwordHash: HASH,
   sanitizeMarkdown,
   renderMarkdown: (title) => renderTopicMarkdown(title),
+  now: NOW,
+  gamification: GAMIFICATION,
 });
 const { sql, statements, summary } = buildSeedSql(dataset, ctx);
 const into = (table) => statements.filter((s) => s.startsWith(`INSERT INTO ${table} `));
@@ -77,7 +82,7 @@ test('every statement is an upsert; nothing deletes, updates bare, or opens a tr
   assert.doesNotMatch(sql, /^\s*(DELETE|DROP|BEGIN|COMMIT|UPDATE)\b/im);
 });
 
-test('summary counts: 6 users, 6 roles, 1 group, 2 members, 21 topics, 2 tags, 27 media, 2 enrollments', () => {
+test('summary counts: 6 users, 6 roles, 1 group, 2 members, 21 topics, 2 tags, 27 media, 2 enrollments, gamification', () => {
   const counts = Object.fromEntries(summary.map((row) => [row.entity, row.rows]));
   assert.deepEqual(counts, {
     users: 6,
@@ -90,6 +95,13 @@ test('summary counts: 6 users, 6 roles, 1 group, 2 members, 21 topics, 2 tags, 2
     media: Object.values(dataset.media.assign).reduce((n, keys) => n + keys.length, 0),
     enrollments_user: 1,
     enrollments_user_group: 1,
+    topic_progress: 3,
+    xp_events: 7,
+    user_badges: 3,
+    user_xp: 2,
+    user_streak: 1,
+    quest_progress: 1,
+    missions: 1,
   });
   for (const [table, rows] of Object.entries(counts)) assert.equal(into(table).length, rows, table);
 });
@@ -127,6 +139,8 @@ test('topic content is the sample rendered with the title and passed through san
     passwordHash: HASH,
     sanitizeMarkdown,
     renderMarkdown: (title) => `# ${title}\n<script>alert(1)</script>[x](javascript:alert(1))`,
+    now: NOW,
+    gamification: GAMIFICATION,
   });
   const hostileSql = buildSeedSql(dataset, hostile).sql;
   assert.doesNotMatch(hostileSql, /<script>|javascript:/);
@@ -146,12 +160,12 @@ test('enrollments: group grant on Root 2, user grant on Root 3, granted by the d
 
 test('the build is deterministic for a fixed ctx, and label-scoped', () => {
   assert.equal(buildSeedSql(dataset, ctx).sql, sql);
-  const other = demoContext({ label: 'spaziord', passwordHash: HASH, sanitizeMarkdown, renderMarkdown: (t) => t });
+  const other = demoContext({ label: 'spaziord', passwordHash: HASH, sanitizeMarkdown, renderMarkdown: (t) => t, now: NOW, gamification: GAMIFICATION });
   assert.doesNotMatch(buildSeedSql(loadDataset('spaziord'), other).sql, new RegExp(demoId('budo', 'user', 'admin')));
 });
 
 test('sections compose in order and later tasks can append their own', () => {
-  assert.deepEqual(SECTIONS.map((s) => s.name), ['users', 'groups', 'tags', 'topics', 'media', 'enrollments']);
+  assert.deepEqual(SECTIONS.map((s) => s.name), ['users', 'groups', 'tags', 'topics', 'media', 'enrollments', 'gamification']);
   const extra = { name: 'extra', build: () => ({ statements: [link('x_links', { a: 'b' })], counts: { x_links: 1 } }) };
   const out = buildSeedSql(dataset, ctx, [...SECTIONS, extra]);
   assert.ok(out.sql.trimEnd().endsWith("ON CONFLICT(a) DO NOTHING;"));
