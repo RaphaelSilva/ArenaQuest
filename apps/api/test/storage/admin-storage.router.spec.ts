@@ -1,7 +1,10 @@
 import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi, afterEach } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
+import { buildContainer } from '@api/container';
+import { AdminStorageController } from '@api/controllers/admin-storage.controller';
+import { ORPHAN_GRACE_MS } from '@arenaquest/shared/domain/storage';
 import { applyMigrations } from '../helpers/apply-migrations';
 import { v1 } from '../helpers/v1';
 
@@ -11,7 +14,9 @@ import { v1 } from '../helpers/v1';
  * Covers what only the full stack can: the admin-only role matrix on every
  * route, query validation, and the resolver + classification wired end to
  * end. The 24 h `stale` flag needs a back-dated object and is covered in the
- * controller spec.
+ * controller spec. A miniflare R2 object cannot be back-dated either, so the
+ * `DELETE /object` success path runs the controller over the real D1 + R2
+ * adapters with a clock moved 25 h ahead instead.
  */
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
@@ -91,15 +96,18 @@ beforeAll(async () => {
   ]);
 });
 
-async function get(path: string, token: string | null = adminToken): Promise<Response> {
+async function send(method: 'GET' | 'DELETE', path: string, token: string | null = adminToken): Promise<Response> {
   const headers: Record<string, string> = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const request = new IncomingRequest(`http://example.com${v1(`/admin/storage${path}`)}`, { headers });
+  const request = new IncomingRequest(`http://example.com${v1(`/admin/storage${path}`)}`, { method, headers });
   const ctx = createExecutionContext();
   const res = await worker.fetch(request, env as AppEnv, ctx);
   await waitOnExecutionContext(ctx);
   return res;
 }
+
+const get = (path: string, token: string | null = adminToken) => send('GET', path, token);
+const del = (path: string, token: string | null = adminToken) => send('DELETE', path, token);
 
 async function jsonOf<T>(res: Response, expected = 200): Promise<T> {
   if (res.status !== expected) throw new Error(`expected ${expected}, got ${res.status}: ${await res.text()}`);
@@ -229,5 +237,117 @@ describe('GET /audit/missing', () => {
   it('rejects a malformed cursor with 400 and a limit above 50', async () => {
     expect((await get('/audit/missing?cursor=not-a-cursor')).status).toBe(400);
     expect((await get('/audit/missing?limit=51')).status).toBe(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /object (Task 06)
+// ---------------------------------------------------------------------------
+
+/** Every row of every table an object key can point at — compared around each delete. */
+async function dbSnapshot() {
+  const tables = ['media', 'events', 'topic_nodes', 'users'] as const;
+  const out: Record<string, unknown[]> = {};
+  for (const t of tables) {
+    out[t] = (await env.DB.prepare(`SELECT * FROM ${t} ORDER BY id`).all()).results;
+  }
+  return out;
+}
+
+/** DELETE through the full worker and assert no D1 row changed. */
+async function delUnchanged(path: string, token: string | null = adminToken): Promise<Response> {
+  const before = await dbSnapshot();
+  const res = await del(path, token);
+  expect(await dbSnapshot()).toEqual(before);
+  return res;
+}
+
+const objectPath = (k: string) => `/object?key=${encodeURIComponent(k)}`;
+
+describe('DELETE /object - role matrix', () => {
+  it('401 without a token, 403 for content_creator and student; the object stays', async () => {
+    expect((await delUnchanged(objectPath(key.rowGone), null)).status).toBe(401);
+    expect((await delUnchanged(objectPath(key.rowGone), creatorToken)).status).toBe(403);
+    expect((await delUnchanged(objectPath(key.rowGone), studentToken)).status).toBe(403);
+    expect(await env.R2.head(key.rowGone)).not.toBeNull();
+  });
+});
+
+describe('DELETE /object', () => {
+  type Conflict = { error: string; reason: string; object: Obj };
+
+  it.each([
+    ['linked media', 'linked', 'linked', 'not-deletable-status'],
+    ['linked flyer', 'flyer', 'linked', 'not-deletable-status'],
+    ['pending upload', 'pending', 'pending', 'not-deletable-status'],
+    ['displaced flyer', 'displaced', 'displaced', 'not-deletable-status'],
+    ['fresh orphan', 'rowGone', 'orphan', 'within-grace-window'],
+    ['fresh deleted-row', 'deletedRow', 'deleted-row', 'within-grace-window'],
+  ] as const)('409 for a %s, with the current classification; object and rows unchanged', async (_, name, status, reason) => {
+    const body = await jsonOf<Conflict>(await delUnchanged(objectPath(key[name])), 409);
+    expect(body).toMatchObject({ error: 'StorageObjectNotDeletable', reason, object: { key: key[name], status } });
+    expect(await env.R2.head(key[name])).not.toBeNull();
+  });
+
+  it('404 for an absent key, 400 without a key', async () => {
+    const body = await jsonOf<{ error: string }>(await delUnchanged(objectPath('topics/nope/x.pdf')), 404);
+    expect(body).toEqual({ error: 'NotFound' });
+    expect((await delUnchanged('/object')).status).toBe(400);
+  });
+});
+
+describe('AdminStorageController.deleteObject over real D1 + R2, 25 h later', () => {
+  const HOUR = 60 * 60 * 1000;
+  const oldOrphan = `topics/${TOPIC}/${crypto.randomUUID()}-old-stray.pdf`;
+  const oldDeletedRow = `topics/${TOPIC}/${crypto.randomUUID()}-old-removed.pdf`;
+  let controller: AdminStorageController;
+
+  beforeAll(async () => {
+    await insertMedia(oldDeletedRow, 'deleted', 'Old Removed.pdf');
+    await env.R2.put(oldOrphan, 'stray-bytes');
+    await env.R2.put(oldDeletedRow, 'removed');
+    const container = buildContainer(env as AppEnv);
+    controller = new AdminStorageController(
+      container.content.storage,
+      container.content.storageReferences,
+      () => Date.now() + ORPHAN_GRACE_MS + HOUR,
+    );
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('removes an old orphan, logs one audit line, changes no row', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const before = await dbSnapshot();
+
+    const res = await controller.deleteObject(oldOrphan, ADMIN_ID);
+
+    expect(res).toEqual({ ok: true, data: { deleted: true, key: oldOrphan, size: 11, status: 'orphan' } });
+    expect(await env.R2.head(oldOrphan)).toBeNull();
+    expect(await dbSnapshot()).toEqual(before);
+    const lines = info.mock.calls.map(([l]) => JSON.parse(String(l)));
+    expect(lines).toMatchObject([{ event: 'storage.orphan.deleted', actor: ADMIN_ID, key: oldOrphan, size: 11 }]);
+  });
+
+  it('removes an old deleted-row object and leaves its media row deleted', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    const before = await dbSnapshot();
+
+    const res = await controller.deleteObject(oldDeletedRow, ADMIN_ID);
+
+    expect(res).toMatchObject({ ok: true, data: { key: oldDeletedRow, status: 'deleted-row' } });
+    expect(await env.R2.head(oldDeletedRow)).toBeNull();
+    expect(await dbSnapshot()).toEqual(before);
+    const row = await env.DB.prepare('SELECT status FROM media WHERE storage_key = ?').bind(oldDeletedRow).first();
+    expect(row).toEqual({ status: 'deleted' });
+  });
+
+  it('still refuses a linked object 25 h later', async () => {
+    expect(await controller.deleteObject(key.linked, ADMIN_ID)).toMatchObject({
+      ok: false,
+      status: 409,
+      meta: { reason: 'not-deletable-status' },
+    });
+    expect(await env.R2.head(key.linked)).not.toBeNull();
   });
 });

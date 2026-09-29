@@ -256,6 +256,21 @@ export const StorageObjectDetailSchema = ClassifiedObjectSchema.extend({
   downloadUrlExpiresAt: z.string().openapi({ example: '2026-09-29T12:05:00.000Z' }),
 }).openapi('StorageObjectDetail');
 
+export const StorageDeleteResponseSchema = z.object({
+  deleted: z.literal(true),
+  key: z.string(),
+  size: z.number().int(),
+  status: z.enum(['orphan', 'deleted-row']).openapi({ description: 'Classification the object had when it was removed.' }),
+}).openapi('StorageDeleteResponse');
+
+export const StorageDeleteConflictSchema = z.object({
+  error: z.literal('StorageObjectNotDeletable'),
+  reason: z.enum(['not-deletable-status', 'within-grace-window']).openapi({
+    description: '`not-deletable-status`: not `orphan` / `deleted-row`. `within-grace-window`: uploaded less than 24 h ago.',
+  }),
+  object: ClassifiedObjectSchema.openapi({ description: 'The classification read during this request.' }),
+}).openapi('StorageDeleteConflict');
+
 export const StorageAuditResponseSchema = z.object({
   objects: z.array(ClassifiedObjectSchema).openapi({ description: 'Only the non-`linked` objects of the page.' }),
   scanned: z.number().int().openapi({ description: 'Number of keys walked for this page.' }),

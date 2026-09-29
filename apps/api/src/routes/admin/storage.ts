@@ -12,6 +12,8 @@ import {
   StorageAuditMissingResponseSchema,
   StorageAuditResponseSchema,
   StorageBrowseResponseSchema,
+  StorageDeleteConflictSchema,
+  StorageDeleteResponseSchema,
   StorageObjectDetailSchema,
 } from '@api/openapi/components/entities';
 import type { AppContainer } from '@api/container';
@@ -20,7 +22,8 @@ import type { AppContainer } from '@api/container';
  * `/v1/admin/storage` — the admin storage browser and orphan audit (RFC 0018).
  *
  * HTTP only: parse, guard, shape. Classification lives in
- * `AdminStorageController`. Read-only — Task 06 adds the only write.
+ * `AdminStorageController`. The only write is `DELETE /object` (Task 06),
+ * which removes a storage object and never touches a DB row.
  */
 
 const common = { tags: ['admin:storage'], security: [{ bearerAuth: [] }] };
@@ -64,21 +67,39 @@ export const browseStorageRoute = createRoute({
   responses: { 200: json('One folder page', StorageBrowseResponseSchema), ...ERROR_RESPONSES },
 });
 
+const ObjectKeyQuery = z.object({
+  key: z.string().min(1).max(1024).openapi({ example: 'topics/3f2c…/9a1b…-lesson.pdf' }),
+});
+
 export const getStorageObjectRoute = createRoute({
   ...common,
   method: 'get',
   path: '/object',
   summary: 'Inspect one stored object',
   description: 'Head, references, classification and a presigned download URL valid for 5 minutes.',
-  request: {
-    query: z.object({
-      key: z.string().min(1).max(1024).openapi({ example: 'topics/3f2c…/9a1b…-lesson.pdf' }),
-    }),
-  },
+  request: { query: ObjectKeyQuery },
   responses: {
     200: json('Object detail', StorageObjectDetailSchema),
     ...ERROR_RESPONSES,
     404: { description: 'No object under that key' },
+  },
+});
+
+export const deleteStorageObjectRoute = createRoute({
+  ...common,
+  method: 'delete',
+  path: '/object',
+  summary: 'Delete an orphaned object',
+  description:
+    'Re-classifies the key at request time and removes the object only when it is `orphan` or `deleted-row` '
+    + 'and was uploaded more than 24 h ago. Anything else answers `409` with the current classification and '
+    + 'leaves the object in place. Storage only: no database row is changed.',
+  request: { query: ObjectKeyQuery },
+  responses: {
+    200: json('Object removed', StorageDeleteResponseSchema),
+    ...ERROR_RESPONSES,
+    404: { description: 'No object under that key' },
+    409: json('Not safe to delete right now', StorageDeleteConflictSchema),
   },
 });
 
@@ -139,6 +160,12 @@ export function buildAdminStorageRouter(container: AppContainer) {
 
   router.openapi(getStorageObjectRoute, async (c) => {
     const result = await controller.object(c.req.valid('query').key);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(deleteStorageObjectRoute, async (c) => {
+    const result = await controller.deleteObject(c.req.valid('query').key, c.get('user').sub);
     if (!result.ok) return respondWith(c, result);
     return c.json(result.data, 200);
   });

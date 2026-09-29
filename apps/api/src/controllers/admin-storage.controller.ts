@@ -13,6 +13,7 @@ import type {
   StorageAuditMissingResponseSchema,
   StorageAuditResponseSchema,
   StorageBrowseResponseSchema,
+  StorageDeleteResponseSchema,
   StorageFolderSchema,
   StorageObjectDetailSchema,
   StorageReferenceSchema,
@@ -44,6 +45,13 @@ export type StorageBrowseDto = z.infer<typeof StorageBrowseResponseSchema>;
 export type StorageObjectDetailDto = z.infer<typeof StorageObjectDetailSchema>;
 export type StorageAuditDto = z.infer<typeof StorageAuditResponseSchema>;
 export type StorageAuditMissingDto = z.infer<typeof StorageAuditMissingResponseSchema>;
+export type StorageDeleteDto = z.infer<typeof StorageDeleteResponseSchema>;
+
+/** Only these may be removed, and only once past the grace window (M25 Task 06). */
+const DELETABLE_STATUSES: ReadonlySet<StorageStatus> = new Set(['orphan', 'deleted-row']);
+
+/** Why a delete was refused — carried on the `409` next to the current classification. */
+export type DeleteRefusalReason = 'not-deletable-status' | 'within-grace-window';
 
 export const BROWSE_DEFAULT_LIMIT = 100;
 export const AUDIT_MAX_LIMIT = 1000;
@@ -250,6 +258,46 @@ export class AdminStorageController {
         ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}),
       },
     };
+  }
+
+  /**
+   * The milestone's only write (M25 Task 06). Re-reads the head and
+   * re-classifies the key inside this request — never trusts what the client
+   * last saw — and removes the object only when it is `orphan` or
+   * `deleted-row` **and** older than `ORPHAN_GRACE_MS`. Storage only: no DB
+   * row is touched, not even the soft-deleted `media` row of a `deleted-row`.
+   */
+  async deleteObject(key: string, actorId: string): Promise<ControllerResult<StorageDeleteDto>> {
+    const head = await this.storage.headObject(key);
+    if (!head) return { ok: false, status: 404, error: 'NotFound' };
+
+    const { objects } = await this.classifyAll([head]);
+    const object = objects[0];
+
+    let reason: DeleteRefusalReason | null = null;
+    if (!DELETABLE_STATUSES.has(object.status)) reason = 'not-deletable-status';
+    else if (this.clock() - head.lastModified.getTime() <= ORPHAN_GRACE_MS) reason = 'within-grace-window';
+    if (reason) {
+      return { ok: false, status: 409, error: 'StorageObjectNotDeletable', meta: { reason, object } };
+    }
+
+    const status = object.status as StorageDeleteDto['status'];
+    await this.storage.deleteObject(key);
+
+    // One structured line, fixed event name; the key is a JSON value, never a
+    // format template.
+    console.info(
+      JSON.stringify({
+        event: 'storage.orphan.deleted',
+        actor: actorId,
+        key,
+        size: head.size,
+        status,
+        at: new Date(this.clock()).toISOString(),
+      }),
+    );
+
+    return { ok: true, data: { deleted: true, key, size: head.size, status } };
   }
 
   /**

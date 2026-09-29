@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   AdminStorageController,
   classifyObject,
@@ -85,7 +85,9 @@ class FakeStorage implements IStorageAdapter {
 
   putObject = vi.fn();
   getObject = vi.fn();
-  deleteObject = vi.fn();
+  deleteObject = vi.fn(async (key: string) => {
+    this.objects.delete(key);
+  });
   deleteObjects = vi.fn();
   getPresignedUploadUrl = vi.fn();
   getPublicUrl = vi.fn();
@@ -385,5 +387,123 @@ describe('AdminStorageController.auditMissing', () => {
   it('maps an invalid reference cursor to 400', async () => {
     const { controller } = fixtures();
     expect(await controller.auditMissing({ cursor: 'bad' })).toMatchObject({ ok: false, status: 400, error: 'InvalidCursor' });
+  });
+});
+
+describe('AdminStorageController.deleteObject', () => {
+  const ADMIN = 'admin-1';
+  const OLD = ORPHAN_GRACE_MS + HOUR; // 25 h
+
+  afterEach(() => vi.restoreAllMocks());
+
+  /** Every `storage.orphan.deleted` line logged through `console.info`. */
+  function auditLines(spy: ReturnType<typeof vi.spyOn>) {
+    return spy.mock.calls
+      .map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+      .filter((l) => l.event === 'storage.orphan.deleted');
+  }
+
+  it.each([
+    ['linked media', 'linkedMedia', 'linked'],
+    ['linked flyer', 'linkedFlyer', 'linked'],
+    ['pending upload', 'pending', 'pending'],
+    ['stale pending upload', 'stalePending', 'pending'],
+    ['displaced flyer', 'displaced', 'displaced'],
+  ] as const)('refuses a %s with 409 and the current classification, keeping the object', async (_, name, status) => {
+    const { controller, storage, k } = fixtures();
+    storage.put(k[name], OLD); // old enough — the status alone must refuse
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+    const res = await controller.deleteObject(k[name], ADMIN);
+
+    expect(res).toMatchObject({
+      ok: false,
+      status: 409,
+      error: 'StorageObjectNotDeletable',
+      meta: { reason: 'not-deletable-status', object: { key: k[name], status } },
+    });
+    expect(storage.objects.has(k[name])).toBe(true);
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+    expect(auditLines(info)).toHaveLength(0);
+  });
+
+  it.each([
+    ['orphan uploaded 1 hour ago', 'rowGone', 'orphan', HOUR],
+    ['deleted-row uploaded 1 hour ago', 'deletedRow', 'deleted-row', HOUR],
+    ['orphan exactly at the grace boundary', 'rowGone', 'orphan', ORPHAN_GRACE_MS],
+  ] as const)('refuses an %s with 409 within-grace-window', async (_, name, status, age) => {
+    const { controller, storage, k } = fixtures();
+    storage.put(k[name], age);
+
+    const res = await controller.deleteObject(k[name], ADMIN);
+
+    expect(res).toMatchObject({
+      ok: false,
+      status: 409,
+      meta: { reason: 'within-grace-window', object: { key: k[name], status } },
+    });
+    expect(storage.objects.has(k[name])).toBe(true);
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('deletes an orphan uploaded 25 hours ago and logs exactly one audit line', async () => {
+    const { controller, storage, k } = fixtures();
+    storage.put(k.rowGone, OLD);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+    const res = await controller.deleteObject(k.rowGone, ADMIN);
+
+    expect(res).toEqual({ ok: true, data: { deleted: true, key: k.rowGone, size: 10, status: 'orphan' } });
+    expect(storage.objects.has(k.rowGone)).toBe(false);
+    expect(storage.deleteObject).toHaveBeenCalledTimes(1);
+    expect(storage.deleteObject).toHaveBeenCalledWith(k.rowGone);
+    expect(info).toHaveBeenCalledTimes(1);
+    const lines = auditLines(info);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toEqual({
+      event: 'storage.orphan.deleted',
+      actor: ADMIN,
+      key: k.rowGone,
+      size: 10,
+      status: 'orphan',
+      at: new Date(NOW).toISOString(),
+    });
+    expect(storage.getPresignedDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it('deletes an unknown-shape and an owner-gone orphan past the grace window', async () => {
+    const { controller, storage, k } = fixtures();
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    for (const name of ['unknown', 'topicGone', 'eventGone'] as const) {
+      storage.put(k[name], OLD);
+      expect(await controller.deleteObject(k[name], ADMIN)).toMatchObject({ ok: true, data: { status: 'orphan' } });
+      expect(storage.objects.has(k[name])).toBe(false);
+    }
+  });
+
+  it('deletes a deleted-row object older than 24 h', async () => {
+    const { controller, storage, refs, k } = fixtures();
+    storage.put(k.deletedRow, OLD);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const refsBefore = structuredClone(refs.refs);
+
+    const res = await controller.deleteObject(k.deletedRow, ADMIN);
+
+    expect(res).toMatchObject({ ok: true, data: { deleted: true, key: k.deletedRow, status: 'deleted-row' } });
+    expect(storage.objects.has(k.deletedRow)).toBe(false);
+    expect(refs.refs).toEqual(refsBefore);
+    expect(auditLines(info)).toMatchObject([{ key: k.deletedRow, actor: ADMIN, status: 'deleted-row' }]);
+  });
+
+  it('returns 404 for an absent key without deleting or logging', async () => {
+    const { controller, storage } = fixtures();
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    expect(await controller.deleteObject('topics/nope/x.pdf', ADMIN)).toMatchObject({
+      ok: false,
+      status: 404,
+      error: 'NotFound',
+    });
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+    expect(auditLines(info)).toHaveLength(0);
   });
 });
