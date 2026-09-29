@@ -2,6 +2,7 @@
 
 **Date:** 2026-09-29
 **Status:** Draft
+**Revised:** 2026-09-29
 **Author:** raphaelsilva
 **Affected:**
 - `packages/shared/domain/search/normalize.ts` (new — the one text normaliser: case, diacritics, dashes, whitespace; used by search *and* tag slugs)
@@ -80,7 +81,7 @@ an empty field.
 
 **Non-Goals**
 - **Full-text search over topic `content`** (Markdown bodies). Different cost profile
-  (payload size, ranking) — see *Alternatives* and *Open Questions*.
+  (payload size, ranking) — see *Alternatives* and Resolved Decision 3.
 - **Server-side search endpoint / FTS5.** Not needed at the current catalog size; the
   matcher is written so it could move behind an endpoint later without changing its
   semantics.
@@ -89,7 +90,7 @@ an empty field.
 - **Tag administration screen** (rename, merge, delete tags). The combobox covers
   creation and reuse; curating the vocabulary is a later backlog item.
 - **Tag inheritance** (a tag on a parent implicitly tagging its children). The tree
-  already surfaces a matching parent; see *Open Questions*.
+  already surfaces a matching parent; see Resolved Decision 2.
 - Searching tasks, events or media.
 
 ## Current State (for reference)
@@ -193,13 +194,15 @@ as for title hits.
   chars each, at most 20 per topic. The controller slugifies them, drops duplicates by
   slug, calls `ITagRepository.upsertMany`, and passes the resulting IDs to the
   repository. `upsertMany` already does `ON CONFLICT(slug) DO UPDATE SET name`, so
-  typing `Chūdan` for an existing `chudan` tag reuses it.
-  *Decision needed*: `DO UPDATE SET name` means the last spelling wins; the RFC proposes
-  changing it to `DO NOTHING` so an existing tag's display name is stable (see
-  *Open Questions*).
+  typing `Chūdan` for an existing `chudan` tag reuses it. `upsertMany` changes from
+  `ON CONFLICT(slug) DO UPDATE SET name` to `DO NOTHING`: the **first spelling wins**
+  and an existing tag's display name never changes as a side effect of tagging a topic
+  (Resolved Decision 1). Renaming belongs to the deferred tag-administration screen.
 - `tagIds` stays accepted for compatibility; `tags` and `tagIds` together is a `400`.
   Unknown `tagIds` now return `422 UNKNOWN_TAG` (mirroring `UNKNOWN_PREREQ`) instead of
   a foreign-key failure.
+- Both `admin` and `content_creator` may create tags through this field (Resolved
+  Decision 5).
 - New `GET /v1/admin/tags?q=&limit=` (roles `admin`, `content_creator`), backed by
   `ITagRepository.list` plus a slug-prefix filter, feeds the combobox. The port gains
   an optional `q` in `list(opts)`.
@@ -262,7 +265,7 @@ RFC 0016; this RFC deliberately does not add to that contention.)
   Slugification catches case/accent variants; genuine synonyms need the (deferred)
   merge screen. Showing existing tags first in the combobox is the main defence.
 - **Name drift.** With the current `DO UPDATE SET name`, any admin re-typing a tag
-  silently renames it for everyone. Hence the proposed switch to `DO NOTHING`.
+  silently renames it for everyone. Hence the switch to `DO NOTHING`.
 - **Tags are only as good as the authoring.** The benefit arrives when the content is
   tagged — step 3 (importer) is what makes that cheap for an existing tree.
 
@@ -281,20 +284,27 @@ RFC 0016; this RFC deliberately does not add to that contention.)
 - A student cannot find, by tag, a topic they cannot open (enrollment test).
 - `check-i18n-coverage.js` passes; `dict-en.ts` and `dict-pt.ts` keys stay identical.
 
-## Open Questions
+## Resolved Decisions
 
-1. **Tag display name on conflict** — change `upsertMany` to `ON CONFLICT(slug) DO
-   NOTHING` (first spelling wins, proposed) or keep last-write-wins?
-2. **Tag inheritance** — should `?tag=kihon` on a parent also list its descendants as
-   matches, or only surface them as the (expandable) children of a matched parent, as
-   title search does today? Proposed: no inheritance; revisit with usage.
-3. **Content search** — is searching inside topic bodies wanted in the near term? If
-   yes, that argues for FTS5 and a server endpoint rather than extending the client
-   matcher.
-4. **Catalog home grid** (`catalog/page.tsx`) — should it also react to `q`/`tag`, or
-   does search remain a sidebar concern?
-5. **Who may create tags** — both `admin` and `content_creator` (proposed), or admins
-   only, with creators limited to existing tags?
+Resolved with the product owner on 2026-09-29.
+
+1. **Tag display name on conflict → first spelling wins.** `upsertMany` uses
+   `ON CONFLICT(slug) DO NOTHING`. If `Chūdan` (`chudan`) exists and an admin types
+   `CHUDAN`, the topic is linked to the existing tag and its name stays `Chūdan`.
+   Renaming is a job for the future tag-administration screen, not a side effect.
+2. **No tag inheritance.** `?tag=soco` matches only topics carrying `soco` themselves.
+   A matched parent still renders its children underneath (expandable), exactly as a
+   title match does today, but they are not results in their own right and carry no
+   inherited chip. A child that should be found on its own gets its own tag.
+3. **No content search for now.** Search covers title + tag names, in the browser.
+   Searching topic bodies is left to a future RFC, which would bring a D1 FTS5 index
+   and a server-side, enrollment-aware endpoint.
+4. **Search stays a sidebar concern.** `q` and `tag` filter the sidebar tree (and the
+   mobile drawer that hosts it); the catalog home grid (`catalog/page.tsx`) keeps
+   showing every root topic. `catalog/page.tsx` is not touched.
+5. **Both `admin` and `content_creator` create tags.** The two roles that already edit
+   topics may reuse or create tags from the combobox; there is no role split on the
+   tag vocabulary.
 
 ## References
 
