@@ -1,6 +1,6 @@
 # Task 02 — Backend: Tag authoring API (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [24 — Catalog search by tags](./milestone.md)
 **RFC:** [RFC 0017](../../RFCs/0017-catalog-search-by-tags.md)
 **Team:** Backend API
@@ -81,23 +81,23 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] With `{ name: 'Chūdan', slug: 'chudan' }` stored, `PATCH` a topic with
+- [x] With `{ name: 'Chūdan', slug: 'chudan' }` stored, `PATCH` a topic with
       `tags: ['CHUDAN']` → `200`; the topic carries that tag, `tags.name` is still
       `Chūdan`, and the `tags` row count is unchanged.
-- [ ] `POST` with `tags: ['Soco', 'soco', ' SOCO ']` creates exactly one `soco` tag and
+- [x] `POST` with `tags: ['Soco', 'soco', ' SOCO ']` creates exactly one `soco` tag and
       one link.
-- [ ] `tags: ['!!!']` → `400`; a 41-character name → `400`; 21 names → `400`.
-- [ ] `tags` and `tagIds` in the same body → `400`.
-- [ ] `tagIds: ['<unknown>']` → `422 UNKNOWN_TAG` with the ID in `meta.detail`, and
+- [x] `tags: ['!!!']` → `400`; a 41-character name → `400`; 21 names → `400`.
+- [x] `tags` and `tagIds` in the same body → `400`.
+- [x] `tagIds: ['<unknown>']` → `422 UNKNOWN_TAG` with the ID in `meta.detail`, and
       `topic_node_tags` is unchanged.
-- [ ] `PATCH` with `tags: []` removes every link; `PATCH` without `tags` keeps them.
-- [ ] `GET /v1/admin/tags?q=chu` returns `chudan` for `admin` and `content_creator`;
+- [x] `PATCH` with `tags: []` removes every link; `PATCH` without `tags` keeps them.
+- [x] `GET /v1/admin/tags?q=chu` returns `chudan` for `admin` and `content_creator`;
       `student` gets `403`; `limit=500` is capped (or rejected) per the schema.
-- [ ] A student's `GET /v1/topics` does not include a tagged topic outside their
+- [x] A student's `GET /v1/topics` does not include a tagged topic outside their
       effective-access set.
-- [ ] No D1 import leaks into the port or controller.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] No D1 import leaks into the port or controller.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
