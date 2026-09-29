@@ -1,7 +1,7 @@
 # RFC 0020: Student submissions — students upload, manage and move demonstration media per topic
 
 **Date:** 2026-09-29
-**Status:** Draft
+**Status:** Proposed
 **Revised:** 2026-09-29
 **Author:** raphaelsilva
 **Affected:**
@@ -20,7 +20,8 @@
 - `apps/api/src/openapi/components/entities.ts` (new schemas)
 - `apps/web/src/lib/submissions-api.ts` (new client)
 - `apps/web/src/app/(protected)/catalog/[id]/page.tsx` (new *My demonstrations* button)
-- `apps/web/src/app/(protected)/catalog/[id]/submissions/page.tsx` (new — the per-topic submissions page: upload, manage, move, class gallery, staff view)
+- `apps/web/src/app/(protected)/catalog/[id]/submissions/page.tsx` (new — the per-topic *Demonstrations* page: tabs *Mine* / *Class* / staff *All*, upload, manage, move)
+- `apps/web/src/app/(protected)/catalog/[id]/submissions/[sid]/page.tsx` (new — direct link to one submission in the full-screen viewer)
 - `apps/web/src/app/(protected)/submissions/page.tsx` (new — "My demonstrations" across topics)
 - `apps/web/src/components/catalog/submissions/*` (new — uploader, card, editor, topic picker, gallery)
 - `apps/web/src/app/(protected)/admin/users/[userId]/page.tsx` (new *Submissions* section)
@@ -37,10 +38,11 @@ student writes, owned by the student, who can edit, delete or **move it to anoth
 any time. The catalog topic page gets a **My demonstrations** button that opens a dedicated
 page for that topic, where the upload happens and where the student manages what they sent.
 A submission is **private by default** (author + staff); the author may **share** it with the
-class, and shared submissions form the topic's *Class demonstrations* gallery on that page.
-Staff can force-unshare, and an admin can remove a file, leaving a *"Removed by the staff"*
-tombstone for its author. Quotas (**10 per topic, 1 GiB per student**) are **environment
-variables**, so each label and environment sets its own. Files travel through the same
+class, and the page's **Da turma / Class** tab shows what classmates shared, in a full-screen
+viewer that steps from one demonstration to the next. Staff can force-unshare, and an admin can
+remove a file, leaving a *"Removed by the staff"* tombstone for its author. Quotas (**10 per
+topic, 1 GiB per student, 250 MB per video**) and whether a label allows sharing at all are
+**environment variables**, so each label and environment sets its own. Files travel through the same
 `presign → PUT → finalize` lifecycle as backoffice media, but in a **separate table and key
 prefix**, so a student upload can never surface as course content.
 
@@ -79,9 +81,12 @@ lifecycle — a different entity.
   topic). Private by default; the UI names the audience in plain words.
 - Staff (`admin`, `content_creator`) see every submission — per topic and per student — and can
   force-unshare. `admin` can remove one; its author then sees *"Removed by the staff"*.
-- Per-topic count, per-student storage and per-file video size are **environment variables**
-  (`SUBMISSIONS_PER_TOPIC_MAX` = 10, `SUBMISSIONS_STORAGE_PER_STUDENT_BYTES` = 1 GiB,
-  `SUBMISSIONS_VIDEO_MAX_BYTES`), set per label and environment in `wrangler.jsonc`.
+- Per-topic count, per-student storage, per-file video size and the sharing switch are
+  **environment variables** (`SUBMISSIONS_PER_TOPIC_MAX` = 10,
+  `SUBMISSIONS_STORAGE_PER_STUDENT_BYTES` = 1 GiB, `SUBMISSIONS_VIDEO_MAX_BYTES` = 250 MB,
+  `SUBMISSIONS_SHARING_ENABLED` = `true`), set per label and environment in `wrangler.jsonc`.
+- A student watches classmates' shared demonstrations in a **Da turma / Class** tab, in a
+  full-screen viewer with previous/next, and can open any one by a direct link.
 - The API re-verifies the **stored** object — size, declared type and file signature — at
   finalize, since the uploader is no longer trusted staff.
 - Abandoned uploads (`pending` rows and their objects) are swept automatically.
@@ -175,9 +180,9 @@ CREATE TABLE IF NOT EXISTS topic_submissions (
                  CHECK (visibility IN ('private', 'shared')),
   shared_at      TEXT,
   moderated_at   TEXT,                              -- staff force-unshare; blocks re-sharing
-  moderated_by   TEXT REFERENCES users(id),
+  moderated_by   TEXT REFERENCES users(id) ON DELETE SET NULL,
   removed_at     TEXT,                              -- admin removal; row kept as a tombstone
-  removed_by     TEXT REFERENCES users(id),
+  removed_by     TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at     TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -192,6 +197,8 @@ CREATE INDEX IF NOT EXISTS idx_topic_submissions_sweep  ON topic_submissions (st
 - **Author delete is a hard delete** (object, then row). **Admin removal is a tombstone**
   (object deleted, row kept with `status = 'removed'`) — §8.
 - **`removed` rows are outside every quota** and every non-author, non-staff listing.
+- **`moderated_by` / `removed_by` are `ON DELETE SET NULL`**: D1 enforces foreign keys, so a
+  plain reference would make deleting a staff account that once moderated a submission fail.
 
 ### 2. Storage layout
 
@@ -228,16 +235,21 @@ env var below, because a phone recording is larger than an edited course clip.
 | `SUBMISSIONS_PER_TOPIC_MAX` | `10` | Pending + ready submissions per student per topic |
 | `SUBMISSIONS_STORAGE_PER_STUDENT_BYTES` | `1073741824` (1 GiB) | Sum of pending + ready `size_bytes` per student, all topics |
 | `SUBMISSIONS_VIDEO_MAX_BYTES` | `262144000` (250 MB) | Per-file limit for `video/mp4` and `video/quicktime` submissions |
+| `SUBMISSIONS_SHARING_ENABLED` | `true` | `false` makes every submission of the label private between student and staff (§7) |
 
 - Declared in each `env.*.vars` block of `wrangler.jsonc` and in `.dev.vars.example`, so every
   label and environment sets its own. Defaults live in `domain/submissions/limits.ts` and apply
   only when a var is **absent**.
 - `apps/api/src/core/submissions/config.ts` parses them with Zod (positive integers,
-  `VIDEO_MAX ≤ STORAGE_PER_STUDENT`). A var that is **present but invalid** is not replaced by a
-  default: submission endpoints answer `500 SUBMISSION_CONFIG_INVALID` and log the var name, and
-  the deploy preflight of RFC 0007 rejects it before it ships.
-- The web never hardcodes them: `GET /v1/me/submissions/quota?topicId=` returns the effective
-  limits and the caller's usage, and the upload page preflights against that response.
+  `VIDEO_MAX ≤ STORAGE_PER_STUDENT`; the switch accepts exactly `true` or `false`). A var that is
+  **present but invalid** is not replaced by a default: submission endpoints answer
+  `500 SUBMISSION_CONFIG_INVALID` and log the var name. The deploy preflight of RFC 0007
+  (`config/deployment.schema.jsonc`) declares all four as optional and rejects a bad
+  `SUBMISSIONS_SHARING_ENABLED` through its `enum` rule; the schema has no integer rule, so the
+  numeric vars are guarded by the runtime check and its tests.
+- The web never hardcodes them: `GET /v1/topics/{id}/submissions/summary` returns the effective
+  limits, the sharing switch, the caller's usage and the class count, and the page preflights
+  against that response.
 
 `domain/submissions/limits.ts` also holds the text limits, which are not tunables:
 `SUBMISSION_TITLE_MAX = 120` and `SUBMISSION_DESCRIPTION_MAX = 2_000` (characters, after
@@ -358,6 +370,11 @@ rules live in `SubmissionsController`.
   `topicAccessible: false` — read-only except delete and **move** (§6). They leave the gallery.
 - **Sharing is a deliberate act**, confirmed with a line saying classmates will see the file
   **with the author's name** — a video of a person is more identifying than a note.
+- **With `SUBMISSIONS_SHARING_ENABLED=false`** the label behaves as if nothing were shared: a
+  presign or `PATCH` asking for `shared` answers `409 SUBMISSION_SHARING_DISABLED`, and every
+  student-facing read (class listing, single read by a non-author) treats `shared` rows as
+  `private`. Rows are **not rewritten** — the switch is a read-time filter, so turning it back on
+  restores what authors had chosen. The web hides the visibility switch and the *Class* tab.
 
 ### 8. Moderation, removal and the tombstone
 
@@ -393,19 +410,22 @@ Mounted like comments/notes — `buildSubmissionsRouter` at `v1.route('/', …)`
 
 | Method & path | Who | Purpose | Success / errors |
 |---|---|---|---|
-| `GET /v1/topics/{id}/submissions?cursor=` | any | Author: own (all statuses) + shared. Students: shared. Staff: all ready + removed. Newest first, page 20 | `200 { data, nextCursor }` |
+| `GET /v1/topics/{id}/submissions?scope=mine\|class\|all&cursor=` | any | `mine`: caller's own, all statuses. `class`: shared ready submissions (caller's own flagged `isMine`). `all`: staff only — every ready + removed. Newest first, page 20 | `200 { data, nextCursor }` · `403` (`all` by a student) |
+| `GET /v1/topics/{id}/submissions/{sid}` | any | One submission, under the §7 rules (direct link, viewer) | `200` · `404` |
+| `GET /v1/topics/{id}/submissions/summary` | any | Effective limits, `sharingEnabled`, the caller's usage (`topicCount`, `bytes`), `classCount`; staff also get `totalCount` | `200` |
 | `POST /v1/topics/{id}/submissions/presign` | student | Create pending + presigned PUT | `201` · `400` · `409 SUBMISSION_QUOTA` · `422 FileTooLarge` · `429` |
 | `POST /v1/topics/{id}/submissions/{sid}/finalize` | author | Verify object, mark ready | `200` · `422 NotUploaded` · `422 UPLOAD_MISMATCH` |
 | `PATCH /v1/topics/{id}/submissions/{sid}` | author | `{ title?, description?, visibility? }` | `200` · `409 SUBMISSION_MODERATED` |
 | `DELETE /v1/topics/{id}/submissions/{sid}` | author | Delete (pending, ready) or dismiss a tombstone | `204` · `502` |
 | `GET /v1/me/submissions?cursor=` | student | All own submissions across topics, with topic title and `topicAccessible` | `200 { data, nextCursor }` |
-| `GET /v1/me/submissions/quota?topicId=` | student | Effective limits (§3) and the caller's usage | `200 { limits, usage }` |
 | `POST /v1/me/submissions/move` | student | Move up to 10 own submissions to a topic (§6) | `200 { moved, refused }` · `404` |
 | `GET /v1/admin/users/{userId}/submissions?cursor=` | staff | Every ready or removed submission by that student | `200 { data, nextCursor }` |
 | `POST /v1/admin/submissions/{id}/unshare` | staff | Force-unshare | `200` |
 | `DELETE /v1/admin/submissions/{id}/moderation` | staff | Clear moderation | `204` |
 | `DELETE /v1/admin/submissions/{id}` | `admin` | Remove → tombstone | `204` · `502` |
 
+- `scope` is validated against the caller's roles; it only ever **narrows** what the §7 table
+  allows, never widens it.
 - `PresignSubmissionSchema`: `fileName ≤ 255`, `contentType: z.enum(SUBMISSION_MEDIA_TYPES)`,
   `sizeBytes`, `title` (1…120 after trim), `description` (`sanitizeMarkdown`, ≤ 2 000),
   `visibility` (default `private`).
@@ -430,15 +450,17 @@ export interface ISubmissionRepository {
   move(authorId: string, ids: string[], targetTopicId: string, perTopicMax: number): Promise<MoveResult>;
   delete(id: string): Promise<void>;
   markRemoved(id: string, adminId: string): Promise<SubmissionRecord>;
-  listByTopic(topicNodeId: string, opts: { viewerId: string; scope: 'student' | 'staff'; page: CursorPage }): Promise<Paged<SubmissionRecord>>;
+  listByTopic(topicNodeId: string, opts: { viewerId: string; scope: 'mine' | 'class' | 'all'; page: CursorPage }): Promise<Paged<SubmissionRecord>>;
+  topicSummary(topicNodeId: string, viewerId: string): Promise<{ mine: number; class: number; total: number }>;
   listByAuthor(authorId: string, opts: { scope: 'self' | 'staff'; page: CursorPage }): Promise<Paged<AuthoredSubmissionRecord>>;
   setModeration(id: string, staffId: string | null): Promise<SubmissionRecord | null>;
   listStalePending(olderThanHours: number, limit: number): Promise<SubmissionRecord[]>;
 }
 ```
 
-`IStorageAdapter` gains `readHead(key, bytes)` (ranged GET) and `deletePrefix(prefix)`. `scope`
-is decided by the controller from roles, never from the request. Instantiated per request in the
+`IStorageAdapter` gains `readHead(key, bytes)` (ranged GET) and `deletePrefix(prefix)`. The
+controller checks the requested `scope` against roles (`all` is staff-only) and passes
+`sharingEnabled` so `class` returns nothing when the label switch is off. Instantiated per request in the
 container's `engagement` slice, next to `commentRepo` and RFC 0016's `noteRepo`; the parsed
 `SubmissionConfig` is built per request from `env` like every other binding.
 
@@ -446,15 +468,19 @@ container's `engagement` slice, next to `commentRepo` and RFC 0016's `noteRepo`;
 
 Decided 2026-09-29: the topic page gets **a button**, and the upload happens on **a new page**.
 
-- **Topic page** (`(protected)/catalog/[id]`): a **Minhas demonstrações / My demonstrations**
-  button in the topic header area, with a count badge of the student's ready submissions on the
-  topic. For staff the same button reads **Demonstrações dos alunos / Student demonstrations**.
-  The topic page renders nothing else of this feature, so it stays as light as today.
-- **Submissions page** (`(protected)/catalog/[id]/submissions`), the student's area for the
-  topic:
+- **Topic page** (`(protected)/catalog/[id]`): a **Demonstrações / Demonstrations** button in
+  the topic header area, carrying both counts from the summary endpoint — *"2 minhas · 8 da
+  turma"* (the class count is omitted when sharing is disabled). For staff it reads
+  **Demonstrações dos alunos / Student demonstrations** with the total. The topic page renders
+  nothing else of this feature, so it stays as light as today.
+- **Demonstrations page** (`(protected)/catalog/[id]/submissions`), with **tabs** (decided
+  2026-09-29): **Minhas / Mine** and **Da turma / Class** for students; staff get a single
+  **Todos / All** tab. The active tab lives in `?tab=`, so it survives reloads and links.
+  "Da turma" was chosen over "Amigos": there is no friend list — the audience is everyone who can
+  read the topic, and the name says exactly that.
   - **Header**: breadcrumb back to the topic, the quota line *"3 of 10 on this topic · 420 MB of
-    1 GB used"* (from `/me/submissions/quota`), and the **Enviar demonstração / Send a
-    demonstration** button (sticky at the bottom on mobile).
+    1 GB used"* (from the summary endpoint), and the **Enviar demonstração / Send a
+    demonstration** button (sticky at the bottom on mobile), shown on the *Mine* tab.
   - **Upload form**: file input (`accept` from `SUBMISSION_MEDIA_TYPES` plus `.mov`; on a phone
     the OS offers camera or library), title prefilled from the file name, description (Markdown,
     with a counter), and the visibility switch with the audience line — *"Private: only you and
@@ -463,7 +489,7 @@ Decided 2026-09-29: the topic page gets **a button**, and the upload happens on 
     is sent. The PUT uses `XMLHttpRequest` for a progress bar, with **Cancel** (aborts the PUT,
     then `DELETE`s the pending row). An interrupted upload shows as *Upload interrupted* with
     **Discard**; the sweep removes it after 24 h anyway.
-  - **My demonstrations**: cards newest first — poster frame / thumbnail / PDF icon, title,
+  - **Mine tab**: cards newest first — poster frame / thumbnail / PDF icon, title,
     description excerpt, date, size, visibility and moderation badges. Clicking opens the
     existing viewers (`VideoStage` with the §4 fallback, `PdfStage`, image viewer). Card menu:
     **Edit**, **Move to another topic**, **Delete**. A **Select** mode enables moving several at
@@ -471,11 +497,25 @@ Decided 2026-09-29: the topic page gets **a button**, and the upload happens on 
   - **Move dialog**: a topic picker over the student's readable topics (the catalog tree the
     page already has access to), showing each target's free slots; states that the moved items
     become private. After the call it reports moved and refused items with the reason.
-  - **Class demonstrations**: the shared submissions of the topic, with author names — the
-    topic's "section of student videos". Hidden when empty.
-  - **Staff view** of the same route: every ready and removed submission, grouped by student,
-    with badges and **Unshare**, **Allow sharing again** and (admin) **Remove**. No upload
-    button, no editor on someone else's submission.
+  - **Class tab** — how a student watches a classmate's demonstration:
+    - A **grid of cards**, newest shared first: poster frame / thumbnail / PDF icon, title,
+      author name, date. The caller's own shared submissions appear too, marked **"Você" /
+      "You"**. No edit or move actions on this tab.
+    - Tapping a card opens the **full-screen viewer** (a modal on desktop, full screen on a
+      phone): the player (`VideoStage` with the §4 fallback, `PdfStage`, image viewer), then
+      title, author, date and the rendered description. **Previous / next** arrows — and swipe on
+      touch — step through the class list in order without closing, loading the next page of the
+      cursor when the end is reached.
+    - **Empty state**: *"Ninguém da turma compartilhou ainda."* with a shortcut to the *Mine* tab.
+    - The whole tab is hidden when `sharingEnabled` is `false`.
+  - **Direct link** (`(protected)/catalog/[id]/submissions/[sid]`): opens the page with the
+    viewer on that submission (backed by `GET /v1/topics/{id}/submissions/{sid}`), so a student
+    can send *"look at mine"* to the class group. The link carries no access of its own — a reader
+    who cannot see that submission under §7 gets the catalog's not-found page. A **Copy link**
+    action sits in the viewer of shared submissions and on the author's own cards.
+  - **All tab (staff)**: every ready and removed submission, grouped by student, with badges and
+    **Unshare**, **Allow sharing again** and (admin) **Remove**, opening the same viewer. No
+    upload button, no editor on someone else's submission.
 - **"My demonstrations" across topics** (`(protected)/submissions`): the student's submissions
   grouped by topic, with the same card actions (move included) and a link to each topic's page;
   rows on topics they lost access to explain why they are read-only.
@@ -552,12 +592,13 @@ QuickTime fixture passing finalize and a renamed text file failing it.
 OpenAPI schemas and regenerated `api-types.gen.ts`.
 
 ### Phase 4 — Web (~2.5–3 d)
-`submissions-api.ts` (XHR PUT with progress and abort); topic-page button; submissions page
-(upload form with preflight against the quota endpoint, cards, edit, delete, tombstones, move
-dialog and select mode, class gallery, staff view); `.mov` playback fallback; "My
+`submissions-api.ts` (XHR PUT with progress and abort); topic-page button with both counts;
+Demonstrations page with *Mine* / *Class* / *All* tabs (upload form with preflight against the
+summary endpoint, cards, edit, delete, tombstones, move dialog and select mode, class grid,
+full-screen viewer with previous/next, direct link, staff view); `.mov` playback fallback; "My
 demonstrations" page; backoffice section; dictionaries in both languages; component tests for
-preflight rejection, cancel, interrupted upload, move with partial refusal, and the playback
-fallback.
+preflight rejection, cancel, interrupted upload, move with partial refusal, viewer navigation,
+sharing-disabled rendering and the playback fallback.
 
 ## Tradeoffs & Risks
 
@@ -570,7 +611,7 @@ fallback.
 | Moving publishes a video to a new class | A move resets visibility to private and the dialog says so |
 | Abusive or illegal content | Staff force-unshare immediately; admin removal deletes the object and leaves only a tombstone |
 | Storage cost grows with every student | Env-configured per-topic count and per-student quota; pending counts; sweep removes abandoned uploads |
-| A misconfigured quota var silently falls back to a default | Present-but-invalid is an error (`500 SUBMISSION_CONFIG_INVALID`), caught first by the RFC 0007 preflight |
+| A misconfigured quota var silently falls back to a default | Present-but-invalid is an error (`500 SUBMISSION_CONFIG_INVALID`); the RFC 0007 preflight catches a bad sharing switch before deploy |
 | Upload/delete loops churn R2 operations | 30 presigns/hour per user (`rl:submissions:`) |
 | Large phone videos on slow mobile networks | Progress bar, cancel, retry re-presigns; 250 MB per-file default is tunable per label; multipart upload deferred |
 | Hard-deleted user leaves orphaned objects | Author-first key prefix + `deletePrefix` on hard delete |
@@ -596,23 +637,29 @@ fallback.
   only `admin` removes; after removal the object is gone, the author sees *"Removed by the
   staff"* and the quota is freed; students and tutors get `403` on every admin route.
 - (Ph 3) A pending row older than 24 h and its object are gone after the scheduled run.
-- (Ph 4) On an iPhone, a student taps *My demonstrations* on a topic, records or picks a video,
+- (Ph 2) With `SUBMISSIONS_SHARING_ENABLED=false`, asking for `shared` answers
+  `409 SUBMISSION_SHARING_DISABLED`, the class listing is empty and previously shared rows are
+  unreadable by other students; switching it back to `true` restores them unchanged.
+- (Ph 4) A student opens the *Class* tab, plays a classmate's video full screen, steps to the
+  next one with the arrow or a swipe, copies its link, and a classmate opening that link lands on
+  the same video; a student without access to the topic gets not-found.
+- (Ph 4) On an iPhone, a student taps *Demonstrations* on a topic, records or picks a video,
   uploads it with a visible progress bar, titles it, and later moves it to another topic; a file
   over its limit is refused before upload; the flow works in `pt` and `en` builds and the i18n
   coverage check passes.
 
 ## Open Questions
 
-1. **Per-label switch for sharing.** Should a label (tenant — `arenaquest`, `spaziord`, `budo`)
-   be able to turn sharing off, so every submission stays private between student and staff —
-   e.g. a school whose students are minors? It would be one more env var
-   (`SUBMISSIONS_SHARING_ENABLED`, default `true`) next to the quotas. Recommendation: include it,
-   it is a few lines. *Owner: product owner.*
-2. **Per-file video default.** 250 MB covers roughly 3–4 min of iPhone 1080p HEVC video, or
-   ~2 min of H.264. Confirm the default (it is tunable per label either way). *Owner: product
-   owner.*
+None — all resolved on 2026-09-29 (below).
 
 ## Resolved Decisions
+
+- **2026-09-29 — Per-label sharing switch included** (product owner):
+  `SUBMISSIONS_SHARING_ENABLED`, default `true`, a read-time filter that never rewrites rows (§7).
+- **2026-09-29 — 250 MB per video file by default** (product owner), tunable per label through
+  `SUBMISSIONS_VIDEO_MAX_BYTES` (§3).
+- **2026-09-29 — The Demonstrations page has *Minhas* / *Da turma* tabs (staff: *Todos*), a
+  full-screen viewer with previous/next, and a direct link per submission** (product owner) (§12).
 
 - **2026-09-29 — Staff review is the next RFC** (product owner). Removed from this one; listed as
   a non-goal.
