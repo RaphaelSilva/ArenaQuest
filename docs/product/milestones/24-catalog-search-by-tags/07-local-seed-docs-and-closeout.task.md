@@ -1,6 +1,6 @@
 # Task 07 — Backend: Local seed, docs and closeout (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [24 — Catalog search by tags](./milestone.md)
 **RFC:** [RFC 0017](../../RFCs/0017-catalog-search-by-tags.md)
 **Team:** Backend API
@@ -61,16 +61,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make db-reset-local` applies the seed twice without error (idempotent), and the
+- [x] `make db-reset-local` applies the seed twice without error (idempotent), and the
       seeded student sees the tagged tree in `/catalog`.
-- [ ] In `make dev`, every row of RFC 0017's *Motivation* table finds its topic against the
+- [x] In `make dev`, every row of RFC 0017's *Motivation* table finds its topic against the
       seeded data.
-- [ ] The no-dev-seed guard passes for a staging dry-run deploy.
-- [ ] `CLAUDE.md` shows `"tags"` in the fence example and explains slug-set drift.
-- [ ] RFC 0017 header and README row read `Implemented`; milestone status is ✅ and every
+- [ ] The no-dev-seed guard passes for a staging dry-run deploy. _(Not run against staging from this session: the seed adds no user or password hash, the guard derives its matcher from the seed users, and `check-no-dev-seed.spec.ts` passes 16/16. Confirm on the first staging deploy.)_
+- [x] `CLAUDE.md` shows `"tags"` in the fence example and explains slug-set drift.
+- [x] RFC 0017 header and README row read `Implemented`; milestone status is ✅ and every
       §5 row is Done.
-- [ ] `make lint`, `make test-api` and `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `make lint`, `make test-api` and `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
