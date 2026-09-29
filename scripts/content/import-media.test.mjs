@@ -11,6 +11,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import {
   ApiError,
@@ -33,6 +35,7 @@ import {
   parseArgs,
   parseOrderPrefix,
   parseReadmeMetadata,
+  printPlan,
   readLedger,
   readManifest,
   reconcileTopics,
@@ -41,6 +44,7 @@ import {
   runPool,
   validateMediaFile,
   skippedReportPathFor,
+  slugify,
   stripMetadataBlock,
   summariseHtmlError,
   titleFromName,
@@ -1340,4 +1344,261 @@ test('parseArgs accepts --manifest only alongside --source and without --root-to
     () => parseArgs([...base, '--source', './out', '--manifest', './m.jsonl', '--root-topic', 'uuid']),
     /--manifest and --root-topic are mutually exclusive/,
   );
+});
+
+// -- README tags (M24 Task 06) ------------------------------------------------
+
+test('slugify mirrors the shared tag slug for every fixture row', () => {
+  const fixturesPath = new URL('../../packages/shared/domain/tags/slugify.fixtures.json', import.meta.url);
+  const rows = JSON.parse(readFileSync(fixturesPath, 'utf8'));
+  assert.ok(rows.length > 0, 'the shared slug fixture is empty');
+  for (const { input, slug } of rows) {
+    assert.equal(slugify(input), slug, `slugify(${JSON.stringify(input)})`);
+  }
+});
+
+test('parseReadmeMetadata reads "tags" as trimmed names', () => {
+  const { metadata, warnings } = parseReadmeMetadata('```arenaquest\n{ "tags": [" Soco ", "Kihon"] }\n```');
+  assert.deepEqual(metadata, { tags: ['Soco', 'Kihon'] });
+  assert.deepEqual(warnings, []);
+});
+
+test('parseReadmeMetadata leaves tags undefined when the fence has none', () => {
+  const { metadata, warnings } = parseReadmeMetadata('```arenaquest\n{ "order": 1 }\n```');
+  assert.equal(metadata.tags, undefined);
+  assert.deepEqual(warnings, []);
+});
+
+test('parseReadmeMetadata warns on malformed "tags" and ignores them', () => {
+  for (const bad of ['"soco"', '[1]', '["soco", 2]', '{ "a": 1 }', 'null']) {
+    const { metadata, warnings } = parseReadmeMetadata(`\`\`\`arenaquest\n{ "tags": ${bad}, "order": 2 }\n\`\`\``);
+    assert.equal(metadata.tags, undefined, `tags ${bad} must be ignored`);
+    assert.equal(metadata.order, 2, 'the rest of the fence still applies');
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /"tags" must be an array of strings/);
+  }
+});
+
+test('parseReadmeMetadata drops a tag name with no usable characters', () => {
+  const { metadata, warnings } = parseReadmeMetadata('```arenaquest\n{ "tags": ["Soco", "!!!", "  "] }\n```');
+  assert.deepEqual(metadata.tags, ['Soco']);
+  assert.equal(warnings.length, 2);
+});
+
+test('resolveReadmes carries README tags onto the topic and the root', async () => {
+  const plan = {
+    topics: [{ key: 'a', title: 'Soco', readme: { name: 'README.md', id: 'r1' } }],
+    rootReadme: { name: 'README.md', id: 'r0' },
+    root: null,
+  };
+  const texts = {
+    r0: '```arenaquest\n{ "tags": ["Kata"] }\n```\n# Raiz',
+    r1: '```arenaquest\n{ "tags": ["Soco", "Kihon"] }\n```\n# Soco',
+  };
+  await resolveReadmes(plan, { readText: async (node) => texts[node.id] });
+  assert.deepEqual(plan.topics[0].tags, ['Soco', 'Kihon']);
+  assert.deepEqual(plan.root.tags, ['Kata']);
+});
+
+test('reconcileTopics sends README tags on create', async () => {
+  const created = [];
+  const { client, calls } = scriptedClient([
+    [
+      (url, init) => url.endsWith('/v1/admin/topics') && init.method === 'POST',
+      async (_url, init) => {
+        created.push(JSON.parse(init.body));
+        return jsonResponse(201, { id: 'new-1' });
+      },
+    ],
+  ]);
+  await reconcileTopics(
+    client,
+    { topics: [{ key: 'a', parentKey: null, title: 'Soco', depth: 0, tags: ['Soco', 'Kihon'] }] },
+    { rootTopicId: null, index: new Map() },
+  );
+  assert.deepEqual(created, [{ parentId: null, title: 'Soco', status: 'draft', tags: ['Soco', 'Kihon'] }]);
+  const topicPosts = calls.filter((call) => call.url.endsWith('/v1/admin/topics') && call.method === 'POST');
+  assert.equal(JSON.parse(topicPosts[0].body).tags.length, 2, 'the request itself carries the tags');
+});
+
+test('reconcileTopics sends no tags for a README without them, or with malformed ones', async () => {
+  const created = [];
+  const { client } = scriptedClient([
+    [
+      (url, init) => url.endsWith('/v1/admin/topics') && init.method === 'POST',
+      async (_url, init) => {
+        created.push(JSON.parse(init.body));
+        return jsonResponse(201, { id: `new-${created.length}` });
+      },
+    ],
+  ]);
+  const plan = {
+    topics: [
+      { key: 'a', title: 'x', readme: { id: 'r1' } },
+      { key: 'b', title: 'y', readme: { id: 'r2' } },
+      { key: 'c', title: 'z', readme: { id: 'r3' } },
+    ],
+  };
+  const texts = {
+    r1: '# no fence',
+    r2: '```arenaquest\n{ "tags": "soco" }\n```\n# y',
+    r3: '```arenaquest\n{ "tags": [1] }\n```\n# z',
+  };
+  const warnings = [];
+  await resolveReadmes(plan, { readText: async (node) => texts[node.id], onWarning: (_t, w) => warnings.push(w) });
+  for (const topic of plan.topics) topic.parentKey = null;
+
+  await reconcileTopics(client, plan, { rootTopicId: null, index: new Map() });
+  assert.equal(warnings.length, 2);
+  assert.equal(created.length, 3);
+  for (const body of created) assert.equal('tags' in body, false);
+});
+
+/** A reused topic that already carries `soco` and `kihon`, as GET /v1/admin/topics returns it. */
+function taggedExisting() {
+  return {
+    id: 't1',
+    parentId: null,
+    title: 'Soco',
+    archived: false,
+    content: '# Soco',
+    status: 'draft',
+    estimatedMinutes: 0,
+    tags: [
+      { id: 'g1', name: 'Soco', slug: 'soco' },
+      { id: 'g2', name: 'Kihon', slug: 'kihon' },
+    ],
+  };
+}
+
+function writeCountingClient() {
+  const patches = [];
+  const { client, calls } = scriptedClient([
+    [
+      (url, init) => url.endsWith('/v1/admin/topics/t1') && init.method === 'PATCH',
+      async (_url, init) => {
+        patches.push(JSON.parse(init.body));
+        return jsonResponse(200, taggedExisting());
+      },
+    ],
+  ]);
+  const writes = () => calls.filter((call) => call.method !== 'GET' && !call.url.endsWith('/v1/auth/login'));
+  return { client, patches, writes };
+}
+
+test('reconcileTopics treats a re-cased tag set as unchanged — zero writes', async () => {
+  const { client, writes } = writeCountingClient();
+  for (const tags of [['Soco', 'Kihon'], ['SOCO', 'kihon'], ['kihon', 'Sôco', 'soco']]) {
+    const result = await reconcileTopics(
+      client,
+      { topics: [{ key: 'a', parentKey: null, title: 'Soco', content: '# Soco', tags }] },
+      { rootTopicId: null, index: indexTopics([taggedExisting()]) },
+    );
+    assert.equal(result.updated, 0, `tags ${tags.join(',')} are the same slug set`);
+  }
+  assert.equal(writes().length, 0, 'an unchanged tree performs no write request');
+});
+
+test('reconcileTopics PATCHes exactly once when a README adds or removes a tag', async () => {
+  for (const tags of [['Soco', 'Kihon', 'Chūdan'], ['Soco'], []]) {
+    const { client, patches, writes } = writeCountingClient();
+    const result = await reconcileTopics(
+      client,
+      { topics: [{ key: 'a', parentKey: null, title: 'Soco', content: '# Soco', tags }] },
+      { rootTopicId: null, index: indexTopics([taggedExisting()]) },
+    );
+    assert.equal(result.updated, 1);
+    assert.equal(writes().length, 1);
+    assert.deepEqual(patches, [{ tags }], 'the PATCH carries only the tags');
+  }
+});
+
+test('reconcileTopics never touches tags when the README declares none', async () => {
+  const { client, writes } = writeCountingClient();
+  await reconcileTopics(
+    client,
+    { topics: [{ key: 'a', parentKey: null, title: 'Soco', content: '# Soco' }] },
+    { rootTopicId: null, index: indexTopics([taggedExisting()]) },
+  );
+  assert.equal(writes().length, 0);
+});
+
+test('applyRootReadme compares root tags as slug sets too', async () => {
+  const record = { id: 'root-1', content: '# Raiz', tags: [{ id: 'g1', name: 'Kata', slug: 'kata' }] };
+  const patches = [];
+  const { client } = scriptedClient([
+    [(url, init) => url.endsWith('/v1/admin/topics/root-1') && init.method === 'GET', async () => jsonResponse(200, record)],
+    [
+      (url, init) => url.endsWith('/v1/admin/topics/root-1') && init.method === 'PATCH',
+      async (_url, init) => {
+        patches.push(JSON.parse(init.body));
+        return jsonResponse(200, record);
+      },
+    ],
+  ]);
+  assert.equal(await applyRootReadme(client, 'root-1', { content: '# Raiz', tags: ['KATA'] }), false);
+  assert.equal(await applyRootReadme(client, 'root-1', { content: '# Raiz', tags: ['Kata', 'Kihon'] }), true);
+  assert.deepEqual(patches, [{ tags: ['Kata', 'Kihon'] }]);
+});
+
+test('printPlan lists the planned tags of each topic', () => {
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+  try {
+    printPlan(
+      {
+        topics: [
+          { key: 'a', title: 'Soco', depth: 0, tags: ['Soco', 'Kihon'] },
+          { key: 'b', title: 'Chute', depth: 0 },
+        ],
+        files: [],
+      },
+      { baseUrl: BASE, sourceLabel: 'test', ledgerEntries: new Map(), rootTopicId: null },
+    );
+  } finally {
+    console.log = original;
+  }
+  assert.ok(lines.some((line) => /\[topic\] Soco .*tags: Soco, Kihon/.test(line)), lines.join('\n'));
+  assert.ok(lines.some((line) => /\[topic\] Chute$/.test(line)), 'a topic without tags prints as before');
+});
+
+test('a --dry-run prints the README tags and performs no request at all', () => {
+  const { root, cleanup } = makeTree({
+    'Soco/README.md': '```arenaquest\n{ "tags": ["Soco", "Kihon"] }\n```\n\n# Soco\n',
+  });
+  const scratch = mkdtempSync(join(tmpdir(), 'aq-import-ledger-'));
+  try {
+    // Any fetch in the child — read or write — fails the run loudly.
+    const trap =
+      'data:text/javascript,globalThis.fetch=(u)=>{process.stderr.write("FETCH "+u+"\\n");process.exit(9)};';
+    const env = { ...process.env, NO_COLOR: '1' };
+    delete env.AQ_API_BASE_URL;
+    delete env.AQ_ADMIN_EMAIL;
+    delete env.AQ_ADMIN_PASSWORD;
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        trap,
+        fileURLToPath(new URL('./import-media.mjs', import.meta.url)),
+        '--label',
+        'arenaquest',
+        '-e',
+        'staging',
+        '--source',
+        root,
+        '--ledger',
+        join(scratch, 'ledger.jsonl'),
+        '--dry-run',
+      ],
+      { encoding: 'utf8', env },
+    );
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.doesNotMatch(result.stderr, /FETCH/);
+    assert.match(result.stdout, /\[topic\] Soco .*tags: Soco, Kihon/);
+  } finally {
+    cleanup();
+    rmSync(scratch, { recursive: true, force: true });
+  }
 });
