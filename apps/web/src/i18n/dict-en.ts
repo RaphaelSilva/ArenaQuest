@@ -2190,6 +2190,28 @@ export const dictEn = {
       emptyOrphans: 'No orphaned, stale, displaced or deleted-row objects found.',
       emptyMissing: 'Every record points to an existing file.',
     },
+    delete: {
+      action: 'Delete',
+      actionFor: (name: string) => `Delete ${name}`,
+      tooRecent: 'Uploaded less than 24 hours ago — it can be deleted once that window has passed.',
+      title: 'Delete this object?',
+      description:
+        'The file is removed from the bucket permanently. No database record is changed.',
+      confirm: 'Delete permanently',
+      cancel: 'Cancel',
+      close: 'Close',
+      deleting: 'Deleting…',
+      deleted: (name: string) => `${name} was deleted from the bucket.`,
+      alreadyGone: (name: string) => `${name} was already gone from the bucket.`,
+      refused: 'The server refused to delete this object.',
+      error: 'Could not delete this object. Try again.',
+      reason: {
+        tooRecent: 'It was uploaded less than 24 hours ago.',
+        linkedToTopic: (topic: string) => `This file is now linked to topic ${topic}.`,
+        linkedToEvent: (event: string) => `This file is now used by event ${event}.`,
+        nowStatus: (status: string) => `It is now classified as ${status}.`,
+      },
+    },
   },
   layout: {
     standingBanner: {

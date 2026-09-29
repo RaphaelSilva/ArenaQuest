@@ -101,6 +101,19 @@ export function useStorageFolder(enabled: boolean) {
     }
   }, [client, rememberTitles, state]);
 
+  /** Drops a deleted object from the pages loaded so far. */
+  const removeObject = useCallback((key: string) => {
+    setState((current) => ({ ...current, objects: current.objects.filter((o) => o.key !== key) }));
+  }, []);
+
+  /** Swaps in the server's current classification for an object already listed. */
+  const replaceObject = useCallback((object: ClassifiedObject) => {
+    setState((current) => ({
+      ...current,
+      objects: current.objects.map((o) => (o.key === object.key ? object : o)),
+    }));
+  }, []);
+
   // The initial state is already the loading root, so the first fetch needs no
   // reset; every write happens after the await.
   useEffect(() => {
@@ -116,5 +129,7 @@ export function useStorageFolder(enabled: boolean) {
     navigate,
     reload: () => navigate(state.prefix),
     loadMore,
+    removeObject,
+    replaceObject,
   };
 }

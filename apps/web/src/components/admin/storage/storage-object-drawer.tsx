@@ -4,7 +4,8 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Spinner } from '@web/components/spinner';
 import { useDict } from '@web/context/dict-context';
-import type { StorageObjectDetail, StorageReference } from '@web/lib/admin-storage-api';
+import type { ClassifiedObject, StorageObjectDetail, StorageReference } from '@web/lib/admin-storage-api';
+import { StorageDeleteButton, isDeletableStatus } from './storage-delete-action';
 import { StorageStatusBadge } from './storage-status-badge';
 import { StorageObjectPreview } from './storage-object-preview';
 import { formatBytes, formatTimestamp, HINT_KEY } from './storage-format';
@@ -22,18 +23,21 @@ const FOCUSABLE =
  * Side drawer with everything the API knows about one object: every
  * reference, the raw key, the orphan hint and an inline preview. Focus is
  * trapped inside while open, Escape closes, and focus returns to the row that
- * opened it.
+ * opened it. An `orphan` / `deleted-row` object gets a *Delete* action in the
+ * footer, which only opens the page's confirmation dialog.
  */
 export function StorageObjectDrawer({
   objectKey,
   state,
   onClose,
   onRetry,
+  onDeleteObject,
 }: {
   objectKey: string;
   state: StorageObjectState;
   onClose: () => void;
   onRetry: () => void;
+  onDeleteObject?: (object: ClassifiedObject) => void;
 }) {
   const d = useDict().adminStorage.drawer;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -103,9 +107,29 @@ export function StorageObjectDrawer({
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <DrawerBody state={state} onRetry={onRetry} />
         </div>
+
+        {state.status === 'ready' && onDeleteObject && (
+          <DeleteFooter detail={state.detail} onDeleteObject={onDeleteObject} />
+        )}
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** Rendered only when the object is deletable; otherwise nothing at all. */
+function DeleteFooter({
+  detail,
+  onDeleteObject,
+}: {
+  detail: StorageObjectDetail;
+  onDeleteObject: (object: ClassifiedObject) => void;
+}) {
+  if (!isDeletableStatus(detail.status)) return null;
+  return (
+    <footer className="border-t border-zinc-200 px-5 py-4 dark:border-zinc-800">
+      <StorageDeleteButton key={detail.key} object={detail} onDelete={onDeleteObject} />
+    </footer>
   );
 }
 

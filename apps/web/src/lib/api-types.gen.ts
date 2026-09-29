@@ -3769,7 +3769,69 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete an orphaned object
+         * @description Re-classifies the key at request time and removes the object only when it is `orphan` or `deleted-row` and was uploaded more than 24 h ago. Anything else answers `409` with the current classification and leaves the object in place. Storage only: no database row is changed.
+         */
+        delete: {
+            parameters: {
+                query: {
+                    key: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Object removed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageDeleteResponse"];
+                    };
+                };
+                /** @description Validation failed or invalid cursor */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No object under that key */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not safe to delete right now */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageDeleteConflict"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -8469,6 +8531,27 @@ export interface components {
             nextCursor?: string;
             objects: components["schemas"]["ClassifiedObject"][];
             prefix: string;
+        };
+        StorageDeleteConflict: {
+            /** @enum {string} */
+            error: "StorageObjectNotDeletable";
+            object: components["schemas"]["ClassifiedObject"] & unknown;
+            /**
+             * @description `not-deletable-status`: not `orphan` / `deleted-row`. `within-grace-window`: uploaded less than 24 h ago.
+             * @enum {string}
+             */
+            reason: "not-deletable-status" | "within-grace-window";
+        };
+        StorageDeleteResponse: {
+            /** @enum {boolean} */
+            deleted: true;
+            key: string;
+            size: number;
+            /**
+             * @description Classification the object had when it was removed.
+             * @enum {string}
+             */
+            status: "orphan" | "deleted-row";
         };
         StorageFolder: {
             /** @description Last segment of the prefix, without the delimiter. */

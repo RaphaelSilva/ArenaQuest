@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useAuth, useHasRole } from '@web/hooks/use-auth';
@@ -9,15 +9,19 @@ import { Spinner } from '@web/components/spinner';
 import { StorageBreadcrumb } from '@web/components/admin/storage/storage-breadcrumb';
 import { StorageListing } from '@web/components/admin/storage/storage-listing';
 import { StorageObjectDrawer } from '@web/components/admin/storage/storage-object-drawer';
-import { StorageScanPanel } from '@web/components/admin/storage/storage-scan-panel';
+import { StorageDeleteDialog } from '@web/components/admin/storage/storage-delete-dialog';
+import { StorageScanPanel, type StorageScanHandle } from '@web/components/admin/storage/storage-scan-panel';
 import { useStorageFolder } from '@web/components/admin/storage/use-storage-folder';
 import { useStorageObject } from '@web/components/admin/storage/use-storage-object';
+import type { ClassifiedObject, StorageDeleteResponse } from '@web/lib/admin-storage-api';
 
 /**
  * `/admin/storage` — the bucket as topic and event folders (RFC 0018).
  *
- * Read-only: nothing on this page uploads, renames or moves an object, and the
- * status of every object is resolved by the API. ADMIN only, matching the
+ * Nothing on this page uploads, renames or moves an object, and the status of
+ * every object is resolved by the API. The one write is deleting a true orphan
+ * (`orphan` / `deleted-row`, older than 24 h) after an explicit confirmation;
+ * the server re-checks it and a refusal refreshes the row with its answer. ADMIN only, matching the
  * router's own `requireRole(ROLES.ADMIN)` — the bucket crosses every topic and
  * event, drafts and restricted events included.
  */
@@ -36,6 +40,37 @@ export default function AdminStoragePage() {
   }, [authLoading, isAdmin, router]);
 
   const closeDrawer = useCallback(() => setSelectedKey(null), []);
+
+  const scanRef = useRef<StorageScanHandle>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ClassifiedObject | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+  const { removeObject, replaceObject } = folder;
+  const { retry: refreshObject } = object;
+
+  const forget = useCallback(
+    (key: string, message: string) => {
+      removeObject(key);
+      scanRef.current?.removeObject(key);
+      setSelectedKey((current) => (current === key ? null : current));
+      setDeleteTarget(null);
+      setAnnouncement(message);
+    },
+    [removeObject],
+  );
+
+  const onDeleted = useCallback(
+    (result: StorageDeleteResponse) => forget(result.key, d.delete.deleted(result.key)),
+    [forget, d],
+  );
+  const onGone = useCallback((key: string) => forget(key, d.delete.alreadyGone(key)), [forget, d]);
+  const onConflict = useCallback(
+    (current: ClassifiedObject) => {
+      replaceObject(current);
+      scanRef.current?.replaceObject(current);
+      if (current.key === selectedKey) refreshObject();
+    },
+    [replaceObject, refreshObject, selectedKey],
+  );
 
   if (authLoading) {
     return (
@@ -58,7 +93,24 @@ export default function AdminStoragePage() {
         <p className="max-w-3xl text-sm text-zinc-600 dark:text-zinc-400">{d.subtitle}</p>
       </div>
 
-      <StorageScanPanel selectedKey={selectedKey} onSelectObject={setSelectedKey} />
+      <p
+        role="status"
+        aria-live="polite"
+        className={
+          announcement
+            ? 'mb-4 break-all rounded-md bg-emerald-50 px-4 py-2 text-sm text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200'
+            : 'sr-only'
+        }
+      >
+        {announcement}
+      </p>
+
+      <StorageScanPanel
+        ref={scanRef}
+        selectedKey={selectedKey}
+        onSelectObject={setSelectedKey}
+        onDeleteObject={setDeleteTarget}
+      />
 
       <StorageBreadcrumb prefix={folder.prefix} titles={folder.titles} onNavigate={folder.navigate} />
 
@@ -81,6 +133,18 @@ export default function AdminStoragePage() {
           state={object.state}
           onClose={closeDrawer}
           onRetry={object.retry}
+          onDeleteObject={setDeleteTarget}
+        />
+      )}
+
+      {deleteTarget && (
+        <StorageDeleteDialog
+          key={deleteTarget.key}
+          object={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={onDeleted}
+          onGone={onGone}
+          onConflict={onConflict}
         />
       )}
     </main>

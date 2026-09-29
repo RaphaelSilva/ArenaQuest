@@ -2192,6 +2192,28 @@ export const dictPt = {
       emptyOrphans: 'Nenhum objeto órfão, pendente antigo, substituído ou com linha excluída foi encontrado.',
       emptyMissing: 'Todos os registros apontam para um arquivo existente.',
     },
+    delete: {
+      action: 'Excluir',
+      actionFor: (name: string) => `Excluir ${name}`,
+      tooRecent: 'Enviado há menos de 24 horas — poderá ser excluído quando esse prazo passar.',
+      title: 'Excluir este objeto?',
+      description:
+        'O arquivo é removido do bucket permanentemente. Nenhum registro do banco de dados é alterado.',
+      confirm: 'Excluir permanentemente',
+      cancel: 'Cancelar',
+      close: 'Fechar',
+      deleting: 'Excluindo…',
+      deleted: (name: string) => `${name} foi excluído do bucket.`,
+      alreadyGone: (name: string) => `${name} já não estava mais no bucket.`,
+      refused: 'O servidor recusou a exclusão deste objeto.',
+      error: 'Não foi possível excluir este objeto. Tente novamente.',
+      reason: {
+        tooRecent: 'Ele foi enviado há menos de 24 horas.',
+        linkedToTopic: (topic: string) => `Este arquivo agora está vinculado ao tópico ${topic}.`,
+        linkedToEvent: (event: string) => `Este arquivo agora é usado pelo evento ${event}.`,
+        nowStatus: (status: string) => `Agora ele está classificado como ${status}.`,
+      },
+    },
   },
   layout: {
     standingBanner: {
