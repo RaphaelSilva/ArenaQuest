@@ -35,7 +35,11 @@ export function MobileSearchBar({ onOpenDrawer }: MobileSearchBarProps) {
     (newQ: string) => {
       const params = new URLSearchParams(searchParams.toString());
       if (newQ) params.set('q', newQ);
-      else params.delete('q');
+      else {
+        // Clearing the search also drops the `?tag=` filter.
+        params.delete('q');
+        params.delete('tag');
+      }
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
     [router, pathname, searchParams],
