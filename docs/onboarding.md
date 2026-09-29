@@ -83,6 +83,47 @@ idempotent — running it twice produces no duplicates.
 To create a *real* admin (on any environment, including remote), use the
 interactive `make bootstrap-admin` instead — but see Known Issues below first.
 
+### Demo seed (RFC 0021)
+
+A richer, label-aware dataset for demos and release-candidate previews: 6 demo
+users (admin, creator, tutor, three students), a 21-topic tree (3 roots × 3
+levels) with 27 `ready` media, a group, two enrollments and gamification state
+(student-1 at 350 XP, student-2 at 950, student-3 at 0).
+
+```bash
+export AQ_DEMO_PASSWORD='…'                        # every demo account's password; never a flag
+make db-seed-demo-local LABEL=budo                 # the local replica (default LABEL=arenaquest)
+make db-seed-demo-local LABEL=budo DRY_RUN=1       # write .arenaquest/demo-budo-local.sql + print the plan only
+make db-seed-demo-staging LABEL=budo               # remote staging D1 — asks you to type its name
+make db-seed-demo-staging LABEL=budo CONFIRM=1     # … without the prompt (CI / scripts)
+node scripts/demo/ci-check.mjs                     # what CI runs (below)
+```
+
+- **No production.** There is no `db-seed-demo-prod`; `seed-demo.mjs` refuses
+  `-e production` and any staging block naming a production D1 or bucket before
+  it writes anything, and the production deploy guard rejects a database holding
+  a demo account (`demo.<user>@<label>.demo.invalid`). Staging tolerates them.
+- **Idempotent.** Ids are deterministic per label; a re-run changes no row
+  count, uploads nothing and rotates the password hash to the current
+  `AQ_DEMO_PASSWORD`.
+- **Dataset.** `scripts/demo/dataset/base.json`, optionally overridden per label
+  by `config/labels/<label>/demo.json`. Media are three public-domain files
+  pinned by SHA-256, cached in `.arenaquest/demo-media/` after the first
+  download (behind a proxy, set `NODE_USE_ENV_PROXY=1`). The local bucket is
+  written in-process through wrangler's `getPlatformProxy`, so a converged local
+  re-run takes seconds.
+- **One label per local replica.** Labels share demo group names and tag slugs,
+  so seeding a second label into the same local replica fails on a `UNIQUE`
+  constraint; `make db-reset-local` before switching labels.
+- **CI.** The *Demo seed check* job runs `scripts/demo/ci-check.mjs`: it applies
+  every migration to a fresh throwaway D1, seeds each label twice (each label in
+  its own copy of the store), and asserts the RFC counts, that every media object
+  exists with its pinned SHA-256, the student XP and badges, `user_xp` = the
+  `xp_events` ledger, and that the second run changed no row count. Media come
+  from `scripts/demo/fixtures/` and any network request fails the check; the
+  password is generated inside the script. It needs Node ≥ 22 (wrangler's floor).
+  A migration that breaks the demo therefore fails the PR that adds it.
+
 ---
 
 ## 4. The naming rule

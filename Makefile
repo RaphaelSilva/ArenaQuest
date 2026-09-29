@@ -27,7 +27,8 @@
         lint lint-api lint-web lint-shared \
         test test-api test-web test-scripts convert-skipped \
         worktree-open worktree-sweep \
-        db-migrate-local db-seed-local db-reset-local \
+        db-migrate-local db-seed-local db-reset-local db-seed-demo-local \
+        db-seed-demo-staging \
         db-migrate-staging db-migrate-prod db-migrations-staging-local \
         bootstrap-admin cf-typegen \
         deploy deploy-api deploy-web \
@@ -56,6 +57,9 @@ BOLD   := \033[1m
 
 # ── Default Values ──────────────────────────────────────────────────────────────
 DEPLOY_LABEL ?= arenaquest
+# The demo seed's label when LABEL is unset (RFC 0021). Deliberately not a
+# global `LABEL ?=`: set-new-label and label-new must keep refusing a missing LABEL.
+DEMO_LABEL = $(or $(LABEL),arenaquest)
 
 # ── Reusable guards ────────────────────────────────────────────────────────────
 
@@ -173,7 +177,8 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/demo/sql.test.mjs \
 		scripts/demo/seed-demo.test.mjs \
 		scripts/demo/media.test.mjs \
-		scripts/demo/gamification.test.mjs
+		scripts/demo/gamification.test.mjs \
+		scripts/demo/ci-check.test.mjs
 
 test-api: ## Run apps/api tests (Vitest + Cloudflare Workers pool)
 	pnpm turbo test --filter api
@@ -202,6 +207,11 @@ db-reset-local: ## Delete the local D1 replica, re-migrate and re-seed
 	@$(MAKE) --no-print-directory db-migrate-local
 	@$(MAKE) --no-print-directory db-seed-local
 	@printf "$(GREEN)  ✔  Local database reset.$(RESET)\n"
+
+# Demo seed (RFC 0021): AQ_DEMO_PASSWORD must be exported (never a variable here).
+db-seed-demo-local: ## Seed the demo dataset into the local replica (LABEL=arenaquest|budo|spaziord; DRY_RUN=1 writes SQL + plan only)
+	node scripts/demo/seed-demo.mjs --label $(DEMO_LABEL) -e local \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
 bootstrap-admin: ## Interactively create the first admin (prompts for local/staging/prod)
 	@bash scripts/bootstrap-first-admin.sh
@@ -261,6 +271,11 @@ deploy-web-staging: ## Build and deploy apps/web to staging Pages (forwards to t
 
 db-migrate-staging: ## Apply D1 migrations to the REMOTE staging database
 	pnpm --filter api exec wrangler d1 migrations apply $(DEPLOY_LABEL)-db-staging --env staging --remote
+
+db-seed-demo-staging: ## Seed the demo dataset into the REMOTE staging D1 of LABEL (prompts for the database name; CONFIRM=1, DRY_RUN=1)
+	node scripts/demo/seed-demo.mjs --label $(DEMO_LABEL) -e staging \
+		$(if $(filter 1,$(CONFIRM)),--yes,) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
 r2-cors-staging: ## Apply the profile-derived CORS rules to the staging bucket
 	node scripts/cloudflare/provision-label.mjs $(DEPLOY_LABEL) --only cors
@@ -385,14 +400,16 @@ confirm-prod:
 	fi
 
 # Refuse to deploy over a database that still contains the dev-seed accounts.
+# The guard's mode is explicit: `--target staging` tolerates demo accounts
+# (RFC 0021), production — also the default when absent — rejects them.
 guard-no-dev-seed-staging:
 	@printf "$(CYAN)  →  Checking staging DB for dev-seed accounts ...$(RESET)\n"
 	@pnpm --filter api exec tsx scripts/check-no-dev-seed.ts \
-		--db arenaquest-db-staging --env staging
+		--db arenaquest-db-staging --env staging --target staging
 
 guard-no-dev-seed-prod:
-	@printf "$(CYAN)  →  Checking production DB for dev-seed accounts ...$(RESET)\n"
-	@pnpm --filter api exec tsx scripts/check-no-dev-seed.ts --db arenaquest-db
+	@printf "$(CYAN)  →  Checking production DB for dev-seed and demo accounts ...$(RESET)\n"
+	@pnpm --filter api exec tsx scripts/check-no-dev-seed.ts --db arenaquest-db --target production
 
 # ==============================================================================
 # ⛔ REMOVED — these used to mean PRODUCTION implicitly.
