@@ -1,6 +1,6 @@
 # Task 03 — Frontend: Catalog search matcher and sidebar (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [24 — Catalog search by tags](./milestone.md)
 **RFC:** [RFC 0017](../../RFCs/0017-catalog-search-by-tags.md)
 **Team:** Frontend Web
@@ -76,21 +76,21 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `matchTopic` unit tests pass for `chudan`, `tsuki chudan`, `kata  basica` against
+- [x] `matchTopic` unit tests pass for `chudan`, `tsuki chudan`, `kata  basica` against
       the corresponding titles, and for `soco` / `faixa amarela` against topics carrying
       those tags.
-- [ ] Existing `catalog-sidebar.test.tsx` and `CatalogSidebar.test.tsx` pass without edits
+- [x] Existing `catalog-sidebar.test.tsx` and `CatalogSidebar.test.tsx` pass without edits
       to their existing cases.
-- [ ] A topic matched only by a tag renders its chip; a topic matched by title renders no
+- [x] A topic matched only by a tag renders its chip; a topic matched by title renders no
       chip.
-- [ ] `?tag=soco` shows the tagged topic and its ancestors, hides an untagged sibling root,
+- [x] `?tag=soco` shows the tagged topic and its ancestors, hides an untagged sibling root,
       and renders the tagged topic's untagged children without a chip.
-- [ ] Dismissing the active-tag chip removes `tag` from the URL and keeps `q`.
-- [ ] Clearing the mobile search input removes both `q` and `tag`.
-- [ ] Typing in the search box triggers no additional `topics.list()` call.
-- [ ] `check-i18n-coverage.js` passes; `dict-en` / `dict-pt` keys identical.
-- [ ] Components lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] Dismissing the active-tag chip removes `tag` from the URL and keeps `q`.
+- [x] Clearing the mobile search input removes both `q` and `tag`.
+- [x] Typing in the search box triggers no additional `topics.list()` call.
+- [x] `check-i18n-coverage.js` passes; `dict-en` / `dict-pt` keys identical.
+- [x] Components lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

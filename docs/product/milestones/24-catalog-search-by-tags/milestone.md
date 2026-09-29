@@ -105,7 +105,7 @@ Out of scope (explicit, from RFC 0017 Non-Goals and Resolved Decisions):
 |---|-----------|-------|------|--------|
 | 01 | [Shared text normaliser and tag slugify](./01-shared-text-normaliser-and-tag-slugify.task.md) | 0 | Backend | ✅ Done |
 | 02 | [Tag authoring API](./02-tag-authoring-api.task.md) | 1 | Backend | ✅ Done |
-| 03 | [Catalog search matcher and sidebar](./03-catalog-search-matcher-and-sidebar.task.md) | 1 | Frontend | ☐ Open |
+| 03 | [Catalog search matcher and sidebar](./03-catalog-search-matcher-and-sidebar.task.md) | 1 | Frontend | ✅ Done |
 | 04 | [Topic page tag chips](./04-topic-page-tag-chips.task.md) | 2 | Frontend | ☐ Open |
 | 05 | [Admin tag combobox](./05-admin-tag-combobox.task.md) | 2 | Frontend | ☐ Open |
 | 06 | [Importer README tags](./06-importer-readme-tags.task.md) | 2 | Backend | ☐ Open |
