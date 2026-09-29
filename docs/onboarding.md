@@ -11,7 +11,7 @@ Google sign-in, and anything targeting staging or production.
 
 ## 1. The 10-minute path
 
-**Prerequisites:** Node ≥ 20 and pnpm ≥ 9 (`corepack enable` gives you pnpm).
+**Prerequisites:** Node ≥ 22 and pnpm ≥ 9 (`corepack enable` gives you pnpm).
 
 ```bash
 git clone <repo-url> ArenaQuest
