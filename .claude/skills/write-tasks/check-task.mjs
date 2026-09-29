@@ -71,6 +71,17 @@ function constraintsBlock(text) {
   return lines.slice(start, end).join('\n');
 }
 
+// A task of an epic whose `**Derived from:**` is "—" has no RFC to link, so the
+// missing-RFC advisory would only be noise there.
+function standaloneEpic(path, text) {
+  if (!/\*\*Epic:\*\*/.test(text)) return false;
+  const folder = resolve(path, '..');
+  const epic = readdirSync(folder).find((f) => f.endsWith('.epic.md'));
+  if (!epic) return false;
+  const m = /^\*\*Derived from:\*\*\s*(.*)$/m.exec(readFileSync(join(folder, epic), 'utf8'));
+  return !!m && !/\[RFC/i.test(m[1]);
+}
+
 function checkTaskFile(path) {
   const errs = [];
   const warns = [];
@@ -118,7 +129,9 @@ function checkTaskFile(path) {
     }
   }
 
-  if (!/\*\*RFC:\*\*/.test(text)) warns.push('no **RFC:** link (recommended — trace the task to its proposal)');
+  if (!/\*\*RFC:\*\*/.test(text) && !standaloneEpic(path, text)) {
+    warns.push('no **RFC:** link (recommended — trace the task to its proposal)');
+  }
   const accept = text.slice(text.search(/^##\s.*acceptance/im));
   if (!/make (test|lint|test-api|test-web)/.test(accept)) {
     warns.push('Acceptance Criteria names no gate command (make lint / test-api / test-web)');

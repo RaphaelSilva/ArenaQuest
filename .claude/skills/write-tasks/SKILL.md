@@ -146,7 +146,7 @@ node .claude/skills/write-tasks/new-task.mjs \
 - The header carries `**Epic:** [<Title>](./<stem>.epic.md)` instead of
   `**Milestone:**`. The `**RFC:**` line is copied from the epic's
   `**Derived from:**` line (first RFC link); a standalone epic (`—`) gets none,
-  which `check-task.mjs` reports as an advisory warning only.
+  and `check-task.mjs` does not warn about the missing RFC link for its tasks.
 - The printed row has the epic table's shape,
   `| # | Task | Team | Depends on | Status |` — replace the planned row (whose
   title is not yet a link) with it, and keep the waves in sync.
