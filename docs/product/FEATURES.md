@@ -118,6 +118,22 @@ put material into the platform.
 **Code:** `apps/web/src/app/(protected)/admin/topics/`
 → [M3](./milestones/3-content-and-media-core/milestone.md) · ✅
 
+### Admin storage browser and orphan audit
+An admin-only *Storage* page that shows the R2 bucket as folders and names each
+file's owner: the topic title, original file name and uploader for media, or the
+event for a flyer. Every object gets one server-side classification: `linked`,
+`pending` (flagged `stale` after 24 h), `displaced`, `deleted-row` or `orphan`,
+with a hint for orphans. A stateless audit that the browser drives page by page
+lists objects nobody owns and rows whose object is gone, with byte totals per
+status. The only write is a guarded delete: it re-classifies the key at request
+time, removes only an `orphan` / `deleted-row` object older than 24 h, and never
+touches a DB row. Each deletion logs one `storage.orphan.deleted` line.
+Which columns hold an R2 key is listed once, in `STORAGE_KEY_OWNERS`, and a spec
+fails on any unregistered `*_key` column in the migrations.
+
+**Code:** `apps/api/src/{controllers/admin-storage.controller.ts,routes/admin/storage.ts,adapters/db/d1-storage-reference-repository.ts}`, `packages/shared/domain/storage/key-owners.ts`, `apps/web/src/app/(protected)/admin/storage/`
+→ [M25](./milestones/25-admin-storage-browser-and-orphan-audit/milestone.md) · [RFC 0018](./RFCs/0018-admin-storage-browser-and-orphan-audit.md) · ✅ (the staging `/audit` latency check is still pending; see the milestone)
+
 ### Participant catalog
 The learner-facing catalog, rebuilt to the wireframe: route topology collapsed to
 `/catalog` and `/catalog/[id]` so any node at any depth is addressable by id, a

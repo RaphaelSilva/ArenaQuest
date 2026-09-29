@@ -26,7 +26,7 @@ it lives in the linked milestone, and is summarised in
 | [0015](./0015-event-extras-one-off-charges-for-events.md) | Event extras: one-off charges for events | 📝 Draft | [M22](../milestones/22-event-extras-one-off-charges/milestone.md) | 2026-09-27 |
 | [0016](./0016-student-notes.md) | Student notes — private and shared topic notes with staff moderation | Proposed | [M21](../milestones/21-student-notes/milestone.md) | 2026-09-27 |
 | [0017](./0017-catalog-search-by-tags.md) | Catalog search by tags | 📝 Draft | [M24](../milestones/24-catalog-search-by-tags/milestone.md) | 2026-09-29 |
-| [0018](./0018-admin-storage-browser-and-orphan-audit.md) | Admin storage browser and orphan audit | Proposed | [M25](../milestones/25-admin-storage-browser-and-orphan-audit/milestone.md) | 2026-09-29 |
+| [0018](./0018-admin-storage-browser-and-orphan-audit.md) | Admin storage browser and orphan audit | ✅ Implemented | [M25](../milestones/25-admin-storage-browser-and-orphan-audit/milestone.md) | 2026-09-29 |
 
 Milestones 1–7 predate this process and derive directly from
 [`../specification.md`](../specification.md).
