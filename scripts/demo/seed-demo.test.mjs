@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, rmSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import {
   DRY_RUN_PASSWORD_HASH,
@@ -55,6 +56,23 @@ test('local resolves to the shared local replica', () => {
     database: LOCAL_DATABASE,
     wranglerArgs: ['--local'],
   });
+});
+
+test('--persist-to is local-only and resolves to an absolute store for D1 and R2 alike', () => {
+  assert.deepEqual(parseSeedArgs(['--label', 'budo', '-e', 'local', '--persist-to', 'tmp/state']), {
+    label: 'budo',
+    env: 'local',
+    dryRun: false,
+    yes: false,
+    persistTo: 'tmp/state',
+  });
+  assert.throws(() => parseSeedArgs(['--label', 'budo', '-e', 'staging', '--persist-to', '/x']), /only applies to -e local/);
+  assert.throws(() => parseSeedArgs(['--label', 'budo', '-e', 'local', '--persist-to', ' ']), /needs a directory/);
+  const target = resolveTarget({ label: 'budo', env: 'local', profiles: PROFILES, persistTo: 'tmp/state' });
+  assert.equal(target.persistTo, resolve('tmp/state'));
+  assert.deepEqual(target.wranglerArgs, ['--local', '--persist-to', resolve('tmp/state')]);
+  assert.deepEqual(wranglerCommand(target, '/abs/demo.sql').slice(-7), ['arenaquest-db', '--local', '--persist-to', resolve('tmp/state'), '--file', '/abs/demo.sql', '--yes']);
+  assert.throws(() => resolveTarget({ label: 'budo', env: 'staging', profiles: PROFILES, persistTo: '/x' }), /only applies to -e local/);
 });
 
 test('staging resolves to the profile D1 and the <label>-staging wrangler env', () => {
