@@ -281,6 +281,12 @@ async function runMain({ failPut = () => false, fetchTable, r2 = memoryR2({ fail
     runR2: run,
     fetchImpl: stubFetch(fetchTable ?? table).fetchImpl,
     executeSql: (command) => {
+      if (command.includes('--command')) {
+        // The read-only user_xp check after the seed: answer "consistent" for every id asked.
+        const ids = command[command.indexOf('--command') + 1].match(/[0-9a-f]{8}-[0-9a-f-]{27}/g) ?? [];
+        const results = ids.map((id) => ({ user_id: id, total_xp: 0, ledger_xp: 0 }));
+        return { status: 0, stdout: JSON.stringify([{ results, success: true }]), stderr: '' };
+      }
       executed.push(command);
       return { status: 0, stdout: '', stderr: '' };
     },

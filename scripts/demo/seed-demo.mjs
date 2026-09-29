@@ -10,9 +10,10 @@
  * build ONE SQL file (`.arenaquest/demo-<label>-<env>.sql`, gitignored) with
  * `sql.mjs` → resolve every media object (media.mjs: exists / cached / download)
  * → confirm a remote write → fetch, validate, upload and confirm the missing
- * objects → `wrangler d1 execute --file` → summary. The SQL (whose `media` rows
- * are `ready`) runs only once every object is in the bucket; any media failure
- * aborts before it.
+ * objects → `wrangler d1 execute --file` → assert `user_xp` = ledger sum for
+ * every demo student → summary. The SQL (whose `media` rows are `ready`) runs
+ * only once every object is in the bucket; any media failure aborts before it.
+ * The XP assertion is a read-only query; a mismatch fails the run loudly.
  *
  * Target (resolved like the deploy CLI, `scripts/cloudflare/deploy.mjs`):
  *   local    → `arenaquest-db --local`, the one local replica every label
@@ -51,6 +52,7 @@ import { parseArgs as nodeParseArgs } from 'node:util';
 import { parseJsonc } from '../label.mjs';
 import log from '../lib/log.mjs';
 import { loadDataset, renderTopicMarkdown, readSampleTopic } from './dataset.mjs';
+import { checkXpConsistency, readGamificationReference, xpConsistencyQuery } from './gamification.mjs';
 import { hashPassword } from './hash.mjs';
 import { listLabels } from './ids.mjs';
 import { buildMediaPlan, createR2, defaultCacheDir, formatMediaPlan, materialiseMedia, mediaTarget, resolveMediaPlan, runWrangler } from './media.mjs';
@@ -156,6 +158,48 @@ export function wranglerCommand(target, file) {
   return ['pnpm', '--filter', 'api', 'exec', 'wrangler', 'd1', 'execute', target.database, ...target.wranglerArgs, '--file', file, '--yes'];
 }
 
+/** The wrangler argv that runs the read-only `query` against `target`, printing JSON. */
+export function wranglerQueryCommand(target, query) {
+  return ['pnpm', '--filter', 'api', 'exec', 'wrangler', 'd1', 'execute', target.database, ...target.wranglerArgs, '--command', query, '--json'];
+}
+
+/**
+ * The result rows of `wrangler d1 execute --json` output. Wrangler may print
+ * banners (e.g. the proxy warning) before the JSON array, so parsing starts at
+ * the first line that opens it.
+ */
+export function parseD1Json(stdout) {
+  const text = String(stdout ?? '');
+  const start = text.search(/^\[/m);
+  if (start < 0) throw new Error('wrangler d1 execute --json printed no JSON result');
+  const parsed = JSON.parse(text.slice(start));
+  const results = Array.isArray(parsed) ? parsed.flatMap((entry) => entry?.results ?? []) : [];
+  return results;
+}
+
+/**
+ * Throws naming every demo student whose `user_xp.total_xp` differs from its
+ * `xp_events` sum (see gamification.mjs). `query(command)` returns spawnSync's shape.
+ */
+export function assertXpConsistency({ target, dataset, ctx, query }) {
+  const students = dataset.gamification.students.map((state) => state.user);
+  const ids = students.map((key) => ctx.id('user', key));
+  const names = Object.fromEntries(students.map((key, index) => [ids[index], key]));
+  const result = query(wranglerQueryCommand(target, xpConsistencyQuery(ids)));
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    process.stderr.write(`${result.stdout ?? ''}${result.stderr ?? ''}`);
+    throw new Error(`the user_xp consistency query exited with status ${result.status}`);
+  }
+  const rows = parseD1Json(result.stdout);
+  const problems = checkXpConsistency(rows, ids, names);
+  if (problems.length > 0) {
+    throw new Error(`user_xp does not match the xp_events ledger after the seed:\n  - ${problems.join('\n  - ')}`);
+  }
+  const byId = new Map(rows.map((row) => [row.user_id, row]));
+  return ids.map((id) => ({ user: names[id], totalXp: Number(byId.get(id).total_xp) }));
+}
+
 export function formatSummary(summary) {
   const width = Math.max(...summary.map((row) => row.entity.length));
   return summary.map((row) => `${row.entity.padEnd(width)}  ${String(row.rows).padStart(3)}  (${row.section})`);
@@ -226,7 +270,8 @@ function runSqlFile(command) {
 
 /**
  * `deps` exists for the tests: `runR2` (wrangler for R2, see media.mjs),
- * `fetchImpl`, `executeSql(command)` (the d1 execute), `cacheDir`, `sqlFile`, `dataset`.
+ * `fetchImpl`, `executeSql(command)` (the d1 execute, also used for the
+ * read-only XP check), `cacheDir`, `sqlFile`, `dataset`, `now`.
  */
 export async function main(argv = process.argv.slice(2), envVars = process.env, deps = {}) {
   const {
@@ -236,6 +281,7 @@ export async function main(argv = process.argv.slice(2), envVars = process.env, 
     cacheDir = defaultCacheDir(),
     sqlFile = null,
     dataset: datasetOverride = null,
+    now = new Date(),
   } = deps;
   const args = parseSeedArgs(argv);
   if (args.help) {
@@ -255,6 +301,8 @@ export async function main(argv = process.argv.slice(2), envVars = process.env, 
     passwordHash: password === null ? DRY_RUN_PASSWORD_HASH : await hashPassword(password),
     sanitizeMarkdown: await loadSanitizeMarkdown(),
     renderMarkdown: (title) => renderTopicMarkdown(title, template),
+    now,
+    gamification: readGamificationReference(),
   });
   const { sql, summary } = buildSeedSql(dataset, ctx);
 
@@ -298,6 +346,9 @@ export async function main(argv = process.argv.slice(2), envVars = process.env, 
   }
 
   for (const line of formatSummary(summary)) log.ok(`upserted ${line}`);
+
+  const xp = assertXpConsistency({ target, dataset, ctx, query: executeSql });
+  log.ok(`user_xp matches the xp_events ledger: ${xp.map((row) => `${row.user} ${row.totalXp} XP`).join(', ')}`);
   return 0;
 }
 

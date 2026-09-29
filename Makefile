@@ -172,7 +172,8 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/demo/hash.test.mjs \
 		scripts/demo/sql.test.mjs \
 		scripts/demo/seed-demo.test.mjs \
-		scripts/demo/media.test.mjs
+		scripts/demo/media.test.mjs \
+		scripts/demo/gamification.test.mjs
 
 test-api: ## Run apps/api tests (Vitest + Cloudflare Workers pool)
 	pnpm turbo test --filter api
