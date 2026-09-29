@@ -1,6 +1,6 @@
 # Task 06 — Backend: Guarded orphan delete API (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [25 — Admin storage browser and orphan audit](./milestone.md)
 **RFC:** [RFC 0018](../../RFCs/0018-admin-storage-browser-and-orphan-audit.md)
 **Team:** Backend API
@@ -57,20 +57,20 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `DELETE /object` returns `409` with the current classification for a `linked` media
+- [x] `DELETE /object` returns `409` with the current classification for a `linked` media
       object, a `linked` flyer, a `pending` object, a `displaced` object and an orphan uploaded
       1 hour ago; each object is still in the bucket afterwards.
-- [ ] On an orphan uploaded 25 hours ago it returns `200`, the object is gone, and exactly one
+- [x] On an orphan uploaded 25 hours ago it returns `200`, the object is gone, and exactly one
       `storage.orphan.deleted` line with key, size and admin id is logged.
-- [ ] On a `deleted-row` object older than 24 h it returns `200`, the object is gone and the
+- [x] On a `deleted-row` object older than 24 h it returns `200`, the object is gone and the
       `media` row is unchanged (still `deleted`).
-- [ ] No D1 row changes during any delete call (row counts and `updated_at` values compared
+- [x] No D1 row changes during any delete call (row counts and `updated_at` values compared
       before/after in the spec).
-- [ ] An absent key returns `404`; no token returns `401`; `content_creator` and `student`
+- [x] An absent key returns `404`; no token returns `401`; `content_creator` and `student`
       tokens return `403`.
-- [ ] No D1 or R2 import in the controller.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] No D1 or R2 import in the controller.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
