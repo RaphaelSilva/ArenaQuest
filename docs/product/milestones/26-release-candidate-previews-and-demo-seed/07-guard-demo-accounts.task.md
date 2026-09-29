@@ -1,6 +1,6 @@
 # Task 07 — Backend: Guard recognises demo accounts (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -52,14 +52,14 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Against a local D1 seeded with the demo, the guard in production mode exits 1 and lists
+- [x] Against a local D1 seeded with the demo, the guard in production mode exits 1 and lists
       the demo accounts; in staging mode it exits 0.
-- [ ] Against a fresh D1 (no `users` table) it exits 0 in both modes.
-- [ ] Existing dev-seed detection behaves exactly as before (existing specs green).
-- [ ] `deploy.mjs --label budo -e production --dry-run` shows the guard step with the
+- [x] Against a fresh D1 (no `users` table) it exits 0 in both modes.
+- [x] Existing dev-seed detection behaves exactly as before (existing specs green).
+- [x] `deploy.mjs --label budo -e production --dry-run` shows the guard step with the
       production mode.
-- [ ] `make test-api`, `make test-scripts` and `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `make test-api`, `make test-scripts` and `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
@@ -67,3 +67,12 @@ Out:
 2. Run it against a fresh replica.
 3. `make test-api && make test-scripts && make lint`.
 4. `git diff --stat` confirms only scope-guardrail files changed.
+
+## Implementation notes
+
+- Mode is an explicit `--target production|staging` flag; **absent means production** (fail-safe); an unknown value
+  exits 2. `deploy.mjs` always passes it (`Guard (production): no dev-seed or demo accounts in <db>`).
+- The staging-mode "exit 0 with demo rows" case was shown on a scratch D1 holding only demo rows: the local replica
+  also holds the dev seed, which the unchanged dev-seed check still rejects in both modes.
+- The Makefile target `guard-no-dev-seed-staging` passes no `--target` and therefore now runs in production mode;
+  it is fixed in Task 08 (Makefile is in that task's scope). Nothing calls it today.
