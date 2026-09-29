@@ -55,7 +55,7 @@ ArenaQuest/
 
 ## ⚙️ Getting Started
 
-**Prerequisites:** Node.js ≥ 20 and pnpm ≥ 9.
+**Prerequisites:** Node.js ≥ 22 and pnpm ≥ 9.
 
 ```bash
 # 1. Clone the repository

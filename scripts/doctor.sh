@@ -81,13 +81,13 @@ group "toolchain"
 # ────────────────────────────────────────────────────────────────────────────
 if command -v node >/dev/null 2>&1; then
   NODE_VERSION="$(node -v | sed 's/^v//')"
-  if version_gte "${NODE_VERSION}" "20.0.0"; then
+  if version_gte "${NODE_VERSION}" "22.0.0"; then
     pass "node" "v${NODE_VERSION}"
   else
-    gap "node" "v${NODE_VERSION} (need >= 20)" "install Node 20+ — see package.json engines"
+    gap "node" "v${NODE_VERSION} (need >= 22)" "install Node 22+ — see package.json engines"
   fi
 else
-  gap "node" "not found" "install Node 20+"
+  gap "node" "not found" "install Node 22+"
 fi
 
 if command -v pnpm >/dev/null 2>&1; then
