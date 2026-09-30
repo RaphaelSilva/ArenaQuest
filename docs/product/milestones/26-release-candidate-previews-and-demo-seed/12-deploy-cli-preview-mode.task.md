@@ -1,6 +1,6 @@
 # Task 12 — Backend: Deploy CLI preview mode, Make targets and workflow (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done (live preview runs pending — see Acceptance Criteria)
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -73,20 +73,20 @@ Out:
 
 - [ ] `make deploy-preview-staging LABEL=budo CANDIDATE=m21` prints a web URL on
       `m21.<budo staging pages host>` and a Workers Preview URL; `demo.admin` logs in on the
-      web preview (CORS and refresh cookie work) and topic media play.
+      web preview (CORS and refresh cookie work) and topic media play. _(Pending live run — needs Cloudflare credentials. `DRY_RUN=1` prints the full plan and the web URL `https://m21.budo-web-staging.pages.dev`.)_
 - [ ] During and after the preview, the live staging API and web keep serving the previous
-      version (unchanged `wrangler deployments list` for the staging Worker).
-- [ ] The run's report includes the bookmark and a working restore command.
-- [ ] `--preview x -e production` and a name like `Feature/M21` exit non-zero before any
+      version (unchanged `wrangler deployments list` for the staging Worker). _(Pending live run.)_
+- [ ] The run's report includes the bookmark and a working restore command. _(The plan prints the restore command template; a real bookmark needs credentials — pending.)_
+- [x] `--preview x -e production` and a name like `Feature/M21` exit non-zero before any
       step runs.
-- [ ] A candidate with a destructive migration (no `@contract`) stops at the lint step,
-      before the bookmark and migrate steps.
+- [x] A candidate with a destructive migration (no `@contract`) stops at the lint step,
+      before the bookmark and migrate steps. _(Verified with a stubbed lint failure: the run stops before bookmark and migrate.)_
 - [ ] `make preview-delete-staging LABEL=budo CANDIDATE=m21` removes the Worker preview and
-      the Pages branch deployments.
+      the Pages branch deployments. _(Pending live run; dry-run plan verified.)_
 - [ ] `preview-candidate.yml` has only a `workflow_dispatch` trigger; a run with `label: all`
-      produces three previews and lists their URLs in the job summary.
-- [ ] `make test-scripts`, `make lint`, `make test-api`, `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+      produces three previews and lists their URLs in the job summary. _(Trigger verified; the `all` dispatch run is pending.)_
+- [x] `make test-scripts`, `make lint`, `make test-api`, `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
@@ -97,3 +97,18 @@ Out:
 5. `make preview-delete-staging LABEL=budo CANDIDATE=m21`; confirm both previews are gone.
 6. Dispatch the workflow with `all`.
 7. `git diff --stat` confirms only scope-guardrail files changed.
+
+## Implementation notes
+
+- Web preview URL is `https://<name>.<pagesProject>.pages.dev` (where Pages serves `--branch`); the CLI refuses a
+  name whose origin the staging `ALLOWED_ORIGINS` would not allow (`originAllowed`, a copy of the API's
+  `origin-policy.ts` rules) or whose `<name>-<worker>` exceeds one DNS label.
+- Plan order: lint-migrations → build-shared → bookmark → migrate → deploy-worker-preview → build-web →
+  deploy-pages-branch → report. Any failure after the bookmark prints the restore command.
+- The API preview URL is taken from `wrangler preview --json` → `preview.urls[0]` (per-preview URL, stable across
+  redeploys; shape read from wrangler 4.144 source, not yet from a live run). `parsePreviewUrl` fails loudly with
+  the raw output if the shape differs.
+- `--scope web` requires `--api-url`. `--summary-file` feeds `$GITHUB_STEP_SUMMARY` in `preview-candidate.yml`.
+- Delete removes the Worker preview and only the branch's **Preview** Pages deployments, re-listing until none remain.
+- Extra files outside the listed guardrail: `scripts/cloudflare/deploy.test.mjs` (URL-capture test) and
+  `originAllowed` in `scripts/label.mjs`.

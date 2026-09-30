@@ -290,6 +290,25 @@ The D1 is emptied in place (same `database_id`); the bucket is not emptied. It
 refuses `-e production`, `-e local` and any production-named D1/bucket through the
 seed's own `resolveTarget`, before any wrangler call; there is no `-prod` target.
 
+**Previewing a candidate (RFC 0021 §1):**
+```bash
+make deploy-preview-staging LABEL=budo CANDIDATE=m21 [DRY_RUN=1]   # API Workers Preview + Pages branch on staging data
+make preview-delete-staging LABEL=budo CANDIDATE=m21              # remove both after the merge
+```
+Both forward to `deploy.mjs --label <l> -e staging --preview <name> [--delete]`
+(`CANDIDATE` empty → `m<N>` from `feature/m<N>/candidate`; name `[a-z0-9-]{1,20}`;
+`-e production` refused). Plan: guard → `check-migrations` against `origin/main` →
+D1 Time Travel bookmark → migrate the staging D1 → `wrangler preview --json` (URL from
+`preview.urls[0]`, parsed in one helper, `parsePreviewUrl`) → web build with that
+`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL=https://<name>.<pagesProject>.pages.dev`,
+`NEXT_PUBLIC_PREVIEW_NAME`/`_SHA` → `pages deploy --branch <name>` → report (both URLs,
+bookmark, restore command). The live staging Worker and the Pages production branch are
+never touched, and the web preview origin must pass the staging `ALLOWED_ORIGINS`
+(`originAllowed`, the API's matching) or the CLI refuses. `--scope web` needs `--api-url`.
+`.github/workflows/preview-candidate.yml` runs the same CLI on `workflow_dispatch`
+only (`label`: one or `all`), writing the URLs to the job summary. See
+`docs/onboarding.md` → "Previewing a candidate".
+
 Renamed targets (`db-migrations-dev` → `db-migrate-local`, `db-seed-dev` →
 `db-seed-local`, `create-db` → `create-db-prod`, ...) still work as deprecated
 aliases that print a pointer. Use the new names.

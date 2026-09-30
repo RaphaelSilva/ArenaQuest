@@ -33,6 +33,7 @@
         bootstrap-admin cf-typegen \
         deploy deploy-api deploy-web \
         deploy-staging deploy-api-staging deploy-web-staging \
+        deploy-preview-staging preview-delete-staging \
         deploy-prod deploy-api-prod deploy-web-prod \
         drive-login import-media-staging import-media-prod \
         r2-cors-staging r2-cors-prod \
@@ -166,6 +167,7 @@ test: test-scripts ## Run all tests
 test-scripts: ## Run the operational script unit tests (node:test — no network, no wrangler)
 	node --test scripts/label.test.mjs \
 		scripts/deploy/core.test.mjs \
+		scripts/cloudflare/deploy.test.mjs \
 		scripts/cloudflare/provision-label.test.mjs \
 		scripts/content/import-media.test.mjs \
 		scripts/content/drive-source.test.mjs \
@@ -276,6 +278,21 @@ deploy-api-staging: ## Deploy apps/api to staging Workers (forwards to the deplo
 
 deploy-web-staging: ## Build and deploy apps/web to staging Pages (forwards to the deploy CLI)
 	node scripts/cloudflare/deploy.mjs --label $(DEPLOY_LABEL) -e staging --scope web
+
+# Candidate previews of staging (RFC 0021 §1): a Workers Preview of LABEL's staging
+# Worker + a Pages branch deployment, both on staging's data. The live staging Worker
+# and the Pages production branch are never touched. An empty CANDIDATE takes m<N>
+# from a feature/m<N>/candidate branch. There is no -prod variant, by design.
+deploy-preview-staging: ## Deploy the current checkout as preview CANDIDATE of LABEL's staging (lint → bookmark → migrate → API + web previews; SCOPE=, API_URL= for SCOPE=web, DRY_RUN=1)
+	node scripts/cloudflare/deploy.mjs --label $(DEMO_LABEL) -e staging --preview "$(CANDIDATE)" \
+		$(if $(SCOPE),--scope $(SCOPE),) \
+		$(if $(API_URL),--api-url $(API_URL),) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+preview-delete-staging: ## Delete preview CANDIDATE of LABEL's staging: the Worker preview and the Pages branch deployments (DRY_RUN=1)
+	node scripts/cloudflare/deploy.mjs --label $(DEMO_LABEL) -e staging --preview "$(CANDIDATE)" --delete \
+		$(if $(SCOPE),--scope $(SCOPE),) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
 db-migrate-staging: ## Apply D1 migrations to the REMOTE staging database
 	pnpm --filter api exec wrangler d1 migrations apply $(DEPLOY_LABEL)-db-staging --env staging --remote
