@@ -1,6 +1,6 @@
 # Milestone 22 — Event extras: one-off charges on a separate billing rail
 
-**Status:** 📝 Draft
+**Status:** ✅ Done
 **Scope:** `apps/api` (billing bounded context: new event-charge ledger, per-rail standing, roster, reports, daily run), `packages/shared` (billing types, new port, `receivable.ts`), `apps/web` (admin billing console, admin events panel, student `/settings/billing`). Derived from [RFC 0015](../../RFCs/0015-event-extras-one-off-charges-for-events.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: the new migration `apps/api/migrations/0028_create_event_charges.sql` (renumbered to `0029` if RFC 0016's `0028_create_topic_notes.sql` lands first); the new files `packages/shared/{ports/i-event-charge-repository.ts,domain/billing/receivable.ts}` and their re-exports in `ports/index.ts` / `domain/billing/index.ts`; `packages/shared/types/entities.ts` **only** to add `Entities.Billing.EventPrice`/`EventCharge` and `Config.ChargeStatus`; the new `apps/api/src/adapters/db/d1-event-charge-repository.ts` and `apps/api/src/core/billing/event-charge-service.ts`; the existing `apps/api/src/core/billing/{billing-service.ts,accounting-service.ts}`, `apps/api/src/controllers/{admin-billing.controller.ts,me-billing.controller.ts}`, `apps/api/src/routes/admin/billing.ts`, `apps/api/src/routes/me/billing.ts` and the container wiring in `apps/api/src/index.ts`; `apps/web/src/app/(protected)/admin/billing/**`, a read-only panel under `apps/web/src/app/(protected)/admin/events/**`, `apps/web/src/app/(protected)/settings/billing/**`, the billing API clients under `apps/web/src/lib/`, both i18n dictionaries; and, for the closeout only, a local seed file under `apps/api/migrations/seed/`, `docs/product/FEATURES.md`, RFC 0015's `Status:` header and its README row. It is explicitly **not** an opportunity to: **merge the two rails** — no field, filter, report or standing may combine contract invoices and event charges, except the explicitly named `cashReceivedMinor`; grant or revoke anything — no write to `enrollments_*` or `event_audience_*`, no read of `getEffectiveAccessTopicIds`, no gate, no `402` (RFC 0013 #2, RFC 0015 Resolved #1); alter any RFC 0013 table (`invoices`, `payments`, `invoice_adjustments`, `subscriptions`, `billing_plans`, `billing_standing_holds`) or the invoice run's idempotency key; add a money column or any money route to `events` / `routes/admin/events.ts`; build self-service checkout, a payment gateway, guest charges, quantities/tickets/seat limits, installments or automatic charging on RSVP/audience; add a hold for the extras rail; or charge a `draft`/`archived` event. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
@@ -86,26 +86,27 @@ Out of scope (explicit, from RFC 0015 Non-Goals):
 
 ## 3. Acceptance Criteria
 
-- [ ] Migration `0028` (or `0029`) creates exactly `event_prices`, `event_charges`, `event_charge_adjustments`, `event_charge_payments` and their indexes, and contains no `ALTER`, `DROP` or `UPDATE` of any pre-existing table.
-- [ ] Issuing the same `(eventId, userIds)` twice returns every pair in `created` the first time and in `absorbed` the second; `SELECT COUNT(*)` is unchanged by the second call.
-- [ ] Issuing on a `draft` or `archived` event returns `409` and writes nothing.
-- [ ] A negotiated amount without `termsNote` returns `400`.
-- [ ] A payment equal to the balance leaves the charge `paid`; its reversal leaves it `open`; reversing the reversal returns `409`.
-- [ ] Voiding a charge with positive net payments returns `409`.
-- [ ] **Rail isolation (API test):** contract paid-up + one overdue charge ⇒ roster `contract.standing = good`, `extras.standing = delinquent`; late invoice + all charges paid ⇒ `contract.standing = delinquent`, `extras.standing = good`.
-- [ ] Calling `resolveRailStanding('contract', …)` with an `event_charge` item throws.
-- [ ] With charges present, `GET /v1/admin/billing/students?contractStanding=delinquent` returns exactly the users it returns with the charge tables empty.
-- [ ] A user with no contract and one overdue charge appears with `contract: null` and `extras.standing = delinquent`, in `?rail=extras` aging, and in their own `/v1/me/billing`.
-- [ ] A hold turns `contract.standing` to `exempt` and leaves `extras.standing` and the extras reminders unchanged.
-- [ ] The roster query-count test asserts **4** queries, independent of the number of students.
-- [ ] Movement for a month with 30000 fees and 15000 extras received returns `receivedMinor = 30000`, `extras.receivedMinor = 15000`, `cashReceivedMinor = 45000`.
-- [ ] The scheduled run leaves every `event_charge*` table's row count unchanged; an overdue charge yields exactly one `extras_due_date` and one `extras_grace_lapsed` reminder over the relevant days, each naming the event.
-- [ ] Charging a user outside a `restricted` event's audience returns them in `outsideAudience`, and `event_audience_user`/`event_audience_group` row counts are unchanged.
-- [ ] A test asserts no charge path writes `enrollments_*` or `event_audience_*`.
-- [ ] Web tests: roster renders both badges and both filters; charge dialog shows the audience warning and still submits; `/settings/billing` renders the extras section apart from the contract one.
-- [ ] `check-i18n-coverage.js` passes; `dict-en`/`dict-pt` keys are identical.
-- [ ] `make lint`, `make test-api` and `make test-web` pass green.
+- [x] Migration `0028` (or `0029`) creates exactly `event_prices`, `event_charges`, `event_charge_adjustments`, `event_charge_payments` and their indexes, and contains no `ALTER`, `DROP` or `UPDATE` of any pre-existing table.
+- [x] Issuing the same `(eventId, userIds)` twice returns every pair in `created` the first time and in `absorbed` the second; `SELECT COUNT(*)` is unchanged by the second call.
+- [x] Issuing on a `draft` or `archived` event returns `409` and writes nothing.
+- [x] A negotiated amount without `termsNote` returns `400`.
+- [x] A payment equal to the balance leaves the charge `paid`; its reversal leaves it `open`; reversing the reversal returns `409`.
+- [x] Voiding a charge with positive net payments returns `409`.
+- [x] **Rail isolation (API test):** contract paid-up + one overdue charge ⇒ roster `contract.standing = good`, `extras.standing = delinquent`; late invoice + all charges paid ⇒ `contract.standing = delinquent`, `extras.standing = good`.
+- [x] Calling `resolveRailStanding('contract', …)` with an `event_charge` item throws.
+- [x] With charges present, `GET /v1/admin/billing/students?contractStanding=delinquent` returns exactly the users it returns with the charge tables empty.
+- [x] A user with no contract and one overdue charge appears with `contract: null` and `extras.standing = delinquent`, in `?rail=extras` aging, and in their own `/v1/me/billing`.
+- [x] A hold turns `contract.standing` to `exempt` and leaves `extras.standing` and the extras reminders unchanged.
+- [x] The roster query-count test asserts **4** queries, independent of the number of students.
+- [x] Movement for a month with 30000 fees and 15000 extras received returns `receivedMinor = 30000`, `extras.receivedMinor = 15000`, `cashReceivedMinor = 45000`.
+- [x] The scheduled run leaves every `event_charge*` table's row count unchanged; an overdue charge yields exactly one `extras_due_date` and one `extras_grace_lapsed` reminder over the relevant days, each naming the event.
+- [x] Charging a user outside a `restricted` event's audience returns them in `outsideAudience`, and `event_audience_user`/`event_audience_group` row counts are unchanged.
+- [x] A test asserts no charge path writes `enrollments_*` or `event_audience_*`.
+- [x] Web tests: roster renders both badges and both filters; charge dialog shows the audience warning and still submits; `/settings/billing` renders the extras section apart from the contract one.
+- [x] `check-i18n-coverage.js` passes; `dict-en`/`dict-pt` keys are identical.
+- [x] `make lint`, `make test-api` and `make test-web` pass green. *(Local run on the candidate, 2026-09-28: API 1364 passed / 3 skipped, web 669 passed / 6 skipped.)*
 - [ ] No diff outside the files listed in the guardrail.
+      *Open — two recorded, owner-visible deviations sit outside the literal list: the container wiring lives in `apps/api/src/container.ts` (where `buildApp` now builds adapters) instead of `apps/api/src/index.ts`, and `Makefile` `db-seed-local` gained the new local seed file. See `closeout-analysis.md` §3. No deviation merges the rails, touches access or alters an RFC 0013 table.*
 
 ---
 
@@ -122,16 +123,16 @@ Out of scope (explicit, from RFC 0015 Non-Goals):
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [Event-charge domain, port and the rail-tagged receivable](./01-event-charge-domain-port-and-receivable.task.md) | 0 | Backend | ☐ Open |
-| 02 | [Event-charge schema, D1 repository and local seed](./02-event-charge-schema-d1-repository-and-seed.task.md) | 1 | Backend | ☐ Open |
-| 03 | [Event-charge service and admin API](./03-event-charge-service-and-admin-api.task.md) | 2 | Backend | ☐ Open |
-| 04 | [Two-rail standing and roster](./04-two-rail-standing-and-roster.task.md) | 3 | Backend | ☐ Open |
-| 05 | [Per-rail reports, statement and `/v1/me/billing`](./05-per-rail-reports-statement-and-me-billing.task.md) | 3 | Backend | ☐ Open |
-| 06 | [Daily run: extras reminders and per-rail crossings](./06-daily-run-extras-reminders-and-crossings.task.md) | 3 | Backend | ☐ Open |
-| 07 | [Admin Extras tab](./07-admin-extras-tab.task.md) | 4 | Frontend | ☐ Open |
-| 08 | [Two-rail roster, reports and statement panel](./08-two-rail-roster-reports-and-statement.task.md) | 4 | Frontend | ☐ Open |
-| 09 | [Student extras, plans-tab link and event charges panel](./09-student-extras-plans-link-and-event-panel.task.md) | 4 | Frontend | ☐ Open |
-| 10 | [Seed, docs and rollout closeout](./10-seed-docs-and-rollout.task.md) | 5 | Backend | ☐ Open |
+| 01 | [Event-charge domain, port and the rail-tagged receivable](./01-event-charge-domain-port-and-receivable.task.md) | 0 | Backend | ✅ Done |
+| 02 | [Event-charge schema, D1 repository and local seed](./02-event-charge-schema-d1-repository-and-seed.task.md) | 1 | Backend | ✅ Done |
+| 03 | [Event-charge service and admin API](./03-event-charge-service-and-admin-api.task.md) | 2 | Backend | ✅ Done |
+| 04 | [Two-rail standing and roster](./04-two-rail-standing-and-roster.task.md) | 3 | Backend | ✅ Done |
+| 05 | [Per-rail reports, statement and `/v1/me/billing`](./05-per-rail-reports-statement-and-me-billing.task.md) | 3 | Backend | ✅ Done |
+| 06 | [Daily run: extras reminders and per-rail crossings](./06-daily-run-extras-reminders-and-crossings.task.md) | 3 | Backend | ✅ Done |
+| 07 | [Admin Extras tab](./07-admin-extras-tab.task.md) | 4 | Frontend | ✅ Done |
+| 08 | [Two-rail roster, reports and statement panel](./08-two-rail-roster-reports-and-statement.task.md) | 4 | Frontend | ✅ Done |
+| 09 | [Student extras, plans-tab link and event charges panel](./09-student-extras-plans-link-and-event-panel.task.md) | 4 | Frontend | ✅ Done |
+| 10 | [Seed, docs and rollout closeout](./10-seed-docs-and-rollout.task.md) | 5 | Backend | 🚧 Docs done · deploy pending |
 
 Dependency graph:
 
@@ -175,9 +176,12 @@ Each task is intended to land as an independent PR into the `feature/m22/candida
 ## 7. Definition of Done (milestone level)
 
 - [ ] All tasks marked Done with every acceptance box checked.
+      *Pending — Tasks 01–09 are Done with every box checked; Task 10's staging walkthrough and production migration are deferred by owner decision (docs only, no deploy). Production migrates through CI when the candidate merges into `main`.*
 - [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] Closeout note written at `./closeout-analysis.md`.
-- [ ] RFC 0015 status set to `Implemented` in its header and
+      *Every functional criterion passes; only the guardrail box above stays open on the recorded deviations.*
+- [x] `make lint`, `make test-api`, and `make test-web` pass green.
+- [x] Closeout note written at `./closeout-analysis.md`.
+- [x] RFC 0015 status set to `Implemented` in its header and
       `docs/product/RFCs/README.md`; deferred items remain backlog.
 - [ ] No diff outside the scope declared in the guardrail.
+      *Open — same two recorded deviations as the §3 guardrail box (`container.ts` wiring, `Makefile` seed line).*

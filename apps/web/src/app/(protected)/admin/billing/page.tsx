@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useAuth, useHasRole } from '@web/hooks/use-auth';
 import { useApiClient } from '@web/context/auth-context';
@@ -13,10 +13,22 @@ import { StudentsTab } from './students-tab';
 import { LedgerTab } from './ledger-tab';
 import { ReportsTab } from './reports-tab';
 import { PlansTab } from './plans-tab';
+import { ExtrasTab } from './extras-tab';
 import type { SignableStudent } from './sign-contract-dialog';
 
-const TABS = ['students', 'ledger', 'reports', 'plans'] as const;
+const TABS = ['students', 'ledger', 'extras', 'reports', 'plans'] as const;
 type Tab = (typeof TABS)[number];
+
+/**
+ * The console's initial tab and Extras event from the query string
+ * (`?tab=extras&eventId=…`, the link the plans tab and the admin event page
+ * use). Without a query the console opens on the students tab as it always has.
+ */
+function readDeepLink(query: URLSearchParams): { tab: Tab; eventId?: string } {
+  const requested = query.get('tab');
+  const tab = TABS.find((name) => name === requested) ?? 'students';
+  return { tab, eventId: query.get('eventId') ?? undefined };
+}
 
 /**
  * `/admin/billing` — the receivables console (RFC 0013 §7).
@@ -28,6 +40,21 @@ type Tab = (typeof TABS)[number];
  * keep.
  */
 export default function AdminBillingPage() {
+  // `useSearchParams` needs a Suspense boundary for the static prerender.
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <Spinner className="h-8 w-8 text-zinc-600" />
+        </div>
+      }
+    >
+      <AdminBillingConsole />
+    </Suspense>
+  );
+}
+
+function AdminBillingConsole() {
   const dict = useDict();
   const d = dict.admin.billing;
   const router = useRouter();
@@ -37,10 +64,14 @@ export default function AdminBillingPage() {
   // `/v1/admin/*` but not to the dojo's money.
   const isAdmin = useHasRole(ROLES.ADMIN);
 
-  const [tab, setTab] = useState<Tab>('students');
+  // The deep link is read once, as initial state: the tab bar owns it after.
+  const searchParams = useSearchParams();
+  const [deepLink] = useState(() => readDeepLink(new URLSearchParams(searchParams.toString())));
+  const [tab, setTab] = useState<Tab>(deepLink.tab);
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({
     students: null,
     ledger: null,
+    extras: null,
     reports: null,
     plans: null,
   });
@@ -226,6 +257,22 @@ export default function AdminBillingPage() {
 
       <div
         role="tabpanel"
+        id="billing-panel-extras"
+        aria-labelledby="billing-tab-extras"
+        hidden={tab !== 'extras'}
+      >
+        {tab === 'extras' && (
+          <ExtrasTab
+            currency={currency}
+            nameOf={nameOf}
+            students={students}
+            initialEventId={deepLink.eventId}
+          />
+        )}
+      </div>
+
+      <div
+        role="tabpanel"
         id="billing-panel-reports"
         aria-labelledby="billing-tab-reports"
         hidden={tab !== 'reports'}
@@ -239,7 +286,9 @@ export default function AdminBillingPage() {
         aria-labelledby="billing-tab-plans"
         hidden={tab !== 'plans'}
       >
-        {tab === 'plans' && <PlansTab currency={currency} />}
+        {tab === 'plans' && (
+          <PlansTab currency={currency} onOpenExtras={() => setTab('extras')} />
+        )}
       </div>
     </main>
   );

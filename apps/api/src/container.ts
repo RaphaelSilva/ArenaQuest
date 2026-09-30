@@ -20,6 +20,7 @@ import { D1MissionRepository } from '@api/adapters/db/d1-mission-repository';
 import { D1CommentRepository } from '@api/adapters/db/d1-comment-repository';
 import { D1NoteRepository } from '@api/adapters/db/d1-note-repository';
 import { D1BillingRepository } from '@api/adapters/db/d1-billing-repository';
+import { D1EventChargeRepository } from '@api/adapters/db/d1-event-charge-repository';
 import { D1EventRepository } from '@api/adapters/db/d1-event-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
@@ -32,6 +33,7 @@ import { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine
 import { AuthService } from '@api/core/auth/auth-service';
 import { BillingService } from '@api/core/billing/billing-service';
 import { AccountingService } from '@api/core/billing/accounting-service';
+import { EventChargeService } from '@api/core/billing/event-charge-service';
 import { buildRegistrationMailHandler } from '@api/core/registration/registration-mail-handler';
 import { PasswordController } from '@api/controllers/password.controller';
 import { AccountController } from '@api/controllers/account.controller';
@@ -65,6 +67,7 @@ import type {
   IOAuthAccountRepository,
   IMailer,
   IBillingRepository,
+  IEventChargeRepository,
   IEventRepository,
 } from '@arenaquest/shared/ports';
 
@@ -123,6 +126,13 @@ export interface BillingContext {
   billingService: BillingService;
   /** Read-only reporting over the same repository (RFC 0013 §5). */
   accountingService: AccountingService;
+  /**
+   * The extras rail's ledger (RFC 0015 §3): a sibling of `billingRepo`, never
+   * merged into it — the two ledgers share rules, not rows.
+   */
+  eventChargeRepo: IEventChargeRepository;
+  /** The extras rail's write rules (RFC 0015 §3), over `eventChargeRepo`. */
+  eventChargeService: EventChargeService;
 }
 
 /**
@@ -256,17 +266,25 @@ export function buildContainer(env: Env): AppContainer {
 
   // Billing repo + service
   const billingRepo = new D1BillingRepository(env.DB);
+  // Extras rail (RFC 0015). Per request like every adapter, next to its sibling.
+  const eventChargeRepo = new D1EventChargeRepository(env.DB);
   // The probe is the only thing billing asks identity: `setHold` refuses an
   // unknown student with a 404 rather than letting the hold table's foreign key
   // surface as a 500.
   const userExists = (userId: string) => users.findById(userId).then((user) => user !== null);
-  const billingService = new BillingService(billingRepo, userExists);
-  // The statement 404s an unknown student, which is all billing needs from
-  // identity — a probe rather than the repository, as `StreakEngine` does.
-  const accountingService = new AccountingService(billingRepo, userExists);
-
+  const billingService = new BillingService(billingRepo, userExists, eventChargeRepo);
   // Events repo (RFC 0014). The audience rule lives inside it and nowhere else.
   const eventRepo = new D1EventRepository(env.DB);
+
+  // The statement 404s an unknown student, which is all billing needs from
+  // identity — a probe rather than the repository, as `StreakEngine` does. The
+  // extras ledger and the event titles are read-only inputs (RFC 0015 §7).
+  const accountingService = new AccountingService(billingRepo, userExists, eventChargeRepo, eventRepo);
+
+  // Extras rail service. It reads the event and its audience grants through
+  // their ports, and the active currency through the billing port; it writes
+  // only to its own ledger.
+  const eventChargeService = new EventChargeService(eventChargeRepo, eventRepo, userGroups, billingRepo);
 
   // Infra: mail
   const mailer: IMailer = env.MAIL_DRIVER === 'resend'
@@ -343,7 +361,7 @@ export function buildContainer(env: Env): AppContainer {
     engagement: { taskRepo, taskStages, taskLinks, commentRepo, noteRepo },
     progress: { progressRepo, enrollmentRepo },
     gamification: { questRepo, badgeRepo, gamificationRepo, missionRepo, xpEngine, streakEngine, questEvaluator, badgeEngine },
-    billing: { billingRepo, billingService, accountingService },
+    billing: { billingRepo, billingService, accountingService, eventChargeRepo, eventChargeService },
     events: { eventRepo, storage, users, userGroups },
     infra: {
       auth,

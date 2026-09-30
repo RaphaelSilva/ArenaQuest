@@ -96,6 +96,23 @@ describe('PlansTab', () => {
     expect(http).toHaveBeenCalledWith('GET', '/admin/billing/plans?archived=false');
   });
 
+  it('links the recurring warning to the Extras tab, the door for a one-off item', async () => {
+    renderTab();
+    const link = await screen.findByRole('link', { name: d.extrasLink });
+    expect(link).toHaveAttribute('href', '/admin/billing?tab=extras');
+  });
+
+  it('switches to the Extras tab in place when the console handles the link', async () => {
+    const onOpenExtras = vi.fn();
+    render(
+      <DictProvider value={dictEn}>
+        <PlansTab currency={BRL} onOpenExtras={onOpenExtras} />
+      </DictProvider>,
+    );
+    fireEvent.click(await screen.findByRole('link', { name: d.extrasLink }));
+    expect(onOpenExtras).toHaveBeenCalledTimes(1);
+  });
+
   it('states that a plan is re-invoiced every period', async () => {
     renderTab();
     expect(await screen.findByText(d.recurringNote)).toBeInTheDocument();

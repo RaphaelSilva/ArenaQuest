@@ -1,6 +1,6 @@
 # Task 09 — Frontend: Student extras, plans-tab link and event charges panel (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [22 — Event extras: one-off charges on a separate billing rail](./milestone.md)
 **RFC:** [RFC 0015](../../RFCs/0015-event-extras-one-off-charges-for-events.md)
 **Team:** Frontend Web
@@ -61,17 +61,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A student with a paid-up contract and one overdue charge sees the contract section
+- [x] A student with a paid-up contract and one overdue charge sees the contract section
       unchanged and an Extras section showing that charge as overdue, with the event title.
-- [ ] A student with no charge sees no Extras section content beyond its empty state.
-- [ ] The plans tab shows a link that opens the Extras tab.
-- [ ] The admin event page shows the Charges summary for a charged event, and the link opens
+- [x] A student with no charge sees no Extras section content beyond its empty state.
+- [x] The plans tab shows a link that opens the Extras tab.
+- [x] The admin event page shows the Charges summary for a charged event, and the link opens
       the Extras tab on that event; the panel issues no non-GET request.
-- [ ] The existing `no-withholding` test passes unchanged.
-- [ ] No hardcoded user-facing string; keys exist in both dictionaries;
+- [x] The existing `no-withholding` test passes unchanged.
+- [x] No hardcoded user-facing string; keys exist in both dictionaries;
       `check-i18n-coverage.js` passes.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

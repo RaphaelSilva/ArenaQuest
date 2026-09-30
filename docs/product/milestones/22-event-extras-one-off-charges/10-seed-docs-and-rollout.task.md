@@ -1,6 +1,6 @@
 # Task 10 — Backend: Seed, docs and rollout closeout (Phase 5)
 
-**Status:** 📝 Open
+**Status:** 🚧 In Progress — docs closeout done; staging walkthrough and production migration pending (deploy deferred by owner, 2026-09-28)
 **Milestone:** [22 — Event extras: one-off charges on a separate billing rail](./milestone.md)
 **RFC:** [RFC 0015](../../RFCs/0015-event-extras-one-off-charges-for-events.md)
 **Team:** Backend API
@@ -55,13 +55,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The extras migration number is unique on `main` and applies after every earlier migration.
+- [x] The extras migration number is unique on `main` and applies after every earlier migration.
 - [ ] The staging walkthrough is recorded step by step in `closeout-analysis.md`, including
       the two rail-isolation scenarios observed on the roster.
-- [ ] `FEATURES.md` describes extras and states that they never affect contract standing or access.
-- [ ] RFC 0015's header and README row read `Implemented`; the milestone status reads Done.
+- [x] `FEATURES.md` describes extras and states that they never affect contract standing or access.
+- [x] RFC 0015's header and README row read `Implemented`; the milestone status reads Done.
 - [ ] The production migration applied for every label without error.
-- [ ] `make lint`, `make test-api` and `make test-web` pass green on the candidate.
+- [x] `make lint`, `make test-api` and `make test-web` pass green on the candidate.
 - [ ] No diff outside the scope guardrail.
 
 ## Verification Plan

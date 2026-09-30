@@ -1,7 +1,7 @@
 # RFC 0015: Event extras: one-off charges for events
 
 **Date:** 2026-09-27
-**Status:** Draft
+**Status:** Implemented
 **Author:** raphaelsilva
 **Affected:**
 - `apps/api/migrations/0028_create_event_charges.sql` (new — `event_prices`, `event_charges`, `event_charge_adjustments`, `event_charge_payments`; purely additive, no `ALTER` of any existing table. RFC 0016 also reserves `0028`: whichever lands second renumbers)

@@ -7,6 +7,7 @@ import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
 import { Spinner } from '@web/components/spinner';
 import type { MyBillingStatement } from '@web/lib/me-billing-api';
+import type { BillingStatementCharge, Standing } from '@web/lib/admin-billing-api';
 
 /**
  * `/settings/billing` — the student's own side of the ledger.
@@ -144,6 +145,42 @@ const s = {
   },
 };
 
+/**
+ * The badge tones for the extras standing. Presentation only: the standing is
+ * the one the API resolved and sent, never recomputed here.
+ */
+const STANDING_TONE: Record<Standing, { color: string; background: string }> = {
+  good: { color: 'var(--aq-text2)', background: 'var(--aq-bg3)' },
+  due: { color: 'var(--aq-accent2)', background: 'var(--aq-bg3)' },
+  delinquent: { color: 'var(--aq-error)', background: 'var(--aq-error-bg)' },
+  exempt: { color: 'var(--aq-text2)', background: 'var(--aq-bg3)' },
+};
+
+const badge = {
+  display: 'inline-block',
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.3px',
+  padding: '3px 10px',
+  borderRadius: 999,
+  border: '1px solid var(--aq-border2)',
+};
+
+type ChargeLabel = 'open' | 'overdue' | 'paid' | 'void';
+
+/**
+ * The label a charge row reads as. The statement carries no per-charge flag,
+ * so "overdue" is the server's own `overdueCharges` predicate from
+ * `resolveExtrasRail` — not void, a positive balance, and `asOf` on or past the
+ * due date — evaluated against the `asOf` the API sent. The rail standing is
+ * never derived here: the section badge renders `extras.standing` as sent.
+ */
+function chargeLabel(charge: BillingStatementCharge, asOf: string): ChargeLabel {
+  if (charge.status === 'void') return 'void';
+  if (charge.balanceMinor <= 0) return 'paid';
+  return asOf >= charge.dueDate ? 'overdue' : 'open';
+}
+
 export default function StudentBillingPage() {
   const dict = useDict();
   const d = dict.settings.billing;
@@ -190,8 +227,13 @@ export default function StudentBillingPage() {
     [currency, d.locale, d.none],
   );
 
+  // "Nothing on your account" only when both rails are empty: an extras-only
+  // buyer sees the contract sections' own empty states instead.
   const isEmptyStatement =
-    statement !== null && statement.contractGroups.length === 0 && statement.invoices.length === 0;
+    statement !== null &&
+    statement.contractGroups.length === 0 &&
+    statement.invoices.length === 0 &&
+    statement.extras.charges.length === 0;
 
   return (
     <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -364,6 +406,112 @@ export default function StudentBillingPage() {
                 </section>
               </>
             )}
+
+            {/* The extras rail: its own badge and its own outstanding, beside —
+                never summed into — the contract figures above. */}
+            <section style={s.card} aria-labelledby="billing-extras-heading">
+              <div style={s.rowHead}>
+                <h2 id="billing-extras-heading" style={{ ...s.h2, marginBottom: 0 }}>
+                  {d.extras.heading}
+                </h2>
+                <span style={{ ...badge, ...STANDING_TONE[statement.extras.standing] }}>
+                  {d.extras.standing[statement.extras.standing]}
+                </span>
+              </div>
+              <p style={{ ...s.note, marginTop: 0, marginBottom: 12 }}>{d.extras.intro}</p>
+
+              {statement.extras.charges.length === 0 ? (
+                <p style={s.empty}>{d.extras.empty}</p>
+              ) : (
+                <>
+                  <div style={{ ...s.summaryGrid, marginBottom: 14 }}>
+                    <div style={s.summaryCell}>
+                      <div style={s.label}>{d.extras.outstandingLabel}</div>
+                      <div style={s.outstanding}>{money(statement.extras.outstandingMinor)}</div>
+                    </div>
+                    <div style={s.summaryCell}>
+                      <div style={s.label}>{d.extras.oldestOverdueLabel}</div>
+                      <div style={s.value}>{statement.extras.oldestOverdueDate ?? d.none}</div>
+                    </div>
+                  </div>
+
+                  {statement.extras.charges.map((charge) => {
+                    const label = chargeLabel(charge, statement.asOf);
+                    return (
+                      <div key={charge.id} style={s.row}>
+                        <div style={s.rowHead}>
+                          <span style={s.rowTitle}>{charge.eventTitle}</span>
+                          <span
+                            style={
+                              label === 'overdue'
+                                ? { ...s.meta, color: 'var(--aq-error)', fontWeight: 700 }
+                                : s.meta
+                            }
+                          >
+                            {d.extras.status[label]}
+                          </span>
+                        </div>
+                        <div style={s.termGrid}>
+                          <div>
+                            <div style={s.label}>{d.extras.eventDateLabel}</div>
+                            <div style={s.value}>
+                              {charge.eventStartsAt === null
+                                ? d.none
+                                : charge.eventStartsAt.slice(0, 10)}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={s.label}>{d.extras.dueLabel}</div>
+                            <div style={s.value}>{charge.dueDate}</div>
+                          </div>
+                          <div>
+                            <div style={s.label}>{d.extras.amountLabel}</div>
+                            <div style={s.value}>{money(charge.amountMinor)}</div>
+                          </div>
+                          <div>
+                            <div style={s.label}>{d.extras.balanceLabel}</div>
+                            <div style={s.value}>{money(charge.balanceMinor)}</div>
+                          </div>
+                        </div>
+
+                        {charge.adjustments.length > 0 && (
+                          <>
+                            <div style={s.subHeading}>{d.invoices.adjustmentsHeading}</div>
+                            <ul style={s.lineList}>
+                              {charge.adjustments.map((adjustment) => (
+                                <li key={adjustment.id} style={s.line}>
+                                  <span>
+                                    {`${d.adjustmentKind[adjustment.kind]} · ${adjustment.appliedAt}`}
+                                  </span>
+                                  <span>{money(adjustment.amountMinor)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+
+                        {charge.payments.length > 0 && (
+                          <>
+                            <div style={s.subHeading}>{d.invoices.paymentsHeading}</div>
+                            <ul style={s.lineList}>
+                              {charge.payments.map((payment) => (
+                                <li key={payment.id} style={s.line}>
+                                  <span>
+                                    {`${d.paymentMethod[payment.method]} · ${payment.paidAt}`}
+                                    {payment.reversesId === null ? '' : ` · ${d.invoices.reversal}`}
+                                  </span>
+                                  <span>{money(payment.amountMinor)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </section>
           </>
         )}
       </div>
