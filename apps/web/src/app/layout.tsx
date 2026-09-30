@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Space_Grotesk, JetBrains_Mono } from "next/font/goog
 import { AuthProvider } from "@web/context/auth-context";
 import { DictProvider } from "@web/context/dict-context";
 import { ThemeProvider } from "@web/context/theme-context";
+import { PreviewBanner } from "@web/components/layout/preview-banner";
 import { getLanguageFromEnv } from "@web/i18n/config";
 import { brand } from "@web/lib/brand";
 import { themeBootstrapScript } from "@web/lib/theme";
@@ -51,6 +52,8 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
       </head>
       <body className="min-h-full flex flex-col">
+        {/* Release-candidate previews only; renders nothing otherwise. */}
+        <PreviewBanner />
         <DictProvider>
           <ThemeProvider>
             <AuthProvider>{children}</AuthProvider>

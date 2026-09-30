@@ -192,7 +192,7 @@ Out of scope (explicit, from RFC 0021 Non-Goals):
 | 10 | [Migration lint: additive and frozen](./10-migration-lint.task.md) | 3 | Backend | ✅ Done |
 | 11 | [Generated `previews` blocks and preview secrets](./11-wrangler-previews-block.task.md) | 3 | Backend | ✅ Done |
 | 12 | [Deploy CLI `--preview` mode, Make targets and workflow](./12-deploy-cli-preview-mode.task.md) | 3 | Backend | ✅ Done |
-| 13 | [Preview banner](./13-preview-banner-frontend.task.md) | 3 | Frontend | ☐ Open |
+| 13 | [Preview banner](./13-preview-banner-frontend.task.md) | 3 | Frontend | ✅ Done |
 | 14 | [Demo extensions: events, billing, tasks, comments](./14-seed-demo-extensions.task.md) | 4 | Backend | ☐ Open |
 
 Dependency graph:
