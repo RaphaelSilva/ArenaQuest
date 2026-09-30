@@ -1,6 +1,6 @@
 # Task 11 — Backend: Generated previews blocks and preview secrets (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -59,18 +59,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Each `<label>-staging` env in `wrangler.jsonc` has a `previews` block whose D1, KV and R2
+- [x] Each `<label>-staging` env in `wrangler.jsonc` has a `previews` block whose D1, KV and R2
       ids/names equal the env's own bindings, with `APP_PREVIEW=1` and no cron.
-- [ ] No production env and not the legacy `staging` block has a `previews` block.
-- [ ] Changing a binding in a fixture profile without regenerating makes the coherence check
+- [x] No production env and not the legacy `staging` block has a `previews` block.
+- [x] Changing a binding in a fixture profile without regenerating makes the coherence check
       fail naming the `previews` field.
-- [ ] `make set-new-label LABEL=budo ONLY=secrets DRY_RUN=1` lists the preview base-config
+- [x] `make set-new-label LABEL=budo ONLY=secrets DRY_RUN=1` lists the preview base-config
       secrets, generating `JWT_SECRET` over stdin and reporting the external ones by name.
-- [ ] `pnpm --filter api exec wrangler preview --env budo-staging --name smoke --dry-run`
+- [x] `pnpm --filter api exec wrangler preview --env budo-staging --name smoke --dry-run`
       (or the closest non-publishing check) validates the config without missing-binding
       warnings.
-- [ ] `make test-scripts`, `make lint` and `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `make test-scripts`, `make lint` and `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
@@ -79,3 +79,19 @@ Out:
 3. Run the coherence check for each label/env.
 4. Provisioner dry run with `ONLY=secrets` for budo.
 5. `git diff --stat` confirms only scope-guardrail files changed.
+
+## Implementation notes
+
+- **`label.mjs scaffold` is never run on the real `wrangler.jsonc`** (it rewrites production blocks). A targeted,
+  JSONC-aware writer `node scripts/label.mjs previews <label> [--write]` replaces only
+  `env.<label>-staging.previews` and preserves every other byte; it is idempotent. Scaffold still emits `previews`
+  for newly scaffolded staging blocks.
+- `deriveEnvVars` is now the single var derivation for an env block and its `previews` block; the block adds
+  `APP_PREVIEW=1` and `observability` (previews do not inherit it). `GOOGLE_CLIENT_ID` is included only when the
+  profile records `googleClientId` (none does today — it is dashboard-managed).
+- Config validated offline with `wrangler deploy --dry-run --env <label>-staging` (no warnings; a stray `triggers`
+  field in `previews` is rejected by wrangler, so a preview can never carry a cron).
+- Preview base-config secrets: own `JWT_SECRET` (generated, stdin, never overwritten); external secrets reported by
+  name. A staging token therefore does not verify on a preview (separate login per preview, as designed).
+- Open for the first live run: whether dashboard Preview base-config vars merge with or are replaced by the file's
+  `previews.vars`.

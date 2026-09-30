@@ -27,6 +27,10 @@ import {
   renderCorsFile,
   workersDevHost,
   kvNamespaceName,
+  derivePreviewsBlock,
+  setPreviewsBlockText,
+  checkPreviewsBlock,
+  diffPaths,
 } from './label.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -321,4 +325,111 @@ test('scaffoldWranglerText stays idempotent once routes are emitted', () => {
   p.environments.production.customDomain = true;
   const once = scaffoldWranglerText(real, 'acme', p);
   assert.equal(scaffoldWranglerText(once, 'acme', p), once);
+});
+
+// ── Workers Previews (RFC 0021) ─────────────────────────────────────────────
+const previewsWranglerText = () => readFileSync(join(FIX, 'previews-wrangler.jsonc'), 'utf8');
+
+test('derivePreviewsBlock re-binds the staging D1/KV/R2 with the staging vars + APP_PREVIEW', () => {
+  const p = profile();
+  const b = derivePreviewsBlock(p, 'staging');
+  assert.deepEqual(b.d1_databases, [{ binding: 'DB', database_name: 'acme-db-staging', database_id: 'aaaa-staging' }]);
+  assert.deepEqual(b.kv_namespaces, [{ binding: 'RATE_LIMIT_KV', id: 'kv-staging' }]);
+  assert.deepEqual(b.r2_buckets, [{ binding: 'R2', bucket_name: 'acme-media-staging' }]);
+  assert.equal(b.vars.APP_PREVIEW, '1');
+  assert.equal(b.vars.WEB_BASE_URL, 'https://acme-web-staging.pages.dev', 'WEB_BASE_URL stays the staging web origin');
+  assert.equal(b.vars.ALLOWED_ORIGINS, deriveExpected(p, 'staging').ALLOWED_ORIGINS);
+  assert.equal(b.vars.GOOGLE_CLIENT_ID, undefined, 'no placeholder client id in a preview');
+  for (const k of ['triggers', 'routes', 'crons', 'name']) assert.ok(!(k in b), `no ${k} in previews`);
+});
+
+test('derivePreviewsBlock carries GOOGLE_CLIENT_ID only when the profile records one', () => {
+  const p = profile();
+  p.environments.staging.googleClientId = 'x.apps.googleusercontent.com';
+  assert.equal(derivePreviewsBlock(p, 'staging').vars.GOOGLE_CLIENT_ID, 'x.apps.googleusercontent.com');
+});
+
+test('derivePreviewsBlock refuses production', () => {
+  assert.throws(() => derivePreviewsBlock(profile(), 'production'), /staging only/);
+});
+
+test('scaffoldWranglerText gives the staging block a previews member and production none', () => {
+  const p = profile();
+  p.environments.staging.customDomain = true;
+  const out = parseJsonc(scaffoldWranglerText('{\n\t"env": {\n\t}\n}\n', 'acme', p));
+  const staging = out.env['acme-staging'];
+  assert.deepEqual(staging.previews, derivePreviewsBlock(p, 'staging'));
+  assert.ok(!('routes' in staging.previews), 'no custom domain inside previews');
+  // Bindings equal the env's own (bar migrations_dir, which previews never use).
+  assert.equal(staging.previews.d1_databases[0].database_id, staging.d1_databases[0].database_id);
+  assert.equal(staging.previews.kv_namespaces[0].id, staging.kv_namespaces[0].id);
+  assert.equal(staging.previews.r2_buckets[0].bucket_name, staging.r2_buckets[0].bucket_name);
+  assert.ok(!('previews' in out.env.acme), 'production has no previews block');
+});
+
+test('setPreviewsBlockText inserts only the previews member and preserves every other byte', () => {
+  const before = previewsWranglerText();
+  const { text, changed, existed } = setPreviewsBlockText(before, 'acme', profile());
+  assert.ok(changed);
+  assert.ok(!existed);
+  // Removing the inserted member gives back the original text exactly.
+  const start = text.indexOf(',\n\t\t\t"previews": {');
+  assert.ok(start > 0, 'inserted after the last member, at member indentation');
+  const end = text.indexOf('\n\t\t\t}', start) + '\n\t\t\t}'.length;
+  assert.equal(text.slice(0, start) + text.slice(end), before);
+  assert.match(text, /this comment must survive/);
+  const cfg = parseJsonc(text);
+  assert.deepEqual(cfg.env['acme-staging'].previews, derivePreviewsBlock(profile(), 'staging'));
+  assert.ok(!('previews' in cfg.env.acme), 'production untouched');
+  assert.ok(!('previews' in cfg.env.staging), 'legacy staging untouched');
+});
+
+test('setPreviewsBlockText is idempotent and repairs a drifted block in place', () => {
+  const once = setPreviewsBlockText(previewsWranglerText(), 'acme', profile()).text;
+  const twice = setPreviewsBlockText(once, 'acme', profile());
+  assert.equal(twice.changed, false);
+  assert.equal(twice.text, once);
+  const drifted = once.replace('"database_id": "aaaa-staging"\n', '"database_id": "WRONG"\n');
+  assert.notEqual(drifted, once);
+  const repaired = setPreviewsBlockText(drifted, 'acme', profile());
+  assert.ok(repaired.existed);
+  assert.equal(repaired.text, once);
+});
+
+test('setPreviewsBlockText refuses a label with no staging block', () => {
+  assert.throws(() => setPreviewsBlockText(previewsWranglerText(), 'nope', profile()), /env\.nope-staging not found/);
+});
+
+test('checkPreviewsBlock is clean for a freshly written block', () => {
+  const cfg = parseJsonc(setPreviewsBlockText(previewsWranglerText(), 'acme', profile()).text);
+  assert.deepEqual(checkPreviewsBlock(profile(), 'staging', cfg.env['acme-staging'].previews), []);
+  assert.deepEqual(checkPreviewsBlock(profile(), 'production', cfg.env.acme.previews), []);
+});
+
+test('checkPreviewsBlock fails naming the previews field when a profile binding changes', () => {
+  const cfg = parseJsonc(setPreviewsBlockText(previewsWranglerText(), 'acme', profile()).text);
+  const p = profile();
+  p.environments.staging.d1.id = 'bbbb-new-staging'; // changed, not regenerated
+  const problems = checkPreviewsBlock(p, 'staging', cfg.env['acme-staging'].previews);
+  assert.equal(problems.length, 1);
+  assert.equal(problems[0].path, 'previews.d1_databases[0].database_id');
+  assert.equal(problems[0].expected, 'bbbb-new-staging');
+  assert.equal(problems[0].actual, 'aaaa-staging');
+});
+
+test('checkPreviewsBlock flags a missing staging block, a stray cron, and any production block', () => {
+  assert.equal(checkPreviewsBlock(profile(), 'staging', undefined)[0].reason, 'missing previews block');
+  const withCron = { ...derivePreviewsBlock(profile(), 'staging'), triggers: { crons: ['0 6 * * *'] } };
+  const stray = checkPreviewsBlock(profile(), 'staging', withCron);
+  assert.equal(stray.length, 1);
+  assert.equal(stray[0].path, 'previews.triggers');
+  assert.equal(stray[0].reason, 'unexpected field');
+  const prod = checkPreviewsBlock(profile(), 'production', {});
+  assert.equal(prod.length, 1);
+  assert.match(prod[0].reason, /production/);
+});
+
+test('diffPaths reports array length and nested value drift by path', () => {
+  assert.deepEqual(diffPaths({ a: [1, 2] }, { a: [1] }, 'x'), [{ path: 'x.a[1]', expected: 2, actual: undefined }]);
+  assert.deepEqual(diffPaths({ a: { b: 'c' } }, { a: { b: 'c' } }), []);
 });
