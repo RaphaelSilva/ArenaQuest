@@ -8,6 +8,11 @@
  *                                     workflow stanza & provisioning commands).
  *   check <label> --env <env>         Grouped preflight checklist for a label.
  *   check --schema                    Drift-guard: schema keys ⊆ *.example files.
+ *   previews <label> [--write] [--out <path>]
+ *                                     Insert/replace ONLY env.<label>-staging.previews
+ *                                     (Workers Previews, RFC 0021) — every other byte
+ *                                     of wrangler.jsonc is preserved. Prints the plan
+ *                                     unless --write is given.
  *
  * Design: the derivation/validation logic is a set of PURE, exported
  * functions (no I/O, no network, no `wrangler`), unit-tested directly by
@@ -285,7 +290,7 @@ export function mapExitCode(results) {
 }
 
 const ICON = { pass: '✅', fail: '❌', skip: '⚠️', manual: '⚠️' };
-const GROUP_ORDER = ['build', 'api-vars', 'api-secrets', 'cf-resources', 'external'];
+const GROUP_ORDER = ['build', 'api-vars', 'previews', 'api-secrets', 'cf-resources', 'external'];
 
 /** Render the grouped checklist. Never emits a secret value — name + state only. */
 export function formatChecklist(label, env, displayName, results) {
@@ -317,6 +322,102 @@ export function formatChecklist(label, env, displayName, results) {
 // PURE: scaffolding text generation
 // ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * The derived `vars` an env block carries, minus GOOGLE_CLIENT_ID (which has no
+ * derivation — see buildEnvBlockObject). One function, consumed by both the env
+ * block and its `previews` block, so the two var sets cannot drift.
+ */
+function deriveEnvVars(profile, env, expected) {
+  const e = profile.environments[env];
+  return {
+    ALLOWED_ORIGINS: expected.ALLOWED_ORIGINS,
+    COOKIE_SAMESITE: e.cookieSameSite,
+    R2_S3_ENDPOINT: expected.R2_S3_ENDPOINT,
+    R2_PUBLIC_BASE: expected.R2_PUBLIC_BASE,
+    R2_BUCKET_NAME: expected.R2_BUCKET_NAME,
+    MAIL_DRIVER: e.mail?.driver ?? '',
+    MAIL_FROM: e.mail?.from ?? '',
+    WEB_BASE_URL: expected.WEB_BASE_URL,
+    GOOGLE_REDIRECT_URI: expected.GOOGLE_REDIRECT_URI,
+  };
+}
+
+/**
+ * The Workers Previews block for a label's STAGING env (RFC 0021 §1).
+ *
+ * Previews inherit nothing from the env they sit in, so every binding the
+ * Worker reads is re-declared here — and re-declared as the *same* staging
+ * resources, so a preview runs against the label's staging data. `vars` are the
+ * staging env's own derived vars (WEB_BASE_URL stays the staging web origin,
+ * RFC OQ3) plus `APP_PREVIEW=1`. GOOGLE_CLIENT_ID is carried only when the
+ * profile records one; otherwise it stays dashboard-managed, as on staging.
+ *
+ * Deliberately absent: `triggers` (no cron — a preview must never bill),
+ * `routes` and custom domains, and `migrations_dir` (previews never migrate).
+ * Production never gets a previews block: this throws for any other env.
+ */
+export function derivePreviewsBlock(profile, env) {
+  if (env !== 'staging') {
+    throw new Error(`previews blocks are generated for staging only, not "${env}"`);
+  }
+  const e = profile.environments?.[env];
+  if (!e) throw new Error(`profile has no environment "${env}"`);
+  const vars = deriveEnvVars(profile, env, deriveExpected(profile, env));
+  if (e.googleClientId) vars.GOOGLE_CLIENT_ID = e.googleClientId;
+  vars.APP_PREVIEW = '1';
+  return {
+    d1_databases: [{ binding: 'DB', database_name: e.d1.name, database_id: e.d1.id }],
+    kv_namespaces: [{ binding: e.kv?.binding || 'RATE_LIMIT_KV', id: e.kv?.id }],
+    r2_buckets: [{ binding: 'R2', bucket_name: e.r2.bucket }],
+    vars,
+    observability: { enabled: true, logs: { enabled: true } },
+  };
+}
+
+/**
+ * Structural diff of a derived value against a committed one, as a list of
+ * `{ path, expected, actual }` using dotted/indexed paths
+ * (`previews.d1_databases[0].database_id`). Keys present only in `actual` are
+ * reported with `expected: undefined` — that is how a stray `triggers` or
+ * `routes` inside a previews block surfaces.
+ */
+export function diffPaths(expected, actual, path = '') {
+  const isObj = (v) => v !== null && typeof v === 'object';
+  if (Array.isArray(expected) || Array.isArray(actual)) {
+    if (!Array.isArray(expected) || !Array.isArray(actual)) return [{ path, expected, actual }];
+    const out = [];
+    const n = Math.max(expected.length, actual.length);
+    for (let i = 0; i < n; i++) out.push(...diffPaths(expected[i], actual[i], `${path}[${i}]`));
+    return out;
+  }
+  if (isObj(expected) && isObj(actual)) {
+    const out = [];
+    const keys = new Set([...Object.keys(expected), ...Object.keys(actual)]);
+    for (const k of keys) out.push(...diffPaths(expected[k], actual[k], path ? `${path}.${k}` : k));
+    return out;
+  }
+  return expected === actual ? [] : [{ path, expected, actual }];
+}
+
+/**
+ * Coherence of an env's committed `previews` block (both directions):
+ *   - staging: it must exist and equal derivePreviewsBlock(profile, 'staging');
+ *   - production: it must not exist at all.
+ * Returns a list of problems `{ path, reason, expected?, actual? }`; [] is clean.
+ */
+export function checkPreviewsBlock(profile, env, actualPreviews) {
+  if (env === 'production') {
+    return actualPreviews === undefined
+      ? []
+      : [{ path: 'previews', reason: 'a production env must not carry a previews block' }];
+  }
+  if (actualPreviews === undefined) {
+    return [{ path: 'previews', reason: 'missing previews block' }];
+  }
+  return diffPaths(derivePreviewsBlock(profile, env), actualPreviews, 'previews')
+    .map((d) => ({ ...d, reason: d.expected === undefined ? 'unexpected field' : 'drifted from the profile' }));
+}
+
 function buildEnvBlockObject(profile, env, expected) {
   const e = profile.environments[env];
   return {
@@ -332,18 +433,12 @@ function buildEnvBlockObject(profile, env, expected) {
     // anything not derivable from the profile would be silently stripped.
     ...(e.customDomain ? { routes: [{ pattern: e.apiHost, custom_domain: true }] } : {}),
     vars: {
-      ALLOWED_ORIGINS: expected.ALLOWED_ORIGINS,
-      COOKIE_SAMESITE: e.cookieSameSite,
-      R2_S3_ENDPOINT: expected.R2_S3_ENDPOINT,
-      R2_PUBLIC_BASE: expected.R2_PUBLIC_BASE,
-      R2_BUCKET_NAME: expected.R2_BUCKET_NAME,
-      MAIL_DRIVER: e.mail?.driver ?? '',
-      MAIL_FROM: e.mail?.from ?? '',
-      WEB_BASE_URL: expected.WEB_BASE_URL,
-      GOOGLE_REDIRECT_URI: expected.GOOGLE_REDIRECT_URI,
+      ...deriveEnvVars(profile, env, expected),
       GOOGLE_CLIENT_ID: e.googleClientId || '<fill: Google OAuth client id (not a secret)>',
     },
     observability: { enabled: true, logs: { enabled: true } },
+    // Workers Previews (RFC 0021): staging only, never production.
+    ...(env === 'staging' ? { previews: derivePreviewsBlock(profile, env) } : {}),
   };
 }
 
@@ -395,6 +490,143 @@ export function scaffoldWranglerText(text, label, profile) {
   }
   next = next.replace(envOpenRe, `$1${fragment}`);
   return next;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PURE: targeted JSONC surgery (the `previews` member only)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// scaffoldWranglerText regenerates a label's WHOLE delimited section, which on
+// the committed wrangler.jsonc would also rewrite hand-kept comments and the
+// dashboard-managed GOOGLE_CLIENT_ID lines. The writer below touches exactly
+// one member — `env.<label>-staging.previews` — and preserves every other byte.
+
+/** Index of the next significant character at or after `i` (skips whitespace and comments). */
+function skipTrivia(text, i) {
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') { i++; continue; }
+    if (ch === '/' && text[i + 1] === '/') {
+      const nl = text.indexOf('\n', i);
+      i = nl === -1 ? text.length : nl + 1;
+      continue;
+    }
+    if (ch === '/' && text[i + 1] === '*') {
+      const end = text.indexOf('*/', i + 2);
+      if (end === -1) throw new Error('unterminated block comment');
+      i = end + 2;
+      continue;
+    }
+    break;
+  }
+  return i;
+}
+
+/** Index just past the string literal opening at `i`. */
+function stringEnd(text, i) {
+  const quote = text[i];
+  for (let j = i + 1; j < text.length; j++) {
+    if (text[j] === '\\') { j++; continue; }
+    if (text[j] === quote) return j + 1;
+  }
+  throw new Error('unterminated string');
+}
+
+/** Index just past the JSONC value starting at `i` (object, array, string or scalar). */
+function valueEnd(text, i) {
+  const ch = text[i];
+  if (ch === '"' || ch === "'") return stringEnd(text, i);
+  if (ch === '{' || ch === '[') {
+    let depth = 0;
+    let j = i;
+    while (j < text.length) {
+      const c = text[j];
+      if (c === '"' || c === "'") { j = stringEnd(text, j); continue; }
+      if (c === '/' && (text[j + 1] === '/' || text[j + 1] === '*')) { j = skipTrivia(text, j); continue; }
+      if (c === '{' || c === '[') depth++;
+      else if (c === '}' || c === ']') {
+        depth--;
+        if (depth === 0) return j + 1;
+      }
+      j++;
+    }
+    throw new Error('unbalanced brackets');
+  }
+  let j = i;
+  while (j < text.length && !/[\s,}\]/]/.test(text[j])) j++;
+  return j;
+}
+
+/** Members of the object whose `{` is at `open`: [{ key, keyStart, valueStart, valueEnd }]. */
+function objectMembers(text, open) {
+  if (text[open] !== '{') throw new Error(`expected an object at offset ${open}`);
+  const members = [];
+  let i = skipTrivia(text, open + 1);
+  while (i < text.length && text[i] !== '}') {
+    if (text[i] !== '"' && text[i] !== "'") throw new Error(`expected a key at offset ${i}`);
+    const keyStart = i;
+    const keyEnd = stringEnd(text, i);
+    const key = text.slice(keyStart + 1, keyEnd - 1);
+    i = skipTrivia(text, keyEnd);
+    if (text[i] !== ':') throw new Error(`expected ":" after key "${key}"`);
+    const valueStart = skipTrivia(text, i + 1);
+    const end = valueEnd(text, valueStart);
+    members.push({ key, keyStart, valueStart, valueEnd: end });
+    i = skipTrivia(text, end);
+    if (text[i] === ',') i = skipTrivia(text, i + 1);
+  }
+  return members;
+}
+
+function memberValueStart(text, open, key) {
+  const m = objectMembers(text, open).find((x) => x.key === key);
+  return m ? m.valueStart : -1;
+}
+
+/** Leading whitespace of the line holding offset `i`, when only whitespace precedes it. */
+function lineIndent(text, i) {
+  const lineStart = text.lastIndexOf('\n', i - 1) + 1;
+  const lead = text.slice(lineStart, i);
+  return /^[ \t]*$/.test(lead) ? lead : '';
+}
+
+/**
+ * Insert or replace ONLY `env.<label>-staging.previews` in a wrangler.jsonc
+ * TEXT with derivePreviewsBlock(profile, 'staging'). Every byte outside that
+ * one member — comments, other blocks, formatting — is preserved, and a second
+ * run is a no-op. Pure: returns { text, changed, existed }.
+ */
+export function setPreviewsBlockText(text, label, profile) {
+  const root = skipTrivia(text, 0);
+  const envOpen = memberValueStart(text, root, 'env');
+  if (envOpen === -1 || text[envOpen] !== '{') {
+    throw new Error('could not locate the "env" object in the wrangler config');
+  }
+  const wEnv = `${label}-staging`;
+  const stagingOpen = memberValueStart(text, envOpen, wEnv);
+  if (stagingOpen === -1 || text[stagingOpen] !== '{') {
+    throw new Error(`env.${wEnv} not found — scaffold the label first`);
+  }
+  const members = objectMembers(text, stagingOpen);
+  if (members.length === 0) throw new Error(`env.${wEnv} is empty`);
+
+  const pad = lineIndent(text, members[0].keyStart);
+  const rendered = JSON.stringify(derivePreviewsBlock(profile, 'staging'), null, '\t')
+    .split('\n')
+    .join(`\n${pad}`);
+
+  const existing = members.find((m) => m.key === 'previews');
+  let next;
+  if (existing) {
+    next = text.slice(0, existing.valueStart) + rendered + text.slice(existing.valueEnd);
+  } else {
+    const last = members[members.length - 1];
+    const after = skipTrivia(text, last.valueEnd);
+    next = text[after] === ','
+      ? `${text.slice(0, after + 1)}\n${pad}"previews": ${rendered}${text.slice(after + 1)}`
+      : `${text.slice(0, last.valueEnd)},\n${pad}"previews": ${rendered}${text.slice(last.valueEnd)}`;
+  }
+  return { text: next, changed: next !== text, existed: Boolean(existing) };
 }
 
 /** The provisioning command list a maintainer runs by hand (printed, never run). */
@@ -460,8 +692,8 @@ function wranglerEnvName(label, env) {
   return env === 'production' ? label : `${label}-staging`;
 }
 
-/** Return the `vars` object of an existing env.<name> block, or null. */
-function readWranglerEnvVars(label, env) {
+/** Return an existing env.<name> block of wrangler.jsonc, or null. */
+function readWranglerEnvBlock(label, env) {
   if (!existsSync(PATHS.wrangler)) return null;
   let cfg;
   try {
@@ -469,8 +701,7 @@ function readWranglerEnvVars(label, env) {
   } catch {
     return null;
   }
-  const block = cfg.env?.[wranglerEnvName(label, env)];
-  return block?.vars ?? null;
+  return cfg.env?.[wranglerEnvName(label, env)] ?? null;
 }
 
 /**
@@ -536,7 +767,8 @@ function cmdCheck(label, env) {
   }
   const e = profile.environments[env];
   const expected = deriveExpected(profile, env);
-  const wranglerVars = readWranglerEnvVars(label, env);
+  const envBlock = readWranglerEnvBlock(label, env);
+  const wranglerVars = envBlock?.vars ?? null;
   const resolved = buildResolved(profile, env, expected, wranglerVars);
   const wEnv = wranglerEnvName(label, env);
   const results = [];
@@ -578,6 +810,23 @@ function cmdCheck(label, env) {
       continue;
     }
     results.push({ group: 'api-vars', key, status: 'pass', detail: spec.derivedFrom ? `coherent with ${spec.derivedFrom}` : 'present' });
+  }
+
+  // ── previews: staging must match its derivation, production must have none ─
+  if (envBlock) {
+    const problems = checkPreviewsBlock(profile, env, envBlock.previews);
+    const fix = env === 'production'
+      ? `remove "previews" from env.${wEnv} (previews are staging-only)`
+      : `node scripts/label.mjs previews ${label} --write`;
+    if (problems.length === 0) {
+      results.push({ group: 'previews', key: 'previews', status: 'pass', detail: env === 'production' ? 'absent (production)' : 'coherent with the staging bindings' });
+    }
+    for (const p of problems) {
+      const detail = p.expected === undefined && p.actual === undefined
+        ? p.reason
+        : `${p.reason}: expected ${JSON.stringify(p.expected)}, got ${JSON.stringify(p.actual)}`;
+      results.push({ group: 'previews', key: p.path, status: 'fail', detail, fix });
+    }
   }
 
   // ── api-secrets: presence by NAME (values never read) ─────────────────────
@@ -755,6 +1004,31 @@ function cmdScaffold(label, outPath) {
   return 0;
 }
 
+function cmdPreviews(label, write, outPath) {
+  const profile = loadProfile(label);
+  const target = outPath || PATHS.wrangler;
+  if (!existsSync(target)) {
+    console.error(`Error: wrangler target not found: ${target}`);
+    return 1;
+  }
+  const before = readFileSync(target, 'utf8');
+  const { text, changed, existed } = setPreviewsBlockText(before, label, profile);
+  const where = `env.${label}-staging.previews`;
+  if (!changed) {
+    console.log(`${where} is already up to date in ${target} — nothing to do.`);
+    return 0;
+  }
+  console.log(`${where} would be ${existed ? 'replaced' : 'inserted'} with:`);
+  console.log(JSON.stringify(derivePreviewsBlock(profile, 'staging'), null, 2));
+  if (!write) {
+    console.log('\nDry run — re-run with --write to apply (only that member changes).');
+    return 0;
+  }
+  writeFileSync(target, text);
+  console.log(`\nWrote ${where} to ${target} (every other byte preserved).`);
+  return 0;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // CLI dispatch
 // ════════════════════════════════════════════════════════════════════════════
@@ -782,8 +1056,12 @@ function main(argv) {
       if (env !== 'staging' && env !== 'production') { console.error('--env must be staging or production'); return 1; }
       return cmdCheck(rest[0], env);
     }
+    case 'previews': {
+      if (!rest[0] || rest[0].startsWith('--')) { console.error('Usage: label.mjs previews <label> [--write] [--out <path>]'); return 1; }
+      return cmdPreviews(rest[0], rest.includes('--write'), getFlag(rest, '--out'));
+    }
     default:
-      console.error('Usage: label.mjs <new|scaffold|check> …');
+      console.error('Usage: label.mjs <new|scaffold|check|previews> …');
       return 1;
   }
 }
