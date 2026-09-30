@@ -188,7 +188,7 @@ Out of scope (explicit, from RFC 0021 Non-Goals):
 | 06 | [Seed gamification state](./06-seed-demo-gamification.task.md) | 1 | Backend | ✅ Done |
 | 07 | [Guard recognises demo accounts](./07-guard-demo-accounts.task.md) | 1 | Backend | ✅ Done |
 | 08 | [Demo seed CI job and Makefile targets](./08-demo-seed-ci-and-make.task.md) | 1 | Backend | ✅ Done |
-| 09 | [Disposable staging: db-reset-staging](./09-db-reset-staging.task.md) | 2 | Backend | ☐ Open |
+| 09 | [Disposable staging: db-reset-staging](./09-db-reset-staging.task.md) | 2 | Backend | ✅ Done |
 | 10 | [Migration lint: additive and frozen](./10-migration-lint.task.md) | 3 | Backend | ☐ Open |
 | 11 | [Generated `previews` blocks and preview secrets](./11-wrangler-previews-block.task.md) | 3 | Backend | ☐ Open |
 | 12 | [Deploy CLI `--preview` mode, Make targets and workflow](./12-deploy-cli-preview-mode.task.md) | 3 | Backend | ☐ Open |

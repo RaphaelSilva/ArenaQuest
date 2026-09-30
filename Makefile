@@ -28,7 +28,7 @@
         test test-api test-web test-scripts convert-skipped \
         worktree-open worktree-sweep \
         db-migrate-local db-seed-local db-reset-local db-seed-demo-local \
-        db-seed-demo-staging \
+        db-seed-demo-staging db-reset-staging \
         db-migrate-staging db-migrate-prod db-migrations-staging-local \
         bootstrap-admin cf-typegen \
         deploy deploy-api deploy-web \
@@ -178,7 +178,8 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/demo/seed-demo.test.mjs \
 		scripts/demo/media.test.mjs \
 		scripts/demo/gamification.test.mjs \
-		scripts/demo/ci-check.test.mjs
+		scripts/demo/ci-check.test.mjs \
+		scripts/db/reset-remote.test.mjs
 
 test-api: ## Run apps/api tests (Vitest + Cloudflare Workers pool)
 	pnpm turbo test --filter api
@@ -274,6 +275,13 @@ db-migrate-staging: ## Apply D1 migrations to the REMOTE staging database
 
 db-seed-demo-staging: ## Seed the demo dataset into the REMOTE staging D1 of LABEL (prompts for the database name; CONFIRM=1, DRY_RUN=1)
 	node scripts/demo/seed-demo.mjs --label $(DEMO_LABEL) -e staging \
+		$(if $(filter 1,$(CONFIRM)),--yes,) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+# Disposable staging (RFC 0021 §4): bookmark → drop every table → migrate → demo seed.
+# AQ_DEMO_PASSWORD must be exported. There is no -prod variant, by design.
+db-reset-staging: ## Wipe LABEL's REMOTE staging D1 in place, re-migrate, re-seed the demo (prompts for the database name; CONFIRM=1, DRY_RUN=1)
+	node scripts/db/reset-remote.mjs --label $(DEMO_LABEL) -e staging \
 		$(if $(filter 1,$(CONFIRM)),--yes,) \
 		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
