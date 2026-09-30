@@ -306,6 +306,8 @@ function fixtureRoot() {
     'apps/api/migrations/0002_seed_roles.sql',
     'apps/api/migrations/0019_seed_quests.sql',
     'apps/api/migrations/0021_seed_badges.sql',
+    'apps/api/migrations/0026_create_billing_tables.sql',
+    'apps/api/migrations/0027_create_events.sql',
     'packages/shared/domain/media/limits.ts',
     'packages/shared/domain/gamification/quest-evaluator.ts',
     'packages/shared/domain/gamification/xp-config.ts',

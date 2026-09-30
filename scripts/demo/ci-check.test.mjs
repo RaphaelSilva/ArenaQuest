@@ -79,7 +79,27 @@ test('guardedFetch passes loopback to the real fetch and refuses anything else',
 
 test('expectations for budo meet the RFC 0021 criteria', () => {
   const expected = expectations(loadDataset('budo'));
-  assert.deepEqual(expected.expect, { users: 6, topics: 21, readyMedia: 27, groups: 1, groupMembers: 2, enrollments: 2 });
+  assert.deepEqual(expected.expect, {
+    users: 6,
+    topics: 21,
+    readyMedia: 27,
+    groups: 1,
+    groupMembers: 2,
+    enrollments: 2,
+    events: 3,
+    eventGrants: 1,
+    billingPlans: 2,
+    activeSubscriptions: 2,
+    paidInvoices: 1,
+    openInvoices: 1,
+    payments: 1,
+    tasks: 1,
+    taskStages: 3,
+    taskTopicLinks: 1,
+    stageTopicLinks: 3,
+    comments: 2,
+    commentLikes: 1,
+  });
   assert.ok(expected.expect.readyMedia >= RFC_FLOOR.readyMedia);
   assert.deepEqual(
     expected.students.map(({ user, xp, badges }) => ({ user, xp, badges })),
@@ -111,12 +131,14 @@ test('checkLabel accepts a correct seed and names every deviation', () => {
   bad.objects[0].state = 'missing';
   bad.students[0].xp = 300;
   bad.xpProblems = ['student-2: user_xp.total_xp 1 but the xp_events ledger sums to 950'];
+  bad.counts.openInvoices = 0;
   const problems = checkLabel(bad, expected);
   assert.ok(problems.some((line) => /^topics: 20, expected 21/.test(line)));
   assert.ok(problems.some((line) => /topics: 20 < RFC floor 21/.test(line)));
   assert.ok(problems.some((line) => /object missing/.test(line)));
   assert.ok(problems.some((line) => /student-1 total_xp: 300, expected 350/.test(line)));
   assert.ok(problems.some((line) => /ledger sums to 950/.test(line)));
+  assert.ok(problems.some((line) => /^openInvoices: 0, expected 1/.test(line)));
 
   const gone = goodObservation(expected);
   gone.students = gone.students.slice(1);

@@ -180,6 +180,7 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/demo/seed-demo.test.mjs \
 		scripts/demo/media.test.mjs \
 		scripts/demo/gamification.test.mjs \
+		scripts/demo/extensions.test.mjs \
 		scripts/demo/ci-check.test.mjs \
 		scripts/db/reset-remote.test.mjs \
 		scripts/db/check-migrations.test.mjs
