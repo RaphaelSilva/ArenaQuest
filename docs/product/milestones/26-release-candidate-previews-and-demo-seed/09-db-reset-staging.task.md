@@ -54,10 +54,10 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make db-reset-staging LABEL=budo` leaves `budo-db-staging` with the same `database_id`, _(Pending live run — needs Cloudflare credentials. Proven locally on a throwaway store: 47 objects dropped incl. `d1_migrations`, 27 migrations re-applied, budo demo seeded.)_
-      every migration listed as applied, and the demo counts of Task 08.
-- [ ] The run prints a bookmark and a restore command; running that command restores the _(The dry run prints both commands; reading a real bookmark and restoring from it need Cloudflare credentials — pending.)_
-      pre-reset data.
+- [ ] `make db-reset-staging LABEL=budo` leaves `budo-db-staging` with the same `database_id`,
+      every migration listed as applied, and the demo counts of Task 08. _(Pending live run — needs Cloudflare credentials. Proven locally on a throwaway store: 47 objects dropped incl. `d1_migrations`, 27 migrations re-applied, budo demo seeded.)_
+- [ ] The run prints a bookmark and a restore command; running that command restores the
+      pre-reset data. _(The dry run prints both commands; reading a real bookmark and restoring from it need Cloudflare credentials — pending.)_
 - [x] `reset-remote.mjs --label budo -e production` exits non-zero before any wrangler call.
 - [x] A migration present in staging but absent from the checkout (abandoned candidate) is
       gone after the reset.
