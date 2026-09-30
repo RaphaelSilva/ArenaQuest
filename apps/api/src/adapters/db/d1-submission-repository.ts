@@ -21,7 +21,7 @@ import type {
   AuthoredSubmissionRecord,
   CreatePendingSubmission,
   CursorPage,
-  CursorPosition,
+  NoteCursorKey,
   ISubmissionRepository,
   ListSubmissionsByAuthorOptions,
   ListSubmissionsByTopicOptions,
@@ -303,7 +303,7 @@ export class D1SubmissionRepository implements ISubmissionRepository {
         values.push(opts.viewerId);
         break;
       case 'class':
-        if (!opts.sharingEnabled) return { data: [], next: null };
+        if (!opts.sharingEnabled) return { data: [], nextCursor: null };
         where = "s.topic_node_id = ? AND s.status = 'ready' AND s.visibility = 'shared'";
         sortKey = 'COALESCE(s.shared_at, s.created_at)';
         break;
@@ -312,11 +312,11 @@ export class D1SubmissionRepository implements ISubmissionRepository {
         break;
       default:
         // Unknown scope: return nothing rather than widen.
-        return { data: [], next: null };
+        return { data: [], nextCursor: null };
     }
 
     const page = await this.listPage<ListedRow>(sortKey, where, values, opts.page);
-    return { data: page.rows.map(rowToRecord), next: page.next };
+    return { data: page.rows.map(rowToRecord), nextCursor: page.nextCursor };
   }
 
   async topicSummary(topicNodeId: string, viewerId: string): Promise<TopicSubmissionSummary> {
@@ -347,13 +347,13 @@ export class D1SubmissionRepository implements ISubmissionRepository {
         where = "s.author_id = ? AND s.status IN ('ready', 'removed')";
         break;
       default:
-        return { data: [], next: null };
+        return { data: [], nextCursor: null };
     }
 
     const page = await this.listPage<AuthoredRow>('s.created_at', where, [authorId], opts.page, TOPIC_TITLE);
     return {
       data: page.rows.map(r => ({ ...rowToRecord(r), topicTitle: r.topic_title ?? '' })),
-      next: page.next,
+      nextCursor: page.nextCursor,
     };
   }
 
@@ -396,7 +396,7 @@ export class D1SubmissionRepository implements ISubmissionRepository {
 
   /**
    * One keyset page: rows of `where`, newest `sortKeyExpr` first, ties broken by
-   * id, strictly after `page.after`. Fetches one extra row to know whether a
+   * id, strictly after `page.cursor`. Fetches one extra row to know whether a
    * next page exists.
    */
   private async listPage<R extends ListedRow>(
@@ -405,13 +405,13 @@ export class D1SubmissionRepository implements ISubmissionRepository {
     values: unknown[],
     page: CursorPage,
     extra: { select: string; join: string } = { select: '', join: '' },
-  ): Promise<{ rows: R[]; next: CursorPosition | null }> {
+  ): Promise<{ rows: R[]; nextCursor: NoteCursorKey | null }> {
     const limit = clampLimit(page.limit);
     const binds = [...values];
     let keyset = '';
-    if (page.after) {
+    if (page.cursor) {
       keyset = ` AND (${sortKeyExpr} < ? OR (${sortKeyExpr} = ? AND s.id < ?))`;
-      binds.push(page.after.sortKey, page.after.sortKey, page.after.id);
+      binds.push(page.cursor.sortKey, page.cursor.sortKey, page.cursor.id);
     }
     binds.push(limit + 1);
 
@@ -430,7 +430,7 @@ export class D1SubmissionRepository implements ISubmissionRepository {
     const rows = results.slice(0, limit);
     const last = rows[rows.length - 1];
     const next = results.length > limit && last ? { sortKey: last.sort_key, id: last.id } : null;
-    return { rows, next };
+    return { rows, nextCursor: next };
   }
 
   private async mustFind(id: string, op: string): Promise<SubmissionRecord> {

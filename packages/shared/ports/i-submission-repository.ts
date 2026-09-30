@@ -5,35 +5,14 @@
  * adapter; a refusal is a typed result, never an exception.
  */
 import type { Entities } from '../types/entities';
+import type { CursorPage, Paged } from './i-note-repository';
 
 // ── Cursor pagination ───────────────────────────────────────────────────────
-// The first keyset-paginated port. Student notes (RFC 0016) should import
-// these rather than redeclare them: two modules re-exported by `ports/index.ts`
-// with the same names would be an ambiguous export.
-
-/**
- * Decoded keyset position. The opaque, client-facing cursor string
- * (base64 of `sortKey|id`) is encoded and decoded by the route-layer helper;
- * the repository only ever sees this.
- */
-export interface CursorPosition {
-  /** Value of the ordering column of the last row returned (ISO timestamp). */
-  sortKey: string;
-  /** Tie-breaker: id of the last row returned. */
-  id: string;
-}
-
-/** A page request: rows strictly after `after` (null = first page), at most `limit`. */
-export interface CursorPage {
-  after: CursorPosition | null;
-  limit: number;
-}
-
-/** A page of rows plus the position to continue from (null = no more rows). */
-export interface Paged<T> {
-  data: T[];
-  next: CursorPosition | null;
-}
+// Keyset pagination is shared with student notes (RFC 0016): `CursorPage` and
+// `Paged` are declared once in `i-note-repository` and reused here, since two
+// modules re-exported by `ports/index.ts` with the same names would be an
+// ambiguous export. The opaque cursor string is encoded and decoded by the
+// route-layer helper; the repository only ever sees the decoded key.
 
 // ── Records ─────────────────────────────────────────────────────────────────
 

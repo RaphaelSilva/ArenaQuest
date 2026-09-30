@@ -365,7 +365,7 @@ describe('D1SubmissionRepository', () => {
   // ── listings ──────────────────────────────────────────────────────────────
 
   describe('listByTopic', () => {
-    const page = { after: null, limit: 20 };
+    const page = { cursor: null, limit: 20 };
 
     /** One row per status × visibility for `me`, plus the same for `other`. */
     async function matrix() {
@@ -408,7 +408,7 @@ describe('D1SubmissionRepository', () => {
       const { me, t } = await matrix();
       expect(
         await repo.listByTopic(t, { viewerId: me, scope: 'class', sharingEnabled: false, page }),
-      ).toEqual({ data: [], next: null });
+      ).toEqual({ data: [], nextCursor: null });
     });
 
     it('all returns ready + removed rows, never pending', async () => {
@@ -438,12 +438,12 @@ describe('D1SubmissionRepository', () => {
           viewerId: me,
           scope: 'mine',
           sharingEnabled: true,
-          page: { after, limit: 3 },
+          page: { cursor: after, limit: 3 },
         });
         expect(res.data.length).toBeLessThanOrEqual(3);
         seen.push(...res.data.map(r => r.id));
-        if (!res.next) break;
-        cursor = encodeCursor(res.next);
+        if (!res.nextCursor) break;
+        cursor = encodeCursor(res.nextCursor);
       }
 
       expect(seen).toHaveLength(7);
@@ -472,7 +472,7 @@ describe('D1SubmissionRepository', () => {
         viewerId: me,
         scope: 'class',
         sharingEnabled: true,
-        page: { after: crafted, limit: 50 },
+        page: { cursor: crafted, limit: 50 },
       });
       expect(res.data.map(r => r.id)).not.toContain(hidden.id);
       expect(res.data.map(r => r.id)).toEqual([late.id, early.id]);
@@ -499,12 +499,12 @@ describe('D1SubmissionRepository', () => {
       await repo.markRemoved(gone.id, await user());
       await ready(await user(), t1); // someone else's
 
-      const self = await repo.listByAuthor(author, { scope: 'self', page: { after: null, limit: 20 } });
+      const self = await repo.listByAuthor(author, { scope: 'self', page: { cursor: null, limit: 20 } });
       expect(self.data.map(x => x.id).sort()).toEqual([p.id, r.id, gone.id].sort());
       expect(self.data.find(x => x.id === r.id)!.topicTitle).toBe('Kata');
-      expect(self.next).toBeNull();
+      expect(self.nextCursor).toBeNull();
 
-      const staff = await repo.listByAuthor(author, { scope: 'staff', page: { after: null, limit: 20 } });
+      const staff = await repo.listByAuthor(author, { scope: 'staff', page: { cursor: null, limit: 20 } });
       expect(staff.data.map(x => x.id).sort()).toEqual([r.id, gone.id].sort());
     });
 
@@ -512,12 +512,12 @@ describe('D1SubmissionRepository', () => {
       const author = await user();
       const t = await topic();
       for (let i = 0; i < 3; i++) await create(author, t);
-      const first = await repo.listByAuthor(author, { scope: 'self', page: { after: null, limit: 2 } });
+      const first = await repo.listByAuthor(author, { scope: 'self', page: { cursor: null, limit: 2 } });
       expect(first.data).toHaveLength(2);
-      expect(first.next).not.toBeNull();
-      const second = await repo.listByAuthor(author, { scope: 'self', page: { after: first.next, limit: 2 } });
+      expect(first.nextCursor).not.toBeNull();
+      const second = await repo.listByAuthor(author, { scope: 'self', page: { cursor: first.nextCursor, limit: 2 } });
       expect(second.data).toHaveLength(1);
-      expect(second.next).toBeNull();
+      expect(second.nextCursor).toBeNull();
     });
   });
 
