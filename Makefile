@@ -25,7 +25,7 @@
         dev dev-api dev-web dev-web-arenaquest dev-web-srd dev-web-budo \
         build build-api build-web \
         lint lint-api lint-web lint-shared \
-        test test-api test-web test-scripts convert-skipped \
+        test test-api test-web test-scripts check-migrations convert-skipped \
         worktree-open worktree-sweep \
         db-migrate-local db-seed-local db-reset-local db-seed-demo-local \
         db-seed-demo-staging db-reset-staging \
@@ -179,7 +179,14 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/demo/media.test.mjs \
 		scripts/demo/gamification.test.mjs \
 		scripts/demo/ci-check.test.mjs \
-		scripts/db/reset-remote.test.mjs
+		scripts/db/reset-remote.test.mjs \
+		scripts/db/check-migrations.test.mjs
+
+# Migration lint (RFC 0021 §2.1): base migrations are frozen, new ones additive
+# unless their header carries `-- @contract: <reason>`. Compares with BASE
+# (default origin/main) — run `git fetch origin main` first for a fresh base.
+check-migrations: ## Lint apps/api/migrations against BASE (default origin/main): frozen + additive
+	node scripts/db/check-migrations.mjs $(if $(BASE),--base $(BASE),)
 
 test-api: ## Run apps/api tests (Vitest + Cloudflare Workers pool)
 	pnpm turbo test --filter api

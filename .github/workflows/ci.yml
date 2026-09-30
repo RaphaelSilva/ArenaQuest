@@ -39,6 +39,15 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      # RFC 0021 §2.1: base migrations frozen, new migrations additive (or `-- @contract:`).
+      # The shallow checkout lacks the base branch, so fetch just its tip first.
+      - name: Check Migrations (frozen + additive)
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          node scripts/db/check-migrations.mjs --base "origin/${BASE_REF}"
+
       - name: Lint
         run: make lint
 
