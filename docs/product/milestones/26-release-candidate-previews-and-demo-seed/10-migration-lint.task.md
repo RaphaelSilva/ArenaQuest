@@ -1,6 +1,6 @@
 # Task 10 — Backend: Migration lint: additive and frozen (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -53,13 +53,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A PR adding a migration with `ALTER TABLE … DROP COLUMN` fails CI naming file and line;
-      the same file with `-- @contract: …` passes.
-- [ ] A PR editing `0027_create_events.sql` fails CI with the "frozen" rule.
-- [ ] `DROP` appearing only inside a string literal or comment does not fail.
-- [ ] The current `main` passes.
-- [ ] `make check-migrations` works locally; `make test-scripts` and `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A PR adding a migration with `ALTER TABLE … DROP COLUMN` fails CI naming file and line;
+      the same file with `-- @contract: …` passes. _(Verified with `make check-migrations`, the same command the CI step runs; the first GitHub Actions run — including the shallow base-ref fetch — is pending.)_
+- [x] A PR editing `0027_create_events.sql` fails CI with the "frozen" rule.
+- [x] `DROP` appearing only inside a string literal or comment does not fail.
+- [x] The current `main` passes.
+- [x] `make check-migrations` works locally; `make test-scripts` and `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
@@ -68,3 +68,15 @@ Out:
    migration (fail), then with the header (pass), then with an edited historical file (fail).
 3. Push and confirm the CI step runs on the PR.
 4. `git diff --stat` confirms only scope-guardrail files changed.
+
+## Implementation notes
+
+- Allowed in a new migration: `CREATE [TEMP] TABLE`, `CREATE [UNIQUE] INDEX`, `INSERT [OR …] INTO`, `UPDATE`,
+  `ALTER TABLE … ADD [COLUMN]` (not `NOT NULL` without `DEFAULT`). `DROP`/`RENAME` anywhere fail; other `ALTER`,
+  `DELETE`, `REPLACE`, `CREATE VIEW/TRIGGER`, `PRAGMA`, `WITH` fail. Comments, strings and quoted identifiers are
+  blanked before matching (line numbers preserved).
+- `-- @contract: <reason>` is accepted anywhere in the file's leading comment header (so it coexists with the
+  `-- Migration NNNN:` headers) and prints a warning with the reason.
+- Frozen rule: every base-ref file must exist unchanged (first differing line reported). No escape hatch.
+- CI: a step in `verify` fetches only the base tip (`--depth=1`) and runs the lint against `origin/<base>`.
+- Linting all 27 historical migrations as if new flags only `0004` (a `DELETE`) — low false-positive rate.

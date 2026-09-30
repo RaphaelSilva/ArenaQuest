@@ -204,6 +204,12 @@ Three corollaries:
    They used to mean production, silently. They now fail with a message
    pointing at `-staging` / `-prod`.
 
+Before adding a migration, run `make check-migrations` (local, read-only; set
+`BASE=<ref>` to compare with something other than `origin/main`): migrations on
+`main` are frozen and new ones must be additive unless they carry a
+`-- @contract: <reason>` header — see *Migrations: expand now, contract later* in
+`CONTRIBUTING.md`.
+
 ### Renamed targets
 
 The old names still work and print a pointer to the new one. They will be

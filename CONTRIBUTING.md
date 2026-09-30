@@ -225,6 +225,25 @@ chore(infra): upgrade wrangler to v4
 - **Checks:** All CI checks (lint, build, tests) must pass before review.
 - **Reviews:** At least **one approval** is required before merging.
 
+### Migrations: expand now, contract later
+
+Staging's D1 is shared by every open candidate, so a migration must not break the
+code still running against it. `make check-migrations` (also a CI step) enforces
+two rules against `origin/main`:
+
+- **Frozen** — a migration already on `main` is never edited, renamed or deleted:
+  D1 records migrations by file name, so an edited file never re-runs anywhere.
+  Fix a shipped migration with a *new* one.
+- **Additive** — a new migration may only `CREATE TABLE`, `CREATE [UNIQUE] INDEX`,
+  `ALTER TABLE … ADD COLUMN` (nullable, or `NOT NULL` with a `DEFAULT`) and
+  `INSERT` / `UPDATE` reference data. `DROP`, `RENAME`, `DELETE` and the
+  create-copy-drop table rebuild fail, naming the file and line.
+
+A destructive change is split in two: first **expand** (add the new shape, ship
+code that uses it), then, once no deployed code reads the old shape, a separate
+**contract** migration whose header carries `-- @contract: <reason>` — a reviewed
+exception that skips the additive rule (the frozen rule has no exception).
+
 ---
 
 ## 🛠️ Local Development Setup
