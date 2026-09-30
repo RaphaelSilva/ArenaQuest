@@ -1,6 +1,6 @@
 # Task 09 — Backend: Disposable staging: db-reset-staging (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done (live staging run pending — see Acceptance Criteria)
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -54,15 +54,15 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make db-reset-staging LABEL=budo` leaves `budo-db-staging` with the same `database_id`,
+- [ ] `make db-reset-staging LABEL=budo` leaves `budo-db-staging` with the same `database_id`, _(Pending live run — needs Cloudflare credentials. Proven locally on a throwaway store: 47 objects dropped incl. `d1_migrations`, 27 migrations re-applied, budo demo seeded.)_
       every migration listed as applied, and the demo counts of Task 08.
-- [ ] The run prints a bookmark and a restore command; running that command restores the
+- [ ] The run prints a bookmark and a restore command; running that command restores the _(The dry run prints both commands; reading a real bookmark and restoring from it need Cloudflare credentials — pending.)_
       pre-reset data.
-- [ ] `reset-remote.mjs --label budo -e production` exits non-zero before any wrangler call.
-- [ ] A migration present in staging but absent from the checkout (abandoned candidate) is
+- [x] `reset-remote.mjs --label budo -e production` exits non-zero before any wrangler call.
+- [x] A migration present in staging but absent from the checkout (abandoned candidate) is
       gone after the reset.
-- [ ] `make test-scripts` and `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `make test-scripts` and `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
@@ -72,3 +72,13 @@ Out:
 3. Restore from the printed bookmark on a scratch run to prove the undo path.
 4. `make test-scripts && make lint`; `git diff --stat` confirms only scope-guardrail files
    changed.
+
+## Implementation notes
+
+- Reuses `resolveTarget`, `loadAllProfiles`, `readPassword`, `parseD1Json` exported by `scripts/demo/seed-demo.mjs`.
+- Views are dropped before tables; excluded names match with `substr` (not `LIKE`, where `_` is a wildcard).
+  The drop batch starts with `PRAGMA defer_foreign_keys = on` (verified locally: a parent-with-child drop fails alone,
+  succeeds in the batch).
+- `AQ_DEMO_PASSWORD` is checked before the bookmark step; a failure after the bookmark repeats the restore command.
+- To confirm on the first live run: `time-travel info --json` exposes `bookmark` (taken from wrangler 4.144 source),
+  and remote D1 runs the multi-statement drop as one batch.
