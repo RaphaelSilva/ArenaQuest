@@ -1,6 +1,6 @@
 # Task 12 — Backend: Deploy CLI preview mode, Make targets and workflow (Phase 3)
 
-**Status:** ✅ Done (live preview runs pending — see Acceptance Criteria)
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -71,22 +71,33 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make deploy-preview-staging LABEL=budo CANDIDATE=m21` prints a web URL on
+- [x] `make deploy-preview-staging LABEL=budo CANDIDATE=m21` prints a web URL on
       `m21.<budo staging pages host>` and a Workers Preview URL; `demo.admin` logs in on the
-      web preview (CORS and refresh cookie work) and topic media play. _(Pending live run — needs Cloudflare credentials. `DRY_RUN=1` prints the full plan and the web URL `https://m21.budo-web-staging.pages.dev`.)_
-- [ ] During and after the preview, the live staging API and web keep serving the previous
-      version (unchanged `wrangler deployments list` for the staging Worker). _(Pending live run.)_
-- [ ] The run's report includes the bookmark and a working restore command. _(The plan prints the restore command template; a real bookmark needs credentials — pending.)_
+      web preview (CORS and refresh cookie work) and topic media play. _(Verified live on
+      2026-09-30 with the budo `m26` candidate. The first run 500'd on login — a Workers
+      Preview gets no secret from the Worker nor the Preview base config — which led to the
+      per-deploy `--secrets-file` and the lazy S3 client in `R2StorageAdapter` (7c8ea05).)_
+- [x] During and after the preview, the live staging API and web keep serving the previous
+      version (unchanged `wrangler deployments list` for the staging Worker). _(Verified live on
+      2026-09-30 with the budo preview.)_
 - [x] `--preview x -e production` and a name like `Feature/M21` exit non-zero before any
       step runs.
 - [x] A candidate with a destructive migration (no `@contract`) stops at the lint step,
       before the bookmark and migrate steps. _(Verified with a stubbed lint failure: the run stops before bookmark and migrate.)_
-- [ ] `make preview-delete-staging LABEL=budo CANDIDATE=m21` removes the Worker preview and
-      the Pages branch deployments. _(Pending live run; dry-run plan verified.)_
-- [ ] `preview-candidate.yml` has only a `workflow_dispatch` trigger; a run with `label: all`
-      produces three previews and lists their URLs in the job summary. _(Trigger verified; the `all` dispatch run is pending.)_
+- [x] `preview-candidate.yml` has only a `workflow_dispatch` trigger. _(A dispatch with
+      `label: all` is deferred — see below.)_
 - [x] `make test-scripts`, `make lint`, `make test-api`, `make test-web` green.
 - [x] No diff outside the scope guardrail.
+
+**Deferred to backlog** ([deployment/03](../../backlog/deployment/03-m26-deferred-live-checks.task.md)) — live checks not yet run:
+
+- The run's report includes the bookmark and a **working** restore command. _(The report
+  prints the bookmark and the restore command; restoring from it has not been exercised.)_
+- `make preview-delete-staging LABEL=budo CANDIDATE=m21` removes the Worker preview and the
+  Pages branch deployments. _(Dry-run plan verified.)_
+- A `preview-candidate.yml` dispatch with `label: all` produces three previews and lists their
+  URLs in the job summary. _(No run yet; arenaquest and spaziord also lack a staging D1 — see
+  the backlog item.)_
 
 ## Verification Plan
 

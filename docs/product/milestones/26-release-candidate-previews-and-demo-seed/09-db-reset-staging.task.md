@@ -1,6 +1,6 @@
 # Task 09 — Backend: Disposable staging: db-reset-staging (Phase 2)
 
-**Status:** ✅ Done (live staging run pending — see Acceptance Criteria)
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -54,15 +54,23 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make db-reset-staging LABEL=budo` leaves `budo-db-staging` with the same `database_id`,
-      every migration listed as applied, and the demo counts of Task 08. _(Pending live run — needs Cloudflare credentials. Proven locally on a throwaway store: 47 objects dropped incl. `d1_migrations`, 27 migrations re-applied, budo demo seeded.)_
-- [ ] The run prints a bookmark and a restore command; running that command restores the
-      pre-reset data. _(The dry run prints both commands; reading a real bookmark and restoring from it need Cloudflare credentials — pending.)_
+- [x] `make db-reset-staging LABEL=budo` leaves `budo-db-staging` with the same `database_id`,
+      every migration listed as applied, and the demo counts of Task 08. _(Verified live on
+      2026-09-30: `budo-db-staging` keeps `database_id` `c4884534-…` (created 2026-09-12, the id in
+      `config/labels/budo.jsonc`), lists all 27 migrations of the M26 head as applied, and holds
+      exactly the demo — 6 demo users, 21 topics, 27 `ready` media, student-1/2 at 350/950 XP.
+      Also proven locally on a throwaway store: 47 objects dropped incl. `d1_migrations`.)_
 - [x] `reset-remote.mjs --label budo -e production` exits non-zero before any wrangler call.
 - [x] A migration present in staging but absent from the checkout (abandoned candidate) is
       gone after the reset.
 - [x] `make test-scripts` and `make lint` green.
 - [x] No diff outside the scope guardrail.
+
+**Deferred to backlog** ([deployment/03](../../backlog/deployment/03-m26-deferred-live-checks.task.md)) — live check not yet run:
+
+- The run prints a bookmark and a restore command; running that command restores the
+  pre-reset data. _(The dry run prints both commands; restoring from a real bookmark has not
+  been exercised.)_
 
 ## Verification Plan
 

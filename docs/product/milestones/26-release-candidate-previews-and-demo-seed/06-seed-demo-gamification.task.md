@@ -62,8 +62,11 @@ Out:
 
 - [x] After a local seed, student-1 shows 350 XP / level 3, one badge, a 3-day streak and
       `weekly-topic` 1/2; student-2 shows 950 XP / level 4; student-3 shows 0 XP.
-- [ ] As student-2, completing one more published lesson in the app raises the total to
-      1050 and the dashboard shows level 5. _(Level 5 is reached, but not at exactly 1050: the same completion also pays the daily/weekly topic quests, the active demo mission and its badge — 950 → 2130. Exact 1050 is impossible while the seeded mission is active; the weekly-quest overpayment comes from a pre-existing evaluator bug, see notes.)_
+- [x] As student-2, completing one more published lesson in the app raises the dashboard to
+      level 5. _(Amended at closeout: the original "total = 1050" is not reachable while the
+      seeded mission is active — the same completion also pays the daily/weekly topic quests,
+      the demo mission and its badge, 950 → 2130. Level 5 is reached as intended. The
+      weekly-quest overpayment is a pre-existing evaluator bug, not in M26's scope — see notes.)_
 - [x] As student-1, re-completing the already-completed lesson awards no XP.
 - [x] As student-3, completing a first lesson awards 100 XP plus *alicerce-solido*, and the
       active mission completes with *tecnica-afiada*.

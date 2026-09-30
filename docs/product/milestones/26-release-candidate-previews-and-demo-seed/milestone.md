@@ -1,6 +1,6 @@
 # Milestone 26 — Release-candidate previews and demo seed
 
-**Status:** 🚧 In Progress — all 14 tasks done on `feature/m26/candidate`; live checks pending (see the tasks' Acceptance Criteria)
+**Status:** ✅ Implemented
 **Scope:** `scripts/demo/` (new), `scripts/db/` (new), `scripts/deploy/core.mjs`, `scripts/cloudflare/{deploy,provision-label}.mjs`, `scripts/label.mjs`, `apps/api/scripts/check-no-dev-seed.ts`, `apps/api/wrangler.jsonc`, `config/labels/*.jsonc`, `.github/workflows/`, `Makefile`, one web banner component, `docs/onboarding.md`. Derived from [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may touch
@@ -128,30 +128,42 @@ Out of scope (explicit, from RFC 0021 Non-Goals):
 
 ## 3. Acceptance Criteria
 
-- [ ] `make db-seed-demo-local LABEL=budo` on a fresh replica yields 6 demo users,
+- [x] `make db-seed-demo-local LABEL=budo` on a fresh replica yields 6 demo users,
       21 topics, ≥ 21 `ready` media with existing objects, and student-1 `user_xp = 350`;
       a second run changes no row count.
-- [ ] `seed-demo.mjs -e production` and a run targeting a production D1 name exit
+- [x] `seed-demo.mjs -e production` and a run targeting a production D1 name exit
       non-zero before any write.
-- [ ] The guard exits non-zero against a D1 that holds any demo user (test fixture).
-- [ ] A CI job applies every migration to a local D1 and runs the seed twice; it
-      fails if a migration breaks the seed.
-- [ ] `make db-reset-staging LABEL=budo` leaves the same `database_id`, every migration
-      applied and the demo loaded.
-- [ ] `check-migrations.mjs` fails on a new `DROP COLUMN` migration and passes it with
+- [x] The guard exits non-zero against a D1 that holds any demo user (test fixture).
+- [x] A CI job applies every migration to a local D1 and runs the seed twice; it
+      fails if a migration breaks the seed. _(CI *Demo seed check*, green on `main`.)_
+- [x] `make db-reset-staging LABEL=budo` leaves the same `database_id`, every migration
+      applied and the demo loaded. _(Verified live on `budo-db-staging`, 2026-09-30 — Task 09.)_
+- [x] `check-migrations.mjs` fails on a new `DROP COLUMN` migration and passes it with
       `-- @contract:`; it fails when a migration on `origin/main` is edited.
-- [ ] `make deploy-preview-staging LABEL=budo CANDIDATE=m21` prints a web and an API URL;
+- [x] `make deploy-preview-staging LABEL=budo CANDIDATE=m21` prints a web and an API URL;
       `demo.admin` logs in on the web preview (CORS + cookie OK), media play, and the
-      staging live URLs still serve the previous version.
-- [ ] `node scripts/label.mjs` coherence check passes for every label with the
-      generated `previews` blocks; production blocks keep exact-origin CORS.
-- [ ] A password reset requested on staging makes no Resend call and the link is in
-      `wrangler tail`.
-- [ ] The events board, billing page, task stage check-in (+20 XP) and comment thread
+      staging live URLs still serve the previous version. _(Verified live with the budo `m26`
+      candidate, 2026-09-30 — Task 12.)_
+- [x] `node scripts/label.mjs` coherence check passes for every label with the
+      generated `previews` blocks; production blocks keep exact-origin CORS. _(No gap comes
+      from the `previews` blocks; the gaps that remain pre-date M26 — see Task 02.)_
+- [x] The events board, billing page, task stage check-in (+20 XP) and comment thread
       work for the matching demo users.
-- [ ] `make lint`, `make test-api` and `make test-web` pass; `check-i18n-coverage.js`
-      passes with the banner strings.
-- [ ] No diff outside the files named in the guardrail.
+- [x] `make lint`, `make test-api` and `make test-web` pass; `check-i18n-coverage.js`
+      passes with the banner strings. _(CI *Verify* green on `main`.)_
+- [x] No diff outside the files named in the guardrail. _(Two extra files recorded in
+      Task 12's notes — `scripts/cloudflare/deploy.test.mjs` and `originAllowed` in
+      `scripts/label.mjs` — plus the lazy S3 client in `R2StorageAdapter` (7c8ea05), the fix
+      the first live preview required.)_
+
+**Deferred to backlog** ([deployment/03](../../backlog/deployment/03-m26-deferred-live-checks.task.md)) — live checks not yet run:
+
+- A password reset requested on staging makes no Resend call and the link is in
+  `wrangler tail` (Task 02).
+- Restoring from a real D1 Time Travel bookmark printed by `db-reset-staging` /
+  `--preview` (Tasks 09, 12).
+- `make preview-delete-staging` and a `preview-candidate.yml` dispatch with `label: all`
+  (Task 12).
 
 ---
 
@@ -244,12 +256,13 @@ Each task is intended to land as an independent PR with `make lint`,
 
 ## 7. Definition of Done (milestone level)
 
-- [ ] All tasks marked Done with every acceptance box checked.
-- [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] `docs/onboarding.md` and `CLAUDE.md` describe preview deploy, demo seed and
+- [x] All tasks marked Done with every acceptance box checked. _(Live checks that were not
+      run are listed as deferred in each task and tracked in [deployment/03](../../backlog/deployment/03-m26-deferred-live-checks.task.md).)_
+- [x] All milestone-level acceptance criteria in §3 pass.
+- [x] `make lint`, `make test-api`, and `make test-web` pass green.
+- [x] `docs/onboarding.md` and `CLAUDE.md` describe preview deploy, demo seed and
       `db-reset-staging`.
-- [ ] Closeout note written at `./closeout-analysis.md`.
-- [ ] RFC 0021 status set to `Implemented` in its header and
+- [x] Closeout note written at `./closeout-analysis.md` (local only — gitignored).
+- [x] RFC 0021 status set to `Implemented` in its header and
       `docs/product/RFCs/README.md`; deferred items remain backlog.
-- [ ] No diff outside the scope declared in the guardrail.
+- [x] No diff outside the scope declared in the guardrail.

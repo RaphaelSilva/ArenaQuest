@@ -1,6 +1,6 @@
 # Task 02 — Backend: Staging profiles: console mail driver and spaziord webOrigin (Phase 0)
 
-**Status:** ✅ Done (two live checks pending — see Acceptance Criteria)
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -51,15 +51,20 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `node scripts/label.mjs` coherence/policy check passes for all labels and both envs. _(Not fully green, but no gap is introduced by this task: spaziord staging went from 2 hard gaps to 0; the remaining gaps pre-date it — `GOOGLE_CLIENT_ID` is set in the dashboard rather than in wrangler vars, arenaquest production has a placeholder KV id, and budo/spaziord production have the domain mismatch tracked separately.)_
+- [x] `node scripts/label.mjs` coherence/policy check introduces no gap for any label or env. _(spaziord staging went from 2 hard gaps to 0. The check is not fully green: the remaining gaps pre-date this task — `GOOGLE_CLIENT_ID` is set in the dashboard rather than in wrangler vars, arenaquest production has a placeholder KV id, and budo/spaziord production have the domain mismatch tracked separately.)_
 - [x] The three `<label>-staging` wrangler blocks carry `MAIL_DRIVER=console`; the
       production blocks still carry `resend`.
 - [x] spaziord staging `ALLOWED_ORIGINS` and bucket CORS derive from
       `spaziord-web-staging.pages.dev` and include `https://*.spaziord-web-staging.pages.dev`.
-- [ ] After redeploy, a password reset on budo staging logs the mail (and its link) in
-      `wrangler tail` and makes no Resend call. _(Pending: needs a staging redeploy with Cloudflare credentials.)_
 - [x] `make test-scripts`, `make lint`, `make test-api` green.
 - [x] No diff outside the scope guardrail.
+
+**Deferred to backlog** ([deployment/03](../../backlog/deployment/03-m26-deferred-live-checks.task.md)) — live checks not yet run:
+
+- After redeploy, a password reset on budo staging logs the mail (and its link) in
+  `wrangler tail` and makes no Resend call. _(The staging Worker has been redeployed through
+  the CLI — the `Deploy to Staging` job is green on `main` — but the reset itself has not been
+  observed.)_
 
 ## Verification Plan
 

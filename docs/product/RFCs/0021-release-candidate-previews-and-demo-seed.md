@@ -1,8 +1,8 @@
 # RFC 0021: Release-candidate previews on staging and a reproducible demo seed
 
 **Date:** 2026-09-29
-**Status:** Proposed
-**Revised:** 2026-09-29 (open questions 1–5 resolved)
+**Status:** Implemented
+**Revised:** 2026-09-29 (open questions 1–5 resolved); 2026-09-30 (implemented by [Milestone 26](../milestones/26-release-candidate-previews-and-demo-seed/milestone.md))
 **Author:** raphaelsilva
 **Affected:**
 - `scripts/demo/seed-demo.mjs` (new — the demo seed CLI: builds deterministic SQL + uploads demo media, targets `local` or `staging`, refuses `production`)
@@ -489,6 +489,11 @@ Total **~9 dev days**.
 - **P4** Events board shows one event per audience for the matching demo user; the
   billing page shows one paid and one open invoice; student-3 checking in a task stage
   earns 20 XP; the demo lesson shows a comment thread with a reply and a like.
+
+_Closeout (2026-09-30): P1–P4 verified — P2 and P3 live on budo staging. The P0 live check
+(password reset observed in `wrangler tail`) and the bookmark-restore, preview-delete and
+`label: all` dispatch runs are tracked in
+[backlog/deployment/03](../backlog/deployment/03-m26-deferred-live-checks.task.md)._
 
 ## Open Questions
 

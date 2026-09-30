@@ -63,8 +63,8 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] After `seed-demo -e local`, every one of the 21 topics has ≥ 1 `ready` media and each
-      presigned URL returned by `GET /v1/topics/{id}` downloads the file (200). _(Partly verified: 27 `ready` rows over all 21 topics, every object present and SHA-256-checked in the local bucket, and the API returns presigned URLs with the expected keys. The 200 download needs real R2 credentials — `.dev.vars` has empty keys — so it is pending until the first staging seed.)_
+- [x] After `seed-demo -e local`, every one of the 21 topics has ≥ 1 `ready` media and each
+      presigned URL returned by `GET /v1/topics/{id}` downloads the file (200). _(Locally: 27 `ready` rows over all 21 topics, every object present and SHA-256-checked. The download needs real R2 credentials, so it was proven on budo staging instead: `budo-db-staging` holds the same 27 `ready` rows and topic media play on the budo candidate preview, verified live on 2026-09-30.)_
 - [x] A second run uploads nothing (plan shows every object as "exists").
 - [x] A manifest entry with a wrong SHA-256 aborts the run and no `media` row is written.
 - [x] A disallowed or oversized file is refused by `validateMediaFile` with the entry named.
