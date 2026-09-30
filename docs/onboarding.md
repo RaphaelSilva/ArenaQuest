@@ -124,6 +124,54 @@ node scripts/demo/ci-check.mjs                     # what CI runs (below)
   password is generated inside the script. It needs Node ≥ 22 (wrangler's floor).
   A migration that breaks the demo therefore fails the PR that adds it.
 
+### Recovering staging (RFC 0021 §4)
+
+Staging is disposable: when a candidate left it in a state nobody wants (an
+abandoned migration, test rows, a half-applied schema), wipe it and reload the
+demo instead of repairing it by hand.
+
+```bash
+export AQ_DEMO_PASSWORD='…'                        # the seed step needs it; checked before anything runs
+make db-reset-staging LABEL=budo DRY_RUN=1         # print the plan — no wrangler call, no credentials
+make db-reset-staging LABEL=budo                   # asks you to type the database name (budo-db-staging)
+make db-reset-staging LABEL=budo CONFIRM=1         # … without the prompt (CI / scripts)
+```
+
+`scripts/db/reset-remote.mjs --label <l> -e staging` runs four steps, in this
+order, each only if the previous one succeeded:
+
+1. **Bookmark.** `wrangler d1 time-travel info <db> --json` records the current
+   Time Travel bookmark and prints the exact undo command. If no bookmark can be
+   read, the reset aborts before dropping anything.
+2. **Drop.** Every table and view in `sqlite_master` except `sqlite_*` and
+   `_cf_*` — `d1_migrations` included — is dropped in one batch that starts
+   with `PRAGMA defer_foreign_keys = on` (D1 does not allow turning foreign keys
+   off). A migration applied on staging but absent from your checkout is
+   therefore forgotten along with its tables.
+3. **Migrate.** `wrangler d1 migrations apply <db> --remote` from the current
+   checkout.
+4. **Seed.** `seed-demo.mjs --label <l> -e staging --yes` (the demo seed's own CLI).
+
+The database is emptied **in place**, so its `database_id` never changes and
+neither the label profile nor `wrangler.jsonc` needs an edit. The bucket is
+**not** emptied: the demo re-uses its own objects, and anything else left there
+becomes an orphan for the RFC 0018 storage audit.
+
+**Undoing a reset.** Run the command the reset printed (it is also repeated in
+the error if a later step fails), from the repo root:
+
+```bash
+pnpm --filter api exec wrangler d1 time-travel restore budo-db-staging \
+     --bookmark=<bookmark> --env budo-staging
+```
+
+Time Travel keeps 30 days of history, so the bookmark is good for that long.
+
+There is **no production variant and no flag that skips the refusals**: the
+script rejects `-e production`, `-e local` (use `make db-reset-local`) and any
+staging block naming a production D1 or bucket — the same target resolution the
+demo seed uses — before any wrangler call.
+
 ---
 
 ## 4. The naming rule
