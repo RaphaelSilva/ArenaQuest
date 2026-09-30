@@ -159,7 +159,8 @@ test: test-scripts ## Run all tests
 	pnpm turbo run test
 
 test-scripts: ## Run the operational script unit tests (node:test — no network, no wrangler)
-	node --test scripts/label.test.mjs \
+	node --test scripts/makefile.test.mjs \
+		scripts/label.test.mjs \
 		scripts/deploy/core.test.mjs \
 		scripts/cloudflare/provision-label.test.mjs \
 		scripts/content/import-media.test.mjs \
@@ -187,9 +188,9 @@ db-seed-local: ## Seed the local D1 with test accounts (Admin, Student, Professo
 	pnpm --filter api exec wrangler d1 execute arenaquest-db --local \
 		--file ./migrations/seed/0003_events_local.sql
 
-db-reset-local: ## Delete the local D1 replica, re-migrate and re-seed
-	@printf "$(YELLOW)  ⚠  Deleting apps/api/.wrangler/state/v3/d1 ...$(RESET)\n"
-	rm -rf apps/api/.wrangler/state/v3/d1
+db-reset-local: ## Delete local Worker state, re-migrate and re-seed D1
+	@printf "$(YELLOW)  ⚠  Deleting apps/api/.wrangler/state ...$(RESET)\n"
+	rm -rf apps/api/.wrangler/state
 	@$(MAKE) --no-print-directory db-migrate-local
 	@$(MAKE) --no-print-directory db-seed-local
 	@printf "$(GREEN)  ✔  Local database reset.$(RESET)\n"

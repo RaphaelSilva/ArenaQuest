@@ -431,6 +431,9 @@ in `apps/web/.env.local` must be a bare origin. `api-client.ts` injects the
 make db-reset-local     # deletes the replica, re-migrates, re-seeds
 ```
 
+The reset removes the whole local Worker state, including version-sensitive KV,
+R2, cache and workflow data, before recreating D1.
+
 **Port 3000 or 8787 already taken.** `make doctor` reports it. Find the holder
 with `lsof -i :8787`.
 
@@ -460,6 +463,10 @@ rather than fixed, so they do not block you unexpectedly.
    which is referenced by nothing.
 4. **`db-migrations-staging-local`** (staging schema against a local replica)
    has no identified caller. It is kept but omitted from `make help`.
+5. **Older checkouts may leave incompatible workerd state behind.** If
+   `make db-reset-local` deletes only `.wrangler/state/v3/d1` and the API fails
+   with an internal-table error such as `_cf_ALARM`, remove
+   `apps/api/.wrangler/state` once or update to a checkout with the full reset.
 
 ---
 
