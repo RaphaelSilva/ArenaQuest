@@ -10,9 +10,15 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { parseJsonc } from '../label.mjs';
+import { parseJsonc, derivePreview, originAllowed } from '../label.mjs';
 import {
   parseArgs,
+  run,
+  buildPreviewPlan,
+  buildPreviewDeletePlan,
+  previewNameFromBranch,
+  resolvePreviewName,
+  MIGRATIONS_BASE,
   loadProfile,
   loadSchema,
   resolve,
@@ -33,12 +39,18 @@ const schema = () => loadSchema();
 // ── parseArgs: valid combinations ─────────────────────────────────────────────
 test('parseArgs returns normalised defaults (scope=all, booleans false)', () => {
   const a = parseArgs(['--label', 'acme', '-e', 'staging']);
-  assert.deepEqual(a, { label: 'acme', env: 'staging', scope: 'all', yes: false, dryRun: false, skipSecretCheck: false });
+  assert.deepEqual(a, {
+    label: 'acme', env: 'staging', scope: 'all', yes: false, dryRun: false, skipSecretCheck: false,
+    preview: null, delete: false, apiUrl: null, summaryFile: null,
+  });
 });
 
 test('parseArgs honours --scope, --yes and --dry-run', () => {
   const a = parseArgs(['--label', 'acme', '--env', 'production', '--scope', 'api', '--yes', '--dry-run']);
-  assert.deepEqual(a, { label: 'acme', env: 'production', scope: 'api', yes: true, dryRun: true, skipSecretCheck: false });
+  assert.deepEqual(a, {
+    label: 'acme', env: 'production', scope: 'api', yes: true, dryRun: true, skipSecretCheck: false,
+    preview: null, delete: false, apiUrl: null, summaryFile: null,
+  });
 });
 
 test('parseArgs defaults skipSecretCheck to false and honours the flag', () => {
@@ -315,4 +327,193 @@ test('core.mjs imports only node builtins + ../label.mjs (no wrangler, no cloud 
   }
   assert.ok(!/\bchild_process\b/.test(CORE_SRC), 'core.mjs must not use node:child_process');
   assert.ok(!/spawnSync\s*\(/.test(CORE_SRC), 'core.mjs must not spawn a subprocess');
+});
+
+// ── candidate previews (RFC 0021 §1) ──────────────────────────────────────────
+const STG = ['--label', 'acme', '-e', 'staging'];
+
+test('previewNameFromBranch maps feature/m<N>/candidate → m<N> and nothing else', () => {
+  assert.equal(previewNameFromBranch('feature/m21/candidate'), 'm21');
+  assert.equal(previewNameFromBranch('feature/m26/12-deploy-cli-preview-mode.task'), null);
+  assert.equal(previewNameFromBranch('main'), null);
+  assert.equal(previewNameFromBranch(''), null);
+  assert.equal(previewNameFromBranch(undefined), null);
+});
+
+test('parseArgs --preview <name> sets the preview; an empty value defaults from the candidate branch', () => {
+  assert.equal(parseArgs([...STG, '--preview', 'm21']).preview, 'm21');
+  assert.equal(parseArgs([...STG, '--preview', ''], { branch: 'feature/m21/candidate' }).preview, 'm21');
+  assert.throws(() => parseArgs([...STG, '--preview', ''], { branch: 'main' }), /needs a name/);
+});
+
+test('parseArgs refuses --preview with -e production before anything else', () => {
+  assert.throws(() => parseArgs(['--label', 'acme', '-e', 'production', '--preview', 'x']), /only valid with -e staging/);
+  assert.throws(() => parseArgs(['--label', 'acme', '-e', 'production', '--preview', 'Feature/M21']), /only valid with -e staging/);
+});
+
+test('parseArgs refuses a preview name outside [a-z0-9-]{1,20}', () => {
+  for (const bad of ['Feature/M21', 'M21', 'a'.repeat(21), 'm_21', 'm21.x', '-m21', 'm21-']) {
+    assert.throws(() => resolvePreviewName(bad, ''), /must match/, bad);
+    assert.throws(() => parseArgs([...STG, `--preview=${bad}`]), /must match/, bad);
+  }
+  assert.equal(resolvePreviewName('a'.repeat(20), ''), 'a'.repeat(20));
+});
+
+test('parseArgs: --delete / --api-url / --summary-file need --preview', () => {
+  assert.throws(() => parseArgs([...STG, '--delete']), /--delete is only valid with --preview/);
+  assert.throws(() => parseArgs([...STG, '--api-url', 'https://x.dev']), /--api-url is only valid with --preview/);
+  assert.throws(() => parseArgs([...STG, '--summary-file', '/tmp/s']), /--summary-file is only valid with --preview/);
+  const a = parseArgs([...STG, '--preview', 'm21', '--delete', '--summary-file', '/tmp/s']);
+  assert.equal(a.delete, true);
+  assert.equal(a.summaryFile, '/tmp/s');
+});
+
+test('parseArgs: a web-only preview requires an https --api-url; other scopes refuse it', () => {
+  assert.throws(() => parseArgs([...STG, '--preview', 'm21', '--scope', 'web']), /needs --api-url/);
+  assert.throws(() => parseArgs([...STG, '--preview', 'm21', '--scope', 'web', '--api-url', 'http://x.dev']), /https/);
+  assert.throws(() => parseArgs([...STG, '--preview', 'm21', '--api-url', 'https://x.dev']), /only valid for a web-only preview/);
+  const a = parseArgs([...STG, '--preview', 'm21', '--scope', 'web', '--api-url', 'https://m21-api.acct.workers.dev/']);
+  assert.equal(a.apiUrl, 'https://m21-api.acct.workers.dev');
+  // deleting a web branch needs no API URL
+  assert.equal(parseArgs([...STG, '--preview', 'm21', '--scope', 'web', '--delete']).apiUrl, null);
+});
+
+test('originAllowed mirrors the API matcher: exact, one-label wildcard, scheme, full wildcard', () => {
+  const list = 'https://w.pages.dev,https://*.w.pages.dev,http://localhost:3000';
+  assert.equal(originAllowed(list, 'https://w.pages.dev'), true);
+  assert.equal(originAllowed(list, 'https://m21.w.pages.dev'), true);
+  assert.equal(originAllowed(list, 'https://M21.W.pages.dev'), true);
+  assert.equal(originAllowed(list, 'https://a.b.w.pages.dev'), false, 'deep subdomain');
+  assert.equal(originAllowed(list, 'http://m21.w.pages.dev'), false, 'scheme mismatch');
+  assert.equal(originAllowed(list, 'https://m21.other.pages.dev'), false);
+  assert.equal(originAllowed(list, 'https://m21.w.pages.dev/path'), false, 'not an origin');
+  assert.equal(originAllowed('*', 'https://anything.example'), true);
+});
+
+test('derivePreview: the web preview is the Pages branch alias, covered by the staging ALLOWED_ORIGINS', () => {
+  const p = derivePreview(goodProfile(), 'm21');
+  assert.equal(p.webUrl, 'https://m21.acme-web-staging.pages.dev');
+  assert.equal(p.siteUrl, p.webUrl);
+  assert.equal(p.pagesProject, 'acme-web-staging');
+  assert.equal(p.d1Name, 'acme-db-staging');
+  assert.ok(originAllowed(p.allowedOrigins, p.webUrl));
+});
+
+test('derivePreview refuses a staging webOrigin that is not the Pages host (CORS would fail)', () => {
+  const p = goodProfile();
+  p.environments.staging.webOrigin = 'staging.acme.app';
+  assert.throws(() => derivePreview(p, 'm21'), /not admitted by the staging ALLOWED_ORIGINS/);
+});
+
+test('derivePreview refuses a name whose Worker preview host exceeds one DNS label', () => {
+  const p = goodProfile();
+  p.environments.staging.worker = 'w'.repeat(50);
+  assert.throws(() => derivePreview(p, 'a'.repeat(13)), /63-character DNS label/);
+  assert.doesNotThrow(() => derivePreview(p, 'a'.repeat(12)));
+});
+
+test('derivePreview holds for every committed label (their staging webOrigin is the Pages host)', () => {
+  for (const label of ['arenaquest', 'spaziord', 'budo']) {
+    const p = derivePreview(loadProfile(label), 'm21');
+    assert.equal(p.webUrl, `https://m21.${loadProfile(label).environments.staging.webOrigin}`, label);
+  }
+});
+
+function previewPlan(scope, extra = {}) {
+  const p = goodProfile();
+  const { resolved, envConfig } = resolve(p, 'staging');
+  return buildPreviewPlan({
+    label: p.label, scope, resolved, envConfig, preview: derivePreview(p, 'm21'), commitSha: 'abc1234', ...extra,
+  });
+}
+
+test('buildPreviewPlan (all): lint → build-shared → bookmark → migrate → worker preview → web → pages branch → report', () => {
+  assert.deepEqual(previewPlan('all').map((s) => s.kind), [
+    'lint-migrations', 'build-shared', 'bookmark', 'migrate', 'deploy-worker-preview',
+    'build-web', 'deploy-pages-branch', 'report',
+  ]);
+});
+
+test('buildPreviewPlan: the lint precedes the bookmark, which precedes the migrate', () => {
+  const kinds = previewPlan('all').map((s) => s.kind);
+  assert.ok(kinds.indexOf('lint-migrations') < kinds.indexOf('bookmark'));
+  assert.ok(kinds.indexOf('bookmark') < kinds.indexOf('migrate'));
+  assert.equal(previewPlan('all')[0].base, MIGRATIONS_BASE);
+});
+
+test('buildPreviewPlan never targets the live staging Worker or the Pages production branch', () => {
+  const kinds = previewPlan('all').map((s) => s.kind);
+  assert.ok(!kinds.includes('deploy-worker'));
+  assert.ok(!kinds.includes('deploy-pages'));
+  const pages = previewPlan('all').find((s) => s.kind === 'deploy-pages-branch');
+  assert.equal(pages.branch, 'm21');
+  assert.equal(pages.pagesProject, 'acme-web-staging');
+  const worker = previewPlan('all').find((s) => s.kind === 'deploy-worker-preview');
+  assert.equal(worker.previewName, 'm21');
+  assert.equal(worker.wranglerEnv, 'acme-staging');
+  assert.equal(worker.message, 'abc1234');
+});
+
+test('buildPreviewPlan scope filtering', () => {
+  assert.deepEqual(previewPlan('api').map((s) => s.kind), [
+    'lint-migrations', 'build-shared', 'bookmark', 'migrate', 'deploy-worker-preview', 'report',
+  ]);
+  assert.deepEqual(previewPlan('web', { apiUrl: 'https://x.dev' }).map((s) => s.kind), [
+    'build-shared', 'build-web', 'deploy-pages-branch', 'report',
+  ]);
+});
+
+test('buildPreviewPlan build-web vars: captured API URL, preview site URL, name and sha over the brand', () => {
+  const web = previewPlan('all').find((s) => s.kind === 'build-web');
+  assert.equal(web.apiUrlFrom, 'deploy-worker-preview');
+  assert.equal(web.brandVars.NEXT_PUBLIC_API_URL, null);
+  assert.equal(web.brandVars.NEXT_PUBLIC_SITE_URL, 'https://m21.acme-web-staging.pages.dev');
+  assert.equal(web.brandVars.NEXT_PUBLIC_PREVIEW_NAME, 'm21');
+  assert.equal(web.brandVars.NEXT_PUBLIC_PREVIEW_SHA, 'abc1234');
+  assert.equal(web.brandVars.NEXT_PUBLIC_BRAND_SIGLA, 'ACM');
+
+  const webOnly = previewPlan('web', { apiUrl: 'https://x.dev' }).find((s) => s.kind === 'build-web');
+  assert.equal(webOnly.apiUrlFrom, null);
+  assert.equal(webOnly.brandVars.NEXT_PUBLIC_API_URL, 'https://x.dev');
+});
+
+test('buildPreviewPlan report carries both URLs and the bookmark source', () => {
+  const report = previewPlan('all').at(-1);
+  assert.equal(report.kind, 'report');
+  assert.equal(report.webUrl, 'https://m21.acme-web-staging.pages.dev');
+  assert.equal(report.apiUrlFrom, 'deploy-worker-preview');
+  assert.equal(report.bookmarkFrom, 'bookmark');
+  assert.equal(report.d1Name, 'acme-db-staging');
+});
+
+test('buildPreviewDeletePlan removes the worker preview and the pages branch, per scope', () => {
+  const p = goodProfile();
+  const { envConfig } = resolve(p, 'staging');
+  const preview = derivePreview(p, 'm21');
+  const all = buildPreviewDeletePlan({ label: 'acme', scope: 'all', envConfig, preview });
+  assert.deepEqual(all.map((s) => s.kind), ['delete-worker-preview', 'delete-pages-branch']);
+  assert.equal(all[0].wranglerEnv, 'acme-staging');
+  assert.equal(all[1].branch, 'm21');
+  assert.deepEqual(buildPreviewDeletePlan({ label: 'acme', scope: 'api', envConfig, preview }).map((s) => s.kind), ['delete-worker-preview']);
+  assert.deepEqual(buildPreviewDeletePlan({ label: 'acme', scope: 'web', envConfig, preview }).map((s) => s.kind), ['delete-pages-branch']);
+});
+
+test('run() builds the preview plan for a real label and threads the commit sha', () => {
+  const r = run(['--label', 'budo', '-e', 'staging', '--preview', 'm21', '--dry-run'], { commitSha: 'abc1234' });
+  assert.equal(r.ok, true);
+  assert.equal(r.preview.webUrl, 'https://m21.budo-web-staging.pages.dev');
+  assert.equal(r.plan[0].kind, 'lint-migrations');
+  assert.equal(r.plan.find((s) => s.kind === 'build-web').brandVars.NEXT_PUBLIC_PREVIEW_SHA, 'abc1234');
+});
+
+test('run() --delete skips the preflight and returns the delete plan', () => {
+  const r = run(['--label', 'budo', '-e', 'staging', '--preview', 'm21', '--delete', '--dry-run']);
+  assert.equal(r.preflight, null);
+  assert.deepEqual(r.plan.map((s) => s.kind), ['delete-worker-preview', 'delete-pages-branch']);
+});
+
+test('run() without --preview still builds the plain deploy plan', () => {
+  const r = run(['--label', 'budo', '-e', 'staging', '--dry-run']);
+  assert.equal(r.preview, null);
+  assert.deepEqual(r.plan.map((s) => s.kind), ['build-shared', 'migrate', 'deploy-worker', 'build-web', 'deploy-pages']);
 });
