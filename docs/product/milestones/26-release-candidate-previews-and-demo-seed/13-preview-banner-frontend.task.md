@@ -1,6 +1,6 @@
 # Task 13 — Frontend: Preview banner (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Frontend Web
@@ -53,14 +53,14 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] With `NEXT_PUBLIC_PREVIEW_NAME=m21 NEXT_PUBLIC_PREVIEW_SHA=abc1234`, every route group
+- [x] With `NEXT_PUBLIC_PREVIEW_NAME=m21 NEXT_PUBLIC_PREVIEW_SHA=abc1234`, every route group
       shows "Preview m21 · abc1234" in the chosen language.
-- [ ] Without the variables, the rendered HTML contains no banner element.
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
+- [x] Without the variables, the rendered HTML contains no banner element.
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `check-i18n-coverage.js` passes.
-- [ ] The banner stays readable and does not cover the navigation at mobile width.
-- [ ] Changed files lint clean; `make test-web` green for the new component test.
-- [ ] No diff outside the scope guardrail.
+- [x] The banner stays readable and does not cover the navigation at mobile width.
+- [x] Changed files lint clean; `make test-web` green for the new component test.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
@@ -71,3 +71,14 @@ Out:
 4. `make test-web`; run `check-i18n-coverage.js`.
 5. Resize to mobile.
 6. `git diff --stat` confirms only scope-guardrail files changed.
+
+## Implementation notes
+
+- Server Component mounted once as the first child of `<body>` in the root layout; returns `null` (no markup)
+  without `NEXT_PUBLIC_PREVIEW_NAME`. Keys `previewBanner.label(name, sha?)` / `previewBanner.sharedData` in both
+  dictionaries ("Prévia m21 · abc1234" / "Preview m21 · abc1234").
+- Verified with `next dev` + Playwright at 375×740: present on `/login`, `/events`, `/catalog` with the vars; absent
+  (0 matches) without them; nav never covered.
+- Known preview-only quirk: the protected layout is exactly one screen tall (`h-dvh overflow-hidden`), so with the
+  banner the page scrolls by the banner height (~41 px on mobile). Fixing it means touching
+  `app/(protected)/layout.tsx`, outside this task — acceptable because it only appears on preview builds.
