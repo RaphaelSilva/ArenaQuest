@@ -375,6 +375,90 @@ export function derivePreviewsBlock(profile, env) {
 }
 
 /**
+ * Does `ALLOWED_ORIGINS` admit `origin`? The same matching the API applies at
+ * runtime (`apps/api/src/core/cors/origin-policy.ts`, `buildOriginMatcher`):
+ * an exact origin (case-insensitive), a `scheme://*.suffix` wildcard that
+ * matches exactly ONE extra leading label over the same scheme, or `*`.
+ * Kept here, next to `checkPolicy`, so tooling can prove a derived origin is
+ * covered before it deploys anything that depends on it.
+ */
+export function originAllowed(allowedOrigins, origin) {
+  const want = String(origin || '').toLowerCase();
+  const sep = want.indexOf('://');
+  if (sep === -1 || want.indexOf('/', sep + 3) !== -1) return false;
+  const scheme = want.slice(0, sep);
+  const host = want.slice(sep + 3);
+  const entries = String(allowedOrigins || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const entry of entries) {
+    if (entry === '*') return true;
+    const lower = entry.toLowerCase().replace(/\/$/, '');
+    if (!lower.includes('*')) {
+      if (lower === want) return true;
+      continue;
+    }
+    const s = lower.indexOf('://');
+    if (s === -1) continue;
+    const pattern = lower.slice(s + 3);
+    if (lower.slice(0, s) !== scheme || !pattern.startsWith('*.') || pattern.indexOf('*', 1) !== -1) continue;
+    const suffix = pattern.slice(1); // ".pages.dev"
+    if (suffix.length < 2 || !host.endsWith(suffix)) continue;
+    const label = host.slice(0, host.length - suffix.length);
+    if (label.length > 0 && !label.includes('.')) return true;
+  }
+  return false;
+}
+
+/** A candidate preview name: one DNS label, short enough for a Pages branch alias. */
+export const PREVIEW_NAME_RE = /^[a-z0-9-]{1,20}$/;
+
+/**
+ * Derive a candidate preview of a label's STAGING env (RFC 0021 §1).
+ *
+ * The web preview is the Pages branch alias `https://<name>.<pagesProject>.pages.dev`
+ * — where Pages actually serves `--branch <name>`. It must be admitted by the
+ * staging `ALLOWED_ORIGINS` (checked with `originAllowed`, the API's own
+ * matching), which holds only when the staging `webOrigin` is that Pages host;
+ * a label on a custom staging domain is refused here instead of shipping a web
+ * preview whose every API call fails CORS. The Workers Preview host is
+ * `<name>-<worker>.<subdomain>.workers.dev`, so `<name>-<worker>` must fit one
+ * 63-character DNS label. Throws with the reason on any of these.
+ */
+export function derivePreview(profile, name) {
+  if (!PREVIEW_NAME_RE.test(String(name ?? ''))) {
+    throw new Error(`preview name "${name}" must match ${PREVIEW_NAME_RE} (e.g. m21)`);
+  }
+  if (name.startsWith('-') || name.endsWith('-')) {
+    throw new Error(`preview name "${name}" must not start or end with "-"`);
+  }
+  const e = profile.environments?.staging;
+  if (!e) throw new Error('profile has no environment "staging"');
+  const workerLabel = `${name}-${e.worker}`;
+  if (workerLabel.length > 63) {
+    throw new Error(`preview name "${name}" is too long for Worker "${e.worker}": "${workerLabel}" exceeds a 63-character DNS label`);
+  }
+  const expected = deriveExpected(profile, 'staging');
+  const webUrl = `https://${name}.${e.pagesProject}.pages.dev`;
+  if (!originAllowed(expected.ALLOWED_ORIGINS, webUrl)) {
+    throw new Error(
+      `the web preview origin ${webUrl} is not admitted by the staging ALLOWED_ORIGINS (${expected.ALLOWED_ORIGINS}) — ` +
+        `the staging webOrigin (${e.webOrigin}) must be the Pages host ${e.pagesProject}.pages.dev`,
+    );
+  }
+  return {
+    name,
+    webUrl,
+    siteUrl: webUrl,
+    pagesProject: e.pagesProject,
+    worker: e.worker,
+    d1Name: e.d1.name,
+    allowedOrigins: expected.ALLOWED_ORIGINS,
+  };
+}
+
+/**
  * Structural diff of a derived value against a committed one, as a list of
  * `{ path, expected, actual }` using dotted/indexed paths
  * (`previews.d1_databases[0].database_id`). Keys present only in `actual` are
