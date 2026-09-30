@@ -11,15 +11,18 @@
  * The output is a sequence of sections, each a `{ name, build(dataset, ctx) }`
  * whose `build` returns `{ statements: string[], counts: { <entity>: n } }`.
  * Order matters (foreign keys): a section may only reference rows written by an
- * earlier one. Tasks 05 (media), 06 (gamification) and 14 (events, billing, …)
- * extend the seed by appending their section to {@link SECTIONS} — or by
- * passing their own list — and build statements with {@link upsert} /
- * {@link link}, so every write keeps the same convergence rules:
+ * earlier one. Tasks 05 (media), 06 (gamification) and 14 (events, billing,
+ * tasks, comments) extend the seed by appending their section to
+ * {@link SECTIONS} — or by passing their own list — and build statements with
+ * {@link upsert} / {@link link} / {@link insertOnce}, so every write keeps the
+ * same convergence rules:
  *
  *   - every row is keyed by a deterministic id (`ctx.id(entity, key)`), and is
  *     written with `INSERT … ON CONFLICT(<pk>) DO UPDATE` — a re-run updates in
  *     place, never duplicates;
  *   - a join row is `INSERT … ON CONFLICT(<composite pk>) DO NOTHING`;
+ *   - a record of something that happened (contract, invoice, payment,
+ *     comment) is inserted once and then left to the app ({@link insertOnce});
  *   - nothing is ever deleted;
  *   - a `touch` column (`updated_at`) moves only when a value actually changed,
  *     so a no-op re-run writes nothing to those tables.
@@ -34,12 +37,14 @@
  *   email(userKey)    demo e-mail
  *   passwordHash      one `pbkdf2:…` hash, shared by every demo user
  *   renderTopic(title) topic markdown, already sanitised
+ *   sanitizeMarkdown  the shared write-side sanitiser (event content)
  *   now               the run's clock reading (gamification dates are relative to it)
  *   gamification      the rules the gamification rows follow (readGamificationReference)
  */
 
 import { demoEmail, demoId } from './ids.mjs';
 import { buildGamification, ledgerSumExpression } from './gamification.mjs';
+import { billingRows, commentRows, eventRows, taskRows } from './extensions.mjs';
 import { buildMediaPlan } from './media.mjs';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -110,6 +115,16 @@ export function link(table, row) {
   return upsert(table, row, { key: columns });
 }
 
+/**
+ * A row written once and never again: `INSERT … ON CONFLICT(<key>) DO NOTHING`.
+ * For records of something that happened (a signed contract, an invoice, a
+ * payment, a comment): once the app owns them — a payment recorded against the
+ * open invoice, a comment deleted — a re-seed must not rewrite history.
+ */
+export function insertOnce(table, row, { key = ['id'] } = {}) {
+  return upsert(table, row, { key, insertOnly: Object.keys(row).filter((column) => !key.includes(column)) });
+}
+
 /** The id of the role called `name`, looked up where it lives (`roles` is seeded by migration 0002). */
 export function roleIdExpression(name) {
   return raw(`(SELECT id FROM roles WHERE name = ${sqlValue(name)})`);
@@ -134,6 +149,7 @@ export function demoContext({ label, passwordHash, sanitizeMarkdown, renderMarkd
     id: (entity, key) => demoId(label, entity, key),
     email: (userKey) => demoEmail(label, userKey),
     renderTopic: (title) => sanitizeMarkdown(renderMarkdown(title)),
+    sanitizeMarkdown,
     now,
     gamification,
   };
@@ -333,11 +349,98 @@ export const gamificationSection = {
   },
 };
 
+// ════════════════════════════════════════════════════════════════════════════
+// Extension sections (Task 14) — rows from extensions.mjs
+// ════════════════════════════════════════════════════════════════════════════
+
+const countsOf = (rows) => Object.fromEntries(Object.entries(rows).map(([table, list]) => [table, list.length]));
+
 /**
- * The seed, in foreign-key order. Later tasks append here:
- * extensions (14) at the end.
+ * Events are catalogue: every run rewrites them, dates included, so "upcoming"
+ * stays upcoming. `flyer_status` is written on insert only — a flyer uploaded
+ * through the backoffice survives a re-seed.
  */
-export const SECTIONS = [usersSection, groupsSection, tagsSection, topicsSection, mediaSection, enrollmentsSection, gamificationSection];
+export const eventsSection = {
+  name: 'events',
+  build(dataset, ctx) {
+    const rows = eventRows(dataset, ctx);
+    const statements = [
+      ...rows.events.map((row) => upsert('events', row, { insertOnly: ['flyer_status'], touch: 'updated_at' })),
+      ...rows.event_audience_group.map((row) => link('event_audience_group', row)),
+    ];
+    return { statements, counts: countsOf(rows) };
+  },
+};
+
+/**
+ * Plans are catalogue (upserted); contracts, invoices and payments are
+ * accounting records, inserted once (payments are append-only by schema, and
+ * a later run must not re-date an invoice into a period the invoice run may
+ * already have issued — `UNIQUE(subscription_id, period_start)`).
+ */
+export const billingSection = {
+  name: 'billing',
+  build(dataset, ctx) {
+    const rows = billingRows(dataset, ctx);
+    const statements = [
+      ...rows.billing_plans.map((row) => upsert('billing_plans', row, { touch: 'updated_at' })),
+      ...rows.subscriptions.map((row) => insertOnce('subscriptions', row)),
+      ...rows.invoices.map((row) => insertOnce('invoices', row)),
+      ...rows.payments.map((row) => insertOnce('payments', row)),
+    ];
+    return { statements, counts: countsOf(rows) };
+  },
+};
+
+/**
+ * Tasks and stages are upserted; a stage's `sort_order` is written on insert
+ * only, so a reorder in the backoffice never collides with a re-seed on
+ * `UNIQUE(task_id, sort_order)`.
+ */
+export const tasksSection = {
+  name: 'tasks',
+  build(dataset, ctx) {
+    const rows = taskRows(dataset, ctx);
+    const statements = [
+      ...rows.tasks.map((row) => upsert('tasks', row, { touch: 'updated_at' })),
+      ...rows.task_stages.map((row) => upsert('task_stages', row, { insertOnly: ['sort_order'] })),
+      ...rows.task_topic_links.map((row) => link('task_topic_links', row)),
+      ...rows.task_stage_topic_links.map((row) => link('task_stage_topic_links', row)),
+    ];
+    return { statements, counts: countsOf(rows) };
+  },
+};
+
+/** Comments and likes are inserted once: a comment the app deleted stays deleted. */
+export const commentsSection = {
+  name: 'comments',
+  build(dataset, ctx) {
+    const rows = commentRows(dataset, ctx);
+    const statements = [
+      ...rows.topic_comments.map((row) => insertOnce('topic_comments', row)),
+      ...rows.comment_likes.map((row) => insertOnce('comment_likes', row, { key: ['comment_id', 'user_id'] })),
+    ];
+    return { statements, counts: countsOf(rows) };
+  },
+};
+
+/**
+ * The seed, in foreign-key order: the baseline (Tasks 04–06), then the
+ * extensions (Task 14), which reference users, groups and topics only.
+ */
+export const SECTIONS = [
+  usersSection,
+  groupsSection,
+  tagsSection,
+  topicsSection,
+  mediaSection,
+  enrollmentsSection,
+  gamificationSection,
+  eventsSection,
+  billingSection,
+  tasksSection,
+  commentsSection,
+];
 
 // ════════════════════════════════════════════════════════════════════════════
 // Assembly

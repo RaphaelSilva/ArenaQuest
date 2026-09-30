@@ -1,5 +1,5 @@
 {
-  "$comment": "Demo baseline (RFC 0021 §3.2–3.4). Keys are stable identifiers, not ids: scripts/demo/ids.mjs derives every id from <label>:<entity>:<key>. No password, hash or secret belongs here. Validated by scripts/demo/dataset.mjs.",
+  "$comment": "Demo baseline (RFC 0021 §3.2–3.5). Keys are stable identifiers, not ids: scripts/demo/ids.mjs derives every id from <label>:<entity>:<key>. No password, hash or secret belongs here. Validated by scripts/demo/dataset.mjs.",
   "language": "en",
   "users": [
     {
@@ -477,6 +477,164 @@
         "badge": "tecnica-afiada",
         "activeDays": 14,
         "xpReward": 100
+      }
+    ]
+  },
+  "events": [
+    {
+      "key": "open-class",
+      "slug": "demo-open-class",
+      "title": "Demo open class",
+      "summary": "An open session anyone can attend — no account needed.",
+      "content": "## Demo open class\n\nA two-hour open session. Beginners are welcome; bring water and comfortable clothes.",
+      "location": "Main hall",
+      "audience": "public",
+      "groups": [],
+      "startsInDays": 10,
+      "startHourUtc": 22,
+      "durationHours": 2,
+      "createdBy": "admin"
+    },
+    {
+      "key": "members-workshop",
+      "slug": "demo-members-workshop",
+      "title": "Demo members workshop",
+      "summary": "A workshop for signed-in members. Already happened.",
+      "content": "## Demo members workshop\n\nThree hours of technical work for every member, followed by a short Q&A.",
+      "location": "Main hall",
+      "audience": "members",
+      "groups": [],
+      "startsInDays": -20,
+      "startHourUtc": 13,
+      "durationHours": 3,
+      "createdBy": "admin"
+    },
+    {
+      "key": "class-seminar",
+      "slug": "demo-class-seminar",
+      "title": "Demo class seminar",
+      "summary": "Closed seminar for the Demo class group.",
+      "content": "## Demo class seminar\n\nA closed seminar for the members of the Demo class. Arrive thirty minutes early.",
+      "location": "Studio 2",
+      "audience": "restricted",
+      "groups": [
+        "demo-class"
+      ],
+      "startsInDays": 21,
+      "startHourUtc": 12,
+      "durationHours": null,
+      "createdBy": "admin"
+    }
+  ],
+  "billing": {
+    "currency": "BRL",
+    "signedBy": "admin",
+    "plans": [
+      {
+        "key": "monthly",
+        "name": "Demo monthly membership",
+        "description": "Demo paid plan, billed every month.",
+        "amountMinor": 15000,
+        "cycle": "monthly",
+        "graceDays": 5
+      },
+      {
+        "key": "scholarship",
+        "name": "Demo scholarship",
+        "description": "Demo free plan. A scholarship is a free contract, never a standing hold.",
+        "amountMinor": 0,
+        "cycle": "monthly",
+        "graceDays": 0
+      }
+    ],
+    "subscriptions": [
+      {
+        "key": "student-1",
+        "user": "student-1",
+        "plan": "monthly",
+        "dueDay": 10,
+        "startMonthsAgo": 1
+      },
+      {
+        "key": "student-2",
+        "user": "student-2",
+        "plan": "monthly",
+        "dueDay": 10,
+        "startMonthsAgo": 1
+      }
+    ],
+    "invoices": [
+      {
+        "key": "student-1/previous",
+        "subscription": "student-1",
+        "periodMonthsAgo": 1,
+        "status": "paid",
+        "payment": {
+          "method": "pix",
+          "paidDaysAfterDue": -2,
+          "externalReference": "DEMO-0001"
+        }
+      },
+      {
+        "key": "student-2/current",
+        "subscription": "student-2",
+        "periodMonthsAgo": 0,
+        "status": "open"
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "key": "first-steps",
+      "title": "Demo task — First steps",
+      "description": "Three short stages across Root 1. Check them in, in order.",
+      "createdBy": "creator",
+      "topics": [
+        "root-1"
+      ],
+      "stages": [
+        {
+          "key": "stage-1",
+          "label": "Watch the warm-up",
+          "topic": "root-1/module-1/lesson-1"
+        },
+        {
+          "key": "stage-2",
+          "label": "Read the basics",
+          "topic": "root-1/module-1/lesson-2"
+        },
+        {
+          "key": "stage-3",
+          "label": "Practise the drill",
+          "topic": "root-1/module-2/lesson-1"
+        }
+      ]
+    }
+  ],
+  "comments": {
+    "entries": [
+      {
+        "key": "question",
+        "topic": "root-1/module-1/lesson-1",
+        "user": "student-1",
+        "parent": null,
+        "body": "Is the second drill meant to be done on both sides?",
+        "postedDaysAgo": 2
+      },
+      {
+        "key": "answer",
+        "topic": "root-1/module-1/lesson-1",
+        "user": "tutor",
+        "parent": "question",
+        "body": "Yes — ten repetitions on each side, then switch.",
+        "postedDaysAgo": 1
+      }
+    ],
+    "likes": [
+      {
+        "comment": "question",
+        "user": "student-2",
+        "likedDaysAgo": 1
       }
     ]
   }

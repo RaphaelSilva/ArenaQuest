@@ -17,7 +17,9 @@
  * manifest entries (by `key`, replacing a same-key entry) and extra
  * `media.assign` keys (appended to a topic's list). It can never add a user or
  * a topic — so the baseline user keys are the complete list for every label,
- * which is what the production guard (Task 07) relies on.
+ * which is what the production guard (Task 07) relies on. The Task 14 sections
+ * (`events`, `billing`, `tasks`, `comments`) are baseline-only: an override
+ * cannot touch them.
  *
  * Validation reads its vocabularies from the files that own them, so there is
  * one source of truth for each:
@@ -27,6 +29,10 @@
  *   media types/limits packages/shared/domain/media/limits.ts
  *   mission predicates packages/shared/domain/gamification/quest-evaluator.ts
  *   topic XP           packages/shared/domain/gamification/xp-config.ts
+ *   active currency,
+ *   payment methods    apps/api/migrations/0026_create_billing_tables.sql
+ *   billing cycles     apps/api/migrations/0026_create_billing_tables.sql
+ *   event audiences    apps/api/migrations/0027_create_events.sql
  * (read as text: this is a stdlib-only script with no build step, like the
  * importer's limits parity test).
  */
@@ -105,9 +111,34 @@ export function readReference(repoRoot = ROOT) {
     read(repoRoot, 'packages/shared/domain/gamification/xp-config.ts').match(/topic_complete:\s*(\d+)/)?.[1],
   );
 
-  const reference = { roles, quests, badges, mediaLimits, missionPredicates, topicCompleteXp };
+  const billing = read(repoRoot, 'apps/api/migrations/0026_create_billing_tables.sql');
+  const activeCurrency = [...billing.matchAll(/\('([A-Z]{3})',\s*\d+,\s*'[^']*',\s*'[^']*',\s*1\)/g)].map((m) => m[1]);
+  const checkList = (source, column) =>
+    [...(source.match(new RegExp(`${column}\\s+IN\\s*\\(([^)]*)\\)`))?.[1] ?? '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  const paymentMethods = checkList(billing, 'method');
+  const billingCycles = checkList(billing, 'cycle');
+  const eventAudiences = checkList(read(repoRoot, 'apps/api/migrations/0027_create_events.sql'), 'audience');
+
+  const reference = {
+    roles,
+    quests,
+    badges,
+    mediaLimits,
+    missionPredicates,
+    topicCompleteXp,
+    activeCurrency: activeCurrency.length === 1 ? activeCurrency[0] : Number.NaN,
+    paymentMethods,
+    billingCycles,
+    eventAudiences,
+  };
   for (const [name, value] of Object.entries(reference)) {
-    const empty = Array.isArray(value) ? value.length === 0 : typeof value === 'object' ? Object.keys(value).length === 0 : !Number.isFinite(value);
+    const empty = Array.isArray(value)
+      ? value.length === 0
+      : typeof value === 'object'
+        ? Object.keys(value).length === 0
+        : typeof value === 'string'
+          ? value.length === 0
+          : !Number.isFinite(value);
     if (empty) throw new Error(`demo dataset: could not read the "${name}" vocabulary from the checkout`);
   }
   return reference;
@@ -392,8 +423,206 @@ export function validateDataset(dataset, reference) {
     if (!isNonNegativeInt(mission.xpReward)) problems.push(`${where}: "xpReward" must be a non-negative integer`);
   }
 
+  validateExtensions(dataset, reference, { users, groups, topics, children }, problems);
+
   if (problems.length > 0) throw new DatasetError(problems);
   return dataset;
+}
+
+// -- extensions (Task 14): events, billing, tasks, comments -------------------
+
+/** URL slug the events board accepts: lowercase kebab-case, at most 120 characters. */
+const EVENT_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** Invoice states a seeded invoice may start in (`void` is an admin action, not a demo state). */
+export const SEEDED_INVOICE_STATUSES = ['open', 'paid'];
+/** The comment body limit of `CreateCommentSchema` (comments.controller.ts). */
+export const COMMENT_BODY_MAX = 2000;
+
+/**
+ * The relative-date rules make "past" and "upcoming" hold for ANY run time, not
+ * just the day the dataset was written: an event starts `startsInDays` whole
+ * UTC days from the run's date, at `startHourUtc`, and lasts `durationHours`
+ * (null: open-ended, which the board treats as one day). With |days| ≥ 2 for a
+ * past event and ≥ 1 for an upcoming one, `COALESCE(ends_at, starts_at + 1 day)`
+ * lands on the intended side of `now` whatever the hour (see extensions.mjs).
+ */
+function validateEventDates(event, where, problems) {
+  if (!Number.isInteger(event.startsInDays) || event.startsInDays === 0 || event.startsInDays === -1) {
+    problems.push(`${where}: "startsInDays" must be an integer ≥ 1 (upcoming) or ≤ -2 (past)`);
+  }
+  if (!Number.isInteger(event.startHourUtc) || event.startHourUtc < 0 || event.startHourUtc > 23) {
+    problems.push(`${where}: "startHourUtc" must be an integer 0..23`);
+  }
+  if (event.durationHours !== null && (!Number.isInteger(event.durationHours) || event.durationHours < 1 || event.durationHours > 24)) {
+    problems.push(`${where}: "durationHours" must be null (open-ended) or an integer 1..24`);
+  }
+}
+
+function validateExtensions(dataset, reference, { users, groups, topics, children }, problems) {
+  const hasRole = (userKey, role) => users.get(userKey)?.roles?.includes(role) ?? false;
+
+  // -- events -------------------------------------------------------------------
+  const events = indexByKey(dataset.events, 'events', problems);
+  const slugs = new Set();
+  let past = 0;
+  for (const [key, event] of events) {
+    const where = `events["${key}"]`;
+    if (typeof event.slug !== 'string' || event.slug.length > 120 || !EVENT_SLUG.test(event.slug)) {
+      problems.push(`${where}: "slug" must be lowercase kebab-case, at most 120 characters`);
+    } else if (slugs.has(event.slug)) {
+      problems.push(`${where}: duplicate slug "${event.slug}" (events.slug is UNIQUE)`);
+    }
+    slugs.add(event.slug);
+    if (!isNonEmptyString(event.title)) problems.push(`${where}: missing "title"`);
+    for (const field of ['summary', 'content', 'location']) {
+      if (event[field] !== undefined && typeof event[field] !== 'string') problems.push(`${where}: "${field}" must be a string`);
+    }
+    if (!reference.eventAudiences.includes(event.audience)) {
+      problems.push(`${where}: unknown audience "${event.audience}" (known: ${reference.eventAudiences.join(', ')})`);
+    }
+    const grants = event.groups ?? [];
+    if (!Array.isArray(grants)) problems.push(`${where}: "groups" must be an array`);
+    else {
+      for (const group of grants) if (!groups.has(group)) problems.push(`${where}: group "${group}" is not a group`);
+      if (event.audience === 'restricted' && grants.length === 0) {
+        problems.push(`${where}: a restricted event needs at least one group, or nobody can see it`);
+      }
+      if (event.audience !== 'restricted' && grants.length > 0) {
+        problems.push(`${where}: only a restricted event takes "groups" (the audience already covers everyone else)`);
+      }
+    }
+    validateEventDates(event, where, problems);
+    if (event.startsInDays < 0) past += 1;
+    if (!users.has(event.createdBy)) problems.push(`${where}: createdBy "${event.createdBy}" is not a user`);
+  }
+  if (events.size > 0) {
+    for (const audience of reference.eventAudiences) {
+      if (![...events.values()].some((event) => event.audience === audience)) problems.push(`events: no event with audience "${audience}"`);
+    }
+    if (past !== 1) problems.push(`events: exactly one event must be in the past (found ${past})`);
+  }
+
+  // -- billing --------------------------------------------------------------------
+  const billing = dataset.billing ?? {};
+  if (billing.currency !== reference.activeCurrency) {
+    problems.push(`billing: currency "${billing.currency}" is not the active currency "${reference.activeCurrency}"`);
+  }
+  if (!hasRole(billing.signedBy, 'admin')) problems.push(`billing: signedBy "${billing.signedBy}" is not an admin user`);
+  const plans = indexByKey(billing.plans ?? [], 'billing.plans', problems);
+  for (const [key, plan] of plans) {
+    const where = `billing.plans["${key}"]`;
+    if (!isNonEmptyString(plan.name)) problems.push(`${where}: missing "name"`);
+    if (!isNonNegativeInt(plan.amountMinor)) problems.push(`${where}: "amountMinor" must be a non-negative integer (minor units)`);
+    if (!reference.billingCycles.includes(plan.cycle)) problems.push(`${where}: unknown cycle "${plan.cycle}"`);
+    if (!isNonNegativeInt(plan.graceDays)) problems.push(`${where}: "graceDays" must be a non-negative integer`);
+  }
+  const subscriptions = indexByKey(billing.subscriptions ?? [], 'billing.subscriptions', problems);
+  const subscribed = new Set();
+  for (const [key, subscription] of subscriptions) {
+    const where = `billing.subscriptions["${key}"]`;
+    if (!hasRole(subscription.user, 'student')) problems.push(`${where}: user "${subscription.user}" is not a student user`);
+    if (subscribed.has(subscription.user)) {
+      problems.push(`${where}: "${subscription.user}" already has an active subscription (one active contract per user)`);
+    }
+    subscribed.add(subscription.user);
+    const plan = plans.get(subscription.plan);
+    if (!plan) problems.push(`${where}: plan "${subscription.plan}" is not a plan`);
+    // The seed derives periods by whole calendar months from the 1st.
+    else if (plan.cycle !== 'monthly') problems.push(`${where}: the demo seeds monthly contracts only (plan "${subscription.plan}" is ${plan.cycle})`);
+    if (!Number.isInteger(subscription.dueDay) || subscription.dueDay < 1 || subscription.dueDay > 28) {
+      problems.push(`${where}: "dueDay" must be an integer 1..28`);
+    }
+    if (!isNonNegativeInt(subscription.startMonthsAgo)) problems.push(`${where}: "startMonthsAgo" must be a non-negative integer`);
+  }
+  const invoices = indexByKey(billing.invoices ?? [], 'billing.invoices', problems);
+  const periods = new Set();
+  for (const [key, invoice] of invoices) {
+    const where = `billing.invoices["${key}"]`;
+    const subscription = subscriptions.get(invoice.subscription);
+    if (!subscription) {
+      problems.push(`${where}: subscription "${invoice.subscription}" is not a subscription`);
+      continue;
+    }
+    if (!isNonNegativeInt(invoice.periodMonthsAgo) || invoice.periodMonthsAgo > subscription.startMonthsAgo) {
+      problems.push(`${where}: "periodMonthsAgo" must be an integer 0..${subscription.startMonthsAgo} (not before the contract starts)`);
+    }
+    const period = `${invoice.subscription}@${invoice.periodMonthsAgo}`;
+    if (periods.has(period)) problems.push(`${where}: a second invoice for the same period (invoices are UNIQUE per subscription and period)`);
+    periods.add(period);
+    if (!SEEDED_INVOICE_STATUSES.includes(invoice.status)) {
+      problems.push(`${where}: status "${invoice.status}" (expected ${SEEDED_INVOICE_STATUSES.join(' or ')})`);
+    }
+    const payment = invoice.payment;
+    if (invoice.status === 'paid') {
+      if (!payment) problems.push(`${where}: a paid invoice needs its "payment"`);
+      else {
+        if (!reference.paymentMethods.includes(payment.method)) {
+          problems.push(`${where}: unknown payment method "${payment.method}" (known: ${reference.paymentMethods.join(', ')})`);
+        }
+        // Paid within its own month, on or before the due date, of a past month:
+        // never a payment dated in the future, whatever the day of the run.
+        if (!(invoice.periodMonthsAgo >= 1)) problems.push(`${where}: a paid invoice must be for a past month ("periodMonthsAgo" ≥ 1)`);
+        const earliest = 1 - (subscription.dueDay ?? 1);
+        if (!Number.isInteger(payment.paidDaysAfterDue) || payment.paidDaysAfterDue > 0 || payment.paidDaysAfterDue < earliest) {
+          problems.push(`${where}: payment "paidDaysAfterDue" must be an integer ${earliest}..0 (on or before the due date, within its month)`);
+        }
+        if (!(plans.get(subscription.plan)?.amountMinor > 0)) problems.push(`${where}: a payment needs a non-zero amount (payments.amount_minor <> 0)`);
+      }
+    } else if (payment !== undefined) {
+      problems.push(`${where}: only a paid invoice carries a "payment"`);
+    }
+  }
+
+  // -- tasks ----------------------------------------------------------------------
+  const tasks = indexByKey(dataset.tasks, 'tasks', problems);
+  for (const [key, task] of tasks) {
+    const where = `tasks["${key}"]`;
+    if (!isNonEmptyString(task.title)) problems.push(`${where}: missing "title"`);
+    if (!users.has(task.createdBy)) problems.push(`${where}: createdBy "${task.createdBy}" is not a user`);
+    for (const topic of task.topics ?? []) if (!topics.has(topic)) problems.push(`${where}: topic "${topic}" is not a topic`);
+    const stages = indexByKey(task.stages, `${where}.stages`, problems);
+    if (stages.size === 0) problems.push(`${where}: needs at least one stage`);
+    for (const [stageKey, stage] of stages) {
+      const at = `${where}.stages["${stageKey}"]`;
+      if (!isNonEmptyString(stage.label)) problems.push(`${at}: missing "label"`);
+      if (!topics.has(stage.topic)) problems.push(`${at}: topic "${stage.topic}" is not a topic`);
+      else if (children.get(stage.topic).length > 0) problems.push(`${at}: topic "${stage.topic}" is not a lesson (a leaf)`);
+    }
+  }
+
+  // -- comments -------------------------------------------------------------------
+  const comments = dataset.comments ?? {};
+  const entries = indexByKey(comments.entries ?? [], 'comments.entries', problems);
+  for (const [key, comment] of entries) {
+    const where = `comments.entries["${key}"]`;
+    if (!topics.has(comment.topic)) problems.push(`${where}: topic "${comment.topic}" is not a topic`);
+    if (!users.has(comment.user)) problems.push(`${where}: user "${comment.user}" is not a user`);
+    if (!isNonEmptyString(comment.body) || comment.body.length > COMMENT_BODY_MAX || /<[^>]*>/.test(comment.body)) {
+      problems.push(`${where}: "body" must be 1..${COMMENT_BODY_MAX} characters with no HTML (the API strips tags)`);
+    }
+    if (!isNonNegativeInt(comment.postedDaysAgo)) problems.push(`${where}: "postedDaysAgo" must be a non-negative integer`);
+    if (comment.parent !== null) {
+      const parent = entries.get(comment.parent);
+      if (!parent) problems.push(`${where}: parent "${comment.parent}" is not a comment`);
+      else {
+        if (parent.parent !== null) problems.push(`${where}: a reply to a reply (the API forbids nested replies)`);
+        if (parent.topic !== comment.topic) problems.push(`${where}: a reply on another topic than its parent`);
+        if (comment.postedDaysAgo > parent.postedDaysAgo) problems.push(`${where}: a reply posted before its parent`);
+      }
+    }
+  }
+  const likes = new Set();
+  for (const like of comments.likes ?? []) {
+    const where = `comments.likes["${like?.comment}" by "${like?.user}"]`;
+    const comment = entries.get(like?.comment);
+    if (!comment) problems.push(`${where}: not a comment`);
+    if (!users.has(like?.user)) problems.push(`${where}: not a user`);
+    if (likes.has(`${like?.comment}|${like?.user}`)) problems.push(`${where}: duplicate like`);
+    likes.add(`${like?.comment}|${like?.user}`);
+    if (!isNonNegativeInt(like?.likedDaysAgo) || (comment && like.likedDaysAgo > comment.postedDaysAgo)) {
+      problems.push(`${where}: "likedDaysAgo" must be a non-negative integer, not before the comment`);
+    }
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -448,5 +677,11 @@ export function datasetCounts(dataset) {
     topicsWithMedia: dataset.topics.filter((topic) => (dataset.media.assign[topic.key] ?? []).length > 0).length,
     enrollments: dataset.enrollments.length,
     missions: dataset.gamification.missions.length,
+    events: (dataset.events ?? []).length,
+    billingPlans: (dataset.billing?.plans ?? []).length,
+    subscriptions: (dataset.billing?.subscriptions ?? []).length,
+    invoices: (dataset.billing?.invoices ?? []).length,
+    tasks: (dataset.tasks ?? []).length,
+    comments: (dataset.comments?.entries ?? []).length,
   };
 }
