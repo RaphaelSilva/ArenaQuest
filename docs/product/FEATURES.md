@@ -171,6 +171,32 @@ through a recursive CTE with request-level caching.
 **Code:** `apps/api/src/adapters/db/d1-enrollment-repository.ts`
 → [M5](./milestones/5-engagement-and-student-progress/milestone.md) · ✅ _(superseded in part by M12 visibility)_
 
+### Student notes
+Each student keeps **one Markdown note per topic** in a Notes panel beside the
+Discussion: an editor with preview and debounced autosave, private by default,
+that the student may **share with the class**. A private note is private among
+students only — `admin` and `content_creator` read every note, read-only, and
+the editor says so before the student writes a word; a `tutor` sees what a
+student sees. Shared notes are listed on the topic newest first with the
+author's name, and *My notes* (`/notes`) reviews every note the student wrote,
+keeping a note on a topic they lost access to readable and deletable but not
+editable. Staff moderate by **force-unshare**, never by editing or deleting:
+the note turns private and cannot be re-shared until staff allow it again, from
+the class list or the per-student *Notes* section of the user backoffice.
+
+No text is lost silently: every write carries the `revision` it was based on
+and lands in one conditional SQL statement, so two tabs saving in the same
+second yield one success and one `409 NOTE_STALE`, and the editor then pauses
+autosave until the student chooses **Load latest** or **Keep mine**. The note
+routes follow the catalog's access gate and answer `404` rather than `403`, and
+their listings are the API's first cursor-paginated ones.
+
+**Code:** `apps/api/src/controllers/notes.controller.ts`, `apps/api/src/adapters/db/d1-note-repository.ts`, `apps/api/src/routes/{notes.router.ts,me/notes.ts,admin/notes.ts,_shared/cursor.ts}`, `apps/web/src/components/catalog/notes/`, `apps/web/src/app/(protected)/notes/`
+→ [M21 Student notes](./milestones/21-student-notes/milestone.md) · [RFC 0016](./RFCs/0016-student-notes.md) · ✅
+_Peer rating of shared notes and XP for notes are deferred (RFC 0016). The user
+backoffice is admin-only in the web, so a `content_creator` reaches the
+per-student notes API but has no page for it yet._
+
 ---
 
 ## 5. Gamification
@@ -364,8 +390,9 @@ not an enumeration oracle. `audience` defaults to `members` and `status` to
 people saw it", never "we published a private grading to the internet";
 publishing is `admin`-only, a narrower gate than creating a draft.
 
-An event is an **announcement, not a product**: no price, no invoice, no
-enrollment. An audience row grants permission to see an announcement and
+An event is an **announcement, not a product**: the `events` table carries no
+price, no invoice and no enrollment (a price, when there is one, lives in its own
+table — see *Event extras* below). An audience row grants permission to see an announcement and
 **never** content access — which is why it lives in its own tables rather than in
 `enrollments_*`, and why `getEffectiveAccessTopicIds` is untouched by the whole
 feature. "Past" is a computed predicate (`COALESCE(ends_at, starts_at + 1 day) <
@@ -382,6 +409,61 @@ whoever receives the message knows which flyer produced it.
 _A deployed build must set `NEXT_PUBLIC_SITE_URL`; unset, the sitemap and the
 canonical tags advertise `http://localhost:3000`. The deploy CLI derives it from
 each label profile's `webOrigin`._
+
+### Event extras — one-off charges on a separate rail
+A seminar, a grading or a camp is paid for once, on top of (or instead of) the
+monthly fee, and the platform charges it **as a charge for an event, never as a
+plan**. An administrator gives a `published` event an optional list price
+(`event_prices` — its own table, so `events` stays money-free and an event with
+no row is simply not for sale), then charges one or many users in a single
+request from the **Extras** tab of `/admin/billing`: a multi-select with group
+expansion and an inline "create user" shortcut, since a buyer needs an account
+but not a contract. The request is idempotent — at most one live charge per
+`(event, user)`, so a re-submit creates nothing and reports the duplicates as
+*absorbed*; a `draft` or `archived` event cannot be charged, while an event
+archived later keeps its charges. An amount other than the list price is
+*negotiated* and requires a note.
+
+A charge carries an invoice's accounting guarantees on **its own ledger**
+(`event_charges`, `event_charge_adjustments`, `event_charge_payments`): the
+amount is snapshot in minor units of the single active currency, adjustments and
+payments are append-only, a payment is undone by a mirror reversal with a
+reason, voiding is a recorded decision refused once money has been received, and
+every write leaves a `billing.charge.*` audit line. RFC 0013's tables, its
+invoice run and its idempotency key are untouched.
+
+The contract and the extras are **two rails, never merged**. Each rail resolves
+its own standing with the same pure resolver (`resolveRailStanding`, which throws
+on a mixed input), and no field sums the two except the explicitly named
+`cashReceivedMinor` — the till total on the movement report. The roster lists
+every user with a contract *or* a charge and shows a *Monthly fee* badge and an
+*Extras* badge side by side, each with its own amount and overdue count and its
+own filter, so "is the monthly fee late?" and "did an extra slip through?" are
+separate questions. Reports keep the rails apart: movement adds an `extras`
+block beside the unchanged contract figures, aging takes `?rail=contract|extras`
+(default `contract`), and each event has its own summary, also shown read-only on
+the admin event page. The student's `/settings/billing` — and the admin
+statement — gains an *Extras* section with its own standing badge and one row per
+charge. The daily run writes nothing on this rail; it reads it to send the same
+two reminders as a monthly fee (due date, grace lapsed), worded for the event,
+and reports standing crossings in a separate digest section. A contract hold
+neither exempts the extras standing nor suppresses the extras reminders; there is
+no extras hold.
+
+**Extras never affect contract standing or access.** A charge never enrolls,
+unlocks, grants or revokes anything, never adds a user to an event's audience,
+and is never read by the manual access decision, which stays on the contract
+standing alone. Charging a user outside a `restricted` event's audience only
+**warns** (`outsideAudience` and an inline flag in the charge dialog) — it never
+blocks and never writes an audience row. There is no self-service checkout, no
+payment gateway and no automatic charging on RSVP; payments are recorded by an
+administrator as in RFC 0013.
+
+**Code:** `packages/shared/domain/billing/receivable.ts`, `packages/shared/ports/i-event-charge-repository.ts`, `apps/api/migrations/0028_create_event_charges.sql`, `apps/api/src/adapters/db/d1-event-charge-repository.ts`, `apps/api/src/core/billing/{event-charge-service,billing-service,accounting-service}.ts`, `apps/api/src/routes/{admin,me}/billing.ts`, `apps/web/src/app/(protected)/admin/billing/{extras-tab,charge-dialog}.tsx`, `apps/web/src/app/(protected)/admin/events/[eventId]/event-charges-panel.tsx`, `apps/web/src/app/(protected)/settings/billing/`
+→ [M22 Event extras](./milestones/22-event-extras-one-off-charges/milestone.md) · [RFC 0015](./RFCs/0015-event-extras-one-off-charges-for-events.md) · ✅
+_Builds on the billing ledger of [RFC 0013](./RFCs/0013-student-billing-contracts-and-receivables-accounting.md).
+The staging walkthrough and the production migration are pending (deploy deferred
+by owner decision); production migrates through CI when the candidate merges._
 
 ---
 

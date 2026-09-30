@@ -23,11 +23,12 @@ it lives in the linked milestone, and is summarised in
 | [0012](./0012-tenant-provisioning-backend-parity.md) | Tenant provisioning — Cloudflare bring-up with backend parity | ✅ Implemented | [M18](../milestones/18-tenant-provisioning-backend-parity/milestone.md) | 2026-08-08 |
 | [0013](./0013-student-billing-contracts-and-receivables-accounting.md) | Student billing, contracts and receivables accounting | Accepted | [M19](../milestones/19-student-billing-and-receivables/milestone.md) | 2026-09-10 |
 | [0014](./0014-events-board-and-whatsapp-contact.md) | Events board — public listing, access-scoped audiences and per-event WhatsApp contact | ✅ Implemented | [M20](../milestones/20-events-board-public-listing-access-scoped-audience/milestone.md) | 2026-09-16 |
-| [0015](./0015-event-extras-one-off-charges-for-events.md) | Event extras: one-off charges for events | 📝 Draft | [M22](../milestones/22-event-extras-one-off-charges/milestone.md) | 2026-09-27 |
-| [0016](./0016-student-notes.md) | Student notes — private and shared topic notes with staff moderation | Proposed | [M21](../milestones/21-student-notes/milestone.md) | 2026-09-27 |
+| [0015](./0015-event-extras-one-off-charges-for-events.md) | Event extras: one-off charges for events | ✅ Implemented | [M22](../milestones/22-event-extras-one-off-charges/milestone.md) | 2026-09-27 |
+| [0016](./0016-student-notes.md) | Student notes — private and shared topic notes with staff moderation | ✅ Implemented | [M21](../milestones/21-student-notes/milestone.md) | 2026-09-27 |
 | [0017](./0017-catalog-search-by-tags.md) | Catalog search by tags | ✅ Implemented | [M24](../milestones/24-catalog-search-by-tags/milestone.md) | 2026-09-29 |
 | [0018](./0018-admin-storage-browser-and-orphan-audit.md) | Admin storage browser and orphan audit | Proposed | [M25](../milestones/25-admin-storage-browser-and-orphan-audit/milestone.md) | 2026-09-29 |
 | [0020](./0020-student-submissions.md) | Student submissions — students upload, manage and move demonstration media per topic | Proposed | [M23](../milestones/23-student-submissions/milestone.md) | 2026-09-29 |
+| [0021](./0021-release-candidate-previews-and-demo-seed.md) | Release-candidate previews on staging and a reproducible demo seed | ✅ Implemented | [M26](../milestones/26-release-candidate-previews-and-demo-seed/milestone.md) | 2026-09-29 |
 
 Milestones 1–7 predate this process and derive directly from
 [`../specification.md`](../specification.md).

@@ -1,6 +1,6 @@
 # Task 04 — Backend: Two-rail standing and roster (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [22 — Event extras: one-off charges on a separate billing rail](./milestone.md)
 **RFC:** [RFC 0015](../../RFCs/0015-event-extras-one-off-charges-for-events.md)
 **Team:** Backend API
@@ -70,20 +70,20 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Contract paid-up + one overdue charge ⇒ `contract.standing = good`,
+- [x] Contract paid-up + one overdue charge ⇒ `contract.standing = good`,
       `extras.standing = delinquent`.
-- [ ] Late invoice + every charge paid ⇒ `contract.standing = delinquent`,
+- [x] Late invoice + every charge paid ⇒ `contract.standing = delinquent`,
       `extras.standing = good`.
-- [ ] A user with no contract and one overdue charge appears with `contract: null` and
+- [x] A user with no contract and one overdue charge appears with `contract: null` and
       `extras.standing = delinquent`.
-- [ ] With charges seeded, `?contractStanding=delinquent` and the legacy `?standing=delinquent`
+- [x] With charges seeded, `?contractStanding=delinquent` and the legacy `?standing=delinquent`
       return exactly the users they return with the charge tables empty.
-- [ ] A hold turns `contract.standing` to `exempt` and leaves `extras.standing` unchanged.
-- [ ] `getStanding` returns identical output to before this task for every existing test input.
-- [ ] The roster query-count test asserts 4 queries for 1 and for N students.
-- [ ] The roster response has no top-level `standing` or `outstandingMinor`.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] A hold turns `contract.standing` to `exempt` and leaves `extras.standing` unchanged.
+- [x] `getStanding` returns identical output to before this task for every existing test input.
+- [x] The roster query-count test asserts 4 queries for 1 and for N students.
+- [x] The roster response has no top-level `standing` or `outstandingMinor`.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

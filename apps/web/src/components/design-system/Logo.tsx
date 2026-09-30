@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { brand } from '@web/lib/brand';
 
 export interface LogoProps {
@@ -30,34 +31,36 @@ export function Logo({
   const { icon: iconClass, text: textClass } = sizes[size];
 
   return (
-    <div className={`flex items-center gap-2.5 ${className}`}>
-      {displayIcon && (
-        <div
-          className={`flex ${iconClass} items-center justify-center rounded-md font-bold shrink-0`}
-          style={{
-            background: 'var(--aq-accent)',
-            color: '#0B0E17',
-            fontFamily: "'Space Grotesk', sans-serif",
-          }}
-        >
-          {brand.sigla}
-        </div>
-      )}
-      {displayText && (
-        <span
-          className={`${textClass} font-bold tracking-tight whitespace-nowrap`}
-          style={{
-            color: 'var(--aq-text)',
-            fontFamily: "'Space Grotesk', sans-serif",
-            letterSpacing: '-0.3px',
-          }}
-        >
-          {brand.namePrefix}
-          {brand.nameAccent && (
-            <span style={{ color: 'var(--aq-accent)' }}>{brand.nameAccent}</span>
-          )}
-        </span>
-      )}
-    </div>
+    <Link href="/">
+      <div className={`flex items-center gap-2.5 ${className}`}>
+        {displayIcon && (
+          <div
+            className={`flex ${iconClass} items-center justify-center rounded-md font-bold shrink-0`}
+            style={{
+              background: 'var(--aq-accent)',
+              color: '#0B0E17',
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            {brand.sigla}
+          </div>
+        )}
+        {displayText && (
+          <span
+            className={`${textClass} font-bold tracking-tight whitespace-nowrap`}
+            style={{
+              color: 'var(--aq-text)',
+              fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: '-0.3px',
+            }}
+          >
+            {brand.namePrefix}
+            {brand.nameAccent && (
+              <span style={{ color: 'var(--aq-accent)' }}>{brand.nameAccent}</span>
+            )}
+          </span>
+        )}
+      </div>
+    </Link>
   );
 }

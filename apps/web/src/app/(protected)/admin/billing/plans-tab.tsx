@@ -23,6 +23,9 @@ import { Money } from './money';
 import { explain } from './explain-error';
 import { fromMinorUnits, toMinorUnits } from './minor-units';
 
+/** The console's Extras tab, addressable so the link also works from a new tab. */
+export const EXTRAS_TAB_HREF = '/admin/billing?tab=extras';
+
 /**
  * The three values the API accepts, and the whole of what this catalogue can
  * express. A plan is the **recurring** shelf: the daily run re-invoices every
@@ -64,7 +67,17 @@ const BLANK: FormValues = {
  * contract that references it stays exactly as it is — and it gates no
  * student's access. A plan is a price, not a permission.
  */
-export function PlansTab({ currency }: { currency: BillingReportCurrency | null }) {
+export function PlansTab({
+  currency,
+  onOpenExtras,
+}: {
+  currency: BillingReportCurrency | null;
+  /**
+   * Switches the console to the Extras tab in place. Without it the link is a
+   * plain navigation to `EXTRAS_TAB_HREF`, which the console reads on mount.
+   */
+  onOpenExtras?: () => void;
+}) {
   const dict = useDict();
   const d = dict.admin.billing.plans;
   const client = useApiClient();
@@ -258,6 +271,21 @@ export function PlansTab({ currency }: { currency: BillingReportCurrency | null 
       <div className="space-y-2">
         <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{d.heading}</h2>
         <p className="max-w-3xl text-sm text-zinc-600 dark:text-zinc-400">{d.recurringNote}</p>
+        {/* The right door for a one-off item (RFC 0015 §8): a plan would bill it
+            again every period, a charge on the Extras tab bills it once. */}
+        <p className="max-w-3xl text-sm">
+          <a
+            href={EXTRAS_TAB_HREF}
+            onClick={(event) => {
+              if (!onOpenExtras) return;
+              event.preventDefault();
+              onOpenExtras();
+            }}
+            className="font-medium text-indigo-600 underline underline-offset-2 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+          >
+            {d.extrasLink}
+          </a>
+        </p>
         <p className="max-w-3xl text-sm text-zinc-600 dark:text-zinc-400">{d.editSafeNote}</p>
         <p className="max-w-3xl text-xs text-zinc-500 dark:text-zinc-400">{d.archiveNote}</p>
         <p className="max-w-3xl text-xs text-zinc-500 dark:text-zinc-400">{d.noGateNote}</p>

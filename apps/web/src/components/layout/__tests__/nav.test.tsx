@@ -159,3 +159,27 @@ describe('Nav — the admin events entry', () => {
     expect(linksTo(aside, '/events')).toHaveLength(1);
   });
 });
+
+describe('Nav — the My notes entry', () => {
+  it('links to /notes from the desktop bar', () => {
+    renderNav();
+    expect(soleLinkTo(document.body, '/notes')).toHaveTextContent(navCopy.myNotes);
+    expect(screen.getByRole('link', { name: navCopy.myNotes })).toBeInTheDocument();
+  });
+
+  it('links to /notes from the mobile drawer and highlights it there', () => {
+    pathname = '/notes';
+    drawerOpen = true;
+    renderNav();
+    const link = soleLinkTo(drawer(), '/notes');
+    expect(link).toHaveTextContent(navCopy.myNotes);
+    expect(link.className).toContain('bg-zinc-100');
+  });
+
+  it('is offered to a student', () => {
+    roles = [ROLES.STUDENT];
+    drawerOpen = true;
+    renderNav();
+    expect(linksTo(drawer(), '/notes')).toHaveLength(1);
+  });
+});

@@ -86,6 +86,7 @@ function statementWith(payments: BillingPayment[]): BillingStudentStatement {
         payments,
       },
     ],
+    extras: { standing: 'good', oldestOverdueDate: null, outstandingMinor: 0, charges: [] },
   };
 }
 

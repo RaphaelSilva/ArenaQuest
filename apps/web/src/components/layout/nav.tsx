@@ -21,6 +21,7 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
   const navLinks = [
     { label: dict.layout.nav.dashboard, href: '/dashboard', prefix: false },
     { label: dict.layout.nav.catalog, href: '/catalog', prefix: true },
+    { label: dict.layout.nav.myNotes, href: '/notes', prefix: true },
     { label: dict.layout.nav.events, href: '/events', prefix: true },
     { label: dict.layout.nav.tasks, href: '/tasks', prefix: false },
     { label: dict.layout.nav.settings, href: '/settings', prefix: false },
@@ -167,6 +168,12 @@ export function Nav() {
             className={(pathname === '/catalog' || pathname.startsWith('/catalog/')) ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
           >
             {dict.layout.nav.catalog}
+          </Link>
+          <Link
+            href="/notes"
+            className={(pathname === '/notes' || pathname.startsWith('/notes/')) ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
+          >
+            {dict.layout.nav.myNotes}
           </Link>
           <Link
             href="/events"

@@ -165,6 +165,32 @@ export namespace Entities {
             SURCHARGE = 'surcharge',
         }
 
+        /**
+         * Lifecycle of an event charge (RFC 0015 section 1). Constrained by the
+         * `status IN ('open','paid','void')` CHECK on `event_charges`. Like
+         * `InvoiceStatus`, `paid` is a cache of the balance sum, never an
+         * independent truth.
+         */
+        export enum ChargeStatus {
+            OPEN = 'open',
+            PAID = 'paid',
+            VOID = 'void',
+        }
+
+        /**
+         * Who may read a student's topic note (RFC 0016 section 3). Constrained by
+         * the `visibility IN ('private','shared')` CHECK on `topic_notes`.
+         *
+         * "Private" means private *among students*: staff (admins and content
+         * creators) can still read it, read-only.
+         */
+        export enum NoteVisibility {
+            /** Only the author and the staff can read it; the default. */
+            PRIVATE = 'private',
+            /** Readable by every student who can read the topic. */
+            SHARED = 'shared',
+        }
+
     }
 
     export namespace Security {
@@ -373,6 +399,31 @@ export namespace Entities {
             label: string;
             order: number;
             createdAt: Date;
+        }
+
+        /**
+         * A student's note on one topic (RFC 0016 section 2) — at most one per
+         * `(topicNodeId, authorId)`.
+         *
+         * `revision` is the concurrency token: it increments on every write, by
+         * anyone (including a staff force-unshare), and a save names the revision
+         * it was based on. `updatedAt` is for display only.
+         */
+        export interface Note {
+            id: string;
+            topicNodeId: string;
+            authorId: string;
+            authorName: string;
+            /** Sanitised Markdown, 1…`NOTE_BODY_MAX` characters. */
+            body: string;
+            visibility: Config.NoteVisibility;
+            revision: number;
+            /** Last time the note became shared; `null` if it never was. */
+            sharedAt: string | null;
+            /** `true` while a staff force-unshare blocks re-sharing. */
+            moderated: boolean;
+            createdAt: string;
+            updatedAt: string;
         }
 
     }
@@ -635,6 +686,84 @@ export namespace Entities {
             expiresAt: string | null;
             setBy: string;
             setAt: Date;
+        }
+
+        /**
+         * The price tag of an event (RFC 0015 section 1). Kept out of `events`
+         * so an event carries no money column: an event with no price is simply
+         * not for sale. A catalogue row — freely editable, never re-read once a
+         * charge has copied it.
+         */
+        export interface EventPrice {
+            eventId: string;
+            amountMinor: number;
+            currency: string;
+            /** Days after issue the charge falls due when no date is picked. */
+            dueInDays: number;
+            graceDays: number;
+            updatedBy: string;
+            updatedAt: Date;
+        }
+
+        /**
+         * One user's participation in one event, as money owed — the
+         * event-shaped twin of `Invoice`, on the **extras** rail. Amount,
+         * currency, due date and grace are snapshots taken at issue. At most one
+         * non-void charge exists per `(eventId, userId)`.
+         */
+        export interface EventCharge {
+            id: string;
+            eventId: string;
+            userId: string;
+            /** Snapshot of the event title at issue. */
+            description: string;
+            amountMinor: number;
+            currency: string;
+            /** `negotiated` when the amount differs from the event price. */
+            termsSource: Config.ContractTermsSource;
+            /** Mandatory (service-enforced) when `termsSource` is negotiated. */
+            termsNote: string;
+            /** YYYY-MM-DD. */
+            dueDate: string;
+            /** Snapshot; the copy standing reads. */
+            graceDays: number;
+            status: Config.ChargeStatus;
+            issuedBy: string;
+            issuedAt: Date;
+            voidedAt: Date | null;
+            voidReason: string | null;
+        }
+
+        /** A signed, append-only override on one event charge. */
+        export interface EventChargeAdjustment {
+            id: string;
+            chargeId: string;
+            kind: Config.AdjustmentKind;
+            /** Signed and never zero; negative reduces what is owed. */
+            amountMinor: number;
+            reason: string;
+            appliedBy: string;
+            appliedAt: Date;
+        }
+
+        /**
+         * Money received against one event charge. Append-only: a mistake is
+         * corrected by a reversing row whose amount is negative.
+         */
+        export interface EventChargePayment {
+            id: string;
+            chargeId: string;
+            /** Signed and never zero; negative is a reversal. */
+            amountMinor: number;
+            currency: string;
+            method: Config.PaymentMethod;
+            /** When the money moved, not when it was typed in. */
+            paidAt: Date;
+            externalReference: string | null;
+            note: string;
+            reversesId: string | null;
+            recordedBy: string;
+            recordedAt: Date;
         }
     }
 }

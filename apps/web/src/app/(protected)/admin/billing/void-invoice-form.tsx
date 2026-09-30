@@ -4,8 +4,8 @@ import { useId, useState } from 'react';
 import { Button } from '@web/components/design-system';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
-import type { BillingInvoiceWithBalance } from '@web/lib/admin-billing-api';
 import { explain } from './explain-error';
+import type { LedgerTarget, LedgerTargetKind } from './ledger-target';
 
 /**
  * Void an invoice — RFC 0013 §7.
@@ -21,16 +21,26 @@ import { explain } from './explain-error';
  */
 export function VoidInvoiceForm({
   invoice,
+  kind = 'invoice',
   onClose,
   onVoided,
 }: {
-  invoice: BillingInvoiceWithBalance;
+  /** The invoice — or, with `kind="charge"`, the event charge — voided. */
+  invoice: Pick<LedgerTarget, 'id'>;
+  kind?: LedgerTargetKind;
   onClose: () => void;
   /** Called after the server accepted the void. */
   onVoided: () => void;
 }) {
   const dict = useDict();
-  const d = dict.admin.billing.ledger.voidInvoice;
+  const isCharge = kind === 'charge';
+  const invoiceCopy = dict.admin.billing.ledger.voidInvoice;
+  const chargeCopy = dict.admin.billing.extras.voidCharge;
+  // The same form, worded for what is being voided. A charge with net payments
+  // is refused by the server (reverse them first); its sentence is shown as-is.
+  const d = isCharge
+    ? { ...chargeCopy, targetLine: chargeCopy.chargeLine }
+    : { ...invoiceCopy, targetLine: invoiceCopy.invoiceLine };
   const client = useApiClient();
 
   const reasonId = useId();
@@ -53,7 +63,11 @@ export function VoidInvoiceForm({
     setSubmitError(null);
     setBusy(true);
     try {
-      await client.adminBilling.invoices.void(invoice.id, trimmed);
+      if (isCharge) {
+        await client.adminBilling.extras.voidCharge(invoice.id, trimmed);
+      } else {
+        await client.adminBilling.invoices.void(invoice.id, trimmed);
+      }
       onVoided();
     } catch (thrown) {
       setSubmitError(explain(thrown, d.error));
@@ -76,7 +90,7 @@ export function VoidInvoiceForm({
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{d.dialogTitle}</h2>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">{d.explainer}</p>
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          {d.invoiceLine(invoice.id.slice(0, 8))}
+          {d.targetLine(invoice.id.slice(0, 8))}
         </p>
 
         <label className="block" htmlFor={reasonId}>

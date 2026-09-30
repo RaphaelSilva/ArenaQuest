@@ -56,15 +56,15 @@ hr
 # ────────────────────────────────────────────────────────────────────────────
 heading "Step 1 of 6 — Toolchain"
 
-command -v node >/dev/null 2>&1 || die "node is not installed or not in PATH (need >= 20)"
+command -v node >/dev/null 2>&1 || die "node is not installed or not in PATH (need >= 22)"
 command -v pnpm >/dev/null 2>&1 || die "pnpm is not installed or not in PATH (need >= 9) — try: corepack enable"
 command -v curl >/dev/null 2>&1 || die "curl is not installed or not in PATH"
 
 NODE_VERSION="$(node -v | sed 's/^v//')"
 PNPM_VERSION="$(pnpm -v)"
 
-version_gte "${NODE_VERSION}" "20.0.0" \
-  || die "node ${NODE_VERSION} is too old — package.json requires >= 20"
+version_gte "${NODE_VERSION}" "22.0.0" \
+  || die "node ${NODE_VERSION} is too old — package.json requires >= 22"
 version_gte "${PNPM_VERSION}" "9.0.0" \
   || die "pnpm ${PNPM_VERSION} is too old — package.json requires >= 9"
 

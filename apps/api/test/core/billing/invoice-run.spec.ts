@@ -211,9 +211,11 @@ describe('BillingService.runBillingCycle — the daily run', () => {
       expect(roster).toHaveLength(1);
       expect(roster[0]).toMatchObject({
         userId: STUDENT,
-        contractStatus: ContractStatus.PAUSED,
-        outstandingMinor: 15000,
-        standing: BillingStanding.DELINQUENT,
+        contract: {
+          status: ContractStatus.PAUSED,
+          outstandingMinor: 15000,
+          standing: BillingStanding.DELINQUENT,
+        },
       });
 
       const aging = ok(await accounting.getReceivablesAging(GRACE_LAPSES));
@@ -474,7 +476,7 @@ describe('BillingService.runBillingCycle — the daily run', () => {
       expect(lapsed.suppressedByHold).toEqual([{ userId: STUDENT, outstandingMinor: 15000 }]);
 
       const roster = ok(await service.listStudentRoster({ asOf: GRACE_LAPSES }));
-      expect(roster[0]).toMatchObject({
+      expect(roster[0].contract).toMatchObject({
         standing: BillingStanding.EXEMPT,
         outstandingMinor: 15000,
       });

@@ -1,6 +1,6 @@
 # Task 01 — Backend: Notes contracts — entity, visibility, body limit and repository port (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [21 — Student notes — private and shared topic notes with staff moderation](./milestone.md)
 **RFC:** [RFC 0016](../../RFCs/0016-student-notes.md)
 **Team:** Backend API
@@ -61,17 +61,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `Entities.Engagement.Note` and `Entities.Config.NoteVisibility` are exported and
+- [x] `Entities.Engagement.Note` and `Entities.Config.NoteVisibility` are exported and
       consumable from `@arenaquest/shared`; `NoteVisibility` has exactly `private` and
       `shared`.
-- [ ] `NOTE_BODY_MAX` equals `20000` and is imported from one module only.
-- [ ] `INoteRepository`'s conditional save returns a discriminated outcome (written vs.
+- [x] `NOTE_BODY_MAX` equals `20000` and is imported from one module only.
+- [x] `INoteRepository`'s conditional save returns a discriminated outcome (written vs.
       stale-with-current) — no method signals staleness by throwing.
-- [ ] No provider-specific (D1/R2) import leaks into the port or the shared types.
-- [ ] `git grep -n "Rating" packages/shared` returns nothing new.
-- [ ] Changed files lint clean; `make test-api` green (the shared package still builds for
+- [x] No provider-specific (D1/R2) import leaks into the port or the shared types.
+- [x] `git grep -n "Rating" packages/shared` returns nothing new.
+- [x] Changed files lint clean; `make test-api` green (the shared package still builds for
       every consumer).
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

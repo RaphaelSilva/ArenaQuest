@@ -1,7 +1,7 @@
 # RFC 0016: Student notes — private and shared topic notes with staff moderation
 
 **Date:** 2026-09-27
-**Status:** Proposed
+**Status:** Implemented
 **Revised:** 2026-09-27
 **Author:** raphaelsilva
 **Affected:**
