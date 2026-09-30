@@ -1,6 +1,6 @@
 # Task 14 — Backend: Demo extensions: events, billing, tasks, comments (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [26 — Release-candidate previews and demo seed](./milestone.md)
 **RFC:** [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md)
 **Team:** Backend API
@@ -56,15 +56,15 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Anonymous, student-3 and student-1 see, respectively, only the public event; public +
+- [x] Anonymous, student-3 and student-1 see, respectively, only the public event; public +
       members; public + members + restricted — and exactly one of them is listed as past.
-- [ ] The billing backoffice shows the two plans and, for student-1 and student-2, one paid
+- [x] The billing backoffice shows the two plans and, for student-1 and student-2, one paid
       and one open invoice.
-- [ ] Student-3 checks in the first stage of the demo task and earns 20 XP.
-- [ ] The demo Root 1 lesson shows a comment by student-1, a reply by the tutor and one like.
-- [ ] A second seed run changes no row count; the extended CI check passes.
-- [ ] `make test-scripts`, `make lint`, `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] Student-3 checks in the first stage of the demo task and earns 20 XP. _(The check-in writes a 20 XP `stage` event; the same request also completes the linked lesson, so the existing badge engine adds `alicerce-solido` (+250) — student-3's total becomes 270.)_
+- [x] The demo Root 1 lesson shows a comment by student-1, a reply by the tutor and one like.
+- [x] A second seed run changes no row count; the extended CI check passes.
+- [x] `make test-scripts`, `make lint`, `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
@@ -74,3 +74,17 @@ Out:
    comments.
 3. Re-run the seed; run `node scripts/demo/ci-check.mjs`.
 4. `git diff --stat` confirms only scope-guardrail files changed.
+
+## Implementation notes
+
+- Rows per label: events 3 (+1 group audience), billing plans 2, subscriptions 2, invoices 2, payments 1, task 1 with
+  3 stages and 4 topic links, comments 2 (+1 like).
+- The **members** event is the past one; anonymous sees only the public event, student-3 public + members,
+  student-1 all three. Out-of-audience details return 404.
+- Billing: student-1 and student-2 on the monthly plan (R$150.00); student-1's previous-month invoice is paid (pix),
+  student-2's current-month invoice is open. The free "Demo scholarship" plan is listed but unused. Contracts start on
+  the 1st, matching the app's period computation.
+- Write policy: contracts, invoices, payments, comments and likes are **insert-once** (a re-seed never rewrites
+  history); event `flyer_status` and stage `sort_order` are set on insert only; events (incl. dates) are rewritten
+  every run so "upcoming" stays upcoming.
+- `ci-check.mjs` now covers 12 more tables in the no-drift assertion (~60 s for three labels).

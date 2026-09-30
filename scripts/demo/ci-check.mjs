@@ -20,8 +20,11 @@
  *   4. after each run assert RFC 0021's success criteria for the label — 6 demo
  *      users, 21 topics, ≥ 21 `ready` media whose objects exist with the pinned
  *      SHA-256, 1 group with 2 members, 2 enrollments, student XP 350 / 950 / 0
- *      with their badges, `user_xp` = the `xp_events` ledger — and that the
- *      second run changed no row count in any seeded table.
+ *      with their badges, `user_xp` = the `xp_events` ledger — plus the Task 14
+ *      extensions (3 events and the restricted grant, 2 plans, 2 active
+ *      contracts, 1 paid + 1 open invoice, 1 payment, the task with its stages
+ *      and links, the comment thread and its like) — and that the second run
+ *      changed no row count in any seeded table.
  *
  * A migration that breaks the demo (e.g. drops a column it writes) makes the
  * seed's `d1 execute` fail, so the PR introducing it fails this check.
@@ -77,6 +80,18 @@ export const SEEDED_TABLES = Object.freeze([
   'user_streak',
   'quest_progress',
   'missions',
+  'events',
+  'event_audience_group',
+  'billing_plans',
+  'subscriptions',
+  'invoices',
+  'payments',
+  'tasks',
+  'task_stages',
+  'task_topic_links',
+  'task_stage_topic_links',
+  'topic_comments',
+  'comment_likes',
 ]);
 
 /** Settings that keep wrangler/miniflare off the network (inherited by child processes). */
@@ -183,7 +198,31 @@ export function expectations(dataset) {
     xp: state.expectedTotalXp,
     badges: state.badges.length,
   }));
+  // Task 14: each count is `SELECT COUNT(*) FROM <table> WHERE <column> IN (<ids>) [AND <filter>]`.
+  const billing = dataset.billing ?? { plans: [], subscriptions: [], invoices: [] };
+  const eventIds = (dataset.events ?? []).map((event) => id('event', event.key));
+  const taskIds = (dataset.tasks ?? []).map((task) => id('task', task.key));
+  const stageIds = (dataset.tasks ?? []).flatMap((task) => task.stages.map((stage) => id('task-stage', `${task.key}/${stage.key}`)));
+  const invoiceIds = billing.invoices.map((invoice) => id('invoice', invoice.key));
+  const commentIds = (dataset.comments?.entries ?? []).map((comment) => id('comment', comment.key));
+  const extension = (what, table, column, ids, wanted, filter = null) => ({ what, table, column, ids, wanted, filter });
+  const extensions = [
+    extension('events', 'events', 'id', eventIds, eventIds.length, "status = 'published'"),
+    extension('eventGrants', 'event_audience_group', 'event_id', eventIds, (dataset.events ?? []).reduce((n, e) => n + (e.groups ?? []).length, 0)),
+    extension('billingPlans', 'billing_plans', 'id', billing.plans.map((plan) => id('billing-plan', plan.key)), billing.plans.length),
+    extension('activeSubscriptions', 'subscriptions', 'id', billing.subscriptions.map((s) => id('subscription', s.key)), billing.subscriptions.length, "status = 'active'"),
+    extension('paidInvoices', 'invoices', 'id', invoiceIds, billing.invoices.filter((i) => i.status === 'paid').length, "status = 'paid'"),
+    extension('openInvoices', 'invoices', 'id', invoiceIds, billing.invoices.filter((i) => i.status === 'open').length, "status = 'open'"),
+    extension('payments', 'payments', 'invoice_id', invoiceIds, billing.invoices.filter((i) => i.payment).length),
+    extension('tasks', 'tasks', 'id', taskIds, taskIds.length, "status = 'published'"),
+    extension('taskStages', 'task_stages', 'id', stageIds, stageIds.length),
+    extension('taskTopicLinks', 'task_topic_links', 'task_id', taskIds, (dataset.tasks ?? []).reduce((n, t) => n + (t.topics ?? []).length, 0)),
+    extension('stageTopicLinks', 'task_stage_topic_links', 'stage_id', stageIds, stageIds.length),
+    extension('comments', 'topic_comments', 'id', commentIds, commentIds.length, 'deleted_at IS NULL'),
+    extension('commentLikes', 'comment_likes', 'comment_id', commentIds, (dataset.comments?.likes ?? []).length),
+  ];
   return {
+    extensions,
     userIds: dataset.users.map((user) => id('user', user.key)),
     topicIds: dataset.topics.map((topic) => id('topic', topic.key)),
     media,
@@ -197,6 +236,7 @@ export function expectations(dataset) {
       groups: dataset.groups.length,
       groupMembers: dataset.groups.reduce((sum, group) => sum + (group.members ?? []).length, 0),
       enrollments: dataset.enrollments.length,
+      ...Object.fromEntries(extensions.map((entry) => [entry.what, entry.wanted])),
     },
   };
 }
@@ -277,6 +317,16 @@ export async function inspectLabel({ DB: db, R2: r2 }, expected) {
         (await scalar(db, `SELECT COUNT(*) AS n FROM enrollments_user_group WHERE id IN (${placeholders(expected.enrollmentIds)})`, expected.enrollmentIds))
       : 0,
   };
+
+  for (const entry of expected.extensions ?? []) {
+    counts[entry.what] = entry.ids.length
+      ? await scalar(
+          db,
+          `SELECT COUNT(*) AS n FROM ${entry.table} WHERE ${entry.column} IN (${placeholders(entry.ids)})${entry.filter ? ` AND ${entry.filter}` : ''}`,
+          entry.ids,
+        )
+      : 0;
+  }
 
   const mediaIds = expected.media.map((entry) => entry.id);
   const { results: rows } = await db

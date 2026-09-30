@@ -82,7 +82,7 @@ test('every statement is an upsert; nothing deletes, updates bare, or opens a tr
   assert.doesNotMatch(sql, /^\s*(DELETE|DROP|BEGIN|COMMIT|UPDATE)\b/im);
 });
 
-test('summary counts: 6 users, 6 roles, 1 group, 2 members, 21 topics, 2 tags, 27 media, 2 enrollments, gamification', () => {
+test('summary counts: 6 users, 6 roles, 1 group, 2 members, 21 topics, 2 tags, 27 media, 2 enrollments, gamification, extensions', () => {
   const counts = Object.fromEntries(summary.map((row) => [row.entity, row.rows]));
   assert.deepEqual(counts, {
     users: 6,
@@ -102,6 +102,18 @@ test('summary counts: 6 users, 6 roles, 1 group, 2 members, 21 topics, 2 tags, 2
     user_streak: 1,
     quest_progress: 1,
     missions: 1,
+    events: 3,
+    event_audience_group: 1,
+    billing_plans: 2,
+    subscriptions: 2,
+    invoices: 2,
+    payments: 1,
+    tasks: 1,
+    task_stages: 3,
+    task_topic_links: 1,
+    task_stage_topic_links: 3,
+    topic_comments: 2,
+    comment_likes: 1,
   });
   for (const [table, rows] of Object.entries(counts)) assert.equal(into(table).length, rows, table);
 });
@@ -165,7 +177,19 @@ test('the build is deterministic for a fixed ctx, and label-scoped', () => {
 });
 
 test('sections compose in order and later tasks can append their own', () => {
-  assert.deepEqual(SECTIONS.map((s) => s.name), ['users', 'groups', 'tags', 'topics', 'media', 'enrollments', 'gamification']);
+  assert.deepEqual(SECTIONS.map((s) => s.name), [
+    'users',
+    'groups',
+    'tags',
+    'topics',
+    'media',
+    'enrollments',
+    'gamification',
+    'events',
+    'billing',
+    'tasks',
+    'comments',
+  ]);
   const extra = { name: 'extra', build: () => ({ statements: [link('x_links', { a: 'b' })], counts: { x_links: 1 } }) };
   const out = buildSeedSql(dataset, ctx, [...SECTIONS, extra]);
   assert.ok(out.sql.trimEnd().endsWith("ON CONFLICT(a) DO NOTHING;"));
