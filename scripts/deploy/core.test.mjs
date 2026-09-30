@@ -19,6 +19,8 @@ import {
   previewNameFromBranch,
   resolvePreviewName,
   MIGRATIONS_BASE,
+  PREVIEW_GENERATED_SECRETS,
+  previewSecretSpec,
   loadProfile,
   loadSchema,
   resolve,
@@ -504,6 +506,36 @@ test('run() builds the preview plan for a real label and threads the commit sha'
   assert.equal(r.preview.webUrl, 'https://m21.budo-web-staging.pages.dev');
   assert.equal(r.plan[0].kind, 'lint-migrations');
   assert.equal(r.plan.find((s) => s.kind === 'build-web').brandVars.NEXT_PUBLIC_PREVIEW_SHA, 'abc1234');
+});
+
+test('previewSecretSpec: JWT_SECRET is generated, the other active secrets are external', () => {
+  const p = goodProfile();
+  const { resolved } = resolve(p, 'staging');
+  const spec = previewSecretSpec(schema(), resolved);
+  assert.deepEqual(spec.generated, PREVIEW_GENERATED_SECRETS);
+  assert.deepEqual(spec.generated, ['JWT_SECRET']);
+  assert.ok(!spec.external.includes('JWT_SECRET'));
+  assert.ok(spec.external.includes('R2_ACCESS_KEY_ID'));
+});
+
+test('preflight of a preview never checks (or blocks on) the Worker secrets', () => {
+  const p = goodProfile();
+  const { expected, resolved } = resolve(p, 'staging');
+  const pf = preflight(schema(), resolved, expected, 'staging', { secretNames: [], label: 'acme', previewSecrets: true });
+  assert.equal(pf.results.filter((r) => r.group === 'api-secrets').length, 0);
+  assert.equal(pf.exitCode, 0);
+});
+
+test('run() of a preview skips the secret lookup and hands the secret NAMES to the worker step', () => {
+  let asked = 0;
+  const fetchSecretNames = () => { asked++; return { ok: true, names: [] }; };
+  const r = run(['--label', 'budo', '-e', 'staging', '--preview', 'm21'], { fetchSecretNames });
+  assert.equal(r.ok, true, 'a preview is not blocked by secrets missing on the staging Worker');
+  assert.equal(asked, 0);
+  const worker = r.plan.find((s) => s.kind === 'deploy-worker-preview');
+  assert.deepEqual(worker.secrets.generated, ['JWT_SECRET']);
+  assert.ok(worker.secrets.external.includes('R2_SECRET_ACCESS_KEY'));
+  assert.ok(!run(['--label', 'budo', '-e', 'staging'], { fetchSecretNames }).ok, 'a plain deploy still hard-gaps');
 });
 
 test('run() --delete skips the preflight and returns the delete plan', () => {

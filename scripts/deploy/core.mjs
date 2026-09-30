@@ -223,7 +223,7 @@ export function resolve(profile, env) {
  * false pass. `opts.label` is used only to render the fix command.
  */
 export function preflight(schema, resolved, expected, env, opts = {}) {
-  const { secretNames = null, label = '' } = opts;
+  const { secretNames = null, label = '', previewSecrets = false } = opts;
   const results = [];
 
   // presence — build section (brand tokens + NEXT_PUBLIC_API_URL)
@@ -241,8 +241,10 @@ export function preflight(schema, resolved, expected, env, opts = {}) {
 
   // presence — api-secrets by NAME only (values are never read, compared or
   // logged; the sole source of truth is the cloud's own secret store).
+  // A candidate preview reads none of the Worker's secrets: its deployment
+  // carries its own (see previewSecretSpec), so there is nothing to check here.
   for (const [key, spec] of Object.entries(schema['api-secrets'] ?? {})) {
-    if (!isActive(spec, resolved)) continue;
+    if (previewSecrets || !isActive(spec, resolved)) continue;
     if (secretNames === null) {
       results.push({
         status: 'skip',
@@ -290,6 +292,40 @@ export function preflight(schema, resolved, expected, env, opts = {}) {
 }
 
 // ── provider-neutral plan builder ─────────────────────────────────────────────
+
+/**
+ * The secrets a candidate preview's deployment carries.
+ *
+ * A Workers Preview deployment holds only the bindings uploaded with it: it
+ * reads none of the staging Worker's secrets, and (wrangler 4.144) neither the
+ * Preview base config's nor a previous preview deployment's. So every
+ * `wrangler preview` gets a `--secrets-file`, rebuilt each run:
+ *   - `generated` — minted fresh per run (a preview signs its own tokens, so a
+ *     staging token never verifies on it — and a redeploy logs everyone out);
+ *   - `external`  — values that come from outside, taken from the operator's
+ *     `AQ_PREVIEW_<NAME>` env var when set; absent ones only switch off what
+ *     `PREVIEW_SECRET_IMPACT` names — the preview still boots and email/password
+ *     login still works.
+ */
+export const PREVIEW_GENERATED_SECRETS = ['JWT_SECRET'];
+export const PREVIEW_SECRET_ENV_PREFIX = 'AQ_PREVIEW_';
+export const PREVIEW_SECRET_IMPACT = {
+  R2_ACCESS_KEY_ID: 'media presigned uploads/downloads are off',
+  R2_SECRET_ACCESS_KEY: 'media presigned uploads/downloads are off',
+  GOOGLE_CLIENT_SECRET: 'Google sign-in is off',
+  RESEND_API_KEY: 'email is not sent',
+};
+
+/** `{ generated, external }` secret names for a preview of these resolved values. */
+export function previewSecretSpec(schema, resolved) {
+  const active = Object.entries(schema['api-secrets'] ?? {})
+    .filter(([, spec]) => isActive(spec, resolved))
+    .map(([key]) => key);
+  return {
+    generated: PREVIEW_GENERATED_SECRETS.filter((k) => active.includes(k)),
+    external: active.filter((k) => !PREVIEW_GENERATED_SECRETS.includes(k)),
+  };
+}
 
 /**
  * The deploy-target env name, by the same convention `label scaffold` writes:
@@ -370,8 +406,13 @@ export function buildPlan({ label, env, scope, resolved, envConfig }) {
  *
  * `build-web` carries `apiUrlFrom: 'deploy-worker-preview'` when the API URL is
  * only known once that step has run; the adapter fills it in.
+ * `deploy-worker-preview` carries `secrets` (see previewSecretSpec): NAMES only —
+ * the adapter writes the values to a secrets file for that one command.
  */
-export function buildPreviewPlan({ label, scope, resolved, envConfig, preview, apiUrl = null, commitSha = '' }) {
+export function buildPreviewPlan({
+  label, scope, resolved, envConfig, preview, apiUrl = null, commitSha = '',
+  secrets = { generated: PREVIEW_GENERATED_SECRETS, external: [] },
+}) {
   const wranglerEnv = targetEnvName(label, 'staging');
   const wantApi = scope === 'api' || scope === 'all';
   const wantWeb = scope === 'web' || scope === 'all';
@@ -410,6 +451,7 @@ export function buildPreviewPlan({ label, scope, resolved, envConfig, preview, a
       wranglerEnv,
       previewName: name,
       message: commitSha,
+      secrets,
     });
   }
 
@@ -569,7 +611,7 @@ export function run(argv, opts = {}) {
   const schema = loadSchema();
 
   let secretNames = null;
-  if (typeof opts.fetchSecretNames === 'function') {
+  if (!preview && typeof opts.fetchSecretNames === 'function') {
     const listed = opts.fetchSecretNames(args.label, args.env);
     if (listed?.ok) secretNames = listed.names;
   }
@@ -577,6 +619,7 @@ export function run(argv, opts = {}) {
   const pf = preflight(schema, resolved, expected, args.env, {
     secretNames,
     label: args.label,
+    previewSecrets: Boolean(preview),
   });
   if (pf.exitCode === 1) {
     return { ok: false, args, preflight: pf, resolved, envConfig };
@@ -591,6 +634,7 @@ export function run(argv, opts = {}) {
         preview,
         apiUrl: args.apiUrl,
         commitSha: opts.commitSha ?? '',
+        secrets: previewSecretSpec(schema, resolved),
       })
     : buildPlan({
         label: args.label,

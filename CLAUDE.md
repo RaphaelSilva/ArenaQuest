@@ -257,8 +257,8 @@ is another route to the upload, not a way around a limit.
 
 **Demo seed (RFC 0021):**
 ```bash
-AQ_DEMO_PASSWORD=… make db-seed-demo-local LABEL=budo          # local replica (DRY_RUN=1: SQL + plan only)
-AQ_DEMO_PASSWORD=… make db-seed-demo-staging LABEL=budo        # remote staging (prompts; CONFIRM=1 skips)
+make db-seed-demo-local LABEL=budo          # local replica (DRY_RUN=1: SQL + plan only)
+make db-seed-demo-staging LABEL=budo        # remote staging (prompts; CONFIRM=1 skips)
 node scripts/demo/ci-check.mjs                                  # the CI check, offline
 ```
 Both targets forward to `scripts/demo/seed-demo.mjs` (`LABEL` defaults to
@@ -266,7 +266,8 @@ Both targets forward to `scripts/demo/seed-demo.mjs` (`LABEL` defaults to
 `config/labels/<label>/demo.json`. **There is no production variant**: the CLI
 refuses `-e production` (and any production-named D1/bucket) before writing
 anything, and the production deploy guard rejects a database holding a
-`*.demo.invalid` account. `AQ_DEMO_PASSWORD` is read from the environment only.
+`*.demo.invalid` account. The demo accounts' password is `AQ_DEMO_PASSWORD` from the
+environment, or — when unset on a TTY — asked for (hidden, twice, ≥ 8 chars); never a flag.
 The run is idempotent (deterministic ids; a re-run changes no row count). The
 local bucket is written in-process through wrangler's `getPlatformProxy`
 (`--persist-to <dir>` retargets a local run, D1 and R2 alike). Labels share
@@ -279,7 +280,7 @@ generated password — so a migration that breaks the demo fails its PR.
 
 **Recovering staging (disposable staging, RFC 0021 §4):**
 ```bash
-AQ_DEMO_PASSWORD=… make db-reset-staging LABEL=budo     # prompts (types the DB name); CONFIRM=1 skips, DRY_RUN=1 plans only
+make db-reset-staging LABEL=budo     # asks for the demo password if AQ_DEMO_PASSWORD is unset; prompts (types the DB name); CONFIRM=1 skips, DRY_RUN=1 plans only
 ```
 `scripts/db/reset-remote.mjs` runs, in a fixed order: a D1 Time Travel bookmark
 (the printed `wrangler d1 time-travel restore <db> --bookmark=… --env <label>-staging`
@@ -298,8 +299,11 @@ make preview-delete-staging LABEL=budo CANDIDATE=m21              # remove both 
 Both forward to `deploy.mjs --label <l> -e staging --preview <name> [--delete]`
 (`CANDIDATE` empty → `m<N>` from `feature/m<N>/candidate`; name `[a-z0-9-]{1,20}`;
 `-e production` refused). Plan: guard → `check-migrations` against `origin/main` →
-D1 Time Travel bookmark → migrate the staging D1 → `wrangler preview --json` (URL from
-`preview.urls[0]`, parsed in one helper, `parsePreviewUrl`) → web build with that
+D1 Time Travel bookmark → migrate the staging D1 → `wrangler preview --json --secrets-file`
+(URL from `preview.urls[0]`, parsed in one helper, `parsePreviewUrl`; the file carries a
+per-deploy generated `JWT_SECRET` plus any `AQ_PREVIEW_<NAME>` from the shell — a preview
+deployment gets no secret from the staging Worker *nor* the Preview base config, so the
+preflight skips the Worker's secrets for a preview) → web build with that
 `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL=https://<name>.<pagesProject>.pages.dev`,
 `NEXT_PUBLIC_PREVIEW_NAME`/`_SHA` → `pages deploy --branch <name>` → report (both URLs,
 bookmark, restore command). The live staging Worker and the Pages production branch are

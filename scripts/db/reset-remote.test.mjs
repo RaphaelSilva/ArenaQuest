@@ -112,8 +112,27 @@ test('main refuses production and a production-named D1 before any wrangler call
 
 test('main refuses a real run without AQ_DEMO_PASSWORD before any wrangler call', async () => {
   const fake = fakeWrangler();
-  await assert.rejects(() => main(['--label', 'budo', '-e', 'staging', '--yes'], {}, { profiles: PROFILES, ...fake }), /AQ_DEMO_PASSWORD is not set/);
+  await assert.rejects(
+    () => main(['--label', 'budo', '-e', 'staging', '--yes'], {}, { profiles: PROFILES, ...fake, isTTY: false }),
+    /AQ_DEMO_PASSWORD is not set/,
+  );
   assert.deepEqual(fake.calls, []);
+});
+
+test('without AQ_DEMO_PASSWORD on a TTY: asks for it before any wrangler call and hands it to the seed', async () => {
+  const fake = fakeWrangler();
+  const envVars = {};
+  let callsWhenAsked = null;
+  const askPassword = async () => {
+    callsWhenAsked ??= fake.calls.length;
+    return 'typed-pass-1';
+  };
+  assert.equal(
+    await main(['--label', 'budo', '-e', 'staging', '--yes'], envVars, { profiles: PROFILES, ...fake, isTTY: true, askPassword }),
+    0,
+  );
+  assert.equal(callsWhenAsked, 0);
+  assert.equal(envVars.AQ_DEMO_PASSWORD, 'typed-pass-1', 'the seed child inherits it');
 });
 
 test('--dry-run makes no wrangler call (password optional)', async () => {

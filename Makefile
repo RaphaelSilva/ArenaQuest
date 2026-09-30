@@ -219,7 +219,8 @@ db-reset-local: ## Delete the local D1 replica, re-migrate and re-seed
 	@$(MAKE) --no-print-directory db-seed-local
 	@printf "$(GREEN)  ✔  Local database reset.$(RESET)\n"
 
-# Demo seed (RFC 0021): AQ_DEMO_PASSWORD must be exported (never a variable here).
+# Demo seed (RFC 0021): the password is AQ_DEMO_PASSWORD when exported, else asked for
+# on the terminal (never a make variable).
 db-seed-demo-local: ## Seed the demo dataset into the local replica (LABEL=arenaquest|budo|spaziord; DRY_RUN=1 writes SQL + plan only)
 	node scripts/demo/seed-demo.mjs --label $(DEMO_LABEL) -e local \
 		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
@@ -304,7 +305,7 @@ db-seed-demo-staging: ## Seed the demo dataset into the REMOTE staging D1 of LAB
 		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
 # Disposable staging (RFC 0021 §4): bookmark → drop every table → migrate → demo seed.
-# AQ_DEMO_PASSWORD must be exported. There is no -prod variant, by design.
+# The demo password is AQ_DEMO_PASSWORD or asked for. There is no -prod variant, by design.
 db-reset-staging: ## Wipe LABEL's REMOTE staging D1 in place, re-migrate, re-seed the demo (prompts for the database name; CONFIRM=1, DRY_RUN=1)
 	node scripts/db/reset-remote.mjs --label $(DEMO_LABEL) -e staging \
 		$(if $(filter 1,$(CONFIRM)),--yes,) \

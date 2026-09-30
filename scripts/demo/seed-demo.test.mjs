@@ -17,7 +17,7 @@ import {
   main,
   parseSeedArgs,
   productionResources,
-  readPassword,
+  resolvePassword,
   resolveTarget,
   sqlFilePath,
   wranglerCommand,
@@ -126,11 +126,27 @@ test('the committed profiles resolve staging without tripping the guard', () => 
   }
 });
 
-test('readPassword needs AQ_DEMO_PASSWORD unless dry-running', () => {
-  assert.throws(() => readPassword({}, { dryRun: false }), /AQ_DEMO_PASSWORD/);
-  assert.throws(() => readPassword({ AQ_DEMO_PASSWORD: '' }, { dryRun: false }), /AQ_DEMO_PASSWORD/);
-  assert.equal(readPassword({}, { dryRun: true }), null);
-  assert.equal(readPassword({ AQ_DEMO_PASSWORD: 'pw' }, { dryRun: false }), 'pw');
+test('resolvePassword: the env var wins; a dry run needs none; no TTY → throws naming the variable', async () => {
+  const never = () => assert.fail('must not prompt');
+  await assert.rejects(resolvePassword({}, { dryRun: false }, { isTTY: false, ask: never }), /AQ_DEMO_PASSWORD/);
+  await assert.rejects(resolvePassword({ AQ_DEMO_PASSWORD: '' }, { dryRun: false }, { isTTY: false, ask: never }), /AQ_DEMO_PASSWORD/);
+  assert.equal(await resolvePassword({}, { dryRun: true }, { isTTY: true, ask: never }), null);
+  assert.equal(await resolvePassword({ AQ_DEMO_PASSWORD: 'pw' }, { dryRun: false }, { isTTY: true, ask: never }), 'pw');
+});
+
+test('resolvePassword asks twice on a TTY, and refuses a short or mismatched password', async () => {
+  const answers = (...a) => {
+    const asked = [];
+    return { asked, ask: async (q) => { asked.push(q); return a.shift(); } };
+  };
+  const ok = answers('demo-pass-1', 'demo-pass-1');
+  assert.equal(await resolvePassword({}, { dryRun: false }, { isTTY: true, ask: ok.ask }), 'demo-pass-1');
+  assert.equal(ok.asked.length, 2);
+  await assert.rejects(resolvePassword({}, { dryRun: false }, { isTTY: true, ask: answers('short').ask }), /at least 8/);
+  await assert.rejects(
+    resolvePassword({}, { dryRun: false }, { isTTY: true, ask: answers('demo-pass-1', 'demo-pass-2').ask }),
+    /did not match/,
+  );
 });
 
 test('the dry-run placeholder is not a hash the adapter would accept', () => {

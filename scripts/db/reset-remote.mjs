@@ -38,7 +38,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs as nodeParseArgs } from 'node:util';
 
 import log from '../lib/log.mjs';
-import { PASSWORD_VAR, loadAllProfiles, parseD1Json, readPassword, resolveTarget } from '../demo/seed-demo.mjs';
+import { PASSWORD_VAR, loadAllProfiles, parseD1Json, resolvePassword, resolveTarget } from '../demo/seed-demo.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(dirname(HERE)); // repo root (scripts/db/..)
@@ -302,7 +302,10 @@ function usage() {
  * Returns 0, or throws.
  */
 export async function main(argv = process.argv.slice(2), envVars = process.env, deps = {}) {
-  const { profiles = null, run = runCaptured, stream = runStreamed, isTTY = Boolean(process.stdin.isTTY), ask = askDatabaseName } = deps;
+  const {
+    profiles = null, run = runCaptured, stream = runStreamed, isTTY = Boolean(process.stdin.isTTY), ask = askDatabaseName,
+    askPassword,
+  } = deps;
   const args = parseResetArgs(argv);
   if (args.help) {
     usage();
@@ -311,11 +314,14 @@ export async function main(argv = process.argv.slice(2), envVars = process.env, 
 
   // Refusals first: no wrangler call happens before these pass.
   const target = resolveResetTarget({ label: args.label, env: args.env, profiles: profiles ?? loadAllProfiles() });
-  const password = readPassword(envVars, args);
 
   log.heading(`Reset staging — ${args.label} → ${target.database} (env ${target.wranglerEnv})`);
   for (const line of formatPlan(target, args.label)) log.info(line);
   log.info('the bucket is not emptied: the demo re-uses its own objects');
+  // Before step 1, so a reset never ends with an empty database for want of it.
+  const password = await resolvePassword(envVars, args, { isTTY, ask: askPassword });
+  // The seed (step 4) runs as a child with stdin closed: it inherits the value.
+  if (password !== null) envVars[PASSWORD_VAR] = password;
 
   if (args.dryRun) {
     if (password === null) log.warn(`${PASSWORD_VAR} unset: a real run needs it for step 4`);

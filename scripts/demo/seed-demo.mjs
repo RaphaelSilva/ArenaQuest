@@ -30,8 +30,9 @@
  *     cannot slip through. (The local replica is exempt: it is addressed with
  *     `--local`, and its name happens to equal the stock label's production D1.)
  *
- * Credentials: `AQ_DEMO_PASSWORD` is read from the environment only (no flag
- * exists for it), required for any non-dry run, never logged; the SQL file
+ * Credentials: `AQ_DEMO_PASSWORD` is read from the environment (no flag exists
+ * for it); when it is unset on a real run with a TTY, the password is asked for
+ * with hidden input, twice (`resolvePassword`). Never logged; the SQL file
  * carries its PBKDF2 hash, never the value. A dry run without it writes a
  * placeholder hash no password verifies against.
  *
@@ -170,12 +171,64 @@ export function resolveTarget({ label, env, profiles, persistTo = null }) {
   return { env, remote: true, database, bucket, wranglerEnv, wranglerArgs: ['--remote', '--env', wranglerEnv] };
 }
 
-/** The password from `envVars`, or throws naming the variable (a dry run may go without). */
-export function readPassword(envVars, { dryRun }) {
+export const MIN_PROMPTED_PASSWORD = 8;
+
+/**
+ * Read a line from a TTY without echoing it. Ctrl-C rejects; backspace edits.
+ */
+export function askHidden(question, { input = process.stdin, output = process.stdout } = {}) {
+  return new Promise((resolve, reject) => {
+    output.write(question);
+    let value = '';
+    const wasRaw = input.isRaw;
+    const done = () => {
+      input.removeListener('data', onData);
+      input.setRawMode(wasRaw);
+      input.pause();
+      output.write('\n');
+    };
+    const onData = (chunk) => {
+      for (const ch of String(chunk)) {
+        if (ch === '\r' || ch === '\n' || ch === '\u0004') {
+          done();
+          resolve(value);
+          return;
+        }
+        if (ch === '\u0003') {
+          done();
+          reject(new Error('aborted'));
+          return;
+        }
+        if (ch === '\u007f' || ch === '\b') value = value.slice(0, -1);
+        else value += ch;
+      }
+    };
+    input.setRawMode(true);
+    input.setEncoding('utf8');
+    input.resume();
+    input.on('data', onData);
+  });
+}
+
+/**
+ * The password for a run: `AQ_DEMO_PASSWORD` when set; `null` on a dry run;
+ * otherwise asked for on the TTY (hidden, typed twice, at least
+ * MIN_PROMPTED_PASSWORD characters). With no TTY it throws naming the variable.
+ */
+export async function resolvePassword(envVars, { dryRun }, { isTTY = Boolean(process.stdin.isTTY), ask = askHidden } = {}) {
   const value = envVars[PASSWORD_VAR];
   if (typeof value === 'string' && value.length > 0) return value;
   if (dryRun) return null;
-  throw new Error(`${PASSWORD_VAR} is not set: export it in the environment (it is never accepted as a flag)`);
+  if (!isTTY) {
+    throw new Error(`${PASSWORD_VAR} is not set and there is no TTY to ask on: export it (it is never accepted as a flag)`);
+  }
+  const first = await ask(`Password for the demo accounts (${PASSWORD_VAR} is unset): `);
+  if (first.length < MIN_PROMPTED_PASSWORD) {
+    throw new Error(`the demo password needs at least ${MIN_PROMPTED_PASSWORD} characters`);
+  }
+  const second = await ask('Type it again: ');
+  if (first !== second) throw new Error('the two passwords did not match');
+  return first;
 }
 
 export function sqlFilePath(label, env, repoRoot = ROOT) {
@@ -323,10 +376,11 @@ export async function main(argv = process.argv.slice(2), envVars = process.env, 
 
   // Refusals first: nothing is written or spawned before these pass.
   const target = resolveTarget({ label: args.label, env: args.env, profiles: loadAllProfiles(), persistTo: args.persistTo });
-  const password = readPassword(envVars, args);
 
   const where = target.remote ? `, env ${target.wranglerEnv}` : `, local${target.persistTo ? ` at ${target.persistTo}` : ''}`;
   log.heading(`Demo seed — ${args.label} → ${target.env} (${target.database}${where})`);
+  // Asked for after the heading, so the operator sees which database it is for.
+  const password = await resolvePassword(envVars, args, { isTTY: deps.isTTY, ask: deps.ask });
   const dataset = datasetOverride ?? loadDataset(args.label);
   const template = readSampleTopic();
   const ctx = demoContext({

@@ -91,8 +91,8 @@ levels) with 27 `ready` media, a group, two enrollments and gamification state
 (student-1 at 350 XP, student-2 at 950, student-3 at 0).
 
 ```bash
-export AQ_DEMO_PASSWORD='…'                        # every demo account's password; never a flag
-make db-seed-demo-local LABEL=budo                 # the local replica (default LABEL=arenaquest)
+make db-seed-demo-local LABEL=budo                 # the local replica (default LABEL=arenaquest); asks for the password
+export AQ_DEMO_PASSWORD='…'                        # … or set it up front (CI / scripts); never a flag
 make db-seed-demo-local LABEL=budo DRY_RUN=1       # write .arenaquest/demo-budo-local.sql + print the plan only
 make db-seed-demo-staging LABEL=budo               # remote staging D1 — asks you to type its name
 make db-seed-demo-staging LABEL=budo CONFIRM=1     # … without the prompt (CI / scripts)
@@ -103,9 +103,13 @@ node scripts/demo/ci-check.mjs                     # what CI runs (below)
   `-e production` and any staging block naming a production D1 or bucket before
   it writes anything, and the production deploy guard rejects a database holding
   a demo account (`demo.<user>@<label>.demo.invalid`). Staging tolerates them.
+- **Password.** Every demo account shares one password: `AQ_DEMO_PASSWORD` when
+  exported, otherwise asked for on the terminal (hidden, typed twice, at least 8
+  characters). With neither — no variable and no TTY, as in CI — a real run
+  refuses before writing anything; a dry run needs no password.
 - **Idempotent.** Ids are deterministic per label; a re-run changes no row
   count, uploads nothing and rotates the password hash to the current
-  `AQ_DEMO_PASSWORD`.
+  password.
 - **Dataset.** `scripts/demo/dataset/base.json`, optionally overridden per label
   by `config/labels/<label>/demo.json`. Media are three public-domain files
   pinned by SHA-256, cached in `.arenaquest/demo-media/` after the first
@@ -131,7 +135,7 @@ abandoned migration, test rows, a half-applied schema), wipe it and reload the
 demo instead of repairing it by hand.
 
 ```bash
-export AQ_DEMO_PASSWORD='…'                        # the seed step needs it; checked before anything runs
+# the seed step's password: AQ_DEMO_PASSWORD, or asked for before anything runs
 make db-reset-staging LABEL=budo DRY_RUN=1         # print the plan — no wrangler call, no credentials
 make db-reset-staging LABEL=budo                   # asks you to type the database name (budo-db-staging)
 make db-reset-staging LABEL=budo CONFIRM=1         # … without the prompt (CI / scripts)
@@ -312,8 +316,11 @@ The run, in order (each step only if the previous one succeeded):
 3. **Bookmark** — `wrangler d1 time-travel info <db> --json`; the restore
    command is printed right away and again in the report.
 4. **Migrate** the staging D1 from the checkout.
-5. **API preview** — `wrangler preview --env <label>-staging --name <name> --json`;
-   the Preview URL (`preview.urls[0]`) is captured from the JSON.
+5. **API preview** — `wrangler preview --env <label>-staging --name <name> --json
+   --secrets-file <tmp>`; the Preview URL (`preview.urls[0]`) is captured from
+   the JSON. The secrets file (0600, deleted as soon as wrangler exits) holds a
+   `JWT_SECRET` generated for this deployment plus any `AQ_PREVIEW_<NAME>` you
+   exported (see below).
 6. **Web build** with `NEXT_PUBLIC_API_URL` = that URL,
    `NEXT_PUBLIC_SITE_URL=https://<name>.<pagesProject>.pages.dev`,
    `NEXT_PUBLIC_PREVIEW_NAME=<name>` and `NEXT_PUBLIC_PREVIEW_SHA=<short sha>`.
@@ -326,8 +333,26 @@ the name matches `[a-z0-9-]{1,20}`; and the web preview origin
 `ALLOWED_ORIGINS` (true when the staging `webOrigin` is the Pages host) — a label
 on a custom staging domain is refused rather than shipped with a broken CORS.
 `--scope web` rebuilds only the web and needs `--api-url <API preview URL>`
-(`API_URL=` in Make). A preview has its own `JWT_SECRET`, so log in again on
-each preview; activation and reset links still point at the staging web.
+(`API_URL=` in Make). A preview has its own `JWT_SECRET`, regenerated on every
+deploy, so log in again on each preview (and after each redeploy); activation and
+reset links still point at the staging web.
+
+**Preview secrets.** A Workers Preview deployment holds only the bindings uploaded
+with it — none of the staging Worker's secrets and, as of wrangler 4.144, none of
+the *Preview base config*'s either (verified live: a base config holding all four
+secrets produced a deployment with zero). That is why the CLI ships the secrets
+with every `wrangler preview`, and why the preflight does not check the staging
+Worker's secrets for a preview. Email/password login needs nothing but the
+generated `JWT_SECRET`. The external ones are optional and taken from your shell:
+
+```bash
+AQ_PREVIEW_R2_ACCESS_KEY_ID=… AQ_PREVIEW_R2_SECRET_ACCESS_KEY=… \
+  make deploy-preview-staging LABEL=budo      # media presign on the preview
+```
+
+Unset, the run warns and the preview still boots: without the R2 keys only presigned
+media uploads/downloads fail (the S3 client is built on first use), without
+`AQ_PREVIEW_GOOGLE_CLIENT_SECRET` only Google sign-in is off.
 
 **Cleanup.** `--preview <name> --delete` runs `wrangler preview delete` and then
 deletes every *preview* deployment of that Pages branch (listed with

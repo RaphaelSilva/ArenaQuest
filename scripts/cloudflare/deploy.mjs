@@ -16,8 +16,9 @@
  *
  *   lint-migrations       → node scripts/db/check-migrations.mjs --base origin/main
  *   bookmark              → wrangler d1 time-travel info <d1Name> --env <env> --json
- *   deploy-worker-preview → wrangler preview --env <env> --name <name> --json
- *                           (the Preview URL is captured by `parsePreviewUrl`)
+ *   deploy-worker-preview → wrangler preview --env <env> --name <name> --json --secrets-file <tmp>
+ *                           (the Preview URL is captured by `parsePreviewUrl`; the
+ *                           secrets file is written for that command and removed)
  *   deploy-pages-branch   → wrangler pages deploy … --project-name=<p> --branch=<name>
  *   report                → both URLs + the bookmark and its restore command
  *   delete-worker-preview → wrangler preview delete --env <env> --name <name> --skip-confirmation
@@ -31,15 +32,23 @@
  * The Cloudflare credential is resolved purely by context — an env token
  * (`CF_API_TOKEN`, RFC-canonical) or an existing `wrangler login` session — and
  * is never prompted for. App runtime secrets (JWT_SECRET, R2_*, …) are never
- * read; they persist on the Worker across deploys.
+ * read; they persist on the Worker across deploys. A candidate preview is the
+ * exception: its deployment carries its own secrets (see `previewSecretSpec`
+ * in the core) — a freshly generated JWT_SECRET plus any `AQ_PREVIEW_<NAME>`
+ * the operator exported — in a 0600 file that exists only while
+ * `wrangler preview` runs. No value is ever put in argv or logged.
  */
 
 import { spawnSync } from 'node:child_process';
-import { appendFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 
-import { run, parseArgs, confirmProduction } from '../deploy/core.mjs';
+import {
+  run, parseArgs, confirmProduction, PREVIEW_SECRET_ENV_PREFIX, PREVIEW_SECRET_IMPACT,
+} from '../deploy/core.mjs';
 import { listSecretNames } from '../label.mjs';
 import { formatCommand, parseBookmark, restoreCommand } from '../db/reset-remote.mjs';
 import log from '../lib/log.mjs';
@@ -55,6 +64,7 @@ const PAGES_OUTPUT = '.vercel/output/static';
 export const PLACEHOLDER = {
   apiUrl: '<API preview URL captured from wrangler preview>',
   bookmark: '<bookmark>',
+  secretsFile: '<secrets file>',
 };
 
 /**
@@ -98,6 +108,7 @@ export function stepToCommand(step, ctx = {}) {
           ...API_WRANGLER, 'preview', '--env', step.wranglerEnv, '--name', step.previewName,
           ...(step.message ? ['--message', step.message] : []),
           '--json',
+          ...(step.secrets ? ['--secrets-file', ctx.secretsFile ?? PLACEHOLDER.secretsFile] : []),
         ],
         capture: true,
       };
@@ -139,6 +150,34 @@ export function stepToCommand(step, ctx = {}) {
     default:
       throw new Error(`unknown plan step kind: ${step.kind}`);
   }
+}
+
+/**
+ * The values of a preview's secrets file: each `generated` name gets 32 fresh
+ * random bytes (hex); each `external` one is read from `AQ_PREVIEW_<NAME>` in
+ * `env`, or listed in `missing` when unset.
+ */
+export function previewSecretValues(secrets, env, random = () => randomBytes(32).toString('hex')) {
+  const values = {};
+  const missing = [];
+  for (const name of secrets.generated) values[name] = random();
+  for (const name of secrets.external) {
+    const value = env[`${PREVIEW_SECRET_ENV_PREFIX}${name}`];
+    if (value) values[name] = value;
+    else missing.push(name);
+  }
+  return { values, missing };
+}
+
+/**
+ * Write `values` to a fresh 0600 JSON file in its own temp dir; the returned
+ * `remove()` deletes the dir. wrangler reads the file, nothing else does.
+ */
+function writeSecretsFile(values) {
+  const dir = mkdtempSync(join(tmpdir(), 'aq-preview-secrets-'));
+  const path = join(dir, 'secrets.json');
+  writeFileSync(path, JSON.stringify(values), { mode: 0o600 });
+  return { path, remove: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
 /** `wrangler pages deployment list` for the preview environment, as JSON. */
@@ -393,7 +432,17 @@ export function executePlan(plan, { runner = spawnRunner, baseEnv = process.env,
       continue;
     }
 
-    const c = stepToCommand(step, ctx);
+    let secretsFile = null;
+    if (step.kind === 'deploy-worker-preview' && step.secrets) {
+      const { values, missing } = previewSecretValues(step.secrets, baseEnv);
+      for (const name of missing) {
+        log.warn(`${name} not passed to the preview (${PREVIEW_SECRET_ENV_PREFIX}${name} unset) — ${PREVIEW_SECRET_IMPACT[name] ?? 'the feature using it is off'}`);
+      }
+      log.ok(`preview secrets: ${Object.keys(values).join(', ')} (${step.secrets.generated.join(', ')} generated for this deployment)`);
+      secretsFile = writeSecretsFile(values);
+    }
+
+    const c = stepToCommand(step, secretsFile ? { ...ctx, secretsFile: secretsFile.path } : ctx);
     log.info(c.title);
     log.cmd(renderCommand(c));
     try {
@@ -415,6 +464,8 @@ export function executePlan(plan, { runner = spawnRunner, baseEnv = process.env,
         error.message = `aborted before migrating: could not record a Time Travel bookmark (${error.message})`;
       }
       throw withRestore(error);
+    } finally {
+      secretsFile?.remove();
     }
   }
   return ctx;
@@ -452,7 +503,14 @@ function dryRunExtras(step) {
     return [`prints the restore command: ${renderRestore(step, PLACEHOLDER.bookmark)}`];
   }
   if (step.kind === 'deploy-worker-preview') {
-    return ['captures preview.urls[0] from the JSON output as the API preview URL'];
+    const lines = ['captures preview.urls[0] from the JSON output as the API preview URL'];
+    if (step.secrets) {
+      lines.push(`secrets file (0600, removed after): ${step.secrets.generated.join(', ')} generated`);
+      for (const name of step.secrets.external) {
+        lines.push(`  ${name} from ${PREVIEW_SECRET_ENV_PREFIX}${name} if set — otherwise ${PREVIEW_SECRET_IMPACT[name] ?? 'the feature using it is off'}`);
+      }
+    }
+    return lines;
   }
   if (step.kind === 'delete-pages-branch') {
     return [
@@ -495,7 +553,8 @@ async function main() {
       // listSecretNames() sees it (it inherits process.env). The same values
       // are merged per-command at step 4.
       Object.assign(process.env, cred.env);
-      if (!preArgs.skipSecretCheck && !preArgs.delete) fetchSecretNames = listSecretNames;
+      // A preview carries its own secrets: the Worker's are not its concern.
+      if (!preArgs.skipSecretCheck && !preArgs.delete && preArgs.preview === null) fetchSecretNames = listSecretNames;
     }
   }
 
@@ -519,7 +578,13 @@ async function main() {
     for (const r of result.preflight.results) {
       if (r.status === 'fail') log.fail(r.detail);
     }
-    log.hint('Fix the offending key(s) in config/labels/<label>.jsonc, then re-run.');
+    // A secret row carries its own fix command; only the rest live in the profile.
+    const failed = result.preflight.results.filter((r) => r.status === 'fail');
+    if (failed.some((r) => r.group !== 'api-secrets')) {
+      log.hint('Fix the offending key(s) in config/labels/<label>.jsonc, then re-run.');
+    } else {
+      log.hint('Set the missing secret(s) with the command(s) above, then re-run.');
+    }
     process.exit(1);
   }
 

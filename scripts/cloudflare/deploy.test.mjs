@@ -7,7 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,6 +18,7 @@ import {
   branchDeploymentIds,
   executePlan,
   parsePreviewUrl,
+  previewSecretValues,
   reportLines,
   stepToCommand,
   summaryMarkdown,
@@ -105,6 +106,7 @@ test('stepToCommand maps the preview steps to wrangler preview / pages deploy --
   assert.deepEqual(cmdOf('bookmark').argv.slice(5), ['d1', 'time-travel', 'info', 'acme-db-staging', '--env', 'acme-staging', '--json']);
   assert.deepEqual(cmdOf('deploy-worker-preview').argv.slice(5), [
     'preview', '--env', 'acme-staging', '--name', 'm21', '--message', 'abc1234', '--json',
+    '--secrets-file', PLACEHOLDER.secretsFile,
   ]);
   const pages = cmdOf('deploy-pages-branch').argv;
   assert.ok(pages.includes('--project-name=acme-web-staging'));
@@ -207,6 +209,72 @@ test('executePlan runs the preview in order, captures bookmark + URL, builds the
   assert.equal(summary.length, 1);
   assert.equal(summary[0][0], 'S');
   assert.match(summary[0][1], /time-travel restore acme-db-staging --bookmark=0000007b/);
+});
+
+test('previewSecretValues: generated names get a fresh value, external ones come from AQ_PREVIEW_<NAME>', () => {
+  const spec = { generated: ['JWT_SECRET'], external: ['R2_ACCESS_KEY_ID', 'GOOGLE_CLIENT_SECRET'] };
+  const { values, missing } = previewSecretValues(spec, { AQ_PREVIEW_R2_ACCESS_KEY_ID: 'rk', R2_ACCESS_KEY_ID: 'not-this' }, () => 'g');
+  assert.deepEqual(values, { JWT_SECRET: 'g', R2_ACCESS_KEY_ID: 'rk' });
+  assert.deepEqual(missing, ['GOOGLE_CLIENT_SECRET']);
+  const real = previewSecretValues(spec, {}).values.JWT_SECRET;
+  assert.match(real, /^[0-9a-f]{64}$/);
+});
+
+test('the worker preview gets a 0600 secrets file that holds the values and is removed afterwards', async () => {
+  const p = profile();
+  const { resolved, envConfig } = resolve(p, 'staging');
+  const withSecrets = buildPreviewPlan({
+    label: 'acme', scope: 'api', resolved, envConfig, preview: derivePreview(p, 'm21'),
+    secrets: { generated: ['JWT_SECRET'], external: ['R2_ACCESS_KEY_ID', 'GOOGLE_CLIENT_SECRET'] },
+  });
+  let seen = null;
+  const { runner, calls } = stubRunner({
+    'time-travel info': { status: 0, stdout: BOOKMARK_JSON },
+    'wrangler preview': (all) => {
+      const argv = all.at(-1).argv;
+      const path = argv[argv.indexOf('--secrets-file') + 1];
+      seen = { path, mode: statSync(path).mode & 0o777, content: JSON.parse(readFileSync(path, 'utf8')) };
+      return { status: 0, stdout: PREVIEW_JSON };
+    },
+  });
+  const printed = [];
+  const log = console.log;
+  console.log = (...a) => printed.push(a.join(' '));
+  try {
+    executePlan(withSecrets, { runner, baseEnv: { AQ_PREVIEW_R2_ACCESS_KEY_ID: 'r2-key-value' } });
+  } finally {
+    console.log = log;
+  }
+  assert.equal(seen.mode, 0o600);
+  assert.match(seen.content.JWT_SECRET, /^[0-9a-f]{64}$/);
+  assert.equal(seen.content.R2_ACCESS_KEY_ID, 'r2-key-value');
+  assert.ok(!('GOOGLE_CLIENT_SECRET' in seen.content));
+  assert.ok(!existsSync(seen.path), 'removed once wrangler is done');
+  const output = printed.join('\n');
+  assert.ok(!output.includes(seen.content.JWT_SECRET) && !output.includes('r2-key-value'), 'no value is logged');
+  assert.match(output, /GOOGLE_CLIENT_SECRET not passed to the preview .*Google sign-in is off/);
+  const argv = calls.find((c) => c.argv.includes('--secrets-file')).argv.join(' ');
+  assert.ok(!argv.includes('r2-key-value'), 'no value in argv');
+});
+
+test('the secrets file is removed even when wrangler preview fails', async () => {
+  let path = null;
+  const { runner } = stubRunner({
+    'time-travel info': { status: 0, stdout: BOOKMARK_JSON },
+    'wrangler preview': (all) => {
+      const argv = all.at(-1).argv;
+      path = argv[argv.indexOf('--secrets-file') + 1];
+      return { status: 1, stdout: '' };
+    },
+  });
+  const p = profile();
+  const { resolved, envConfig } = resolve(p, 'staging');
+  const withSecrets = buildPreviewPlan({
+    label: 'acme', scope: 'api', resolved, envConfig, preview: derivePreview(p, 'm21'),
+    secrets: { generated: ['JWT_SECRET'], external: [] },
+  });
+  await quiet(() => assert.throws(() => executePlan(withSecrets, { runner, baseEnv: {} })));
+  assert.ok(path && !existsSync(path));
 });
 
 test('a failing migration lint stops the run before the bookmark and the migrate', async () => {
