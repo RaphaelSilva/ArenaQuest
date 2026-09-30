@@ -1,6 +1,6 @@
 # Milestone 26 — Release-candidate previews and demo seed
 
-**Status:** 📝 Draft
+**Status:** 🚧 In Progress — all 14 tasks done on `feature/m26/candidate`; live checks pending (see the tasks' Acceptance Criteria)
 **Scope:** `scripts/demo/` (new), `scripts/db/` (new), `scripts/deploy/core.mjs`, `scripts/cloudflare/{deploy,provision-label}.mjs`, `scripts/label.mjs`, `apps/api/scripts/check-no-dev-seed.ts`, `apps/api/wrangler.jsonc`, `config/labels/*.jsonc`, `.github/workflows/`, `Makefile`, one web banner component, `docs/onboarding.md`. Derived from [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may touch
@@ -193,7 +193,7 @@ Out of scope (explicit, from RFC 0021 Non-Goals):
 | 11 | [Generated `previews` blocks and preview secrets](./11-wrangler-previews-block.task.md) | 3 | Backend | ✅ Done |
 | 12 | [Deploy CLI `--preview` mode, Make targets and workflow](./12-deploy-cli-preview-mode.task.md) | 3 | Backend | ✅ Done |
 | 13 | [Preview banner](./13-preview-banner-frontend.task.md) | 3 | Frontend | ✅ Done |
-| 14 | [Demo extensions: events, billing, tasks, comments](./14-seed-demo-extensions.task.md) | 4 | Backend | ☐ Open |
+| 14 | [Demo extensions: events, billing, tasks, comments](./14-seed-demo-extensions.task.md) | 4 | Backend | ✅ Done |
 
 Dependency graph:
 
