@@ -23,13 +23,24 @@ describe('D1TagRepository', () => {
     expect(tags.every(t => typeof t.id === 'string')).toBe(true);
   });
 
-  it('upsertMany updates name on slug conflict without changing id', async () => {
+  it('upsertMany keeps the first spelling on slug conflict (DO NOTHING)', async () => {
     const [original] = await repo.upsertMany([{ name: 'React', slug: 'react' }]);
-    const [updated] = await repo.upsertMany([{ name: 'React.js', slug: 'react' }]);
+    const [again] = await repo.upsertMany([{ name: 'React.js', slug: 'react' }]);
 
-    expect(updated.id).toBe(original.id);
-    expect(updated.name).toBe('React.js');
-    expect(updated.slug).toBe('react');
+    expect(again.id).toBe(original.id);
+    expect(again.name).toBe('React');
+    expect(again.slug).toBe('react');
+  });
+
+  it('upsertMany reuses an existing slug without adding a row', async () => {
+    await repo.upsertMany([{ name: 'Chūdan', slug: 'chudan' }]);
+    const before = await env.DB.prepare('SELECT COUNT(*) AS n FROM tags').first<{ n: number }>();
+
+    const [tag] = await repo.upsertMany([{ name: 'CHUDAN', slug: 'chudan' }]);
+    const after = await env.DB.prepare('SELECT COUNT(*) AS n FROM tags').first<{ n: number }>();
+
+    expect(tag.name).toBe('Chūdan');
+    expect(after!.n).toBe(before!.n);
   });
 
   it('upsertMany with empty array returns empty array', async () => {
@@ -68,5 +79,32 @@ describe('D1TagRepository', () => {
     for (let i = 1; i < all.length; i++) {
       expect(all[i].slug >= all[i - 1].slug).toBe(true);
     }
+  });
+
+  it('list with q returns only tags whose slug starts with q', async () => {
+    await repo.upsertMany([
+      { name: 'Chūdan', slug: 'chudan' },
+      { name: 'Chūdan Tsuki', slug: 'chudan-tsuki' },
+      { name: 'Jōdan', slug: 'jodan' },
+    ]);
+
+    const hits = await repo.list({ q: 'chu' });
+    expect(hits.map(t => t.slug)).toEqual(['chudan', 'chudan-tsuki']);
+
+    const limited = await repo.list({ q: 'chu', limit: 1 });
+    expect(limited.map(t => t.slug)).toEqual(['chudan']);
+
+    expect(await repo.list({ q: 'zzz-none' })).toEqual([]);
+  });
+
+  it('findByIds returns only the existing tags', async () => {
+    const [a, b] = await repo.upsertMany([
+      { name: 'Ids A', slug: 'ids-a' },
+      { name: 'Ids B', slug: 'ids-b' },
+    ]);
+
+    const found = await repo.findByIds([a.id, 'missing-id', b.id]);
+    expect(found.map(t => t.id).sort()).toEqual([a.id, b.id].sort());
+    expect(await repo.findByIds([])).toEqual([]);
   });
 });

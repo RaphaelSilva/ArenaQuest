@@ -967,7 +967,8 @@ function toApiError(response, body) {
  * A README may declare topic overrides in a fenced block tagged `arenaquest`:
  *
  *     ```arenaquest
- *     { "order": 9, "status": "draft", "estimatedMinutes": 90, "title": "9 Kyu" }
+ *     { "order": 9, "status": "draft", "estimatedMinutes": 90, "title": "9 Kyu",
+ *       "tags": ["Soco", "Kihon"] }
  *     ```
  *
  * A fence is used rather than `---` front-matter because a Google Doc exported
@@ -978,6 +979,29 @@ function toApiError(response, body) {
 const METADATA_FENCE = /^```(?:json\s+)?arenaquest[^\n]*\n([\s\S]*?)\n```/m;
 
 const TOPIC_STATUS_VALUES = ['draft', 'published'];
+
+/**
+ * Tag slug, mirroring `packages/shared/domain/search/normalize.ts`
+ * (`normalizeText` + `tokenize`) and `packages/shared/domain/tags/slugify.ts`
+ * EXACTLY. This script is stdlib-only and cannot import that TypeScript, so it
+ * carries its own copy; import-media.test.mjs asserts parity against
+ * `packages/shared/domain/tags/slugify.fixtures.json`. Change both together.
+ */
+export function slugify(name) {
+  if (typeof name !== 'string' || name.length === 0) return '';
+  const normalized = name
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .replace(/[\p{Pd}−]/gu, '-')
+    .toLowerCase()
+    .replace(/\s+/gu, ' ')
+    .trim();
+  return normalized
+    .split(/[\s\-_/.,;:]+/u)
+    .map((token) => token.replace(/[^\p{L}\p{N}]+/gu, ''))
+    .filter(Boolean)
+    .join('-');
+}
 
 export function parseReadmeMetadata(markdown) {
   const match = METADATA_FENCE.exec(markdown ?? '');
@@ -1015,6 +1039,21 @@ export function parseReadmeMetadata(markdown) {
     if (TOPIC_STATUS_VALUES.includes(parsed.status)) metadata.status = parsed.status;
     else warnings.push(`metadata "status" must be one of ${TOPIC_STATUS_VALUES.join('|')} — ignored`);
   }
+  if (parsed.tags !== undefined) {
+    if (Array.isArray(parsed.tags) && parsed.tags.every((tag) => typeof tag === 'string')) {
+      const tags = [];
+      for (const raw of parsed.tags) {
+        const name = raw.trim();
+        // The API rejects a name with no usable characters (400), which would
+        // fail the whole topic — so such a name is dropped here with a warning.
+        if (slugify(name) === '') warnings.push(`metadata tag "${raw}" has no usable characters — ignored`);
+        else tags.push(name);
+      }
+      metadata.tags = tags;
+    } else {
+      warnings.push('metadata "tags" must be an array of strings — ignored');
+    }
+  }
 
   return { metadata, warnings };
 }
@@ -1050,6 +1089,7 @@ export async function resolveReadmes(plan, { readText, concurrency = 4, onWarnin
         content: stripMetadataBlock(raw),
         status: metadata.status,
         estimatedMinutes: metadata.estimatedMinutes,
+        tags: metadata.tags,
       };
     } catch (err) {
       if (onWarning) onWarning({ key: '(root topic)' }, `README could not be read (${err.message}) — root topic left as is`);
@@ -1071,6 +1111,7 @@ export async function resolveReadmes(plan, { readText, concurrency = 4, onWarnin
     if (metadata.order !== undefined) topic.order = metadata.order;
     if (metadata.status !== undefined) topic.status = metadata.status;
     if (metadata.estimatedMinutes !== undefined) topic.estimatedMinutes = metadata.estimatedMinutes;
+    if (metadata.tags !== undefined) topic.tags = metadata.tags;
     return null;
   });
 
@@ -1100,6 +1141,19 @@ export function indexTopics(records) {
   return index;
 }
 
+/**
+ * Tags drift only when the SLUG sets differ: re-casing or re-accenting a name
+ * in the README (`SOCO` vs `soco`) is not a change, adding or removing one is.
+ * `record.tags` is the `{ id, name, slug }[]` the admin topics API returns.
+ */
+function tagsDrifted(names, recordTags) {
+  const wanted = new Set(names.map(slugify));
+  const current = new Set((recordTags ?? []).map((tag) => tag.slug));
+  if (wanted.size !== current.size) return true;
+  for (const slug of wanted) if (!current.has(slug)) return true;
+  return false;
+}
+
 /** Fields a README owns. Only a real difference triggers a PATCH. */
 function topicDrift(topic, record) {
   const patch = {};
@@ -1108,6 +1162,8 @@ function topicDrift(topic, record) {
   if (topic.estimatedMinutes !== undefined && topic.estimatedMinutes !== record.estimatedMinutes) {
     patch.estimatedMinutes = topic.estimatedMinutes;
   }
+  // A README without `tags` never touches the topic's tags.
+  if (topic.tags !== undefined && tagsDrifted(topic.tags, record.tags)) patch.tags = topic.tags;
   return patch;
 }
 
@@ -1164,6 +1220,7 @@ export async function reconcileTopics(client, plan, { rootTopicId, index, onCrea
           status: topic.status ?? TOPIC_STATUS,
           ...(topic.content !== undefined ? { content: topic.content } : {}),
           ...(topic.estimatedMinutes !== undefined ? { estimatedMinutes: topic.estimatedMinutes } : {}),
+          ...(topic.tags !== undefined ? { tags: topic.tags } : {}),
         },
         expectStatus: 201,
       }),
@@ -1433,7 +1490,7 @@ function createSource(args) {
   });
 }
 
-function printPlan(plan, { baseUrl, sourceLabel, ledgerEntries, rootTopicId }) {
+export function printPlan(plan, { baseUrl, sourceLabel, ledgerEntries, rootTopicId }) {
   log.info(`Source: ${sourceLabel}`);
   log.info(`Target: ${baseUrl}${rootTopicId ? ` (under topic ${rootTopicId})` : ''}`);
 
@@ -1468,6 +1525,7 @@ function printPlan(plan, { baseUrl, sourceLabel, ledgerEntries, rootTopicId }) {
     if (topic.content !== undefined) notes.push(`readme ${formatBytes(Buffer.byteLength(topic.content))}`);
     if (topic.order !== undefined) notes.push(`order ${topic.order}`);
     if (topic.status !== undefined) notes.push(topic.status);
+    if (topic.tags !== undefined) notes.push(`tags: ${topic.tags.length ? topic.tags.join(', ') : '(none)'}`);
     console.log(`  ${indent}[topic] ${topic.title}${notes.length ? `  (${notes.join(', ')})` : ''}`);
     for (const file of filesByTopic.get(topic.key) ?? []) renderFile(file, indent);
   }
@@ -1562,6 +1620,9 @@ async function main() {
     const totalBytes = pending.reduce((sum, file) => sum + file.sizeBytes, 0);
     if (plan.root) {
       log.info(`Root topic ${args.rootTopicId} gets ${formatBytes(Buffer.byteLength(plan.root.content))} of README content.`);
+      if (plan.root.tags !== undefined) {
+        log.info(`Root topic tags: ${plan.root.tags.length ? plan.root.tags.join(', ') : '(none)'}`);
+      }
     }
     if (args.manifest) {
       log.ok(`${pending.length} file(s) to upload (${formatBytes(totalBytes)}) into ${new Set(plan.files.map((file) => file.topicId)).size} existing topic(s).`);

@@ -1,6 +1,6 @@
 # Task 04 — Frontend: Topic page tag chips (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [24 — Catalog search by tags](./milestone.md)
 **RFC:** [RFC 0017](../../RFCs/0017-catalog-search-by-tags.md)
 **Team:** Frontend Web
@@ -53,14 +53,14 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A topic with tags `Soco` and `Kihon` renders two links with hrefs
+- [x] A topic with tags `Soco` and `Kihon` renders two links with hrefs
       `/catalog?tag=soco` and `/catalog?tag=kihon`.
-- [ ] A topic with no tags renders no tag list element.
-- [ ] Clicking a chip in `make dev` lands on the catalog with the sidebar filtered and the
+- [x] A topic with no tags renders no tag list element.
+- [x] Clicking a chip in `make dev` lands on the catalog with the sidebar filtered and the
       active-tag chip visible.
-- [ ] `check-i18n-coverage.js` passes; `dict-en` / `dict-pt` keys identical.
-- [ ] Components lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `check-i18n-coverage.js` passes; `dict-en` / `dict-pt` keys identical.
+- [x] Components lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

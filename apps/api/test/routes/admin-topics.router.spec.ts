@@ -264,3 +264,117 @@ describe('DELETE /admin/topics/:id', () => {
     expect(grandchildData.archived).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tags by name (M24 Task 02)
+// ---------------------------------------------------------------------------
+
+type TopicWithTags = { id: string; tags?: { id: string; name: string; slug: string }[] };
+
+async function countRows(sql: string, ...binds: unknown[]): Promise<number> {
+  const row = await env.DB.prepare(sql).bind(...binds).first<{ n: number }>();
+  return row!.n;
+}
+
+async function getTopic(id: string): Promise<TopicWithTags> {
+  const res = await req('GET', `/admin/topics/${id}`, { token: adminToken });
+  expect(res.status).toBe(200);
+  return res.json<TopicWithTags>();
+}
+
+describe('tags on POST / PATCH /admin/topics', () => {
+  it('PATCH tags [CHUDAN] links the stored Chūdan tag without renaming it or adding a row', async () => {
+    await env.DB
+      .prepare("INSERT OR IGNORE INTO tags (id, name, slug) VALUES (?, 'Chūdan', 'chudan')")
+      .bind(crypto.randomUUID())
+      .run();
+    const stored = await env.DB.prepare("SELECT id, name FROM tags WHERE slug = 'chudan'").first<{ id: string; name: string }>();
+    const topic = await createTopic({ title: 'Tag CHUDAN Topic' });
+    const before = await countRows('SELECT COUNT(*) AS n FROM tags');
+
+    const res = await req('PATCH', `/admin/topics/${topic.id}`, { token: adminToken, body: { tags: ['CHUDAN'] } });
+    expect(res.status).toBe(200);
+
+    const after = await countRows('SELECT COUNT(*) AS n FROM tags');
+    expect(after).toBe(before);
+    const node = await getTopic(topic.id);
+    expect(node.tags).toEqual([{ id: stored!.id, name: stored!.name, slug: 'chudan' }]);
+    expect(stored!.name).toBe('Chūdan');
+  });
+
+  it('POST tags [Soco, soco, " SOCO "] creates exactly one soco tag and one link', async () => {
+    const res = await req('POST', '/admin/topics', {
+      token: adminToken,
+      body: { title: 'Soco Topic', tags: ['Soco', 'soco', ' SOCO '] },
+    });
+    expect(res.status).toBe(201);
+    const { id } = await res.json<{ id: string }>();
+
+    expect(await countRows("SELECT COUNT(*) AS n FROM tags WHERE slug = 'soco'")).toBe(1);
+    expect(await countRows('SELECT COUNT(*) AS n FROM topic_node_tags WHERE topic_node_id = ?', id)).toBe(1);
+    const node = await getTopic(id);
+    expect(node.tags?.map(t => [t.name, t.slug])).toEqual([['Soco', 'soco']]);
+  });
+
+  it('content_creator can tag a topic by name', async () => {
+    const res = await req('POST', '/admin/topics', {
+      token: contentCreatorToken,
+      body: { title: 'CC Tagged', tags: ['Kata'] },
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it.each([
+    ['a name with no usable characters', ['!!!']],
+    ['a 41-character name', ['x'.repeat(41)]],
+    ['21 names', Array.from({ length: 21 }, (_, i) => `tag ${i}`)],
+    ['an empty name', ['   ']],
+  ])('returns 400 for %s', async (_label, tags) => {
+    const res = await req('POST', '/admin/topics', { token: adminToken, body: { title: 'Bad Tags', tags } });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when tags and tagIds are sent together', async () => {
+    const topic = await createTopic({ title: 'Both Fields' });
+    const res = await req('PATCH', `/admin/topics/${topic.id}`, {
+      token: adminToken,
+      body: { tags: ['x'], tagIds: [] },
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json<{ detail?: string }>();
+    expect(body.detail).toContain('tagIds');
+  });
+
+  it('unknown tagIds -> 422 UNKNOWN_TAG with the id in detail, topic_node_tags unchanged', async () => {
+    const topic = await createTopic({ title: 'Unknown TagId Topic', tags: ['Keep Me'] });
+    const linksBefore = await countRows('SELECT COUNT(*) AS n FROM topic_node_tags');
+    const ghost = crypto.randomUUID();
+
+    const res = await req('PATCH', `/admin/topics/${topic.id}`, { token: adminToken, body: { tagIds: [ghost] } });
+    expect(res.status).toBe(422);
+    const body = await res.json<{ error: string; detail: string }>();
+    expect(body.error).toBe('UNKNOWN_TAG');
+    expect(body.detail).toContain(ghost);
+
+    expect(await countRows('SELECT COUNT(*) AS n FROM topic_node_tags')).toBe(linksBefore);
+    expect((await getTopic(topic.id)).tags?.map(t => t.slug)).toEqual(['keep-me']);
+
+    const postRes = await req('POST', '/admin/topics', { token: adminToken, body: { title: 'Ghost', tagIds: [ghost] } });
+    expect(postRes.status).toBe(422);
+    expect(await countRows("SELECT COUNT(*) AS n FROM topic_nodes WHERE title = 'Ghost'")).toBe(0);
+  });
+
+  it('PATCH tags [] removes every link; PATCH without tags keeps them', async () => {
+    const topic = await createTopic({ title: 'Clear Tags Topic', tags: ['One', 'Two'] });
+    expect((await getTopic(topic.id)).tags).toHaveLength(2);
+
+    const keep = await req('PATCH', `/admin/topics/${topic.id}`, { token: adminToken, body: { title: 'Still Tagged' } });
+    expect(keep.status).toBe(200);
+    expect((await getTopic(topic.id)).tags).toHaveLength(2);
+
+    const clear = await req('PATCH', `/admin/topics/${topic.id}`, { token: adminToken, body: { tags: [] } });
+    expect(clear.status).toBe(200);
+    expect((await getTopic(topic.id)).tags ?? []).toHaveLength(0);
+    expect(await countRows('SELECT COUNT(*) AS n FROM topic_node_tags WHERE topic_node_id = ?', topic.id)).toBe(0);
+  });
+});

@@ -8,6 +8,7 @@ import * as topicsApiModule from './topics-api';
 import * as tasksApiModule from './tasks-api';
 import * as accountApiModule from './account-api';
 import * as adminTopicsApiModule from './admin-topics-api';
+import * as adminTagsApiModule from './admin-tags-api';
 import * as adminTasksApiModule from './admin-tasks-api';
 import * as adminUsersApiModule from './admin-users-api';
 import * as adminMediaApiModule from './admin-media-api';
@@ -82,6 +83,10 @@ export class ApiClient {
 
   get adminTopics() {
     return adminTopicsApiModule.createAdminTopicsApi(this.http);
+  }
+
+  get adminTags() {
+    return adminTagsApiModule.createAdminTagsApi(this.http);
   }
 
   get adminTasks() {

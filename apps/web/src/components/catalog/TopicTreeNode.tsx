@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { TopicNode, TopicProgressStatus } from '@web/lib/topics-api';
+import { TagChip } from './TagChip';
 
 export type TopicTreeData = TopicNode & { children: TopicTreeData[] };
 
@@ -46,7 +47,13 @@ type Props = {
   onToggle: (id: string) => void;
   expandLabel: (title: string) => string;
   collapseLabel: (title: string) => string;
+  /** Per-node tags explaining a search match (only for nodes matched through a tag). */
+  matchChips?: ReadonlyMap<string, readonly { name: string }[]>;
+  /** Overflow label for chips beyond the first two, e.g. `+n`. */
+  moreLabel?: (n: number) => string;
 };
+
+const MAX_CHIPS = 2;
 
 export function TopicTreeNode({
   node,
@@ -57,11 +64,15 @@ export function TopicTreeNode({
   onToggle,
   expandLabel,
   collapseLabel,
+  matchChips,
+  moreLabel,
 }: Props) {
   const hasChildren = node.children.length > 0;
   const isOpen = expandedIds.has(node.id);
   const isActive = activeId === node.id;
   const status = progressMap.get(node.id) ?? 'not_started';
+  const chips = matchChips?.get(node.id) ?? [];
+  const overflow = chips.length - MAX_CHIPS;
 
   return (
     <div>
@@ -120,6 +131,18 @@ export function TopicTreeNode({
           >
             {node.title}
           </p>
+          {chips.length > 0 && (
+            <div className="mt-0.5 flex min-w-0 items-center gap-1 overflow-hidden">
+              {chips.slice(0, MAX_CHIPS).map((chip, i) => (
+                <TagChip key={`${chip.name}-${i}`} label={chip.name} />
+              ))}
+              {overflow > 0 && moreLabel && (
+                <span className="flex-shrink-0 text-[11px]" style={{ color: 'var(--aq-text3)' }}>
+                  {moreLabel(overflow)}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         {/* Trailing: count badge for intermediate nodes, status indicator for leaves */}
         {hasChildren ? (
@@ -164,6 +187,8 @@ export function TopicTreeNode({
               onToggle={onToggle}
               expandLabel={expandLabel}
               collapseLabel={collapseLabel}
+              matchChips={matchChips}
+              moreLabel={moreLabel}
             />
           ))}
         </div>
