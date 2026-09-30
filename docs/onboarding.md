@@ -287,6 +287,57 @@ config store.
 instead of an inbox. Read them — and their links — with
 `pnpm --filter api exec wrangler tail --env <label>-staging`. Production keeps `resend`.
 
+### Previewing a candidate (RFC 0021 §1)
+
+A candidate branch is tried on real URLs **as a preview of staging**, before it
+merges: the API as a Workers Preview of the label's staging Worker, the web as a
+Pages branch deployment of the staging Pages project. Both run on the label's
+staging D1, KV and R2; the live staging Worker and the Pages production branch
+are never touched.
+
+```bash
+make deploy-preview-staging LABEL=budo CANDIDATE=m21 DRY_RUN=1   # print the plan — no credentials
+make deploy-preview-staging LABEL=budo CANDIDATE=m21             # deploy it
+make deploy-preview-staging LABEL=budo                           # on feature/m21/candidate: CANDIDATE defaults to m21
+make preview-delete-staging LABEL=budo CANDIDATE=m21             # after the candidate merges
+# ≡ node scripts/cloudflare/deploy.mjs --label budo -e staging --preview m21 [--scope api|web|all] [--dry-run]
+```
+
+The run, in order (each step only if the previous one succeeded):
+
+1. **Guard** (staging mode) — no dev-seed accounts in the staging D1.
+2. **Migration lint** — `scripts/db/check-migrations.mjs --base origin/main`
+   (fetch `main` first). A destructive migration without `-- @contract:` stops
+   here, before anything touches the shared staging D1.
+3. **Bookmark** — `wrangler d1 time-travel info <db> --json`; the restore
+   command is printed right away and again in the report.
+4. **Migrate** the staging D1 from the checkout.
+5. **API preview** — `wrangler preview --env <label>-staging --name <name> --json`;
+   the Preview URL (`preview.urls[0]`) is captured from the JSON.
+6. **Web build** with `NEXT_PUBLIC_API_URL` = that URL,
+   `NEXT_PUBLIC_SITE_URL=https://<name>.<pagesProject>.pages.dev`,
+   `NEXT_PUBLIC_PREVIEW_NAME=<name>` and `NEXT_PUBLIC_PREVIEW_SHA=<short sha>`.
+7. **Pages branch** — `wrangler pages deploy … --branch <name>`.
+8. **Report** — web URL, API URL, bookmark and restore command.
+
+Rules the CLI enforces before any step runs: `--preview` only with `-e staging`;
+the name matches `[a-z0-9-]{1,20}`; and the web preview origin
+`https://<name>.<pagesProject>.pages.dev` must be admitted by the staging
+`ALLOWED_ORIGINS` (true when the staging `webOrigin` is the Pages host) — a label
+on a custom staging domain is refused rather than shipped with a broken CORS.
+`--scope web` rebuilds only the web and needs `--api-url <API preview URL>`
+(`API_URL=` in Make). A preview has its own `JWT_SECRET`, so log in again on
+each preview; activation and reset links still point at the staging web.
+
+**Cleanup.** `--preview <name> --delete` runs `wrangler preview delete` and then
+deletes every *preview* deployment of that Pages branch (listed with
+`wrangler pages deployment list --json`, deleted with `--force`).
+
+**CI.** `.github/workflows/preview-candidate.yml` is `workflow_dispatch` only:
+run it from the candidate branch with `label` (one label or `all`) and an
+optional `candidate`; each leg runs the same CLI and writes both URLs and the
+bookmark to the job summary (`--summary-file "$GITHUB_STEP_SUMMARY"`).
+
 ### Bringing up a new tenant
 
 Deploy assumes the tenant already exists. Creating it is the provisioner's job:
