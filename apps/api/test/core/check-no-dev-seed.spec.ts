@@ -6,13 +6,22 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  buildDemoMatcher,
+  buildDemoWhereClause,
+  buildGuardQuery,
   buildSeedMatcher,
   buildSeedWhereClause,
   extractSeedUsersFromSql,
   isFreshDatabaseError,
+  matchesDemoRow,
   matchesSeedRow,
+  parseArgs,
   readSeedSqlFiles,
+  runGuard,
+  type GuardArgs,
+  type WranglerResult,
 } from '../../scripts/check-no-dev-seed';
+import { demoEmail, demoId, demoUserIds, listLabels } from '../../../../scripts/demo/ids.mjs';
 
 const SEED_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -205,5 +214,186 @@ describe('buildSeedMatcher — fail closed on an empty matcher set', () => {
     expect(matcher.seedIds).toEqual([]);
     expect(matcher.hashPrefixes).toEqual([]);
     expect(matcher.likePatterns).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Demo matcher + production-only enforcement (RFC 0021 §3.6, M26 Task 07)
+// ---------------------------------------------------------------------------
+
+const SEED_ADMIN = {
+  id: 'seed-admin-00000000-0000-0000-0000-000000000001',
+  email: 'admin@arenaquest.dev',
+  password_hash:
+    'pbkdf2:100000:14987ad9c165000b3c1deb276aceb877:829f6ee1357f13811ab9c944fc1535da74f5ff8ab67215c79b45319b68ecb48a',
+};
+const REAL_USER = {
+  id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+  email: 'someone@example.com',
+  password_hash:
+    'pbkdf2:100000:00112233445566778899aabbccddeeff:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd',
+};
+const DEMO_ADMIN = {
+  id: demoId('budo', 'user', 'admin'),
+  email: demoEmail('budo', 'admin'),
+  password_hash: 'pbkdf2:100000:demosaltdemosaltdemosaltdemosalt:demokey',
+};
+
+function rowsResult(rows: object[]): WranglerResult {
+  return { status: 0, stdout: JSON.stringify([{ results: rows, success: true }]), stderr: '' };
+}
+
+/** A fake wrangler that answers every query with `result` and records the argv. */
+function fakeWrangler(result: WranglerResult) {
+  const calls: string[][] = [];
+  const run = (argv: string[]) => {
+    calls.push(argv);
+    return result;
+  };
+  return { run, calls };
+}
+
+function args(target: GuardArgs['target']): GuardArgs {
+  return { db: 'budo-db', env: null, target, local: false };
+}
+
+describe('buildDemoMatcher — ids from scripts/demo/ids.mjs, for every label', () => {
+  const matcher = buildDemoMatcher();
+
+  it('covers the demo user ids of every label in config/labels/', () => {
+    const labels = listLabels();
+    expect(labels.length).toBeGreaterThan(0);
+    for (const label of labels) {
+      expect(matcher.demoIds).toEqual(expect.arrayContaining(demoUserIds(label)));
+    }
+  });
+
+  it('fails closed on an empty label list', () => {
+    expect(() => buildDemoMatcher([])).toThrow(/no label/);
+  });
+
+  it('matches a demo row by id alone and by e-mail domain alone', () => {
+    expect(matchesDemoRow({ id: DEMO_ADMIN.id, email: 'renamed@example.com' }, matcher)).toBe(true);
+    expect(matchesDemoRow({ id: REAL_USER.id, email: 'demo.x@newlabel.demo.invalid' }, matcher)).toBe(true);
+    expect(matchesDemoRow({ id: REAL_USER.id, email: 'Demo.X@Budo.DEMO.INVALID' }, matcher)).toBe(true);
+  });
+
+  it('does not match a real user or a dev-seed user', () => {
+    expect(matchesDemoRow(REAL_USER, matcher)).toBe(false);
+    expect(matchesDemoRow(SEED_ADMIN, matcher)).toBe(false);
+    expect(matchesDemoRow({ id: REAL_USER.id, email: 'x@demo.invalid.example.com' }, matcher)).toBe(false);
+  });
+
+  it('builds `id IN (…) OR email LIKE \'%.demo.invalid\'`', () => {
+    const where = buildDemoWhereClause(matcher);
+    expect(where).toMatch(/^id IN \(/);
+    expect(where).toContain(DEMO_ADMIN.id);
+    expect(where).toContain("email LIKE '%.demo.invalid'");
+  });
+});
+
+describe('buildGuardQuery', () => {
+  const seed = buildSeedMatcher(readSeedSqlFiles(SEED_DIR));
+
+  it('is exactly the dev-seed query when no demo matcher is enforced', () => {
+    expect(buildGuardQuery(seed, null)).toBe(
+      `SELECT id, email, password_hash FROM users WHERE ${buildSeedWhereClause(seed)}`,
+    );
+  });
+
+  it('ORs the demo clause into one read-only users query when enforced', () => {
+    const query = buildGuardQuery(seed, buildDemoMatcher());
+    expect(query).toMatch(/^SELECT id, email, password_hash FROM users WHERE \(/);
+    expect(query).toContain("email LIKE '%.demo.invalid'");
+    expect(query).not.toMatch(/\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b/i);
+  });
+});
+
+describe('parseArgs — the target mode', () => {
+  it('defaults to production (fail-safe)', () => {
+    expect(parseArgs(['--db', 'x']).target).toBe('production');
+    expect(parseArgs(['--db', 'x', '--env', 'staging']).target).toBe('production');
+  });
+
+  it('reads --target staging|production', () => {
+    expect(parseArgs(['--target', 'staging']).target).toBe('staging');
+    expect(parseArgs(['--target', 'production', '--local'])).toEqual({
+      db: null, env: null, target: 'production', local: true,
+    });
+  });
+
+  it('rejects an unknown or missing target rather than weakening the guard', () => {
+    expect(() => parseArgs(['--target', 'prod'])).toThrow(/--target/);
+    expect(() => parseArgs(['--target'])).toThrow(/--target/);
+  });
+});
+
+describe('runGuard', () => {
+  it('passes on a fresh database (no users table) in both modes', () => {
+    for (const target of ['production', 'staging'] as const) {
+      const { run } = fakeWrangler({
+        status: 1, stdout: '', stderr: 'no such table: users: SQLITE_ERROR',
+      });
+      const outcome = runGuard(args(target), run);
+      expect(outcome.code).toBe(0);
+      expect(outcome.stdout).toMatch(/no users table yet/);
+    }
+  });
+
+  it('passes on a clean database in both modes', () => {
+    for (const target of ['production', 'staging'] as const) {
+      const outcome = runGuard(args(target), fakeWrangler(rowsResult([REAL_USER])).run);
+      expect(outcome.code).toBe(0);
+    }
+  });
+
+  it('fails on a dev-seed row in both modes, with the unchanged message', () => {
+    for (const target of ['production', 'staging'] as const) {
+      const outcome = runGuard(args(target), fakeWrangler(rowsResult([SEED_ADMIN])).run);
+      expect(outcome.code).toBe(1);
+      expect(outcome.stderr).toContain('BLOCKED — dev-seed password hash found in database "budo-db"');
+      expect(outcome.stderr).toContain('  • admin@arenaquest.dev');
+      expect(outcome.stderr).not.toMatch(/demo accounts/);
+    }
+  });
+
+  it('fails on a demo row for production, listing id and e-mail but never the hash', () => {
+    const outcome = runGuard(args('production'), fakeWrangler(rowsResult([REAL_USER, DEMO_ADMIN])).run);
+    expect(outcome.code).toBe(1);
+    expect(outcome.stderr).toContain('BLOCKED — demo accounts found in production database "budo-db"');
+    expect(outcome.stderr).toContain(`  • ${DEMO_ADMIN.id}  ${DEMO_ADMIN.email}`);
+    expect(outcome.stderr).not.toContain(DEMO_ADMIN.password_hash);
+    expect(outcome.stderr).not.toContain('pbkdf2');
+    expect(outcome.stderr).not.toContain(REAL_USER.email);
+  });
+
+  it('passes on a demo row for staging, whose query does not even ask for demo rows', () => {
+    const { run, calls } = fakeWrangler(rowsResult([DEMO_ADMIN]));
+    const outcome = runGuard(args('staging'), run);
+    expect(outcome.code).toBe(0);
+    expect(calls[0].join(' ')).not.toContain('demo.invalid');
+  });
+
+  it('reports both matchers when production holds dev-seed and demo rows', () => {
+    const outcome = runGuard(args('production'), fakeWrangler(rowsResult([SEED_ADMIN, DEMO_ADMIN])).run);
+    expect(outcome.code).toBe(1);
+    expect(outcome.stderr).toContain('dev-seed password hash found');
+    expect(outcome.stderr).toContain('demo accounts found');
+  });
+
+  it('runs exactly one read-only query, local/remote and --env as before', () => {
+    const { run, calls } = fakeWrangler(rowsResult([]));
+    runGuard({ db: 'budo-db-staging', env: 'budo-staging', target: 'production', local: true }, run);
+    expect(calls).toHaveLength(1);
+    const argv = calls[0];
+    expect(argv.slice(0, 7)).toEqual(['exec', 'wrangler', 'd1', 'execute', 'budo-db-staging', '--local', '--json']);
+    expect(argv.slice(-2)).toEqual(['--env', 'budo-staging']);
+    expect(argv[argv.indexOf('--command') + 1]).toMatch(/^SELECT id, email, password_hash FROM users WHERE/);
+  });
+
+  it('exits 2 on an unexpected wrangler failure, surfacing its output', () => {
+    const outcome = runGuard(args('production'), fakeWrangler({ status: 1, stdout: '', stderr: 'Authentication failed' }).run);
+    expect(outcome.code).toBe(2);
+    expect(outcome.stderr).toContain('Authentication failed');
   });
 });

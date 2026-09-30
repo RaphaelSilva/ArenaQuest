@@ -1,21 +1,34 @@
 /**
  * check-no-dev-seed.ts
  *
- * Pre-deploy guard: fails loudly (exit 1) if the known dev-seed password hash
- * is present in the target database. Run this before every production or
- * staging deploy.
+ * Pre-deploy guard: fails loudly (exit 1) if the target database holds
+ * accounts that must never be released. Run this before every production or
+ * staging deploy. Two matchers:
+ *
+ *   • dev seed — the `seed-` rows parsed from migrations/seed/*.sql (by id or
+ *     password-hash prefix). Enforced for every target.
+ *   • demo    — the demo user ids of EVERY label in config/labels/, derived by
+ *     scripts/demo/ids.mjs, plus any e-mail in a `*.demo.invalid` domain
+ *     (RFC 0021 §3.6). Enforced for production targets only: staging is
+ *     allowed to carry the demo.
  *
  * Usage:
- *   tsx scripts/check-no-dev-seed.ts --db <database-name> [--env staging] [--local]
+ *   tsx scripts/check-no-dev-seed.ts --db <database-name> [--env <wrangler-env>]
+ *       [--target production|staging] [--local]
  *
  * Flags:
- *   --db <name>    D1 database name (e.g. arenaquest-db, arenaquest-db-staging)
- *   --env <name>   Wrangler environment (e.g. staging). Omit for production.
- *   --local        Query the local D1 replica instead of the remote database.
+ *   --db <name>       D1 database name (e.g. arenaquest-db, arenaquest-db-staging)
+ *   --env <name>      Wrangler environment (e.g. staging). Omit for production.
+ *   --target <name>   Deploy target: `production` (default — fail-safe) or
+ *                     `staging`. Selects whether the demo matcher is enforced.
+ *                     Passed by scripts/cloudflare/deploy.mjs; it is never
+ *                     inferred from the database or wrangler env name.
+ *   --local           Query the local D1 replica instead of the remote database.
  *
  * Exit codes:
- *   0  No dev hash found — safe to deploy.
- *   1  Dev hash found — abort deploy; listed emails are printed to stderr.
+ *   0  Nothing found — safe to deploy.
+ *   1  Dev-seed or (production) demo accounts found — abort deploy; the
+ *      matched accounts are printed to stderr by id and e-mail.
  *   2  Usage error or unexpected wrangler failure.
  */
 
@@ -23,6 +36,14 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+// The one source of demo identities (RFC 0021 §3.1) — never a local list.
+import {
+  DEMO_EMAIL_DOMAIN_SUFFIX,
+  demoUserIds,
+  isDemoEmail,
+  listLabels,
+} from '../../../scripts/demo/ids.mjs';
 
 /** A newly provisioned D1 has no schema yet; migrations will create it. */
 export function isFreshDatabaseError(output: string): boolean {
@@ -192,16 +213,78 @@ export function buildSeedWhereClause(matcher: SeedMatcher): string {
 }
 
 // ---------------------------------------------------------------------------
+// Demo matcher — RFC 0021 §3.6. The ids come from scripts/demo/ids.mjs for
+// every label in config/labels/, so a label added later is covered without
+// touching this file; the e-mail domain catches a demo row whatever its id.
+// ---------------------------------------------------------------------------
+
+export type GuardTarget = 'production' | 'staging';
+
+export const GUARD_TARGETS: readonly GuardTarget[] = ['production', 'staging'];
+
+export interface DemoMatcher {
+  demoIds: string[];
+  emailSuffix: string;
+}
+
+/** Builds the demo matcher from the given labels (default: every label in
+ * config/labels/). Fails closed: throws on an empty label list. */
+export function buildDemoMatcher(labels: string[] = listLabels()): DemoMatcher {
+  if (labels.length === 0) {
+    throw new Error('no label found in config/labels/ — cannot derive the demo user ids');
+  }
+  const demoIds = new Set<string>();
+  for (const label of labels) {
+    for (const id of demoUserIds(label)) demoIds.add(id);
+  }
+  return { demoIds: [...demoIds], emailSuffix: DEMO_EMAIL_DOMAIN_SUFFIX };
+}
+
+/** True if a users row is a demo account — by derived id or by e-mail domain. */
+export function matchesDemoRow(
+  row: { id: string; email: string },
+  matcher: DemoMatcher,
+): boolean {
+  return matcher.demoIds.includes(row.id) || isDemoEmail(row.email);
+}
+
+/** `id IN (<demo ids>) OR email LIKE '%.demo.invalid'`. */
+export function buildDemoWhereClause(matcher: DemoMatcher): string {
+  const clauses: string[] = [];
+  if (matcher.demoIds.length > 0) {
+    clauses.push(`id IN (${matcher.demoIds.map(sqlQuote).join(', ')})`);
+  }
+  clauses.push(`email LIKE ${sqlQuote(`%${matcher.emailSuffix}`)}`);
+  return clauses.join(' OR ');
+}
+
+/** The single read-only query the guard runs. With no demo matcher (staging)
+ * it is exactly the dev-seed query; with one (production) the demo clause is
+ * OR-ed in so both matchers are served by one round trip. */
+export function buildGuardQuery(seed: SeedMatcher, demo: DemoMatcher | null): string {
+  const seedWhere = buildSeedWhereClause(seed);
+  const where = demo ? `(${seedWhere}) OR (${buildDemoWhereClause(demo)})` : seedWhere;
+  return `SELECT id, email, password_hash FROM users WHERE ${where}`;
+}
+
+// ---------------------------------------------------------------------------
 // Argument parsing (no external deps)
 // ---------------------------------------------------------------------------
 
-function parseArgs(argv: string[]): {
+export interface GuardArgs {
   db: string | null;
   env: string | null;
+  target: GuardTarget;
   local: boolean;
-} {
+}
+
+/** Parses the CLI flags. `--target` defaults to `production` (fail-safe: an
+ * invocation that does not say otherwise gets the strictest check); an unknown
+ * value throws rather than silently weakening the guard. */
+export function parseArgs(argv: string[]): GuardArgs {
   let db: string | null = null;
   let env: string | null = null;
+  let target: GuardTarget = 'production';
   let local = false;
 
   for (let i = 0; i < argv.length; i++) {
@@ -209,69 +292,103 @@ function parseArgs(argv: string[]): {
       db = argv[++i];
     } else if (argv[i] === '--env' && argv[i + 1]) {
       env = argv[++i];
+    } else if (argv[i] === '--target') {
+      const value = argv[++i];
+      if (!GUARD_TARGETS.includes(value as GuardTarget)) {
+        throw new Error(`--target must be one of ${GUARD_TARGETS.join(', ')} (got "${value ?? ''}")`);
+      }
+      target = value as GuardTarget;
     } else if (argv[i] === '--local') {
       local = true;
     }
   }
 
-  return { db, env, local };
+  return { db, env, target, local };
 }
 
 // ---------------------------------------------------------------------------
-// Main
+// Guard run — pure over an injected wrangler runner, so every outcome is unit
+// testable without wrangler.
 // ---------------------------------------------------------------------------
 
-function main() {
-  const args = parseArgs(process.argv.slice(2));
+export interface WranglerResult {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+  error?: Error;
+}
 
-  if (!args.db) {
-    // Default DB names match wrangler.jsonc bindings.
-    args.db = args.env === 'staging' ? 'arenaquest-db-staging' : 'arenaquest-db';
-  }
+export type WranglerRunner = (wranglerArgs: string[]) => WranglerResult;
 
-  let matcher: SeedMatcher;
+export interface GuardOutcome {
+  code: 0 | 1 | 2;
+  stdout: string;
+  stderr: string;
+}
+
+type UserRow = { id: string; email: string; password_hash: string };
+
+function listAccounts(rows: UserRow[]): string {
+  return rows.map((r) => `  • ${r.id}  ${r.email}`).join('\n');
+}
+
+export function runGuard(
+  args: GuardArgs,
+  run: WranglerRunner,
+  matchers: { seed?: SeedMatcher; demo?: DemoMatcher } = {},
+): GuardOutcome {
+  const db = args.db ?? (args.env === 'staging' ? 'arenaquest-db-staging' : 'arenaquest-db');
+  const enforceDemo = args.target === 'production';
+
+  let seed: SeedMatcher;
   try {
-    matcher = buildSeedMatcher(readSeedSqlFiles());
+    seed = matchers.seed ?? buildSeedMatcher(readSeedSqlFiles());
   } catch (err) {
-    process.stderr.write(
-      `[check-no-dev-seed] failed to build the seed matcher from migrations/seed/*.sql: ${(err as Error).message}\n`,
-    );
-    process.exit(2);
+    return {
+      code: 2,
+      stdout: '',
+      stderr: `[check-no-dev-seed] failed to build the seed matcher from migrations/seed/*.sql: ${(err as Error).message}\n`,
+    };
   }
 
-  if (matcher.seedIds.length === 0 && matcher.hashPrefixes.length === 0) {
-    process.stderr.write(
-      '[check-no-dev-seed] no seed matcher could be derived from migrations/seed/*.sql — refusing to report OK on an empty matcher.\n',
-    );
-    process.exit(2);
+  if (seed.seedIds.length === 0 && seed.hashPrefixes.length === 0) {
+    return {
+      code: 2,
+      stdout: '',
+      stderr: '[check-no-dev-seed] no seed matcher could be derived from migrations/seed/*.sql — refusing to report OK on an empty matcher.\n',
+    };
   }
 
-  const query = `SELECT id, email, password_hash FROM users WHERE ${buildSeedWhereClause(matcher)}`;
+  let demo: DemoMatcher | null = null;
+  if (enforceDemo) {
+    try {
+      demo = matchers.demo ?? buildDemoMatcher();
+    } catch (err) {
+      return {
+        code: 2,
+        stdout: '',
+        stderr: `[check-no-dev-seed] failed to build the demo matcher from scripts/demo/ids.mjs: ${(err as Error).message}\n`,
+      };
+    }
+  }
+
+  const mode =
+    `[check-no-dev-seed] target: ${args.target} — dev-seed matcher` +
+    (enforceDemo ? ' + demo matcher (RFC 0021 §3.6)' : ' only (staging may hold the demo)') +
+    '.\n';
 
   // Build the wrangler argument list directly (avoids shell quoting issues
   // and lets spawnSync pipe stdout/stderr independently).
   const wranglerArgs = [
     'exec', 'wrangler', 'd1', 'execute',
-    args.db,
+    db,
     args.local ? '--local' : '--remote',
     '--json',
-    '--command', query,
+    '--command', buildGuardQuery(seed, demo),
     ...(args.env ? ['--env', args.env] : []),
   ];
 
-  const wranglerEnv = { ...process.env };
-  if (wranglerEnv.CF_ACCOUNT_ID && !wranglerEnv.CLOUDFLARE_ACCOUNT_ID) {
-    wranglerEnv.CLOUDFLARE_ACCOUNT_ID = wranglerEnv.CF_ACCOUNT_ID;
-  }
-  if (wranglerEnv.CF_API_TOKEN && !wranglerEnv.CLOUDFLARE_API_TOKEN) {
-    wranglerEnv.CLOUDFLARE_API_TOKEN = wranglerEnv.CF_API_TOKEN;
-  }
-
-  const result = spawnSync('pnpm', wranglerArgs, {
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: wranglerEnv,
-  });
+  const result = run(wranglerArgs);
 
   // Surface the real wrangler error (auth, unknown DB, network, etc.)
   // before printing our own message.
@@ -281,55 +398,110 @@ function main() {
       .filter(Boolean)
       .join('\n');
     if (isFreshDatabaseError(wranglerOutput)) {
-      process.stdout.write(
-        `[check-no-dev-seed] OK — database "${args.db}" has no users table yet; migrations will initialize it.\n`,
-      );
-      process.exit(0);
+      return {
+        code: 0,
+        stdout: mode + `[check-no-dev-seed] OK — database "${db}" has no users table yet; migrations will initialize it.\n`,
+        stderr: '',
+      };
     }
-    if (wranglerOutput) {
-      process.stderr.write(`${wranglerOutput}\n`);
-    }
-    process.stderr.write(
-      `[check-no-dev-seed] wrangler failed (exit ${result.status ?? 'null'}) for database "${args.db}".\n` +
-      `Hints:\n` +
-      `  • \`wrangler whoami\`           — verify Cloudflare authentication\n` +
-      `  • \`make db-migrate-staging\`   — apply migrations to remote staging DB\n` +
-      `  • \`wrangler d1 migrations apply ${args.db} --remote\` — apply migrations manually\n`,
-    );
-    process.exit(2);
+    return {
+      code: 2,
+      stdout: mode,
+      stderr:
+        (wranglerOutput ? `${wranglerOutput}\n` : '') +
+        `[check-no-dev-seed] wrangler failed (exit ${result.status ?? 'null'}) for database "${db}".\n` +
+        `Hints:\n` +
+        `  • \`wrangler whoami\`           — verify Cloudflare authentication\n` +
+        `  • \`make db-migrate-staging\`   — apply migrations to remote staging DB\n` +
+        `  • \`wrangler d1 migrations apply ${db} --remote\` — apply migrations manually\n`,
+    };
   }
 
-  let rows: Array<{ email: string }>;
+  let candidates: UserRow[];
   try {
     // wrangler --json returns an array of result sets; each has a `results` array.
-    type Row = { id: string; email: string; password_hash: string };
-    const parsed = JSON.parse(result.stdout) as Array<{ results: Array<Row> }>;
-    // Exact match in JS (by seed id or hash prefix) eliminates theoretical
-    // false positives from the intentionally coarse LIKE/IN filter used in
-    // the SQL query.
-    rows = parsed
-      .flatMap(r => r.results ?? [])
-      .filter(r => matchesSeedRow(r, matcher));
+    const parsed = JSON.parse(result.stdout) as Array<{ results: Array<UserRow> }>;
+    candidates = parsed.flatMap(r => r.results ?? []);
   } catch {
-    process.stderr.write(
-      `[check-no-dev-seed] failed to parse wrangler output:\n${result.stdout}\n`,
-    );
+    return {
+      code: 2,
+      stdout: mode,
+      stderr: `[check-no-dev-seed] failed to parse wrangler output:\n${result.stdout}\n`,
+    };
+  }
+
+  // Exact match in JS (by seed id or hash prefix; by demo id or e-mail
+  // domain) eliminates theoretical false positives from the intentionally
+  // coarse LIKE/IN filter used in the SQL query.
+  const seedRows = candidates.filter(r => matchesSeedRow(r, seed));
+  const demoRows = demo
+    ? candidates.filter(r => !matchesSeedRow(r, seed) && matchesDemoRow(r, demo))
+    : [];
+
+  if (seedRows.length === 0 && demoRows.length === 0) {
+    return {
+      code: 0,
+      stdout:
+        mode +
+        '[check-no-dev-seed] OK — no dev-seed hashes found.\n' +
+        (enforceDemo ? '[check-no-dev-seed] OK — no demo accounts found.\n' : ''),
+      stderr: '',
+    };
+  }
+
+  let stderr = '';
+  if (seedRows.length > 0) {
+    const emails = seedRows.map(r => `  • ${r.email}`).join('\n');
+    stderr +=
+      `[check-no-dev-seed] BLOCKED — dev-seed password hash found in database "${db}".\n` +
+      `Affected accounts:\n${emails}\n\n` +
+      `Remove or re-hash these accounts before deploying.\n` +
+      `See docs/product/api/bootstrap-first-admin.md for the correct procedure.\n`;
+  }
+  if (demoRows.length > 0) {
+    stderr +=
+      (stderr ? '\n' : '') +
+      `[check-no-dev-seed] BLOCKED — demo accounts found in production database "${db}".\n` +
+      `Affected accounts (id, e-mail):\n${listAccounts(demoRows)}\n\n` +
+      `The demo dataset belongs on staging only (RFC 0021 §3.6). Remove these accounts\n` +
+      `and their data before releasing to production.\n`;
+  }
+  return { code: 1, stdout: mode, stderr };
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+function main() {
+  let args: GuardArgs;
+  try {
+    args = parseArgs(process.argv.slice(2));
+  } catch (err) {
+    process.stderr.write(`[check-no-dev-seed] ${(err as Error).message}\n`);
     process.exit(2);
   }
 
-  if (rows.length === 0) {
-    process.stdout.write('[check-no-dev-seed] OK — no dev-seed hashes found.\n');
-    process.exit(0);
+  const wranglerEnv = { ...process.env };
+  if (wranglerEnv.CF_ACCOUNT_ID && !wranglerEnv.CLOUDFLARE_ACCOUNT_ID) {
+    wranglerEnv.CLOUDFLARE_ACCOUNT_ID = wranglerEnv.CF_ACCOUNT_ID;
+  }
+  if (wranglerEnv.CF_API_TOKEN && !wranglerEnv.CLOUDFLARE_API_TOKEN) {
+    wranglerEnv.CLOUDFLARE_API_TOKEN = wranglerEnv.CF_API_TOKEN;
   }
 
-  const emails = rows.map(r => `  • ${r.email}`).join('\n');
-  process.stderr.write(
-    `[check-no-dev-seed] BLOCKED — dev-seed password hash found in database "${args.db}".\n` +
-    `Affected accounts:\n${emails}\n\n` +
-    `Remove or re-hash these accounts before deploying.\n` +
-    `See docs/product/api/bootstrap-first-admin.md for the correct procedure.\n`,
-  );
-  process.exit(1);
+  const outcome = runGuard(args, (wranglerArgs) => {
+    const result = spawnSync('pnpm', wranglerArgs, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: wranglerEnv,
+    });
+    return { status: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '', error: result.error };
+  });
+
+  if (outcome.stdout) process.stdout.write(outcome.stdout);
+  if (outcome.stderr) process.stderr.write(outcome.stderr);
+  process.exit(outcome.code);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {

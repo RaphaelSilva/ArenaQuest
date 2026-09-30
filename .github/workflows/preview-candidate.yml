@@ -1,0 +1,71 @@
+name: Preview Candidate
+
+# Candidate previews of staging (RFC 0021 §1). MANUAL ONLY (RFC OQ1): a preview
+# migrates the shared staging D1, so it never runs on push or pull_request.
+# Run it from the candidate branch (e.g. feature/m21/candidate); every leg
+# forwards to the same deploy CLI an operator runs — no wrangler command here.
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: 'Label to preview (all = arenaquest, spaziord, budo)'
+        required: true
+        type: choice
+        default: arenaquest
+        options:
+          - arenaquest
+          - spaziord
+          - budo
+          - all
+      candidate:
+        description: 'Preview name, [a-z0-9-]{1,20} (empty = m<N> from a feature/m<N>/candidate branch)'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    name: Preview ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    strategy:
+      fail-fast: false
+      matrix:
+        label: ${{ fromJSON(inputs.label == 'all' && '["arenaquest","spaziord","budo"]' || format('["{0}"]', inputs.label)) }}
+    # One preview run per label at a time: each migrates that label's staging D1.
+    concurrency:
+      group: preview-candidate-${{ matrix.label }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # The migration lint compares against origin/main; the shallow checkout lacks it.
+      - name: Fetch main for the migration lint
+        run: git fetch --no-tags --depth=1 origin "+refs/heads/main:refs/remotes/origin/main"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy preview
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CANDIDATE: ${{ inputs.candidate }}
+          LABEL: ${{ matrix.label }}
+        run: |
+          node scripts/cloudflare/deploy.mjs --label "$LABEL" -e staging \
+            --preview "$CANDIDATE" --yes --summary-file "$GITHUB_STEP_SUMMARY"

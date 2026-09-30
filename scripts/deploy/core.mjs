@@ -29,6 +29,8 @@ import {
   checkPolicy,
   mapExitCode,
   isActive,
+  derivePreview,
+  PREVIEW_NAME_RE,
 } from '../label.mjs';
 
 const ENVS = ['staging', 'production'];
@@ -42,7 +44,40 @@ const SCOPES = ['api', 'web', 'all'];
  */
 const DEPLOY_BLOCK_ONLY_VARS = new Set(['GOOGLE_CLIENT_ID']);
 
+/** The ref a candidate's new migrations are linted against (RFC 0021 §2.2). */
+export const MIGRATIONS_BASE = 'origin/main';
+
 // ── argument parsing ──────────────────────────────────────────────────────────
+
+/**
+ * The preview name of a candidate branch: `feature/m<N>/candidate` → `m<N>`;
+ * any other branch (or none) → `null`.
+ */
+export function previewNameFromBranch(branch) {
+  const m = /^feature\/m(\d+)\/candidate$/.exec(String(branch ?? '').trim());
+  return m ? `m${m[1]}` : null;
+}
+
+/**
+ * Resolve `--preview <name>`: an empty value takes the default from the current
+ * branch (`feature/m<N>/candidate` → `m<N>`); the result must match
+ * `[a-z0-9-]{1,20}`. Throws with the reason otherwise.
+ */
+export function resolvePreviewName(raw, branch) {
+  let name = String(raw ?? '').trim();
+  if (name === '') {
+    name = previewNameFromBranch(branch);
+    if (!name) {
+      throw new Error(
+        `--preview needs a name: the current branch (${branch || 'unknown'}) is not feature/m<N>/candidate — pass --preview <name>`,
+      );
+    }
+  }
+  if (!PREVIEW_NAME_RE.test(name) || name.startsWith('-') || name.endsWith('-')) {
+    throw new Error(`--preview name "${name}" must match ${PREVIEW_NAME_RE} and not start or end with "-" (e.g. m21)`);
+  }
+  return name;
+}
 
 /**
  * Parse the deploy CLI arguments into a normalised shape.
@@ -55,8 +90,14 @@ const DEPLOY_BLOCK_ONLY_VARS = new Set(['GOOGLE_CLIENT_ID']);
  * the externally-valued secrets legitimately do not exist yet (the provisioner
  * reports them as follow-ups and never writes them — RFC 0012). It must not be
  * used to push past a real gap on an already-provisioned environment.
+ *
+ * Candidate previews (RFC 0021 §1): `--preview <name>` (staging only; an empty
+ * value defaults from `ctx.branch`, see `resolvePreviewName`), `--delete`
+ * (with `--preview`: remove that preview), `--api-url <url>` (required by a
+ * web-only preview — the API preview it points at), `--summary-file <path>`
+ * (append the report as Markdown, e.g. `$GITHUB_STEP_SUMMARY`).
  */
-export function parseArgs(argv) {
+export function parseArgs(argv, ctx = {}) {
   let parsed;
   try {
     parsed = nodeParseArgs({
@@ -68,6 +109,10 @@ export function parseArgs(argv) {
         yes: { type: 'boolean' },
         'dry-run': { type: 'boolean' },
         'skip-secret-check': { type: 'boolean' },
+        preview: { type: 'string' },
+        delete: { type: 'boolean' },
+        'api-url': { type: 'string' },
+        'summary-file': { type: 'string' },
       },
       allowPositionals: false,
     });
@@ -93,6 +138,35 @@ export function parseArgs(argv) {
     throw new Error(`--scope must be one of ${SCOPES.join('|')} (got "${scope}")`);
   }
 
+  const previewMode = values.preview !== undefined;
+  if (!previewMode) {
+    for (const flag of ['delete', 'api-url', 'summary-file']) {
+      if (values[flag] !== undefined) throw new Error(`--${flag} is only valid with --preview <name>`);
+    }
+  }
+  let preview = null;
+  let apiUrl = null;
+  if (previewMode) {
+    // Refused before anything else about the preview is looked at.
+    if (env !== 'staging') {
+      throw new Error('--preview is only valid with -e staging: production never gets a candidate preview (RFC 0021 §1)');
+    }
+    preview = resolvePreviewName(values.preview, ctx.branch);
+    if (values['api-url'] !== undefined) {
+      if (values.delete || scope !== 'web') throw new Error('--api-url is only valid for a web-only preview (--scope web)');
+      let url;
+      try {
+        url = new URL(values['api-url']);
+      } catch {
+        throw new Error(`--api-url must be an https URL (got "${values['api-url']}")`);
+      }
+      if (url.protocol !== 'https:') throw new Error(`--api-url must be an https URL (got "${values['api-url']}")`);
+      apiUrl = url.origin;
+    } else if (scope === 'web' && !values.delete) {
+      throw new Error('a web-only preview (--scope web) needs --api-url <the API preview URL>: nothing captures it without the api steps');
+    }
+  }
+
   return {
     label,
     env,
@@ -100,6 +174,10 @@ export function parseArgs(argv) {
     yes: Boolean(values.yes),
     dryRun: Boolean(values['dry-run']),
     skipSecretCheck: Boolean(values['skip-secret-check']),
+    preview,
+    delete: Boolean(values.delete),
+    apiUrl,
+    summaryFile: values['summary-file'] ?? null,
   };
 }
 
@@ -145,7 +223,7 @@ export function resolve(profile, env) {
  * false pass. `opts.label` is used only to render the fix command.
  */
 export function preflight(schema, resolved, expected, env, opts = {}) {
-  const { secretNames = null, label = '' } = opts;
+  const { secretNames = null, label = '', previewSecrets = false } = opts;
   const results = [];
 
   // presence — build section (brand tokens + NEXT_PUBLIC_API_URL)
@@ -163,8 +241,10 @@ export function preflight(schema, resolved, expected, env, opts = {}) {
 
   // presence — api-secrets by NAME only (values are never read, compared or
   // logged; the sole source of truth is the cloud's own secret store).
+  // A candidate preview reads none of the Worker's secrets: its deployment
+  // carries its own (see previewSecretSpec), so there is nothing to check here.
   for (const [key, spec] of Object.entries(schema['api-secrets'] ?? {})) {
-    if (!isActive(spec, resolved)) continue;
+    if (previewSecrets || !isActive(spec, resolved)) continue;
     if (secretNames === null) {
       results.push({
         status: 'skip',
@@ -212,6 +292,40 @@ export function preflight(schema, resolved, expected, env, opts = {}) {
 }
 
 // ── provider-neutral plan builder ─────────────────────────────────────────────
+
+/**
+ * The secrets a candidate preview's deployment carries.
+ *
+ * A Workers Preview deployment holds only the bindings uploaded with it: it
+ * reads none of the staging Worker's secrets, and (wrangler 4.144) neither the
+ * Preview base config's nor a previous preview deployment's. So every
+ * `wrangler preview` gets a `--secrets-file`, rebuilt each run:
+ *   - `generated` — minted fresh per run (a preview signs its own tokens, so a
+ *     staging token never verifies on it — and a redeploy logs everyone out);
+ *   - `external`  — values that come from outside, taken from the operator's
+ *     `AQ_PREVIEW_<NAME>` env var when set; absent ones only switch off what
+ *     `PREVIEW_SECRET_IMPACT` names — the preview still boots and email/password
+ *     login still works.
+ */
+export const PREVIEW_GENERATED_SECRETS = ['JWT_SECRET'];
+export const PREVIEW_SECRET_ENV_PREFIX = 'AQ_PREVIEW_';
+export const PREVIEW_SECRET_IMPACT = {
+  R2_ACCESS_KEY_ID: 'media presigned uploads/downloads are off',
+  R2_SECRET_ACCESS_KEY: 'media presigned uploads/downloads are off',
+  GOOGLE_CLIENT_SECRET: 'Google sign-in is off',
+  RESEND_API_KEY: 'email is not sent',
+};
+
+/** `{ generated, external }` secret names for a preview of these resolved values. */
+export function previewSecretSpec(schema, resolved) {
+  const active = Object.entries(schema['api-secrets'] ?? {})
+    .filter(([, spec]) => isActive(spec, resolved))
+    .map(([key]) => key);
+  return {
+    generated: PREVIEW_GENERATED_SECRETS.filter((k) => active.includes(k)),
+    external: active.filter((k) => !PREVIEW_GENERATED_SECRETS.includes(k)),
+  };
+}
 
 /**
  * The deploy-target env name, by the same convention `label scaffold` writes:
@@ -273,6 +387,140 @@ export function buildPlan({ label, env, scope, resolved, envConfig }) {
     });
   }
 
+  return steps;
+}
+
+/**
+ * Build the PROVIDER-NEUTRAL plan of a candidate preview of staging
+ * (RFC 0021 §1). Step kinds, in order:
+ *
+ *   lint-migrations → build-shared → bookmark → migrate → deploy-worker-preview
+ *     → build-web → deploy-pages-branch → report
+ *
+ * `lint-migrations` is first so a destructive migration stops the run before
+ * the bookmark and the migrate touch the shared staging D1. `--scope api` keeps
+ * the lint/bookmark/migrate/worker steps, `--scope web` the web steps (with the
+ * API URL supplied up front); `report` always closes the plan. The live staging
+ * Worker and the Pages production branch are never a target: the worker step
+ * creates a named preview, the pages step deploys a named branch.
+ *
+ * `build-web` carries `apiUrlFrom: 'deploy-worker-preview'` when the API URL is
+ * only known once that step has run; the adapter fills it in.
+ * `deploy-worker-preview` carries `secrets` (see previewSecretSpec): NAMES only —
+ * the adapter writes the values to a secrets file for that one command.
+ */
+export function buildPreviewPlan({
+  label, scope, resolved, envConfig, preview, apiUrl = null, commitSha = '',
+  secrets = { generated: PREVIEW_GENERATED_SECRETS, external: [] },
+}) {
+  const wranglerEnv = targetEnvName(label, 'staging');
+  const wantApi = scope === 'api' || scope === 'all';
+  const wantWeb = scope === 'web' || scope === 'all';
+  const name = preview.name;
+
+  const steps = [];
+  if (wantApi) {
+    steps.push({
+      id: 'lint-migrations',
+      title: `Lint new migrations against ${MIGRATIONS_BASE} (frozen + additive)`,
+      kind: 'lint-migrations',
+      base: MIGRATIONS_BASE,
+    });
+  }
+  steps.push({ id: 'build-shared', title: 'Build shared package', kind: 'build-shared' });
+
+  if (wantApi) {
+    steps.push({
+      id: 'bookmark',
+      title: `Record the database bookmark (${envConfig.d1.name})`,
+      kind: 'bookmark',
+      d1Name: envConfig.d1.name,
+      wranglerEnv,
+    });
+    steps.push({
+      id: 'migrate',
+      title: `Apply database migrations (${envConfig.d1.name})`,
+      kind: 'migrate',
+      d1Name: envConfig.d1.name,
+      wranglerEnv,
+    });
+    steps.push({
+      id: 'deploy-worker-preview',
+      title: `Deploy API preview "${name}" (${envConfig.worker})`,
+      kind: 'deploy-worker-preview',
+      wranglerEnv,
+      previewName: name,
+      message: commitSha,
+      secrets,
+    });
+  }
+
+  if (wantWeb) {
+    const brandVars = {};
+    for (const [k, v] of Object.entries(resolved)) {
+      if (k.startsWith('NEXT_PUBLIC_')) brandVars[k] = v;
+    }
+    brandVars.NEXT_PUBLIC_API_URL = apiUrl;
+    brandVars.NEXT_PUBLIC_SITE_URL = preview.siteUrl;
+    brandVars.NEXT_PUBLIC_PREVIEW_NAME = name;
+    brandVars.NEXT_PUBLIC_PREVIEW_SHA = commitSha;
+    steps.push({
+      id: 'build-web',
+      title: `Build web for preview "${name}" (brand-parametrised)`,
+      kind: 'build-web',
+      brandVars,
+      apiUrlFrom: apiUrl ? null : 'deploy-worker-preview',
+    });
+    steps.push({
+      id: 'deploy-pages-branch',
+      title: `Deploy web preview branch "${name}" (${envConfig.pagesProject})`,
+      kind: 'deploy-pages-branch',
+      pagesProject: envConfig.pagesProject,
+      branch: name,
+    });
+  }
+
+  steps.push({
+    id: 'report',
+    title: `Report preview "${name}"`,
+    kind: 'report',
+    label,
+    previewName: name,
+    webUrl: wantWeb ? preview.webUrl : null,
+    apiUrl,
+    apiUrlFrom: wantApi ? 'deploy-worker-preview' : null,
+    bookmarkFrom: wantApi ? 'bookmark' : null,
+    d1Name: envConfig.d1.name,
+    wranglerEnv,
+  });
+  return steps;
+}
+
+/**
+ * The neutral plan that removes a candidate preview: the Worker preview
+ * (`--scope api|all`) and every deployment of the Pages branch (`web|all`).
+ */
+export function buildPreviewDeletePlan({ label, scope, envConfig, preview }) {
+  const wranglerEnv = targetEnvName(label, 'staging');
+  const steps = [];
+  if (scope === 'api' || scope === 'all') {
+    steps.push({
+      id: 'delete-worker-preview',
+      title: `Delete API preview "${preview.name}" (${envConfig.worker})`,
+      kind: 'delete-worker-preview',
+      wranglerEnv,
+      previewName: preview.name,
+    });
+  }
+  if (scope === 'web' || scope === 'all') {
+    steps.push({
+      id: 'delete-pages-branch',
+      title: `Delete web preview branch "${preview.name}" deployments (${envConfig.pagesProject})`,
+      kind: 'delete-pages-branch',
+      pagesProject: envConfig.pagesProject,
+      branch: preview.name,
+    });
+  }
   return steps;
 }
 
@@ -342,15 +590,28 @@ export async function confirmProduction({ env, label, yes, promptFn, isTTY } = {
  * import wrangler or spawn anything), so listing secrets is a capability handed
  * IN rather than reached for. Absent or failing → secrets go unverified (`skip`),
  * which never blocks a deploy on its own.
+ *
+ * `opts.branch` (the current git branch, for the `--preview` default) and
+ * `opts.commitSha` (the short sha a preview is labelled with) are facts the
+ * adapter reads from the checkout and hands in, like `fetchSecretNames`.
+ * A preview name, a production refusal or an uncovered preview origin throws
+ * here — before any plan exists, so before any step can run.
  */
 export function run(argv, opts = {}) {
-  const args = parseArgs(argv);
+  const args = parseArgs(argv, { branch: opts.branch });
   const profile = loadProfile(args.label);
   const { expected, resolved, envConfig } = resolve(profile, args.env);
+  const preview = args.preview ? derivePreview(profile, args.preview) : null;
+
+  if (preview && args.delete) {
+    const plan = buildPreviewDeletePlan({ label: args.label, scope: args.scope, envConfig, preview });
+    return { ok: true, args, preflight: null, plan, resolved, envConfig, preview };
+  }
+
   const schema = loadSchema();
 
   let secretNames = null;
-  if (typeof opts.fetchSecretNames === 'function') {
+  if (!preview && typeof opts.fetchSecretNames === 'function') {
     const listed = opts.fetchSecretNames(args.label, args.env);
     if (listed?.ok) secretNames = listed.names;
   }
@@ -358,17 +619,29 @@ export function run(argv, opts = {}) {
   const pf = preflight(schema, resolved, expected, args.env, {
     secretNames,
     label: args.label,
+    previewSecrets: Boolean(preview),
   });
   if (pf.exitCode === 1) {
     return { ok: false, args, preflight: pf, resolved, envConfig };
   }
 
-  const plan = buildPlan({
-    label: args.label,
-    env: args.env,
-    scope: args.scope,
-    resolved,
-    envConfig,
-  });
-  return { ok: true, args, preflight: pf, plan, resolved, envConfig };
+  const plan = preview
+    ? buildPreviewPlan({
+        label: args.label,
+        scope: args.scope,
+        resolved,
+        envConfig,
+        preview,
+        apiUrl: args.apiUrl,
+        commitSha: opts.commitSha ?? '',
+        secrets: previewSecretSpec(schema, resolved),
+      })
+    : buildPlan({
+        label: args.label,
+        env: args.env,
+        scope: args.scope,
+        resolved,
+        envConfig,
+      });
+  return { ok: true, args, preflight: pf, plan, resolved, envConfig, preview };
 }

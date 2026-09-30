@@ -33,14 +33,14 @@ export interface R2StorageAdapterConfig {
 
 export class R2StorageAdapter implements IStorageAdapter {
   private readonly bucket: R2Bucket;
-  private readonly s3: S3Client;
   private readonly bucketName: string;
   private readonly publicBase: string | undefined;
+  private readonly s3Endpoint: string;
+  private readonly accessKeyId: string;
+  private readonly secretAccessKey: string;
+  private s3Client: S3Client | null = null;
 
   constructor(config: R2StorageAdapterConfig) {
-    if (!config.accessKeyId || !config.secretAccessKey) {
-      throw new Error('R2StorageAdapter: accessKeyId and secretAccessKey are required');
-    }
     if (!config.s3Endpoint) {
       throw new Error('R2StorageAdapter: s3Endpoint is required');
     }
@@ -48,16 +48,33 @@ export class R2StorageAdapter implements IStorageAdapter {
     this.bucket = config.bucket;
     this.bucketName = config.bucketName;
     this.publicBase = config.publicBase || undefined;
+    this.s3Endpoint = config.s3Endpoint;
+    this.accessKeyId = config.accessKeyId;
+    this.secretAccessKey = config.secretAccessKey;
+  }
 
-    this.s3 = new S3Client({
-      region: 'auto',
-      endpoint: config.s3Endpoint,
-      forcePathStyle: true,
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      },
-    });
+  /**
+   * The S3 client, built on first use. The credentials are checked here rather
+   * than in the constructor: the container builds this adapter on every
+   * request, so an eager throw took down every route (login included) on a
+   * Worker missing them, while only the S3 calls below actually need them.
+   */
+  private get s3(): S3Client {
+    if (!this.s3Client) {
+      if (!this.accessKeyId || !this.secretAccessKey) {
+        throw new Error('R2StorageAdapter: accessKeyId and secretAccessKey are required');
+      }
+      this.s3Client = new S3Client({
+        region: 'auto',
+        endpoint: this.s3Endpoint,
+        forcePathStyle: true,
+        credentials: {
+          accessKeyId: this.accessKeyId,
+          secretAccessKey: this.secretAccessKey,
+        },
+      });
+    }
+    return this.s3Client;
   }
 
   async putObject(

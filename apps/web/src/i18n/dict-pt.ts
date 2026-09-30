@@ -2250,4 +2250,8 @@ export const dictPt = {
     forbidden: 'Você não tem permissão para acessar este recurso.',
     somethingWentWrong: 'Algo deu errado. Tente novamente.',
   },
+  previewBanner: {
+    label: (name: string, sha?: string) => (sha ? `Prévia ${name} · ${sha}` : `Prévia ${name}`),
+    sharedData: 'Dados de demonstração compartilhados do staging',
+  },
 } as const;
