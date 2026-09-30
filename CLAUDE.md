@@ -277,6 +277,19 @@ RFC 0021's counts, the media objects' SHA-256, the student XP/badges and
 `user_xp` = ledger — offline, with media from `scripts/demo/fixtures/` and a
 generated password — so a migration that breaks the demo fails its PR.
 
+**Recovering staging (disposable staging, RFC 0021 §4):**
+```bash
+AQ_DEMO_PASSWORD=… make db-reset-staging LABEL=budo     # prompts (types the DB name); CONFIRM=1 skips, DRY_RUN=1 plans only
+```
+`scripts/db/reset-remote.mjs` runs, in a fixed order: a D1 Time Travel bookmark
+(the printed `wrangler d1 time-travel restore <db> --bookmark=… --env <label>-staging`
+undoes the reset; no bookmark → nothing is dropped) → drop every table/view except
+`sqlite_*`/`_cf_*`, `d1_migrations` included, with `PRAGMA defer_foreign_keys = on`
+→ `d1 migrations apply --remote` from the checkout → the demo seed CLI with `--yes`.
+The D1 is emptied in place (same `database_id`); the bucket is not emptied. It
+refuses `-e production`, `-e local` and any production-named D1/bucket through the
+seed's own `resolveTarget`, before any wrangler call; there is no `-prod` target.
+
 Renamed targets (`db-migrations-dev` → `db-migrate-local`, `db-seed-dev` →
 `db-seed-local`, `create-db` → `create-db-prod`, ...) still work as deprecated
 aliases that print a pointer. Use the new names.
