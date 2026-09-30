@@ -8,6 +8,7 @@ import { useHasRole } from '@web/hooks/use-auth';
 import { useApiClient } from '@web/context/auth-context';
 import { ResetPasswordModal } from '@web/components/admin/ResetPasswordModal';
 import { Spinner } from '@web/components/spinner';
+import { StaffUserNotesSection } from '@web/components/catalog/notes/StaffUserNotesSection';
 import { useDict } from '@web/context/dict-context';
 import type { Entities } from '@arenaquest/shared/types/entities';
 
@@ -109,6 +110,8 @@ export default function AdminUserDetailPage({ params }: Props) {
           </div>
         </dl>
       )}
+
+      {user && <StaffUserNotesSection userId={userId} />}
 
       {showResetModal && user && (
         <ResetPasswordModal

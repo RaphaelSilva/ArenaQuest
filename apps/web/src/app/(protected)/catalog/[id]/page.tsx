@@ -17,6 +17,7 @@ import { CatalogBreadcrumb } from '@web/components/catalog/CatalogBreadcrumb';
 import { useDict } from '@web/context/dict-context';
 import { MainPaneSkeleton } from '@web/components/catalog/MainPaneSkeleton';
 import { Discussion } from '@web/components/catalog/Discussion';
+import { NotesPanel } from '@web/components/catalog/notes/NotesPanel';
 
 type CatalogTopicPageProps = {
   params: Promise<{ id: string }>;
@@ -167,6 +168,11 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
       {/* Discussion Section */}
       {topic.parentId !== null && (
         <Discussion topicId={id} />
+      )}
+
+      {/* Notes Section */}
+      {topic.parentId !== null && (
+        <NotesPanel topicId={id} />
       )}
 
       {/* Subtopics */}

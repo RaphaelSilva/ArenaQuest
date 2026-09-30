@@ -15,6 +15,1366 @@
         ],
         "type": "object"
       },
+      "AdminEvent": {
+        "properties": {
+          "audience": {
+            "enum": [
+              "public",
+              "members",
+              "restricted"
+            ],
+            "type": "string"
+          },
+          "audienceGrants": {
+            "$ref": "#/components/schemas/EventAudienceGrants"
+          },
+          "contactLabel": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "endsAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "flyer": {
+            "properties": {
+              "key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sizeBytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "none",
+                  "pending",
+                  "ready"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "key",
+              "type",
+              "sizeBytes",
+              "name"
+            ],
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "whatsappMessage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "whatsappNumber": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "summary",
+          "content",
+          "location",
+          "startsAt",
+          "endsAt",
+          "timezone",
+          "status",
+          "audience",
+          "flyer",
+          "whatsappNumber",
+          "whatsappMessage",
+          "contactLabel",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "AmendContractBody": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "cycle": {
+            "enum": [
+              "monthly",
+              "quarterly",
+              "yearly"
+            ],
+            "example": "monthly",
+            "type": "string"
+          },
+          "dueDay": {
+            "maximum": 28,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "graceDays": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "startDate": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "termsNote": {
+            "example": "Scholarship agreed for 2026.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "termsSource": {
+            "enum": [
+              "standard",
+              "negotiated"
+            ],
+            "example": "standard",
+            "type": "string"
+          }
+        },
+        "required": [
+          "startDate",
+          "termsNote"
+        ],
+        "type": "object"
+      },
+      "ApplyAdjustmentBody": {
+        "properties": {
+          "amountMinor": {
+            "example": -5000,
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "discount",
+              "credit",
+              "waiver",
+              "surcharge"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "amountMinor",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "AuthoredNote": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Note"
+          },
+          {
+            "properties": {
+              "topicAccessible": {
+                "description": "False when the caller can no longer read the topic; the note is then read-only (delete allowed)",
+                "example": true,
+                "type": "boolean"
+              },
+              "topicTitle": {
+                "example": "Intro to Algebra",
+                "type": "string"
+              }
+            },
+            "required": [
+              "topicTitle",
+              "topicAccessible"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "AuthoredNotePage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AuthoredNote"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "description": "Opaque cursor of the next page; null on the last page",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "BillingAgingBucket": {
+        "properties": {
+          "bucket": {
+            "enum": [
+              "0-30",
+              "31-60",
+              "61-90",
+              "90+"
+            ],
+            "type": "string"
+          },
+          "fromDaysPastDue": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "invoiceCount": {
+            "type": "integer"
+          },
+          "studentCount": {
+            "type": "integer"
+          },
+          "toDaysPastDue": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "totalMinor": {
+            "example": 15000,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bucket",
+          "fromDaysPastDue",
+          "toDaysPastDue",
+          "invoiceCount",
+          "studentCount",
+          "totalMinor"
+        ],
+        "type": "object"
+      },
+      "BillingAgingReport": {
+        "properties": {
+          "asOf": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/BillingAgingBucket"
+            },
+            "type": "array"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/BillingReportCurrency"
+          },
+          "invoiceCount": {
+            "type": "integer"
+          },
+          "studentCount": {
+            "type": "integer"
+          },
+          "totalMinor": {
+            "example": 15000,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "asOf",
+          "currency",
+          "buckets",
+          "totalMinor",
+          "invoiceCount",
+          "studentCount"
+        ],
+        "type": "object"
+      },
+      "BillingInvoice": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "dueDate": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "graceDays": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "issuedAt": {
+            "type": "string"
+          },
+          "periodEnd": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "periodStart": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "paid",
+              "void"
+            ],
+            "type": "string"
+          },
+          "subscriptionId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "voidReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "voidedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "subscriptionId",
+          "userId",
+          "periodStart",
+          "periodEnd",
+          "dueDate",
+          "amountMinor",
+          "currency",
+          "graceDays",
+          "status",
+          "issuedAt",
+          "voidedAt",
+          "voidReason"
+        ],
+        "type": "object"
+      },
+      "BillingInvoiceAdjustment": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "appliedAt": {
+            "type": "string"
+          },
+          "appliedBy": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "discount",
+              "credit",
+              "waiver",
+              "surcharge"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "invoiceId",
+          "kind",
+          "amountMinor",
+          "reason",
+          "appliedBy",
+          "appliedAt"
+        ],
+        "type": "object"
+      },
+      "BillingInvoiceWithBalance": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BillingInvoice"
+          },
+          {
+            "properties": {
+              "balanceMinor": {
+                "example": 15000,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "balanceMinor"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "BillingMovementReport": {
+        "properties": {
+          "activeStudents": {
+            "type": "integer"
+          },
+          "adjustmentsMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "billedMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/BillingReportCurrency"
+          },
+          "invoicedMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "invoicesIssued": {
+            "type": "integer"
+          },
+          "month": {
+            "example": "2026-08",
+            "type": "string"
+          },
+          "outstandingMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "periodEnd": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "periodStart": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "receivedMinor": {
+            "example": 15000,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "periodStart",
+          "periodEnd",
+          "currency",
+          "invoicedMinor",
+          "adjustmentsMinor",
+          "billedMinor",
+          "receivedMinor",
+          "outstandingMinor",
+          "invoicesIssued",
+          "activeStudents"
+        ],
+        "type": "object"
+      },
+      "BillingPayment": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "externalReference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "cash",
+              "pix",
+              "bank_transfer",
+              "card",
+              "gateway",
+              "other"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "paidAt": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string"
+          },
+          "recordedBy": {
+            "type": "string"
+          },
+          "reversesId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "invoiceId",
+          "amountMinor",
+          "currency",
+          "method",
+          "paidAt",
+          "externalReference",
+          "note",
+          "reversesId",
+          "recordedBy",
+          "recordedAt"
+        ],
+        "type": "object"
+      },
+      "BillingPlan": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "currency": {
+            "example": "BRL",
+            "type": "string"
+          },
+          "cycle": {
+            "enum": [
+              "monthly",
+              "quarterly",
+              "yearly"
+            ],
+            "example": "monthly",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "graceDays": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scopeTopicId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "amountMinor",
+          "currency",
+          "cycle",
+          "graceDays",
+          "scopeTopicId",
+          "archived",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "BillingReportCurrency": {
+        "properties": {
+          "code": {
+            "example": "BRL",
+            "type": "string"
+          },
+          "exponent": {
+            "example": 2,
+            "type": "integer"
+          },
+          "symbol": {
+            "example": "R$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "exponent",
+          "symbol"
+        ],
+        "type": "object"
+      },
+      "BillingRosterEntry": {
+        "properties": {
+          "asOf": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "contractGroupId": {
+            "type": "string"
+          },
+          "contractId": {
+            "type": "string"
+          },
+          "contractStatus": {
+            "enum": [
+              "active",
+              "paused",
+              "cancelled",
+              "superseded"
+            ],
+            "type": "string"
+          },
+          "currency": {
+            "example": "BRL",
+            "type": "string"
+          },
+          "hold": {
+            "$ref": "#/components/schemas/BillingStandingHold"
+          },
+          "negotiatedTerms": {
+            "type": "boolean"
+          },
+          "nextDueDate": {
+            "example": "2026-01-01",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "oldestOverdueDate": {
+            "example": "2026-01-01",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outstandingMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "standing": {
+            "enum": [
+              "good",
+              "due",
+              "delinquent",
+              "exempt"
+            ],
+            "example": "delinquent",
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "asOf",
+          "standing",
+          "oldestOverdueDate",
+          "outstandingMinor",
+          "contractId",
+          "contractGroupId",
+          "contractStatus",
+          "currency",
+          "nextDueDate",
+          "negotiatedTerms",
+          "hold"
+        ],
+        "type": "object"
+      },
+      "BillingRunReport": {
+        "properties": {
+          "absorbed": {
+            "type": "integer"
+          },
+          "adminsNotified": {
+            "type": "integer"
+          },
+          "asOf": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "crossings": {
+            "items": {
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "from": {
+                  "enum": [
+                    "good",
+                    "due",
+                    "delinquent",
+                    "exempt"
+                  ],
+                  "example": "delinquent",
+                  "type": "string"
+                },
+                "oldestOverdueDate": {
+                  "example": "2026-01-01",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "outstandingMinor": {
+                  "example": 15000,
+                  "type": "integer"
+                },
+                "to": {
+                  "enum": [
+                    "good",
+                    "due",
+                    "delinquent",
+                    "exempt"
+                  ],
+                  "example": "delinquent",
+                  "type": "string"
+                },
+                "userId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "userId",
+                "from",
+                "to",
+                "oldestOverdueDate",
+                "outstandingMinor",
+                "currency"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "divergences": {
+            "items": {
+              "properties": {
+                "balanceMinor": {
+                  "example": 15000,
+                  "type": "integer"
+                },
+                "cachedStatus": {
+                  "enum": [
+                    "open",
+                    "paid",
+                    "void"
+                  ],
+                  "type": "string"
+                },
+                "expectedStatus": {
+                  "enum": [
+                    "open",
+                    "paid",
+                    "void"
+                  ],
+                  "type": "string"
+                },
+                "invoiceId": {
+                  "type": "string"
+                },
+                "userId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "invoiceId",
+                "userId",
+                "cachedStatus",
+                "expectedStatus",
+                "balanceMinor"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "eligibleContracts": {
+            "type": "integer"
+          },
+          "issued": {
+            "items": {
+              "properties": {
+                "amountMinor": {
+                  "example": 15000,
+                  "type": "integer"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "dueDate": {
+                  "example": "2026-01-01",
+                  "type": "string"
+                },
+                "invoiceId": {
+                  "type": "string"
+                },
+                "periodStart": {
+                  "example": "2026-01-01",
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "open",
+                    "paid",
+                    "void"
+                  ],
+                  "type": "string"
+                },
+                "subscriptionId": {
+                  "type": "string"
+                },
+                "userId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "invoiceId",
+                "subscriptionId",
+                "userId",
+                "periodStart",
+                "dueDate",
+                "amountMinor",
+                "currency",
+                "status"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "mailsSent": {
+            "type": "integer"
+          },
+          "reminders": {
+            "items": {
+              "properties": {
+                "balanceMinor": {
+                  "example": 15000,
+                  "type": "integer"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "dueDate": {
+                  "example": "2026-01-01",
+                  "type": "string"
+                },
+                "invoiceId": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "due_date",
+                    "grace_lapsed"
+                  ],
+                  "type": "string"
+                },
+                "sent": {
+                  "type": "boolean"
+                },
+                "suppressedByHold": {
+                  "type": "boolean"
+                },
+                "triggerOn": {
+                  "example": "2026-01-01",
+                  "type": "string"
+                },
+                "userId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "invoiceId",
+                "userId",
+                "kind",
+                "dueDate",
+                "triggerOn",
+                "balanceMinor",
+                "currency",
+                "sent",
+                "suppressedByHold"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "since": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "suppressedByHold": {
+            "items": {
+              "properties": {
+                "outstandingMinor": {
+                  "example": 15000,
+                  "type": "integer"
+                },
+                "userId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "userId",
+                "outstandingMinor"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "asOf",
+          "since",
+          "eligibleContracts",
+          "issued",
+          "absorbed",
+          "reminders",
+          "crossings",
+          "suppressedByHold",
+          "divergences",
+          "mailsSent",
+          "adminsNotified"
+        ],
+        "type": "object"
+      },
+      "BillingStandingHold": {
+        "properties": {
+          "expiresAt": {
+            "example": "2026-01-01",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "setAt": {
+            "type": "string"
+          },
+          "setBy": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "reason",
+          "expiresAt",
+          "setBy",
+          "setAt"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "BillingStatementContractGroup": {
+        "properties": {
+          "contractGroupId": {
+            "type": "string"
+          },
+          "endDate": {
+            "example": "2026-01-01",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startDate": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "paused",
+              "cancelled",
+              "superseded"
+            ],
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/BillingSubscription"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "contractGroupId",
+          "startDate",
+          "endDate",
+          "status",
+          "versions"
+        ],
+        "type": "object"
+      },
+      "BillingStatementInvoice": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BillingInvoiceWithBalance"
+          },
+          {
+            "properties": {
+              "adjustments": {
+                "items": {
+                  "$ref": "#/components/schemas/BillingInvoiceAdjustment"
+                },
+                "type": "array"
+              },
+              "payments": {
+                "items": {
+                  "$ref": "#/components/schemas/BillingPayment"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "adjustments",
+              "payments"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "BillingStudentStatement": {
+        "properties": {
+          "contractGroups": {
+            "items": {
+              "$ref": "#/components/schemas/BillingStatementContractGroup"
+            },
+            "type": "array"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/BillingReportCurrency"
+          },
+          "currentMembershipSince": {
+            "example": "2026-01-01",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "invoices": {
+            "items": {
+              "$ref": "#/components/schemas/BillingStatementInvoice"
+            },
+            "type": "array"
+          },
+          "outstandingMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "studentSince": {
+            "example": "2026-01-01",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "currency",
+          "studentSince",
+          "currentMembershipSince",
+          "outstandingMinor",
+          "contractGroups",
+          "invoices"
+        ],
+        "type": "object"
+      },
+      "BillingSubscription": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "contractGroupId": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "cycle": {
+            "enum": [
+              "monthly",
+              "quarterly",
+              "yearly"
+            ],
+            "example": "monthly",
+            "type": "string"
+          },
+          "dueDay": {
+            "type": "integer"
+          },
+          "endDate": {
+            "example": "2026-01-01",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "graceDays": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "planId": {
+            "type": "string"
+          },
+          "signedAt": {
+            "type": "string"
+          },
+          "signedBy": {
+            "type": "string"
+          },
+          "startDate": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "paused",
+              "cancelled",
+              "superseded"
+            ],
+            "type": "string"
+          },
+          "supersedesId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "termsNote": {
+            "type": "string"
+          },
+          "termsSource": {
+            "enum": [
+              "standard",
+              "negotiated"
+            ],
+            "example": "standard",
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "planId",
+          "contractGroupId",
+          "supersedesId",
+          "termsSource",
+          "amountMinor",
+          "currency",
+          "cycle",
+          "graceDays",
+          "dueDay",
+          "status",
+          "startDate",
+          "endDate",
+          "termsNote",
+          "signedBy",
+          "signedAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "ChangeContractLifecycleBody": {
+        "properties": {
+          "action": {
+            "enum": [
+              "pause",
+              "resume",
+              "cancel"
+            ],
+            "example": "pause",
+            "type": "string"
+          },
+          "amountMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "cycle": {
+            "enum": [
+              "monthly",
+              "quarterly",
+              "yearly"
+            ],
+            "example": "monthly",
+            "type": "string"
+          },
+          "dueDay": {
+            "type": "integer"
+          },
+          "endDate": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "graceDays": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "ClassNote": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Note"
+          },
+          {
+            "properties": {
+              "isMine": {
+                "description": "True when the caller wrote this note",
+                "example": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "isMine"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "ClassNotePage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ClassNote"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "description": "Opaque cursor of the next page; null on the last page",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
       "Comment": {
         "properties": {
           "body": {
@@ -149,6 +1509,54 @@
         ],
         "type": "object"
       },
+      "CreateBillingPlanBody": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "currency": {
+            "example": "BRL",
+            "type": "string"
+          },
+          "cycle": {
+            "enum": [
+              "monthly",
+              "quarterly",
+              "yearly"
+            ],
+            "example": "monthly",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "graceDays": {
+            "example": 5,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "scopeTopicId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "amountMinor",
+          "currency",
+          "cycle",
+          "graceDays"
+        ],
+        "type": "object"
+      },
       "ErrorBody": {
         "additionalProperties": true,
         "description": "Standard error response body with optional metadata fields",
@@ -160,6 +1568,89 @@
         },
         "required": [
           "error"
+        ],
+        "type": "object"
+      },
+      "EventAudienceGrants": {
+        "properties": {
+          "groupIds": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "userIds": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "EventFlyerPresign": {
+        "properties": {
+          "expiresInSeconds": {
+            "type": "integer"
+          },
+          "flyer": {
+            "properties": {
+              "key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sizeBytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "none",
+                  "pending",
+                  "ready"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "key",
+              "type",
+              "sizeBytes",
+              "name"
+            ],
+            "type": "object"
+          },
+          "maxBytes": {
+            "type": "integer"
+          },
+          "uploadUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "uploadUrl",
+          "expiresInSeconds",
+          "maxBytes",
+          "flyer"
         ],
         "type": "object"
       },
@@ -199,6 +1690,39 @@
           "version",
           "timestamp",
           "adapters"
+        ],
+        "type": "object"
+      },
+      "IssueInvoiceBody": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "dueDate": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "periodEnd": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "periodStart": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "referenceDate": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "subscriptionId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "subscriptionId"
         ],
         "type": "object"
       },
@@ -336,6 +1860,148 @@
         ],
         "type": "object"
       },
+      "MyBillingStatement": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BillingStudentStatement"
+          },
+          {
+            "properties": {
+              "asOf": {
+                "example": "2026-03-01",
+                "type": "string"
+              },
+              "oldestOverdueDate": {
+                "example": "2026-02-10",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "standing": {
+                "enum": [
+                  "good",
+                  "due",
+                  "delinquent",
+                  "exempt"
+                ],
+                "example": "delinquent",
+                "type": "string"
+              }
+            },
+            "required": [
+              "standing",
+              "oldestOverdueDate",
+              "asOf"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "Note": {
+        "properties": {
+          "authorId": {
+            "example": "student-a",
+            "type": "string"
+          },
+          "authorName": {
+            "example": "Student A",
+            "type": "string"
+          },
+          "body": {
+            "description": "Sanitised Markdown, 1..NOTE_BODY_MAX characters",
+            "example": "The **key idea** is...",
+            "type": "string"
+          },
+          "createdAt": {
+            "example": "2026-09-28 12:00:00",
+            "type": "string"
+          },
+          "id": {
+            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+            "format": "uuid",
+            "type": "string"
+          },
+          "moderated": {
+            "description": "True while a staff force-unshare blocks re-sharing",
+            "example": false,
+            "type": "boolean"
+          },
+          "revision": {
+            "description": "Concurrency token; send it back as `baseRevision`",
+            "example": 1,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "sharedAt": {
+            "description": "Last time the note became shared; null if it never was",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "topicNodeId": {
+            "example": "topic-1",
+            "type": "string"
+          },
+          "updatedAt": {
+            "example": "2026-09-28 12:00:00",
+            "type": "string"
+          },
+          "visibility": {
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "example": "private",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "topicNodeId",
+          "authorId",
+          "authorName",
+          "body",
+          "visibility",
+          "revision",
+          "sharedAt",
+          "moderated",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "NoteConflictBody": {
+        "properties": {
+          "current": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Note"
+              },
+              {
+                "description": "NOTE_STALE only: the stored note (null when it no longer exists)"
+              }
+            ]
+          },
+          "error": {
+            "enum": [
+              "NOTE_STALE",
+              "NOTE_MODERATED"
+            ],
+            "example": "NOTE_STALE",
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
       "PlayerProgression": {
         "properties": {
           "badges": {
@@ -421,6 +2087,46 @@
         ],
         "type": "object"
       },
+      "RecordPaymentBody": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "externalReference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "method": {
+            "enum": [
+              "cash",
+              "pix",
+              "bank_transfer",
+              "card",
+              "gateway",
+              "other"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "paidAt": {
+            "example": "2026-01-01",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amountMinor",
+          "method"
+        ],
+        "type": "object"
+      },
       "RegisterRequest": {
         "properties": {
           "email": {
@@ -501,6 +2207,215 @@
           "newPassword"
         ],
         "type": "object"
+      },
+      "ReversePaymentBody": {
+        "properties": {
+          "paidAt": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "reason": {
+            "example": "Cheque bounced.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "RunInvoiceCycleBody": {
+        "properties": {
+          "asOf": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "since": {
+            "example": "2026-01-01",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SaveNoteBody": {
+        "properties": {
+          "baseRevision": {
+            "description": "The revision last received; 0 when no note exists yet",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "body": {
+            "description": "Markdown; sanitised and trimmed, then must be 1..NOTE_BODY_MAX characters",
+            "example": "My note",
+            "type": "string"
+          },
+          "visibility": {
+            "description": "Omitted: keep the current visibility (private on create)",
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "example": "private",
+            "type": "string"
+          }
+        },
+        "required": [
+          "body",
+          "baseRevision"
+        ],
+        "type": "object"
+      },
+      "SetBillingHoldBody": {
+        "properties": {
+          "expiresAt": {
+            "example": "2026-01-01",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "example": "Injured; agreed to pause chasing until March.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "SignContractBody": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "cycle": {
+            "enum": [
+              "monthly",
+              "quarterly",
+              "yearly"
+            ],
+            "example": "monthly",
+            "type": "string"
+          },
+          "dueDay": {
+            "example": 10,
+            "maximum": 28,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "graceDays": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "planId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "startDate": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "termsNote": {
+            "type": "string"
+          },
+          "termsSource": {
+            "enum": [
+              "standard",
+              "negotiated"
+            ],
+            "example": "standard",
+            "type": "string"
+          },
+          "userId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "planId",
+          "dueDay",
+          "startDate"
+        ],
+        "type": "object"
+      },
+      "StaffAuthoredNote": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StaffNote"
+          },
+          {
+            "properties": {
+              "topicTitle": {
+                "example": "Intro to Algebra",
+                "type": "string"
+              }
+            },
+            "required": [
+              "topicTitle"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "StaffAuthoredNotePage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/StaffAuthoredNote"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "description": "Opaque cursor of the next page; null on the last page",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "StaffNote": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Note"
+          },
+          {
+            "properties": {
+              "moderatedAt": {
+                "description": "When staff force-unshared the note; null when not moderated",
+                "example": null,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "moderatedBy": {
+                "description": "The staff member who force-unshared the note; null when not moderated",
+                "example": null,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "moderatedAt",
+              "moderatedBy"
+            ],
+            "type": "object"
+          }
+        ]
       },
       "Tag": {
         "properties": {
@@ -763,6 +2678,45 @@
         },
         "type": "object"
       },
+      "UpdateBillingPlanBody": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "cycle": {
+            "enum": [
+              "monthly",
+              "quarterly",
+              "yearly"
+            ],
+            "example": "monthly",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "graceDays": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "scopeTopicId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "ValidationErrorBody": {
         "description": "Validation error response with Zod issues",
         "properties": {
@@ -793,6 +2747,18 @@
         "required": [
           "error",
           "issues"
+        ],
+        "type": "object"
+      },
+      "VoidInvoiceBody": {
+        "properties": {
+          "reason": {
+            "example": "Issued to the wrong student.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
         ],
         "type": "object"
       },
@@ -1281,6 +3247,1679 @@
         "summary": "Update Badge",
         "tags": [
           "admin:badges"
+        ]
+      }
+    },
+    "/v1/admin/billing/holds/{userId}": {
+      "delete": {
+        "description": "Removes the hold. The debt it kept out of the listing was never touched.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "example": "user-id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Hold cleared"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Clear a Standing Hold",
+        "tags": [
+          "admin:billing"
+        ]
+      },
+      "post": {
+        "description": "Suppresses an alert, never a permission and never a total: the reported standing becomes `exempt` and the student leaves the delinquency listing and the reminder mail, while their balance stays in the movement report, the aging report and their statement. The reason is mandatory and the acting admin is recorded, so a temporary hold cannot quietly become permanent. An `expiresAt` needs nothing to run — the day after it passes the underlying standing is reported again.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "example": "user-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetBillingHoldBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/BillingStandingHold"
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Hold set"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Hold a Student Standing",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/invoices": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "open",
+                "paid",
+                "void"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "userId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subscriptionId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BillingInvoiceWithBalance"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Invoices with their balances"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Search Invoices",
+        "tags": [
+          "admin:billing"
+        ]
+      },
+      "post": {
+        "description": "Snapshots the contract's terms — never the plan's. A zero amount settles at issue.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueInvoiceBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingInvoice"
+                }
+              }
+            },
+            "description": "Invoice issued"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Issue an Ad-hoc Invoice",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/invoices/run": {
+      "post": {
+        "description": "Issues the period's invoices, sends the two student notices, digests the admins on standing crossings and asserts each open invoice's cached status. It writes no adjustment of any kind and repairs no status.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunInvoiceCycleBody"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingRunReport"
+                }
+              }
+            },
+            "description": "The run report"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Run the Billing Cycle",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/invoices/{id}/adjustments": {
+      "post": {
+        "description": "Append-only. Negative reduces what is owed; nothing accrues a fee on its own.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "plan-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyAdjustmentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingInvoiceAdjustment"
+                }
+              }
+            },
+            "description": "Adjustment applied"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Apply an Invoice Adjustment",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/invoices/{id}/payments": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "plan-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordPaymentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingPayment"
+                }
+              }
+            },
+            "description": "Payment recorded"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Record a Payment",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/invoices/{id}/void": {
+      "post": {
+        "description": "The reason is mandatory. The acting admin is recorded in the audit event.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "plan-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidInvoiceBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingInvoice"
+                }
+              }
+            },
+            "description": "Invoice voided"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Void an Invoice",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/payments/{id}/reverse": {
+      "post": {
+        "description": "Appends the mirror-image row; the original is never updated or deleted.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "plan-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReversePaymentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingPayment"
+                }
+              }
+            },
+            "description": "Reversal recorded"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Reverse a Payment",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/plans": {
+      "get": {
+        "description": "The price list. Freely editable — a signed contract snapshots its terms.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "archived",
+            "required": false,
+            "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cycle",
+            "required": false,
+            "schema": {
+              "enum": [
+                "monthly",
+                "quarterly",
+                "yearly"
+              ],
+              "example": "monthly",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BillingPlan"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Plans"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List Billing Plans",
+        "tags": [
+          "admin:billing"
+        ]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBillingPlanBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingPlan"
+                }
+              }
+            },
+            "description": "Plan created"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a Billing Plan",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/plans/{id}": {
+      "patch": {
+        "description": "Editing the shelf is safe: every signed contract and every issued invoice carries its own snapshot of the terms.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "plan-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBillingPlanBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingPlan"
+                }
+              }
+            },
+            "description": "Plan updated"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Edit a Billing Plan",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/reports/aging": {
+      "get": {
+        "description": "Open balances bucketed 0-30 / 31-60 / 61-90 / 90+ by days past each invoice's own due date. Boundaries are exclusive: 30 days past due and 31 days past due land in different buckets.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "asOf",
+            "required": false,
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingAgingReport"
+                }
+              }
+            },
+            "description": "Receivables aging"
+          },
+          "400": {
+            "description": "Validation failed — a malformed month or asOf"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "409": {
+            "description": "The report would span two currencies; totals are never converted"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Receivables Aging",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/reports/movement": {
+      "get": {
+        "description": "Billed, received and outstanding for one month, recomputed from the ledger rows. Billed is keyed off the invoice's issue date and the adjustment's applied date; received is keyed off the payment's paid date — a payment in September against an August invoice is September's received and August's billed.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "example": "2026-08",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingMovementReport"
+                }
+              }
+            },
+            "description": "Monthly movement"
+          },
+          "400": {
+            "description": "Validation failed — a malformed month or asOf"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "409": {
+            "description": "The report would span two currencies; totals are never converted"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Monthly Movement",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/students": {
+      "get": {
+        "description": "Every student with a contract, with their standing resolved from their invoices rather than read from a column: outstanding balance, oldest overdue date, next due date and whether the terms were negotiated. `standing=exempt` is the held filter — a hold is the only way to reach it. Reporting only: nothing here gates a student's access.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "standing",
+            "required": false,
+            "schema": {
+              "enum": [
+                "good",
+                "due",
+                "delinquent",
+                "exempt"
+              ],
+              "example": "delinquent",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "asOf",
+            "required": false,
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BillingRosterEntry"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "The roster"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "The Student Billing Roster",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/students/{userId}/statement": {
+      "get": {
+        "description": "The student's contracts with their chains, invoices with their adjustments and payments, the outstanding total, and the two derived membership dates: \"student since\" spans every contract group, \"current membership since\" is the root of the group now active.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "example": "user-id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingStudentStatement"
+                }
+              }
+            },
+            "description": "Student statement"
+          },
+          "400": {
+            "description": "Validation failed — a malformed month or asOf"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Student not found"
+          },
+          "409": {
+            "description": "The report would span two currencies; totals are never converted"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "A Student's Statement",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/subscriptions": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "userId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "planId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "active",
+                "paused",
+                "cancelled",
+                "superseded"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "contractGroupId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BillingSubscription"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Contracts"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List Contracts",
+        "tags": [
+          "admin:billing"
+        ]
+      },
+      "post": {
+        "description": "Snapshots the plan's amount, currency, cycle and grace days onto the contract. Negotiated terms require termsSource 'negotiated' and a termsNote.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignContractBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSubscription"
+                }
+              }
+            },
+            "description": "Contract signed"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Sign a Contract",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/subscriptions/{id}": {
+      "patch": {
+        "description": "Pause, resume or cancel only. Terms move through POST /subscriptions/{id}/amend.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "plan-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeContractLifecycleBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSubscription"
+                }
+              }
+            },
+            "description": "Contract updated"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Change a Contract Lifecycle",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/subscriptions/{id}/amend": {
+      "post": {
+        "description": "Closes the live version to superseded and opens a new active one in the same contract group.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "plan-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmendContractBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSubscription"
+                }
+              }
+            },
+            "description": "Contract amended"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Amend a Contract",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/events": {
+      "get": {
+        "description": "Drafts, published and archived alike, newest start first. This is the authoring board; the audience rule that scopes `GET /v1/events` deliberately does not apply.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "draft",
+                "published",
+                "archived"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "example": "50",
+              "pattern": "^\\d+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "example": "0",
+              "pattern": "^\\d+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/AdminEvent"
+                      },
+                      "type": "array"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "total",
+                    "limit",
+                    "offset"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The events page"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List every event",
+        "tags": [
+          "admin:events"
+        ]
+      },
+      "post": {
+        "description": "Always creates a `draft`: publishing is a separate, admin-only transition on `PATCH /{id}`. An explicit `slug` is honoured and a collision answers `409`; an omitted one is derived from the title, once.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "audience": {
+                    "enum": [
+                      "public",
+                      "members",
+                      "restricted"
+                    ],
+                    "type": "string"
+                  },
+                  "contactLabel": {
+                    "maxLength": 80,
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "endsAt": {
+                    "example": "2026-10-10T13:00:00.000Z",
+                    "format": "date-time",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "location": {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  "slug": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "startsAt": {
+                    "example": "2026-10-10T13:00:00.000Z",
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "summary": {
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  "timezone": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "title": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "whatsappMessage": {
+                    "maxLength": 1000,
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "whatsappNumber": {
+                    "maxLength": 32,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "startsAt"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEvent"
+                }
+              }
+            },
+            "description": "The created draft"
+          },
+          "400": {
+            "description": "Malformed payload"
+          },
+          "409": {
+            "description": "The explicit slug is already taken"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create an event draft",
+        "tags": [
+          "admin:events"
+        ]
+      }
+    },
+    "/v1/admin/events/{id}": {
+      "patch": {
+        "description": "Renaming never re-derives the slug — a link already circulating keeps working. Supplying `slug` moves it explicitly and a collision answers `409`. `status: \"published\"` additionally requires the `admin` role; `archived` does not.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "audience": {
+                    "enum": [
+                      "public",
+                      "members",
+                      "restricted"
+                    ],
+                    "type": "string"
+                  },
+                  "contactLabel": {
+                    "maxLength": 80,
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "endsAt": {
+                    "example": "2026-10-10T13:00:00.000Z",
+                    "format": "date-time",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "location": {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  "slug": {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "startsAt": {
+                    "example": "2026-10-10T13:00:00.000Z",
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "draft",
+                      "published",
+                      "archived"
+                    ],
+                    "type": "string"
+                  },
+                  "summary": {
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  "timezone": {
+                    "maxLength": 64,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "title": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "whatsappMessage": {
+                    "maxLength": 1000,
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "whatsappNumber": {
+                    "maxLength": 32,
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEvent"
+                }
+              }
+            },
+            "description": "The patched event"
+          },
+          "400": {
+            "description": "Malformed payload"
+          },
+          "403": {
+            "description": "Publishing requires the admin role"
+          },
+          "404": {
+            "description": "No such event"
+          },
+          "409": {
+            "description": "The explicit slug is already taken"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Patch an event, including its status transitions",
+        "tags": [
+          "admin:events"
+        ]
+      }
+    },
+    "/v1/admin/events/{id}/audience": {
+      "put": {
+        "description": "Whole-set, never additive: a group or user absent from the payload loses its grant. An unknown id answers `422` rather than a foreign-key failure.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventAudienceGrants"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventAudienceGrants"
+                }
+              }
+            },
+            "description": "The grant set now in force"
+          },
+          "404": {
+            "description": "No such event"
+          },
+          "422": {
+            "description": "An unknown group or user id"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Replace the whole audience grant set",
+        "tags": [
+          "admin:events"
+        ]
+      }
+    },
+    "/v1/admin/events/{id}/flyer": {
+      "delete": {
+        "description": "Clears the flyer columns and deletes the object. This is the only `DELETE` on this router: an event itself is removed by archiving it.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Flyer removed"
+          },
+          "404": {
+            "description": "No such event"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove the flyer",
+        "tags": [
+          "admin:events"
+        ]
+      }
+    },
+    "/v1/admin/events/{id}/flyer/finalize": {
+      "post": {
+        "description": "Reads the stored object's real size and compares it against the ceiling. Over it, the object is deleted and the flyer stays `pending` (`422 FileTooLarge`); an object that never landed answers `422 NotUploaded`. On success the flyer a previous upload displaced is deleted from storage.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEvent"
+                }
+              }
+            },
+            "description": "The event with its flyer now `ready`"
+          },
+          "404": {
+            "description": "No such event"
+          },
+          "422": {
+            "description": "Not uploaded, over the ceiling, or nothing pending"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Confirm an uploaded flyer",
+        "tags": [
+          "admin:events"
+        ]
+      }
+    },
+    "/v1/admin/events/{id}/flyer/presign": {
+      "post": {
+        "description": "Returns a short-lived presigned `PUT`. A non-image type and a declared size over the shared image ceiling are both refused `422`. The ceiling is re-checked against the stored bytes at finalize.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "contentType": {
+                    "description": "An event flyer must be one of: image/jpeg, image/png, image/webp.",
+                    "enum": [
+                      "application/pdf",
+                      "video/mp4",
+                      "image/jpeg",
+                      "image/png",
+                      "image/webp"
+                    ],
+                    "example": "image/jpeg",
+                    "type": "string"
+                  },
+                  "fileName": {
+                    "maxLength": 255,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "sizeBytes": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "fileName",
+                  "contentType",
+                  "sizeBytes"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventFlyerPresign"
+                }
+              }
+            },
+            "description": "The upload URL and the pending flyer"
+          },
+          "404": {
+            "description": "No such event"
+          },
+          "422": {
+            "description": "Not an image, or larger than the ceiling"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Authorise a flyer upload",
+        "tags": [
+          "admin:events"
         ]
       }
     },
@@ -2514,6 +6153,111 @@
         "summary": "Update Mission",
         "tags": [
           "admin:missions"
+        ]
+      }
+    },
+    "/v1/admin/notes/{id}/moderation": {
+      "delete": {
+        "description": "Lets the author share the note again. It does not re-share it.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Note ID",
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Moderation cleared"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "No note with this ID"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Clear a note's moderation flag (staff)",
+        "tags": [
+          "admin:notes"
+        ]
+      }
+    },
+    "/v1/admin/notes/{id}/unshare": {
+      "post": {
+        "description": "Sets the note private and flags it moderated, recording who and when, and increments `revision` so an open editor gets `NOTE_STALE`. The body is never changed. On a private note it is idempotent in effect (stays private, becomes flagged).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Note ID",
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffNote"
+                }
+              }
+            },
+            "description": "The moderated note"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "No note with this ID"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Force-unshare a note (staff)",
+        "tags": [
+          "admin:notes"
         ]
       }
     },
@@ -6665,6 +10409,71 @@
         ]
       }
     },
+    "/v1/admin/users/{userId}/notes": {
+      "get": {
+        "description": "Every note the user wrote, private included, newest `updatedAt` first, with the topic title and moderation provenance. An unknown user yields an empty page. Pages of 20.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "description": "Author user ID",
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Opaque cursor from a previous page (`nextCursor`); omit for the first page",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffAuthoredNotePage"
+                }
+              }
+            },
+            "description": "One page of the user's notes"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Malformed cursor (`InvalidCursor`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List a user's notes (staff)",
+        "tags": [
+          "admin:notes"
+        ]
+      }
+    },
     "/v1/auth/activate": {
       "post": {
         "description": "Activates a newly registered user account using the activation token.",
@@ -6986,6 +10795,332 @@
         ]
       }
     },
+    "/v1/events": {
+      "get": {
+        "description": "Audience-scoped board. Without a token this is the published, `public` set; with one it additionally contains `members` events and the `restricted` events granted to that user or to one of their groups. One endpoint serves both — the client never declares what it may see.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "description": "Which side of now to list. Defaults to `upcoming`.",
+              "enum": [
+                "upcoming",
+                "past"
+              ],
+              "example": "upcoming",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "example": "50",
+              "pattern": "^\\d+$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "example": "0",
+              "pattern": "^\\d+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "properties": {
+                          "audience": {
+                            "enum": [
+                              "public",
+                              "members",
+                              "restricted"
+                            ],
+                            "example": "public",
+                            "type": "string"
+                          },
+                          "endsAt": {
+                            "example": null,
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "hasFlyer": {
+                            "example": true,
+                            "type": "boolean"
+                          },
+                          "id": {
+                            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+                            "type": "string"
+                          },
+                          "location": {
+                            "example": "Dojo central",
+                            "type": "string"
+                          },
+                          "slug": {
+                            "example": "seminario-de-verao",
+                            "type": "string"
+                          },
+                          "startsAt": {
+                            "example": "2026-10-10T13:00:00.000Z",
+                            "type": "string"
+                          },
+                          "summary": {
+                            "example": "Open mat with a visiting instructor.",
+                            "type": "string"
+                          },
+                          "timezone": {
+                            "example": "America/Sao_Paulo",
+                            "type": "string"
+                          },
+                          "title": {
+                            "example": "Seminário de verão",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "title",
+                          "summary",
+                          "location",
+                          "startsAt",
+                          "endsAt",
+                          "timezone",
+                          "audience",
+                          "hasFlyer"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "limit": {
+                      "example": 50,
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "example": 0,
+                      "type": "integer"
+                    },
+                    "scope": {
+                      "enum": [
+                        "upcoming",
+                        "past"
+                      ],
+                      "example": "upcoming",
+                      "type": "string"
+                    },
+                    "total": {
+                      "example": 3,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "total",
+                    "limit",
+                    "offset",
+                    "scope"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The slice of the board this caller may see"
+          },
+          "400": {
+            "description": "Malformed query parameter"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        },
+        "summary": "List events the caller may see",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/v1/events/{slug}": {
+      "get": {
+        "description": "Returns the event with its sanitised Markdown body and its resolved contact block. An event the caller may not see answers `404`, byte-identical to a slug that does not exist.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "example": "seminario-de-verao",
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "audience": {
+                      "enum": [
+                        "public",
+                        "members",
+                        "restricted"
+                      ],
+                      "example": "public",
+                      "type": "string"
+                    },
+                    "contact": {
+                      "properties": {
+                        "label": {
+                          "example": "",
+                          "type": "string"
+                        },
+                        "message": {
+                          "example": "",
+                          "type": "string"
+                        },
+                        "number": {
+                          "example": "5519999991155",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "number",
+                        "message",
+                        "label"
+                      ],
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "content": {
+                      "example": "## Programme\n\n...",
+                      "type": "string"
+                    },
+                    "endsAt": {
+                      "example": null,
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "hasFlyer": {
+                      "example": true,
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+                      "type": "string"
+                    },
+                    "location": {
+                      "example": "Dojo central",
+                      "type": "string"
+                    },
+                    "slug": {
+                      "example": "seminario-de-verao",
+                      "type": "string"
+                    },
+                    "startsAt": {
+                      "example": "2026-10-10T13:00:00.000Z",
+                      "type": "string"
+                    },
+                    "summary": {
+                      "example": "Open mat with a visiting instructor.",
+                      "type": "string"
+                    },
+                    "timezone": {
+                      "example": "America/Sao_Paulo",
+                      "type": "string"
+                    },
+                    "title": {
+                      "example": "Seminário de verão",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "slug",
+                    "title",
+                    "summary",
+                    "location",
+                    "startsAt",
+                    "endsAt",
+                    "timezone",
+                    "audience",
+                    "hasFlyer",
+                    "content",
+                    "contact"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The event"
+          },
+          "404": {
+            "description": "No such event, or not visible to this caller"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        },
+        "summary": "Read one event by slug",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/v1/events/{slug}/flyer": {
+      "get": {
+        "description": "Redirects to a freshly minted presigned GET (TTL 1h). The route itself is the stable URL — safe to paste into a chat or an `og:image` tag — while the bucket stays private and the audience check runs on every hit.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "example": "seminario-de-verao",
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the presigned flyer URL"
+          },
+          "404": {
+            "description": "No such event, not visible to this caller, or no flyer"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        },
+        "summary": "Redirect to the event flyer",
+        "tags": [
+          "events"
+        ]
+      }
+    },
     "/v1/leaderboard": {
       "get": {
         "description": "Returns a list of users with their XP and rank.",
@@ -7181,6 +11316,35 @@
         "summary": "Get Badges list",
         "tags": [
           "me:gamification"
+        ]
+      }
+    },
+    "/v1/me/billing": {
+      "get": {
+        "description": "The caller's own standing, contracts, invoices with their payments, and outstanding total. It takes no parameters: the subject is the authenticated caller and there is no request that names another student. A member with no contract gets an empty statement with standing `good`, not a 404.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyBillingStatement"
+                }
+              }
+            },
+            "description": "The caller’s statement"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "My Billing Statement",
+        "tags": [
+          "me:billing"
         ]
       }
     },
@@ -7389,6 +11553,60 @@
         "summary": "Get Missions",
         "tags": [
           "me:gamification"
+        ]
+      }
+    },
+    "/v1/me/notes": {
+      "get": {
+        "description": "Every note the caller wrote, across topics, newest `updatedAt` first, with the topic title and `topicAccessible`. A note whose topic is no longer accessible is read-only (delete allowed). Pages of 20.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Opaque cursor from a previous page (`nextCursor`); omit for the first page",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoredNotePage"
+                }
+              }
+            },
+            "description": "One page of the caller's notes"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Malformed cursor (`InvalidCursor`)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List my notes",
+        "tags": [
+          "me:notes"
         ]
       }
     },
@@ -8215,6 +12433,313 @@
           "topics:comments"
         ]
       }
+    },
+    "/v1/topics/{id}/notes": {
+      "get": {
+        "description": "Students and tutors: shared notes only, newest share first, own flagged `isMine`. Admins and content creators: every note. Pages of 20.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "topic-1",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Opaque cursor from a previous page (`nextCursor`); omit for the first page",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassNotePage"
+                }
+              }
+            },
+            "description": "One page of notes"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Malformed cursor (`InvalidCursor`)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Topic missing, draft, archived or outside the caller's access"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List the notes on a topic",
+        "tags": [
+          "topics:notes"
+        ]
+      }
+    },
+    "/v1/topics/{id}/notes/me": {
+      "delete": {
+        "description": "Hard-deletes the caller's note. Allowed even when the topic is no longer readable.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "topic-1",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Note deleted"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "The caller has no note on this topic"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete my note on a topic",
+        "tags": [
+          "topics:notes"
+        ]
+      },
+      "get": {
+        "description": "Returns the caller's note on the topic, or `null` when there is none.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "topic-1",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Note"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The caller's note, or null"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Topic missing, draft, archived or outside the caller's access"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get my note on a topic",
+        "tags": [
+          "topics:notes"
+        ]
+      },
+      "put": {
+        "description": "Conditional upsert keyed on `baseRevision` (0 = create). The body is sanitised and trimmed, then must be 1..NOTE_BODY_MAX characters.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "topic-1",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveNoteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Note"
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Note updated"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Note"
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Note created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Malformed body, or `NOTE_BODY_EMPTY` / `NOTE_BODY_TOO_LONG` after sanitisation"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Topic missing, draft, archived or outside the caller's access"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteConflictBody"
+                }
+              }
+            },
+            "description": "`NOTE_STALE`: `baseRevision` is not the stored revision; `current` carries the stored note (or null). `NOTE_MODERATED`: sharing a note the staff made private."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create or update my note on a topic",
+        "tags": [
+          "topics:notes"
+        ]
+      }
     }
   },
   "servers": [
@@ -8224,7 +12749,7 @@
     },
     {
       "description": "Staging environment",
-      "url": "https://api-staging.arenaquest.app"
+      "url": "https://api-staging.taibudo.com"
     },
     {
       "description": "Production environment",

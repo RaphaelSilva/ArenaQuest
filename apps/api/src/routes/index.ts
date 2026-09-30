@@ -6,6 +6,7 @@ import { buildTopicsRouter } from '@api/routes/topics.router';
 import { buildPublicRouter } from '@api/routes/public';
 import { buildMeRouter } from '@api/routes/me';
 import { buildCommentsRouter } from '@api/routes/comments.router';
+import { buildNotesRouter } from '@api/routes/notes.router';
 import { buildEventsRouter } from '@api/routes/events.router';
 import { buildHealthRouter } from '@api/routes/public/health';
 
@@ -77,6 +78,7 @@ export class AppRouter {
     const v1 = new OpenAPIHono();
     v1.route('/', buildPublicRouter(container));
     v1.route('/', buildCommentsRouter({ engagement, progress, gamification }));
+    v1.route('/', buildNotesRouter({ engagement, content, progress }));
     v1.route('/auth', buildAuthRouter({ identity, infra, controllers, gamification }));
     v1.route('/admin', buildAdminRouter(container));
     v1.route('/me', buildMeRouter(container));
