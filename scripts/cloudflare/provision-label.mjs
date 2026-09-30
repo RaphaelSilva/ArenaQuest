@@ -31,6 +31,13 @@
  * stdin. Secret VALUES are never logged, never placed in argv, and never
  * written to disk. Externally-valued secrets (R2_*, GOOGLE_CLIENT_SECRET,
  * RESEND_API_KEY) are only ever *detected* by name and reported.
+ *
+ * Workers Previews (RFC 0021): for a STAGING env the `secrets` group also
+ * covers the Preview base config (`wrangler preview base-config secret …
+ * --env <label>-staging`), which previews inherit instead of the staging
+ * Worker's own secrets. Same contract: JWT_SECRET generated here, piped over
+ * stdin, set only when absent; the external ones detected by name and reported.
+ * Production has no previews, so its secrets group never touches them.
  */
 
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
@@ -243,6 +250,36 @@ function corsFilePath(label, env) {
   return join(tmpdir(), `aq-cors-${label}-${env}.json`);
 }
 
+/**
+ * Names of the externally-valued secrets an env needs (schema `api-secrets`
+ * minus JWT_SECRET, which provisioning generates). RESEND_API_KEY counts only
+ * when the env's MAIL_DRIVER is resend. Pure: the schema is passed in.
+ */
+export function externalSecretNames(schema, profile, env) {
+  const section = schema?.['api-secrets'] || {};
+  const mailDriver = profile.environments[env].mail?.driver;
+  return Object.entries(section)
+    .filter(([name]) => name !== 'JWT_SECRET')
+    .filter(([, spec]) => spec.required || requiredWhenActive(spec.requiredWhen, { MAIL_DRIVER: mailDriver }))
+    .map(([name]) => name);
+}
+
+/**
+ * What to do with a generated secret given the names already set:
+ *   'unknown' — the list failed (null): do nothing, never read it as absent;
+ *   'keep'    — already set: never overwritten;
+ *   'put'     — absent: generate and pipe over stdin.
+ */
+export function secretAction(names, name) {
+  if (names === null) return 'unknown';
+  return names.includes(name) ? 'keep' : 'put';
+}
+
+/** The fix command for a missing Preview base-config secret (value typed interactively). */
+export function previewSecretFixCommand(name, wranglerEnv) {
+  return renderCommand(wranglerArgv('api', 'preview', 'base-config', 'secret', 'put', name, '--env', wranglerEnv));
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // PURE: the provisioning plan
 // ════════════════════════════════════════════════════════════════════════════
@@ -256,7 +293,7 @@ function corsFilePath(label, env) {
  * create command when the resource already exists.
  */
 export function buildProvisionPlan(profile, env, options = {}) {
-  const { withDomain = false, only = 'all' } = options;
+  const { withDomain = false, only = 'all', schema = null } = options;
   const label = profile.label;
   const e = profile.environments[env];
   const wEnv = wranglerEnvName(label, env);
@@ -319,12 +356,31 @@ export function buildProvisionPlan(profile, env, options = {}) {
     },
     {
       id: 'secrets',
-      title: `Worker secrets for env.${wEnv}`,
+      title: env === 'staging'
+        ? `Worker + Preview base-config secrets for env.${wEnv}`
+        : `Worker secrets for env.${wEnv}`,
       commands: [
         wranglerArgv('api', 'secret', 'list', '--env', wEnv, '--format', 'json'),
         wranglerArgv('api', 'secret', 'put', 'JWT_SECRET', '--env', wEnv),
+        // Workers Previews inherit the Preview base config, not the Worker's
+        // secrets — staging only (production has no previews block).
+        ...(env === 'staging'
+          ? [
+            wranglerArgv('api', 'preview', 'base-config', 'secret', 'list', '--env', wEnv, '--json'),
+            wranglerArgv('api', 'preview', 'base-config', 'secret', 'put', 'JWT_SECRET', '--env', wEnv),
+          ]
+          : []),
       ],
-      note: 'JWT_SECRET generated here (32 random bytes) and piped over stdin — never logged, never on disk. Set only when absent.',
+      note: [
+        'JWT_SECRET generated here (32 random bytes) and piped over stdin — never logged, never on disk. Set only when absent.',
+        ...(env === 'staging'
+          ? ['Preview base config: its own JWT_SECRET, same contract (generated, stdin, set only when absent).']
+          : []),
+        ...(schema
+          ? [`External secrets reported by name, never written: ${externalSecretNames(schema, profile, env).join(', ')}` +
+            (env === 'staging' ? ' (on the Worker and on the Preview base config).' : '.')]
+          : []),
+      ].join('\n'),
     },
     {
       id: 'worker',
@@ -644,11 +700,13 @@ export function generateSecretValue(bytes = 32) {
  * null is deliberately distinct from []: a failed list must never be read as
  * "absent", or a re-run would overwrite a perfectly good JWT_SECRET.
  */
-function listSecretNames(wranglerEnv) {
-  const res = runCommand(
-    wranglerArgv('api', 'secret', 'list', '--env', wranglerEnv, '--format', 'json'),
-    { allowFailure: true },
-  );
+function listSecretNames(wranglerEnv, { preview = false } = {}) {
+  // `wrangler secret list` takes --format json; `preview base-config secret
+  // list` takes --json. Both print [{ name, type }].
+  const argv = preview
+    ? wranglerArgv('api', 'preview', 'base-config', 'secret', 'list', '--env', wranglerEnv, '--json')
+    : wranglerArgv('api', 'secret', 'list', '--env', wranglerEnv, '--format', 'json');
+  const res = runCommand(argv, { allowFailure: true });
   if (res.status !== 0) return null;
   const parsed = parseJsonOutput(res.stdout);
   if (!Array.isArray(parsed)) return null;
@@ -662,8 +720,10 @@ function listSecretNames(wranglerEnv) {
  * line and interpolates captured output into its error message. Nothing here
  * may carry the value.
  */
-function putSecret(wranglerEnv, name, value) {
-  const argv = wranglerArgv('api', 'secret', 'put', name, '--env', wranglerEnv);
+function putSecret(wranglerEnv, name, value, { preview = false } = {}) {
+  const argv = preview
+    ? wranglerArgv('api', 'preview', 'base-config', 'secret', 'put', name, '--env', wranglerEnv)
+    : wranglerArgv('api', 'secret', 'put', name, '--env', wranglerEnv);
   log.cmd(`${renderCommand(argv)}   # value generated, read from stdin`);
   const res = spawnSync(argv[0], argv.slice(1), {
     cwd: ROOT,
@@ -672,7 +732,8 @@ function putSecret(wranglerEnv, name, value) {
     env: childEnv(),
   });
   if (res.status !== 0) {
-    throw new Error(`failed to set ${name} for env.${wranglerEnv} (exit ${res.status ?? 'signal'})`);
+    const where = preview ? `the Preview base config of env.${wranglerEnv}` : `env.${wranglerEnv}`;
+    throw new Error(`failed to set ${name} for ${where} (exit ${res.status ?? 'signal'})`);
   }
 }
 
@@ -688,18 +749,60 @@ function putSecret(wranglerEnv, name, value) {
  * (and should) run before the first deploy.
  */
 function ensureWorkerSecrets(wranglerEnv) {
-  const names = listSecretNames(wranglerEnv);
-  if (names === null) {
+  const action = secretAction(listSecretNames(wranglerEnv), 'JWT_SECRET');
+  if (action === 'unknown') {
     log.warn(`Could not list secrets for env.${wranglerEnv} — skipping JWT_SECRET rather than risk overwriting one.`);
     log.hint(`Check it by hand: pnpm --filter api exec wrangler secret list --env ${wranglerEnv} --format json`);
     return;
   }
-  if (names.includes('JWT_SECRET')) {
+  if (action === 'keep') {
     log.ok(`JWT_SECRET already set for env.${wranglerEnv}`);
     return;
   }
   putSecret(wranglerEnv, 'JWT_SECRET', generateSecretValue());
   log.ok(`JWT_SECRET generated and set for env.${wranglerEnv} (32 random bytes)`);
+}
+
+/**
+ * The Preview base-config counterpart of ensureWorkerSecrets (staging only).
+ *
+ * Previews do not read the staging Worker's secrets, so without this a preview
+ * boots with no JWT_SECRET and 500s on every authenticated route. The value is
+ * freshly generated — never copied from staging, whose value is unreadable by
+ * design — so a token minted by staging does not verify on a preview.
+ * A failed list is "unknown", never "absent": nothing is overwritten.
+ */
+function ensurePreviewSecrets(wranglerEnv) {
+  const action = secretAction(listSecretNames(wranglerEnv, { preview: true }), 'JWT_SECRET');
+  if (action === 'unknown') {
+    log.warn(`Could not list Preview base-config secrets for env.${wranglerEnv} — skipping JWT_SECRET rather than risk overwriting one.`);
+    log.hint(`Check it by hand: pnpm --filter api exec wrangler preview base-config secret list --env ${wranglerEnv} --json`);
+    return;
+  }
+  if (action === 'keep') {
+    log.ok(`JWT_SECRET already set on the Preview base config of env.${wranglerEnv}`);
+    return;
+  }
+  putSecret(wranglerEnv, 'JWT_SECRET', generateSecretValue(), { preview: true });
+  log.ok(`JWT_SECRET generated and set on the Preview base config of env.${wranglerEnv} (32 random bytes)`);
+}
+
+/** Report — never write — the external secrets on the Preview base config (staging only). */
+function reportExternalPreviewSecrets(profile, env, wranglerEnv) {
+  const schema = parseJsonc(readFileSync(PATHS.schema, 'utf8'));
+  const names = listSecretNames(wranglerEnv, { preview: true });
+  if (names === null) {
+    log.warn(`Could not list Preview base-config secrets for env.${wranglerEnv} — external secret status unknown.`);
+    return;
+  }
+  for (const name of externalSecretNames(schema, profile, env)) {
+    if (names.includes(name)) {
+      log.ok(`${name} set on the Preview base config of env.${wranglerEnv}`);
+    } else {
+      log.warn(`${name} not set on the Preview base config of env.${wranglerEnv}`);
+      log.hint(previewSecretFixCommand(name, wranglerEnv));
+    }
+  }
 }
 
 /**
@@ -715,8 +818,6 @@ function ensureWorkerSecrets(wranglerEnv) {
  */
 function reportExternalSecrets(profile, env, wranglerEnv) {
   const schema = parseJsonc(readFileSync(PATHS.schema, 'utf8'));
-  const section = schema['api-secrets'] || {};
-  const mailDriver = profile.environments[env].mail?.driver;
   const names = listSecretNames(wranglerEnv);
 
   if (names === null) {
@@ -724,9 +825,7 @@ function reportExternalSecrets(profile, env, wranglerEnv) {
     return;
   }
 
-  for (const [name, spec] of Object.entries(section)) {
-    if (name === 'JWT_SECRET') continue;
-    if (!spec.required && !requiredWhenActive(spec.requiredWhen, { MAIL_DRIVER: mailDriver })) continue;
+  for (const name of externalSecretNames(schema, profile, env)) {
     if (names.includes(name)) {
       log.ok(`${name} set for env.${wranglerEnv}`);
     } else {
@@ -866,10 +965,11 @@ function printManualFollowups(profile, environments) {
 
 function printPlan(profile, env, options) {
   log.info(`${env} plan`);
-  for (const step of buildProvisionPlan(profile, env, options)) {
+  const schema = parseJsonc(readFileSync(PATHS.schema, 'utf8'));
+  for (const step of buildProvisionPlan(profile, env, { ...options, schema })) {
     log.ok(step.title);
     for (const argv of step.commands) log.cmd(renderCommand(argv));
-    if (step.note) log.hint(step.note);
+    if (step.note) for (const line of step.note.split('\n')) log.hint(line);
   }
 }
 
@@ -901,10 +1001,14 @@ async function provisionEnvironment(state, env, options) {
 
   if (has('cors')) ensureR2Cors(state.profile, env);
   if (has('pages')) ensurePages(state.profile.environments[env], env);
-  if (has('secrets')) ensureWorkerSecrets(wEnv);
+  if (has('secrets')) {
+    ensureWorkerSecrets(wEnv);
+    if (env === 'staging') ensurePreviewSecrets(wEnv);
+  }
   if (has('worker')) ensureWorker(label, env);
   if (has('domain') && withDomain) await ensureCustomDomain(state, env);
   if (has('secrets') || has('worker')) reportExternalSecrets(state.profile, env, wEnv);
+  if (has('secrets') && env === 'staging') reportExternalPreviewSecrets(state.profile, env, wEnv);
 }
 
 export async function main(argv = process.argv.slice(2)) {

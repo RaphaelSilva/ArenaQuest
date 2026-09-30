@@ -16,6 +16,9 @@ import {
   renderCommand,
   isPlaceholder,
   wranglerEnvName,
+  externalSecretNames,
+  secretAction,
+  previewSecretFixCommand,
 } from './provision-label.mjs';
 
 const profileText = `/** profile comment */
@@ -226,6 +229,73 @@ test('the worker step goes through the deploy CLI, not a bare wrangler deploy', 
   const line = renderCommand(worker.commands[0]);
   assert.match(line, /scripts\/cloudflare\/deploy\.mjs/);
   assert.match(line, /--scope api/);
+});
+
+// ── Preview base-config secrets (RFC 0021) ──────────────────────────────────
+
+const schema = {
+  'api-secrets': {
+    JWT_SECRET: { required: true },
+    R2_ACCESS_KEY_ID: { required: true },
+    R2_SECRET_ACCESS_KEY: { required: true },
+    GOOGLE_CLIENT_SECRET: { required: true },
+    RESEND_API_KEY: { required: false, requiredWhen: 'MAIL_DRIVER=resend' },
+  },
+};
+const previewCommands = (env) => buildProvisionPlan(planProfile, env)
+  .find((s) => s.id === 'secrets').commands
+  .filter((argv) => argv.includes('preview'));
+
+test('the staging secrets group lists, then sets, JWT_SECRET on the Preview base config', () => {
+  const lines = previewCommands('staging').map(renderCommand);
+  assert.deepEqual(lines, [
+    'pnpm --filter api exec wrangler preview base-config secret list --env acme-staging --json',
+    'pnpm --filter api exec wrangler preview base-config secret put JWT_SECRET --env acme-staging',
+  ]);
+});
+
+test('production never touches the Preview base config', () => {
+  assert.deepEqual(previewCommands('production'), []);
+});
+
+test('--only secrets carries the preview commands and nothing else', () => {
+  const plan = buildProvisionPlan(planProfile, 'staging', { only: 'secrets' });
+  assert.deepEqual(plan.map((s) => s.id), ['secrets']);
+  assert.ok(plan[0].commands.some((argv) => argv.includes('base-config')));
+});
+
+test('the preview put command carries no value — it is read from stdin', () => {
+  const put = previewCommands('staging').find((argv) => argv.includes('put'));
+  assert.equal(put[put.length - 3], 'JWT_SECRET', 'the key is the last positional before --env');
+  assert.deepEqual(put.slice(-2), ['--env', 'acme-staging']);
+});
+
+test('the dry-run note names the external secrets for the Worker and the Preview base config', () => {
+  const step = buildProvisionPlan(planProfile, 'staging', { schema }).find((s) => s.id === 'secrets');
+  assert.match(step.note, /R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, GOOGLE_CLIENT_SECRET, RESEND_API_KEY/);
+  assert.match(step.note, /Preview base config/);
+  assert.doesNotMatch(step.note, /[0-9a-f]{64}/);
+});
+
+test('externalSecretNames excludes JWT_SECRET and gates RESEND_API_KEY on the mail driver', () => {
+  assert.deepEqual(externalSecretNames(schema, planProfile, 'staging'),
+    ['R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'GOOGLE_CLIENT_SECRET', 'RESEND_API_KEY']);
+  const consoleMail = structuredClone(planProfile);
+  consoleMail.environments.staging.mail.driver = 'console';
+  assert.ok(!externalSecretNames(schema, consoleMail, 'staging').includes('RESEND_API_KEY'));
+});
+
+test('secretAction never overwrites an existing secret and never reads a failed list as absent', () => {
+  assert.equal(secretAction(['JWT_SECRET', 'R2_ACCESS_KEY_ID'], 'JWT_SECRET'), 'keep');
+  assert.equal(secretAction([], 'JWT_SECRET'), 'put');
+  assert.equal(secretAction(null, 'JWT_SECRET'), 'unknown');
+});
+
+test('previewSecretFixCommand points at the Preview base config, not the Worker', () => {
+  assert.equal(
+    previewSecretFixCommand('GOOGLE_CLIENT_SECRET', 'acme-staging'),
+    'pnpm --filter api exec wrangler preview base-config secret put GOOGLE_CLIENT_SECRET --env acme-staging',
+  );
 });
 
 // ── misc ─────────────────────────────────────────────────────────────────────
