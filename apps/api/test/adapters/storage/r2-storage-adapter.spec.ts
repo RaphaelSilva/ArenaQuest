@@ -127,12 +127,22 @@ function makeAdapter(overrides?: Partial<ConstructorParameters<typeof R2StorageA
 
 describe('R2StorageAdapter', () => {
   describe('construction', () => {
-    it('throws when accessKeyId is missing', () => {
-      expect(() => makeAdapter({ accessKeyId: '' })).toThrow('accessKeyId');
+    // The container builds this adapter on every request: a missing S3
+    // credential must fail the S3 calls only, never every route.
+    it('builds without S3 credentials; the binding-backed calls still work', async () => {
+      const { adapter } = makeAdapter({ accessKeyId: '', secretAccessKey: '' });
+      await adapter.putObject('k', 'v');
+      expect(await adapter.headObject('k')).not.toBeNull();
     });
 
-    it('throws when secretAccessKey is missing', () => {
-      expect(() => makeAdapter({ secretAccessKey: '' })).toThrow('secretAccessKey');
+    it('throws on a presign when accessKeyId is missing', async () => {
+      const { adapter } = makeAdapter({ accessKeyId: '' });
+      await expect(adapter.getPresignedUploadUrl('k')).rejects.toThrow('accessKeyId');
+    });
+
+    it('throws on a presign when secretAccessKey is missing', async () => {
+      const { adapter } = makeAdapter({ secretAccessKey: '' });
+      await expect(adapter.getPresignedDownloadUrl('k')).rejects.toThrow('secretAccessKey');
     });
 
     it('throws when s3Endpoint is missing', () => {

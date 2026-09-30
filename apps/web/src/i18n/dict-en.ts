@@ -2142,4 +2142,8 @@ export const dictEn = {
     forbidden: 'You do not have permission to access this resource.',
     somethingWentWrong: 'Something went wrong. Please try again.',
   },
+  previewBanner: {
+    label: (name: string, sha?: string) => (sha ? `Preview ${name} · ${sha}` : `Preview ${name}`),
+    sharedData: 'Shared staging demo data',
+  },
 } as const satisfies Dictionary;

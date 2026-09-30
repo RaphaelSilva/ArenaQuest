@@ -1,6 +1,6 @@
 # Milestone 26 — Release-candidate previews and demo seed
 
-**Status:** 📝 Draft
+**Status:** 🚧 In Progress — all 14 tasks done on `feature/m26/candidate`; live checks pending (see the tasks' Acceptance Criteria)
 **Scope:** `scripts/demo/` (new), `scripts/db/` (new), `scripts/deploy/core.mjs`, `scripts/cloudflare/{deploy,provision-label}.mjs`, `scripts/label.mjs`, `apps/api/scripts/check-no-dev-seed.ts`, `apps/api/wrangler.jsonc`, `config/labels/*.jsonc`, `.github/workflows/`, `Makefile`, one web banner component, `docs/onboarding.md`. Derived from [RFC 0021](../../RFCs/0021-release-candidate-previews-and-demo-seed.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may touch
@@ -180,20 +180,20 @@ Out of scope (explicit, from RFC 0021 Non-Goals):
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [Wrangler ≥ 4.135 and staging deploys through the CLI](./01-wrangler-bump-and-staging-ci-via-cli.task.md) | 0 | Backend | ☐ Open |
-| 02 | [Staging profiles: console mail driver and spaziord webOrigin](./02-staging-profile-mail-and-origin.task.md) | 0 | Backend | ☐ Open |
-| 03 | [Demo ids and baseline dataset](./03-demo-ids-and-dataset.task.md) | 1 | Backend | ☐ Open |
-| 04 | [Seed CLI: users, groups, topics, enrollments, tags](./04-seed-demo-cli-core.task.md) | 1 | Backend | ☐ Open |
-| 05 | [Seed media: manifest, cache, R2 upload](./05-seed-demo-media.task.md) | 1 | Backend | ☐ Open |
-| 06 | [Seed gamification state](./06-seed-demo-gamification.task.md) | 1 | Backend | ☐ Open |
-| 07 | [Guard recognises demo accounts](./07-guard-demo-accounts.task.md) | 1 | Backend | ☐ Open |
-| 08 | [Demo seed CI job and Makefile targets](./08-demo-seed-ci-and-make.task.md) | 1 | Backend | ☐ Open |
-| 09 | [Disposable staging: db-reset-staging](./09-db-reset-staging.task.md) | 2 | Backend | ☐ Open |
-| 10 | [Migration lint: additive and frozen](./10-migration-lint.task.md) | 3 | Backend | ☐ Open |
-| 11 | [Generated `previews` blocks and preview secrets](./11-wrangler-previews-block.task.md) | 3 | Backend | ☐ Open |
-| 12 | [Deploy CLI `--preview` mode, Make targets and workflow](./12-deploy-cli-preview-mode.task.md) | 3 | Backend | ☐ Open |
-| 13 | [Preview banner](./13-preview-banner-frontend.task.md) | 3 | Frontend | ☐ Open |
-| 14 | [Demo extensions: events, billing, tasks, comments](./14-seed-demo-extensions.task.md) | 4 | Backend | ☐ Open |
+| 01 | [Wrangler ≥ 4.135 and staging deploys through the CLI](./01-wrangler-bump-and-staging-ci-via-cli.task.md) | 0 | Backend | ✅ Done |
+| 02 | [Staging profiles: console mail driver and spaziord webOrigin](./02-staging-profile-mail-and-origin.task.md) | 0 | Backend | ✅ Done |
+| 03 | [Demo ids and baseline dataset](./03-demo-ids-and-dataset.task.md) | 1 | Backend | ✅ Done |
+| 04 | [Seed CLI: users, groups, topics, enrollments, tags](./04-seed-demo-cli-core.task.md) | 1 | Backend | ✅ Done |
+| 05 | [Seed media: manifest, cache, R2 upload](./05-seed-demo-media.task.md) | 1 | Backend | ✅ Done |
+| 06 | [Seed gamification state](./06-seed-demo-gamification.task.md) | 1 | Backend | ✅ Done |
+| 07 | [Guard recognises demo accounts](./07-guard-demo-accounts.task.md) | 1 | Backend | ✅ Done |
+| 08 | [Demo seed CI job and Makefile targets](./08-demo-seed-ci-and-make.task.md) | 1 | Backend | ✅ Done |
+| 09 | [Disposable staging: db-reset-staging](./09-db-reset-staging.task.md) | 2 | Backend | ✅ Done |
+| 10 | [Migration lint: additive and frozen](./10-migration-lint.task.md) | 3 | Backend | ✅ Done |
+| 11 | [Generated `previews` blocks and preview secrets](./11-wrangler-previews-block.task.md) | 3 | Backend | ✅ Done |
+| 12 | [Deploy CLI `--preview` mode, Make targets and workflow](./12-deploy-cli-preview-mode.task.md) | 3 | Backend | ✅ Done |
+| 13 | [Preview banner](./13-preview-banner-frontend.task.md) | 3 | Frontend | ✅ Done |
+| 14 | [Demo extensions: events, billing, tasks, comments](./14-seed-demo-extensions.task.md) | 4 | Backend | ✅ Done |
 
 Dependency graph:
 
