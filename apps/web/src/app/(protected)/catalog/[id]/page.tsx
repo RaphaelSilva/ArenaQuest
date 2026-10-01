@@ -18,6 +18,7 @@ import { useDict } from '@web/context/dict-context';
 import { MainPaneSkeleton } from '@web/components/catalog/MainPaneSkeleton';
 import { Discussion } from '@web/components/catalog/Discussion';
 import { NotesPanel } from '@web/components/catalog/notes/NotesPanel';
+import { SubmissionsButton } from '@web/components/catalog/submissions/SubmissionsButton';
 
 type CatalogTopicPageProps = {
   params: Promise<{ id: string }>;
@@ -106,6 +107,9 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
 
       {/* Topic header */}
       <TopicHeader topic={topic} trail={trail} totalInBranch={totalInBranch} />
+
+      {/* Demonstrations — the only piece of the submissions feature on this page */}
+      <SubmissionsButton topicId={id} />
 
       {/* Progress bar */}
       <div className="mb-8">
