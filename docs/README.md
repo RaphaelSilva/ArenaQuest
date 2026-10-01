@@ -50,6 +50,9 @@ objectives and acceptance criteria; a task is one unit of work against that
 contract. Milestones 1–7 predate the RFC process and derive directly from
 [`product/specification.md`](./product/specification.md).
 
+The Claude Code skills that write and execute this chain — and how they hand
+work to one another — are mapped in [`.claude/skills/README.md`](../.claude/skills/README.md).
+
 ## What is *not* kept here
 
 Per-task execution plans (`planing/`), executor logs (`.executor-logs/`) and
