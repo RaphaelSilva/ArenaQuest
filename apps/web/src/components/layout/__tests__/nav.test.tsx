@@ -204,10 +204,14 @@ describe('Nav — the My demonstrations entry', () => {
     expect(link.className).toContain('bg-zinc-100');
   });
 
-  it('is not offered to staff, who do not upload or move submissions', () => {
-    roles = [ROLES.CONTENT_CREATOR];
+  it.each([
+    ['an admin', ROLES.ADMIN],
+    ['a content creator', ROLES.CONTENT_CREATOR],
+  ])('is offered to %s, who also upload demonstrations', (_label, role) => {
+    roles = [role];
     drawerOpen = true;
     renderNav();
-    expect(linksTo(document.body, '/submissions')).toHaveLength(0);
+    expect(linksTo(document.body, '/submissions')).toHaveLength(2);
+    expect(soleLinkTo(drawer(), '/submissions')).toHaveTextContent(label);
   });
 });

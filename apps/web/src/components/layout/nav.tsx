@@ -22,8 +22,7 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
     { label: dict.layout.nav.dashboard, href: '/dashboard', prefix: false },
     { label: dict.layout.nav.catalog, href: '/catalog', prefix: true },
     { label: dict.layout.nav.myNotes, href: '/notes', prefix: true },
-    // Staff neither upload nor move submissions; theirs is the per-student backoffice view.
-    ...(canAccessAdmin ? [] : [{ label: dict.submissions.myDemonstrations.navLabel, href: '/submissions', prefix: false }]),
+    { label: dict.submissions.myDemonstrations.navLabel, href: '/submissions', prefix: false },
     { label: dict.layout.nav.events, href: '/events', prefix: true },
     { label: dict.layout.nav.tasks, href: '/tasks', prefix: false },
     { label: dict.layout.nav.settings, href: '/settings', prefix: false },
@@ -177,14 +176,12 @@ export function Nav() {
           >
             {dict.layout.nav.myNotes}
           </Link>
-          {!canAccessAdmin && (
-            <Link
-              href="/submissions"
-              className={pathname === '/submissions' ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
-            >
-              {dict.submissions.myDemonstrations.navLabel}
-            </Link>
-          )}
+          <Link
+            href="/submissions"
+            className={pathname === '/submissions' ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
+          >
+            {dict.submissions.myDemonstrations.navLabel}
+          </Link>
           <Link
             href="/events"
             className={(pathname === '/events' || pathname.startsWith('/events/')) ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}

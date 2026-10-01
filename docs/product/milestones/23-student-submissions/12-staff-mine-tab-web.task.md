@@ -1,6 +1,6 @@
 # Task 12 — Frontend: *Minhas* tab and upload for staff (Phase 6)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md) — §7 as amended on 2026-10-01 ("Staff also upload")
 **Team:** Frontend Web
@@ -48,16 +48,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] An `admin` and a `content_creator` see *Todos* and *Minhas* on the Demonstrations page;
+- [x] An `admin` and a `content_creator` see *Todos* and *Minhas* on the Demonstrations page;
       *Minhas* shows only their own uploads and the **Enviar demonstração** button.
-- [ ] A staff user can upload, edit, share, move and delete their own demonstration from
+- [x] A staff user can upload, edit, share, move and delete their own demonstration from
       *Minhas*.
-- [ ] *Todos* still lists every submission grouped by student with the Task 09 actions; no edit
+- [x] *Todos* still lists every submission grouped by student with the Task 09 actions; no edit
       or move control appears on another user's submission.
-- [ ] Students see exactly what they saw before (*Minhas* / *Da turma*).
-- [ ] The *Minhas demonstrações* nav entry is shown to staff and students.
-- [ ] `make lint` and `make test-web` green; web `tsc --noEmit` adds no new error.
-- [ ] No diff outside the scope guardrail.
+- [x] Students see exactly what they saw before (*Minhas* / *Da turma*).
+- [x] The *Minhas demonstrações* nav entry is shown to staff and students.
+- [x] `make lint` and `make test-web` green; web `tsc --noEmit` adds no new error.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
