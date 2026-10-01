@@ -23,6 +23,17 @@ export type PresignSubmissionResult = components['schemas']['PresignSubmissionRe
 
 export type EditSubmissionInput = components['schemas']['EditSubmissionBody'];
 
+/** One row of "My demonstrations": the caller's own submission, its topic title and whether that topic is still readable. */
+export type AuthoredSubmission = components['schemas']['AuthoredSubmission'];
+
+/** What a move did: the moved submissions (now private) and a reason per refused id. */
+export type MoveSubmissionsResult = components['schemas']['MoveSubmissionsResult'];
+
+export type MoveRefusalReason = MoveSubmissionsResult['refused'][number]['reason'];
+
+/** Most ids one move request may carry (RFC 0020 §6), mirrored by the select mode. */
+export const SUBMISSION_MOVE_MAX_IDS = 10;
+
 export type SubmissionsApiErrorCode =
   | 'Unauthorized'
   | 'Forbidden'
@@ -249,6 +260,28 @@ export function createSubmissionsApi(http: HttpTransport) {
       const res = await send(http, 'PATCH', one(topicId, submissionId), input);
       if (!res.ok) throw await toError(res);
       return (await res.json()) as Submission;
+    },
+
+    /**
+     * A page of every submission the caller owns, across topics, newest first,
+     * each with its topic title and `topicAccessible`.
+     */
+    async listMyAll(cursor?: string | null): Promise<SubmissionPage<AuthoredSubmission>> {
+      const query = cursor ? `?${new URLSearchParams({ cursor }).toString()}` : '';
+      const res = await send(http, 'GET', `/me/submissions${query}`);
+      if (!res.ok) throw await toError(res);
+      return (await res.json()) as SubmissionPage<AuthoredSubmission>;
+    },
+
+    /**
+     * Moves up to 10 of the caller's ready submissions to `targetTopicId`, in
+     * order. Partial success is normal: each refused id carries its reason.
+     * `NotFound` when the target is not readable.
+     */
+    async move(ids: string[], targetTopicId: string): Promise<MoveSubmissionsResult> {
+      const res = await send(http, 'POST', '/me/submissions/move', { ids, targetTopicId });
+      if (!res.ok) throw await toError(res);
+      return (await res.json()) as MoveSubmissionsResult;
     },
 
     /** Deletes a pending or ready submission, or dismisses a tombstone. */

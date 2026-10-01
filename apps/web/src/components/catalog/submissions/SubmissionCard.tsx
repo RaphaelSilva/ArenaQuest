@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Image from 'next/image';
 import { useDict } from '@web/context/dict-context';
 import type { SubmissionView } from '@web/lib/submissions-api';
@@ -13,12 +13,22 @@ type SubmissionCardProps = {
   submission: SubmissionView;
   /** Opens a ready submission in the viewer. */
   onOpen: (submission: SubmissionView) => void;
-  onEdit: (submission: SubmissionView) => void;
+  /** Absent on a read-only row (a topic the student lost): no *Edit* button. */
+  onEdit?: (submission: SubmissionView) => void;
+  /** *Move to another topic* — offered on ready submissions only. */
+  onMove?: (submission: SubmissionView) => void;
   /**
    * Deletes the row: a ready submission (after confirmation), an interrupted
    * upload (*Discard*) or a tombstone (*Dismiss*). Rejects on failure.
    */
   onDelete: (submission: SubmissionView) => Promise<void>;
+  /**
+   * Select mode: a checkbox replaces the actions. Only ready submissions can
+   * be selected; `disabled` is set once the selection is full.
+   */
+  selection?: { selected: boolean; disabled: boolean; onToggle: (submission: SubmissionView) => void };
+  /** A line under the card's details, e.g. why the row is read-only. */
+  notice?: ReactNode;
 };
 
 export const KIND_ICONS = { video: '🎬', image: '🖼️', pdf: '📄' } as const;
@@ -33,11 +43,12 @@ function excerpt(markdown: string, max = 140): string {
 
 /**
  * One of the student's own submissions. A ready one shows its preview, title,
- * excerpt, date, size and badges with *Edit* and *Delete*; a pending one is an
+ * excerpt, date, size and badges with *Edit*, *Move* and *Delete* (or a
+ * selection checkbox in select mode); a pending one is an
  * interrupted upload with *Discard*; a removed one is the staff tombstone with
  * only *Dismiss*.
  */
-export function SubmissionCard({ submission, onOpen, onEdit, onDelete }: SubmissionCardProps) {
+export function SubmissionCard({ submission, onOpen, onEdit, onMove, onDelete, selection, notice }: SubmissionCardProps) {
   const dict = useDict();
   const t = dict.submissions;
   const [confirming, setConfirming] = useState(false);
@@ -130,8 +141,21 @@ export function SubmissionCard({ submission, onOpen, onEdit, onDelete }: Submiss
     <article
       aria-label={submission.title}
       className="flex gap-3 rounded-[12px] border p-3 sm:p-4"
-      style={{ borderColor: 'var(--aq-border)', background: 'var(--aq-bg2)' }}
+      style={{
+        borderColor: selection?.selected ? 'var(--aq-accent)' : 'var(--aq-border)',
+        background: 'var(--aq-bg2)',
+      }}
     >
+      {selection && (
+        <input
+          type="checkbox"
+          checked={selection.selected}
+          disabled={selection.disabled && !selection.selected}
+          onChange={() => selection.onToggle(submission)}
+          aria-label={t.select.toggle(submission.title)}
+          className="mt-1 h-4 w-4 flex-shrink-0 cursor-pointer disabled:cursor-not-allowed"
+        />
+      )}
       <button
         type="button"
         onClick={() => onOpen(submission)}
@@ -173,9 +197,11 @@ export function SubmissionCard({ submission, onOpen, onEdit, onDelete }: Submiss
           {formatBytes(dict, submission.sizeBytes)}
         </p>
 
+        {notice}
+
         {errorLine}
 
-        {confirming ? (
+        {selection ? null : confirming ? (
           <div role="group" className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-[12px]" style={{ color: 'var(--aq-text)' }}>
               {t.delete.confirm}
@@ -202,14 +228,26 @@ export function SubmissionCard({ submission, onOpen, onEdit, onDelete }: Submiss
           </div>
         ) : (
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => onEdit(submission)}
-              className={secondaryButton}
-              style={{ borderColor: 'var(--aq-border2)', color: 'var(--aq-text)' }}
-            >
-              {t.card.edit}
-            </button>
+            {onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(submission)}
+                className={secondaryButton}
+                style={{ borderColor: 'var(--aq-border2)', color: 'var(--aq-text)' }}
+              >
+                {t.card.edit}
+              </button>
+            )}
+            {onMove && (
+              <button
+                type="button"
+                onClick={() => onMove(submission)}
+                className={secondaryButton}
+                style={{ borderColor: 'var(--aq-border2)', color: 'var(--aq-text)' }}
+              >
+                {t.card.move}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setConfirming(true)}
