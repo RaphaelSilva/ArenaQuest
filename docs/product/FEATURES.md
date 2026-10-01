@@ -129,6 +129,18 @@ Includes a per-topic discussion list.
 **Code:** `apps/web/src/app/(protected)/catalog/`, `apps/web/src/components/catalog/`
 → [M11 Catalog redesign](./milestones/11-catalog-redesign/milestone.md) · [RFC 0004](./RFCs/0004-catalog-redesign.md) · ✅
 
+### Catalog search by title and tags
+The catalog sidebar search matches word by word against topic titles and tags,
+ignoring case, accents and extra whitespace, so `chudan`, `tsuki chudan` and
+`kata  basica` all find their topic. A `#slug` term or a `?tag=` URL parameter
+filters by tag alone. Topics show their tags as chips, and each chip on a topic page
+links to the filtered catalog. In the backoffice a tag combobox authors tags by name
+(the first spelling of a slug wins), and the bulk importer accepts a `"tags"` key in
+a folder README fence.
+
+**Code:** `apps/web/src/lib/catalog-search.ts`, `apps/web/src/components/catalog/`, `apps/web/src/components/admin/TagCombobox.tsx`, `apps/api/src/controllers/admin-tags.controller.ts`, `scripts/content/import-media.mjs`
+→ [M24 Catalog search by tags](./milestones/24-catalog-search-by-tags/milestone.md) · [RFC 0017](./RFCs/0017-catalog-search-by-tags.md) · ✅
+
 ---
 
 ## 4. Tasks, Engagement & Progress

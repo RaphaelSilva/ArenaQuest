@@ -1,5 +1,9 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { AdminTopicsController } from '@api/controllers/admin-topics.controller';
+import {
+  AdminTopicsController,
+  TAG_NAME_MAX_LENGTH,
+  TAG_NAMES_MAX_COUNT,
+} from '@api/controllers/admin-topics.controller';
 import { AdminMediaController } from '@api/controllers/admin-media.controller';
 import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
 import type { AppContainer } from '@api/container';
@@ -19,6 +23,18 @@ const TagSchema = z.object({
   name: z.string(),
   slug: z.string(),
 });
+
+const TagNamesBodySchema = z
+  .array(z.string().trim().min(1).max(TAG_NAME_MAX_LENGTH))
+  .max(TAG_NAMES_MAX_COUNT)
+  .optional()
+  .openapi({
+    description:
+      'Tag names (1–40 characters each after trim, at most 20). Each name is slugified; an existing slug is ' +
+      'reused with its stored name, a new one is created. Mutually exclusive with `tagIds`. On PATCH, `[]` ' +
+      'removes every tag and omitting the field leaves them unchanged.',
+    example: ['Chūdan', 'Kata'],
+  });
 
 const MediaSchema = z.object({
   id: z.string().uuid(),
@@ -102,7 +118,10 @@ export const createTopicRoute = createRoute({
             status: TopicStatusSchema.optional(),
             visibility: TopicVisibilitySchema.optional(),
             estimatedMinutes: z.number().int().min(0).optional(),
-            tagIds: z.array(z.string()).optional(),
+            tagIds: z.array(z.string()).optional().openapi({
+              description: 'Tag IDs to link. Mutually exclusive with `tags`; an unknown ID returns 422 UNKNOWN_TAG.',
+            }),
+            tags: TagNamesBodySchema,
             prerequisiteIds: z.array(z.string()).optional(),
           }),
         },
@@ -119,7 +138,13 @@ export const createTopicRoute = createRoute({
       },
     },
     400: {
-      description: 'Bad Request / Validation Failed',
+      description: 'Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters)',
+    },
+    404: {
+      description: 'Parent topic not found',
+    },
+    422: {
+      description: 'UNKNOWN_TAG or UNKNOWN_PREREQ — a referenced ID does not exist; nothing is written',
     },
   },
 });
@@ -171,7 +196,10 @@ export const updateTopicRoute = createRoute({
             status: TopicStatusSchema.optional(),
             visibility: TopicVisibilitySchema.optional(),
             estimatedMinutes: z.number().int().min(0).optional(),
-            tagIds: z.array(z.string()).optional(),
+            tagIds: z.array(z.string()).optional().openapi({
+              description: 'Tag IDs to link. Mutually exclusive with `tags`; an unknown ID returns 422 UNKNOWN_TAG.',
+            }),
+            tags: TagNamesBodySchema,
             prerequisiteIds: z.array(z.string()).optional(),
           }),
         },
@@ -188,10 +216,13 @@ export const updateTopicRoute = createRoute({
       },
     },
     400: {
-      description: 'Bad Request / Validation Failed',
+      description: 'Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters)',
     },
     404: {
       description: 'Topic not found',
+    },
+    422: {
+      description: 'UNKNOWN_TAG or UNKNOWN_PREREQ — a referenced ID does not exist; nothing is written',
     },
   },
 });

@@ -241,6 +241,31 @@ describe('Phase 0 — enrollment enforcement', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Tags do not widen the catalog (M24 Task 02 regression)
+// ---------------------------------------------------------------------------
+
+describe('Tagged topics stay bounded by enrollment', () => {
+  it('student GET /topics omits a tagged topic outside their effective-access set', async () => {
+    const tagged = await req('PATCH', `/admin/topics/${ungrantedTopicId}`, {
+      token: adminToken,
+      body: { tags: ['Enrollment Bound'] },
+    });
+    expect(tagged.status).toBe(200);
+
+    const studentRes = await req('GET', '/topics', { token: studentToken });
+    expect(studentRes.status).toBe(200);
+    const studentIds = (await studentRes.json<{ data: { id: string }[] }>()).data.map(t => t.id);
+    expect(studentIds).not.toContain(ungrantedTopicId);
+
+    // Sanity: the tag really is on the topic, visible to an admin.
+    const adminRes = await req('GET', '/topics', { token: adminToken });
+    const adminTopic = (await adminRes.json<{ data: { id: string; tags?: { slug: string }[] }[] }>())
+      .data.find(t => t.id === ungrantedTopicId);
+    expect(adminTopic?.tags?.map(t => t.slug)).toContain('enrollment-bound');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Visibility filter
 // ---------------------------------------------------------------------------
 

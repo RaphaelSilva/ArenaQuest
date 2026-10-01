@@ -30,6 +30,8 @@ export type CreateTopicInput = {
   status?: 'draft' | 'published' | 'archived';
   visibility?: 'public' | 'restricted' | 'private';
   estimatedMinutes?: number;
+  /** Tag names; missing tags are created by slug server-side. Never sent with `tagIds`. */
+  tags?: string[];
   tagIds?: string[];
   prerequisiteIds?: string[];
 };
@@ -40,6 +42,8 @@ export type UpdateTopicInput = {
   status?: 'draft' | 'published' | 'archived';
   visibility?: 'public' | 'restricted' | 'private';
   estimatedMinutes?: number;
+  /** Tag names; missing tags are created by slug server-side. Never sent with `tagIds`. */
+  tags?: string[];
   tagIds?: string[];
   prerequisiteIds?: string[];
 };

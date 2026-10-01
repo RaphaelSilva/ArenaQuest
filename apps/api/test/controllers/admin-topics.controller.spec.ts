@@ -39,13 +39,24 @@ function makeTopicsRepo(overrides: Partial<ITopicNodeRepository> = {}): ITopicNo
   };
 }
 
-function makeTagsRepo(): ITagRepository {
+/** In-memory fake with the adapter's first-spelling-wins semantics. */
+function makeTagsRepo(seed: Entities.Content.Tag[] = []): ITagRepository {
+  const bySlug = new Map(seed.map(t => [t.slug, t]));
+  let seq = 0;
   return {
-    list: vi.fn(async () => []),
-    findBySlug: vi.fn(async () => null),
-    upsertMany: vi.fn(async () => []),
+    list: vi.fn(async () => [...bySlug.values()]),
+    findBySlug: vi.fn(async (slug) => bySlug.get(slug) ?? null),
+    findByIds: vi.fn(async (ids) => [...bySlug.values()].filter(t => ids.includes(t.id))),
+    upsertMany: vi.fn(async (tags) => {
+      for (const t of tags) {
+        if (!bySlug.has(t.slug)) bySlug.set(t.slug, { id: `tag-${++seq}`, name: t.name, slug: t.slug });
+      }
+      return tags.map(t => bySlug.get(t.slug)!);
+    }),
   };
 }
+
+const CHUDAN: Entities.Content.Tag = { id: 'tag-chudan', name: 'Chūdan', slug: 'chudan' };
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -232,6 +243,93 @@ describe('AdminTopicsController', () => {
       expect(result.ok).toBe(false);
       if (result.ok) return;
       expect(result.status).toBe(404);
+    });
+  });
+
+  // ── tags ──────────────────────────────────────────────────────────────────
+
+  describe('tags', () => {
+    let tagsRepo: ITagRepository;
+
+    beforeEach(() => {
+      tagsRepo = makeTagsRepo([CHUDAN]);
+      controller = new AdminTopicsController(topicsRepo, tagsRepo);
+    });
+
+    const createArg = () => (topicsRepo.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const updateArg = () => (topicsRepo.update as ReturnType<typeof vi.fn>).mock.calls[0][1];
+
+    it('update: tags [CHUDAN] reuses the stored Chūdan tag without renaming it', async () => {
+      const result = await controller.update('root-1', { tags: ['CHUDAN'] });
+      expect(result.ok).toBe(true);
+      expect(tagsRepo.upsertMany).toHaveBeenCalledWith([{ name: 'CHUDAN', slug: 'chudan' }]);
+      expect(updateArg().tagIds).toEqual([CHUDAN.id]);
+      expect((await tagsRepo.findBySlug('chudan'))!.name).toBe('Chūdan');
+    });
+
+    it('create: de-duplicates names by slug, keeping the first spelling', async () => {
+      const result = await controller.create({ title: 'T', tags: ['Soco', 'soco', ' SOCO '] });
+      expect(result.ok).toBe(true);
+      expect(tagsRepo.upsertMany).toHaveBeenCalledWith([{ name: 'Soco', slug: 'soco' }]);
+      expect(createArg().tagIds).toHaveLength(1);
+    });
+
+    it('returns 400 when a name has no usable characters, writing nothing', async () => {
+      const result = await controller.create({ title: 'T', tags: ['ok', '!!!'] });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(400);
+      expect(result.meta?.detail).toContain('!!!');
+      expect(tagsRepo.upsertMany).not.toHaveBeenCalled();
+      expect(topicsRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when both tags and tagIds are sent', async () => {
+      const result = await controller.update('root-1', { tags: ['a'], tagIds: [CHUDAN.id] });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(400);
+      expect(topicsRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 422 UNKNOWN_TAG for an unknown tagId, writing nothing', async () => {
+      const result = await controller.update('root-1', { tagIds: [CHUDAN.id, 'ghost-id'] });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(422);
+      expect(result.error).toBe('UNKNOWN_TAG');
+      expect(result.meta?.detail).toContain('ghost-id');
+      expect(topicsRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('create: unknown tagId also returns 422 UNKNOWN_TAG', async () => {
+      const result = await controller.create({ title: 'T', tagIds: ['ghost-id'] });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error).toBe('UNKNOWN_TAG');
+      expect(topicsRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('does not upsert tags when a later check fails (unknown prerequisite)', async () => {
+      const result = await controller.create({ title: 'T', tags: ['New'], prerequisiteIds: ['missing'] });
+      expect(result.ok).toBe(false);
+      expect(tagsRepo.upsertMany).not.toHaveBeenCalled();
+    });
+
+    it('update: tags [] clears the links; omitting tags leaves them unchanged', async () => {
+      await controller.update('root-1', { tags: [] });
+      expect(updateArg().tagIds).toEqual([]);
+      expect(tagsRepo.upsertMany).not.toHaveBeenCalled();
+
+      (topicsRepo.update as ReturnType<typeof vi.fn>).mockClear();
+      await controller.update('root-1', { title: 'Renamed' });
+      expect(updateArg().tagIds).toBeUndefined();
+    });
+
+    it('update: known tagIds are forwarded as before', async () => {
+      const result = await controller.update('root-1', { tagIds: [CHUDAN.id] });
+      expect(result.ok).toBe(true);
+      expect(updateArg().tagIds).toEqual([CHUDAN.id]);
     });
   });
 });

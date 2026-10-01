@@ -133,7 +133,8 @@ media: its markdown becomes that topic's `content` (the API sanitises it with
 
 ````
 ```arenaquest
-{ "order": 9, "status": "draft", "estimatedMinutes": 90, "title": "9th Kyu" }
+{ "order": 9, "status": "draft", "estimatedMinutes": 90, "title": "9th Kyu",
+  "tags": ["Soco", "Kihon"] }
 ```
 ````
 
@@ -145,6 +146,14 @@ order — that is what fixes a tree whose folder names sort against their real
 sequence. On a re-run a reused topic is `PATCH`ed only when its README actually
 drifted, and a sibling group already in place is not moved, so a no-op re-run
 performs no writes at all.
+
+`tags` is a list of tag *names*, sent by name on create: the API slugifies each,
+reuses an existing tag with the same slug (keeping its first spelling) and creates
+the rest. `"tags": []` clears the topic's tags, while omitting the key leaves them
+untouched. A name with no usable characters (nothing survives slugifying) is dropped
+with a warning, and a `tags` that is not an array of strings is ignored with a
+warning. On a re-run drift is compared as **slug sets**, so re-casing or
+re-accenting a name is not drift and an unchanged tree still performs no writes.
 
 **Google Drive source.** `scripts/content/drive-source.mjs` lists a folder
 recursively (following `nextPageToken`, covering Shared Drives), downloads
