@@ -200,7 +200,7 @@ interface DashboardShape {
 - Route: extend `GET /v1/me/dashboard`; do not add a second learner dashboard.
 - Empty state: `recommendations: []`, not `404` and not a failure of the other
   dashboard sections.
-- Authorization: authenticated learner only; each item must pass the existing
+- Authorization: authenticated participant only; each item must pass the existing
   effective-access / visibility policy before it is returned.
 - Deduplication: one topic appears at most once even when recommended by multiple
   groups. Which reason wins and how source groups are audited are open decisions;
