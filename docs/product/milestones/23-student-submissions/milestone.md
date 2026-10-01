@@ -125,7 +125,7 @@ Each task is one independent PR with one owner and one review surface. Backend a
 | 06 | [Demonstrations page — Mine tab and upload](./06-mine-tab-and-upload-web.task.md) | 4 | Frontend | ✅ Done |
 | 07 | [Class tab, full-screen viewer and direct link](./07-class-tab-and-viewer-web.task.md) | 4 | Frontend | ✅ Done |
 | 08 | [Move dialog and My demonstrations page](./08-move-and-my-demonstrations-web.task.md) | 4 | Frontend | ✅ Done |
-| 09 | [Staff submission surfaces](./09-staff-surfaces-web.task.md) | 4 | Frontend | ☐ Open |
+| 09 | [Staff submission surfaces](./09-staff-surfaces-web.task.md) | 4 | Frontend | ✅ Done |
 | 10 | [Local seed and documentation closeout](./10-seed-and-docs.task.md) | 5 | Backend | ☐ Open |
 
 Dependency graph:
