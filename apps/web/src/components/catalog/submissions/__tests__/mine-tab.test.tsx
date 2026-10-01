@@ -137,4 +137,24 @@ describe('MineTab', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: t.viewer.close }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+  it('opens Mine cards in the shared viewer, stepping over ready items only', async () => {
+    mockClient.submissions.listMine.mockResolvedValue({
+      data: [
+        view({ id: 'a', title: 'Kata A', visibility: 'shared', sharedAt: '2026-09-30 10:00:00' }),
+        view({ id: 'p', title: 'Half', status: 'pending', url: null }),
+        view({ id: 'b', title: 'Kata B' }),
+      ],
+      nextCursor: null,
+    });
+    render(<MineTab topicId="t1" summary={summary()} onUsageChanged={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: t.card.open('Kata A') }));
+    const first = screen.getByRole('dialog', { name: t.viewer.label('Kata A') });
+    expect(within(first).getByRole('button', { name: t.viewer.copyLink })).toBeInTheDocument();
+    fireEvent.click(within(first).getByRole('button', { name: new RegExp(t.viewer.next) }));
+
+    const second = screen.getByRole('dialog', { name: t.viewer.label('Kata B') });
+    expect(within(second).queryByRole('button', { name: t.viewer.copyLink })).not.toBeInTheDocument();
+    expect(within(second).getByRole('button', { name: new RegExp(t.viewer.next) })).toBeDisabled();
+  });
 });

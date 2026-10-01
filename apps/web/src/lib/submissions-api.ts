@@ -208,6 +208,28 @@ export function createSubmissionsApi(http: HttpTransport) {
       return (await res.json()) as SubmissionPage<SubmissionView>;
     },
 
+    /**
+     * A page of the class's shared, ready submissions on a topic, newest first,
+     * the caller's own flagged `isMine`. Empty while sharing is off.
+     */
+    async listClass(topicId: string, cursor?: string | null): Promise<SubmissionPage<SubmissionView>> {
+      const query = new URLSearchParams({ scope: 'class' });
+      if (cursor) query.set('cursor', cursor);
+      const res = await send(http, 'GET', `${base(topicId)}?${query.toString()}`);
+      if (!res.ok) throw await toError(res);
+      return (await res.json()) as SubmissionPage<SubmissionView>;
+    },
+
+    /**
+     * One submission (the direct link). `NotFound` whenever the caller cannot
+     * see it — the API never says whether it exists.
+     */
+    async getOne(topicId: string, submissionId: string): Promise<SubmissionView> {
+      const res = await send(http, 'GET', one(topicId, submissionId));
+      if (!res.ok) throw await toError(res);
+      return (await res.json()) as SubmissionView;
+    },
+
     /** Creates a `pending` submission and returns its presigned PUT. */
     async presign(topicId: string, input: PresignSubmissionInput): Promise<PresignSubmissionResult> {
       const res = await send(http, 'POST', `${base(topicId)}/presign`, input);

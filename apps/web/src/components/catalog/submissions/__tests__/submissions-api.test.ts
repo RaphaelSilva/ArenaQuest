@@ -29,6 +29,20 @@ describe('submissions-api', () => {
     expect(http).toHaveBeenCalledWith('GET', '/topics/t1/submissions?scope=mine&cursor=abc', undefined);
   });
 
+  it('lists the class’s shared submissions with scope=class and reads one by id', async () => {
+    const http = vi
+      .fn()
+      .mockResolvedValueOnce(json(200, { data: [], nextCursor: null }))
+      .mockResolvedValueOnce(json(200, { id: 's 1' }))
+      .mockResolvedValueOnce(json(404, { error: 'NotFound' }));
+    const api = createSubmissionsApi(http);
+    await api.listClass('t1', 'c2');
+    expect(http).toHaveBeenCalledWith('GET', '/topics/t1/submissions?scope=class&cursor=c2', undefined);
+    await api.getOne('t1', 's 1');
+    expect(http).toHaveBeenLastCalledWith('GET', '/topics/t1/submissions/s%201', undefined);
+    expect((await caught(api.getOne('t1', 'x'))).code).toBe('NotFound');
+  });
+
   it('maps 409 SUBMISSION_QUOTA with its spread meta', async () => {
     const http = vi.fn().mockResolvedValue(json(409, { error: 'SUBMISSION_QUOTA', reason: 'storage', used: 5, limit: 1024 }));
     const err = await caught(createSubmissionsApi(http).presign('t1', {
