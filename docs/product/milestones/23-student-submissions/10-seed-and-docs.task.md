@@ -1,6 +1,6 @@
 # Task 10 — Backend: Local seed and documentation closeout (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md)
 **Team:** Backend API
@@ -56,16 +56,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] After `make db-reset-local`, the seeded student sees a private, a shared, a moderated
+- [x] After `make db-reset-local`, the seeded student sees a private, a shared, a moderated
       and a removed submission on the seeded topic, and the videos play.
-- [ ] `check-no-dev-seed.ts` rejects the new seed for staging and production; running
+- [x] `check-no-dev-seed.ts` rejects the new seed for staging and production; running
       `make db-seed-local` twice leaves the same rows.
-- [ ] `CLAUDE.md` and `FEATURES.md` describe the feature; `closeout-analysis.md` maps every
+- [x] `CLAUDE.md` and `FEATURES.md` describe the feature; `closeout-analysis.md` maps every
       milestone §3 box to its evidence.
-- [ ] RFC 0020 reads `Implemented` in its header and README row; `check-rfc.mjs` and
+- [x] RFC 0020 reads `Implemented` in its header and README row; `check-rfc.mjs` and
       `check-feature.mjs` pass.
-- [ ] `make lint`, `make test-api` and `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `make lint`, `make test-api` and `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -1,7 +1,7 @@
 # RFC 0020: Student submissions — students upload, manage and move demonstration media per topic
 
 **Date:** 2026-09-29
-**Status:** Proposed
+**Status:** Implemented
 **Revised:** 2026-09-29
 **Author:** raphaelsilva
 **Affected:**
