@@ -2,20 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
+import { useHasRole } from '@web/hooks/use-auth';
 import type { SubmissionSummary } from '@web/lib/submissions-api';
 
 /**
  * The only piece of the feature on the topic page: a link to the
  * Demonstrations page carrying the caller's and the class counts (the class
- * count is omitted when the label's sharing is off). Without a summary the
+ * count is omitted when the label's sharing is off). Staff get *Student
+ * demonstrations* with the topic's total instead. Without a summary the
  * button still renders, just without counts.
  */
 export function SubmissionsButton({ topicId }: { topicId: string }) {
   const dict = useDict();
   const t = dict.submissions.button;
   const client = useApiClient();
+  const isStaff = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
   const [summary, setSummary] = useState<SubmissionSummary | null>(null);
 
   useEffect(() => {
@@ -33,11 +37,13 @@ export function SubmissionsButton({ topicId }: { topicId: string }) {
     };
   }, [client, topicId]);
 
-  const counts = summary
-    ? summary.sharingEnabled
+  const counts = !summary
+    ? null
+    : isStaff
+      ? t.total(summary.totalCount ?? 0)
+      : summary.sharingEnabled
       ? t.mineAndClass(summary.usage.topicCount, summary.classCount)
-      : t.mine(summary.usage.topicCount)
-    : null;
+        : t.mine(summary.usage.topicCount);
 
   return (
     <div className="mb-8">
@@ -48,7 +54,7 @@ export function SubmissionsButton({ topicId }: { topicId: string }) {
       >
         <span aria-hidden>🎬</span>
         <span className="text-[14px] font-bold" style={{ color: 'var(--aq-text)' }}>
-          {t.label}
+          {isStaff ? t.staffLabel : t.label}
         </span>
         {counts && (
           <span className="text-[13px]" style={{ color: 'var(--aq-text2)' }}>

@@ -22,6 +22,32 @@ async function caught(promise: Promise<unknown>): Promise<SubmissionsApiError> {
 }
 
 describe('submissions-api', () => {
+  it('calls the staff routes: scope=all, per-user list, unshare, clear moderation and remove', async () => {
+    const http = vi
+      .fn()
+      .mockResolvedValueOnce(json(200, { data: [], nextCursor: null }))
+      .mockResolvedValueOnce(json(200, { data: [], nextCursor: null }))
+      .mockResolvedValueOnce(json(200, { id: 's1', moderated: true }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(json(502, { error: 'StorageUnavailable' }))
+      .mockResolvedValueOnce(json(403, { error: 'Forbidden' }));
+    const api = createSubmissionsApi(http);
+
+    await api.listAll('t1', 'c1');
+    expect(http).toHaveBeenLastCalledWith('GET', '/topics/t1/submissions?scope=all&cursor=c1', undefined);
+    await api.listByUser('u 1', 'c2');
+    expect(http).toHaveBeenLastCalledWith('GET', '/admin/users/u%201/submissions?cursor=c2', undefined);
+    expect(await api.unshare('s1')).toEqual({ id: 's1', moderated: true });
+    expect(http).toHaveBeenLastCalledWith('POST', '/admin/submissions/s1/unshare', undefined);
+    await api.clearModeration('s1');
+    expect(http).toHaveBeenLastCalledWith('DELETE', '/admin/submissions/s1/moderation', undefined);
+    await api.removeByStaff('s1');
+    expect(http).toHaveBeenLastCalledWith('DELETE', '/admin/submissions/s1', undefined);
+    expect((await caught(api.removeByStaff('s1'))).code).toBe('StorageUnavailable');
+    expect((await caught(api.removeByStaff('s1'))).code).toBe('Forbidden');
+  });
+
   it('lists the caller’s own submissions with scope=mine and the cursor', async () => {
     const http = vi.fn().mockResolvedValue(json(200, { data: [], nextCursor: null }));
     const api = createSubmissionsApi(http);

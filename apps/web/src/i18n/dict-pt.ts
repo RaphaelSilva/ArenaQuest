@@ -2485,6 +2485,8 @@ export const dictPt = {
       mine: (count: number) => `${count} ${count === 1 ? 'minha' : 'minhas'}`,
       mineAndClass: (mine: number, cls: number) =>
         `${mine} ${mine === 1 ? 'minha' : 'minhas'} · ${cls} da turma`,
+      staffLabel: 'Demonstrações dos alunos',
+      total: (count: number) => (count === 1 ? '1 no total' : `${count} no total`),
     },
     size: {
       bytes: (n: number) => `${n} B`,
@@ -2505,7 +2507,6 @@ export const dictPt = {
       mine: 'Minhas',
       class: 'Da turma',
       all: 'Todos',
-      comingSoon: 'Esta aba estará disponível em breve.',
     },
     quota: {
       line: (count: number, max: number, used: string, limit: string) =>
@@ -2686,6 +2687,38 @@ export const dictPt = {
       inaccessible:
         'Você não tem mais acesso a este tópico, então esta demonstração é só para leitura. Você ainda pode excluí-la ou movê-la para outro tópico.',
       editLoadError: 'Não foi possível abrir a edição. Tente de novo.',
+    },
+    staff: {
+      allLabel: 'Todas as demonstrações deste tópico, por aluno',
+      loading: 'Carregando as demonstrações…',
+      loadError: 'Não foi possível carregar as demonstrações.',
+      empty: 'Nenhum aluno enviou demonstração neste tópico ainda.',
+      groupLabel: (name: string) => `Demonstrações de ${name}`,
+      groupCount: (count: number) => (count === 1 ? '1 demonstração' : `${count} demonstrações`),
+      removedBadge: 'Removida',
+      removedBy: (name: string, date: string) => `Removida por ${name} em ${date}`,
+      removedOn: (date: string) => `Removida em ${date}`,
+      unshare: 'Remover compartilhamento',
+      confirmUnshare: 'Tornar esta demonstração privada? O aluno não poderá compartilhá-la de novo até você permitir.',
+      unshareError: 'Não foi possível remover o compartilhamento. Tente de novo.',
+      allowSharing: 'Permitir compartilhar de novo',
+      confirmAllowSharing:
+        'Permitir que o aluno compartilhe esta demonstração de novo? Ela continua privada até ele compartilhar.',
+      allowSharingError: 'Não foi possível permitir o compartilhamento. Tente de novo.',
+      remove: 'Remover',
+      confirmRemove:
+        'Remover esta demonstração? O arquivo será apagado e o aluno verá "Removido pela equipe". Isso não pode ser desfeito.',
+      confirm: 'Confirmar',
+      cancel: 'Cancelar',
+      pending: 'Salvando…',
+      userSection: {
+        title: 'Demonstrações',
+        loading: 'Carregando as demonstrações…',
+        loadError: 'Não foi possível carregar as demonstrações.',
+        empty: 'Este usuário não enviou nenhuma demonstração.',
+        emptyHint: 'As demonstrações enviadas nos tópicos do catálogo aparecem aqui.',
+        groupLabel: (topic: string) => `Demonstrações em ${topic}`,
+      },
     },
     errors: {
       quotaCount: (limit: number) => `Limite de ${limit} demonstrações neste tópico atingido.`,

@@ -7,7 +7,7 @@ import { summary, view } from './fixtures';
 
 const mockClient = {
   topics: { getById: vi.fn() },
-  submissions: { summary: vi.fn(), listMine: vi.fn(), listClass: vi.fn(), getOne: vi.fn() },
+  submissions: { summary: vi.fn(), listMine: vi.fn(), listClass: vi.fn(), listAll: vi.fn(), getOne: vi.fn() },
 };
 
 const mockReplace = vi.fn();
@@ -45,6 +45,7 @@ describe('SubmissionsPage', () => {
     mockClient.topics.getById.mockResolvedValue({ id: 't1', title: 'Kihon' });
     mockClient.submissions.listMine.mockResolvedValue({ data: [], nextCursor: null });
     mockClient.submissions.listClass.mockResolvedValue({ data: [], nextCursor: null });
+    mockClient.submissions.listAll.mockResolvedValue({ data: [], nextCursor: null });
   });
 
   it('shows Mine and Class tabs, the quota line and the Mine tab by default', async () => {
