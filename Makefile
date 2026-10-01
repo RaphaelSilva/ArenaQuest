@@ -204,7 +204,7 @@ db-migrate-local: ## Apply all D1 migrations to the local replica
 	pnpm --filter api exec wrangler d1 migrations apply arenaquest-db --local
 
 # WARNING: LOCAL DEVELOPMENT ONLY — never run against staging or production.
-db-seed-local: ## Seed the local D1 with test accounts (Admin, Student, Professor), a billing ledger, an events board, event extras, example notes and a tagged catalog
+db-seed-local: ## Seed the local D1 with test accounts (Admin, Student, Professor), a billing ledger, an events board, event extras, example notes, a tagged catalog and example demonstrations
 	pnpm --filter api exec wrangler d1 execute arenaquest-db --local \
 		--file ./migrations/seed/0001_test_users.sql
 	pnpm --filter api exec wrangler d1 execute arenaquest-db --local \
@@ -217,6 +217,15 @@ db-seed-local: ## Seed the local D1 with test accounts (Admin, Student, Professo
 		--file ./migrations/seed/0004_notes_local.sql
 	pnpm --filter api exec wrangler d1 execute arenaquest-db --local \
 		--file ./migrations/seed/0004_catalog_tags_local.sql
+	pnpm --filter api exec wrangler d1 execute arenaquest-db --local \
+		--file ./migrations/seed/0005_submissions_local.sql
+	@# Placeholder objects for the three ready seed submissions (keys must match
+	@# 0005_submissions_local.sql). An overwriting put, so a re-run is a no-op.
+	@for k in 23b1-mae-geri 23b2-oi-tsuki 23b3-age-uke; do \
+		pnpm --filter api exec wrangler r2 object put \
+			"arenaquest-media/submissions/seed-student-0000-0000-0000-0000-000000000002/00000000-0000-4000-8000-00000000$$k.mp4" \
+			--local --file ./test/fixtures/submissions/sample.mp4 --content-type video/mp4 || exit 1; \
+	done
 
 db-reset-local: ## Delete the local D1 replica, re-migrate and re-seed
 	@printf "$(YELLOW)  ⚠  Deleting apps/api/.wrangler/state/v3/d1 ...$(RESET)\n"
