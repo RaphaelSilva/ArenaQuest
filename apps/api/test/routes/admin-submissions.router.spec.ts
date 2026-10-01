@@ -408,3 +408,31 @@ describe('DELETE /admin/submissions/{id} (remove)', () => {
     expect((await rowOf(pending.id))!.status).toBe('pending');
   });
 });
+
+describe('moderation of a staff-authored submission (M23 Task 11)', () => {
+  it("an admin force-unshares and clears moderation on a content creator's own upload; the creator cannot re-share meanwhile", async () => {
+    const { id } = await insert({ author: CREATOR, visibility: 'shared' });
+    expect(ids((await (await list(T_MAIN, tokenA, '?scope=class')).json()) as Json)).toContain(id);
+
+    expect((await unshare(id, adminToken)).status).toBe(200);
+    expect(ids((await (await list(T_MAIN, tokenA, '?scope=class')).json()) as Json)).not.toContain(id);
+
+    const blocked = await share(T_MAIN, id, creatorToken);
+    expect(blocked.status).toBe(409);
+    expect(((await blocked.json()) as Json).error).toBe('SUBMISSION_MODERATED');
+
+    expect((await clearModeration(id, adminToken)).status).toBe(204);
+    expect((await share(T_MAIN, id, creatorToken)).status).toBe(200);
+  });
+
+  it("the admin-only remove is unchanged: a content creator gets 403 even on their own upload, an admin leaves a tombstone", async () => {
+    const { id, key } = await insert({ author: CREATOR, visibility: 'shared' });
+    expect((await remove(id, creatorToken)).status).toBe(403);
+    expect(await env.R2.head(key!)).not.toBeNull();
+
+    expect((await remove(id, adminToken)).status).toBe(204);
+    expect(await rowOf(id)).toMatchObject({ status: 'removed', storage_key: null, removed_by: ADMIN });
+    const mine = (await (await list(T_MAIN, creatorToken, '?scope=mine')).json()) as Json;
+    expect(mine.data).toEqual([expect.objectContaining({ id, status: 'removed', url: null })]);
+  });
+});

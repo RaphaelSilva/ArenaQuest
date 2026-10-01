@@ -42,7 +42,9 @@ const submissionNotFound = error(
   "Topic not readable, or the submission is missing, on another topic or another student's",
 );
 const configInvalid = error('`SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed');
-const staffForbidden = error("Staff acting on someone else's submission (they read and moderate only)");
+const staffForbidden = error(
+  "Staff acting on a submission someone else authored (they read and moderate it, they do not change it)",
+);
 
 /** Responses carrying a presigned URL, or a student's private file metadata, are never cached. */
 export const NO_STORE = 'private, no-store';
@@ -103,7 +105,7 @@ export const presignSubmissionRoute = createRoute({
   path: '/topics/{id}/submissions/presign',
   summary: 'Start a submission upload',
   description:
-    'Creates a `pending` submission and returns a presigned PUT under a server-built key. Rate limited to 30 per hour per user.',
+    'Creates a `pending` submission and returns a presigned PUT under a server-built key. Rate limited to 30 per hour per user. Staff (`admin`, `content_creator`) upload too, under the same type, size, quota and sharing rules, on any published, non-archived topic.',
   tags: ['topics:submissions'],
   security: [{ bearerAuth: [] }],
   request: {
@@ -116,7 +118,6 @@ export const presignSubmissionRoute = createRoute({
       content: { 'application/json': { schema: PresignSubmissionResponseSchema } },
     },
     400: error('Malformed body, or `SUBMISSION_TITLE_INVALID` / `SUBMISSION_DESCRIPTION_TOO_LONG`'),
-    403: error('Staff do not upload submissions'),
     404: topicNotFound,
     409: {
       description:

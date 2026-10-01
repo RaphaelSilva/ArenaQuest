@@ -307,7 +307,8 @@ export class SubmissionsController {
   /**
    * The caller's own submission on `topicId`. Another student's row, a row on a
    * different topic and a missing row are all `404`; staff, who may read any
-   * submission, get `403` on someone else's — they have no write route here.
+   * submission, get `403` on someone else's. On their own, staff are authors
+   * like anyone else (RFC 0020 §7, amended 2026-10-01).
    */
   private async findOwn(
     topicId: string,
@@ -383,9 +384,9 @@ export class SubmissionsController {
     if (!cfg.ok) return cfg;
     const { config } = cfg;
 
+    // Staff upload too (RFC 0020 §7, amended 2026-10-01): the same gate — for
+    // them "published and not archived" — and the same limits as a student.
     if (!(await this.isTopicReadable(topicId, caller))) return NOT_FOUND;
-    // Uploading is a student act (RFC 0020 §7, §10); staff only read and moderate.
-    if (isStaff(caller)) return FORBIDDEN;
 
     const limited = await this.rateLimited(caller);
     if (limited) return limited;
@@ -718,7 +719,10 @@ export class SubmissionsController {
    * student rescues uploads from a topic they lost. The repository's batched
    * guarded `UPDATE`s decide each item (per-topic count on the target), reset
    * visibility to private and keep moderation; the object is never touched.
-   * Staff have no move route (`403`).
+   * Staff move their own submissions under the same rules (RFC 0020 §7, amended
+   * 2026-10-01). Naming a submission someone else authored is `403` for staff —
+   * they may read it, so a per-item `not_found` would misstate it — and nothing
+   * is moved; a student still gets the per-item `not_found`.
    */
   async move(
     caller: SubmissionCaller,
@@ -726,8 +730,12 @@ export class SubmissionsController {
   ): Promise<ControllerResult<MoveSubmissionsResult>> {
     const cfg = this.effectiveConfig();
     if (!cfg.ok) return cfg;
-    if (isStaff(caller)) return FORBIDDEN;
     if (!(await this.isTopicReadable(input.targetTopicId, caller))) return NOT_FOUND;
+
+    if (isStaff(caller)) {
+      const records = await Promise.all(input.ids.map((id) => this.submissions.findById(id)));
+      if (records.some((r) => r !== null && r.authorId !== caller.userId)) return FORBIDDEN;
+    }
 
     const result = await this.submissions.move(
       caller.userId,

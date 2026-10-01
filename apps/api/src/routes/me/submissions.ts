@@ -48,7 +48,7 @@ export const moveMySubmissionsRoute = createRoute({
   path: '/submissions/move',
   summary: 'Move my submissions to another topic',
   description:
-    "Moves up to 10 of the caller's ready submissions, in order, each guarded by the target's per-topic count. Partial success is normal. Moved submissions become private, keep their moderation flag, and their file is not touched. The source topic need not be readable.",
+    "Moves up to 10 of the caller's ready submissions, in order, each guarded by the target's per-topic count. Partial success is normal. Moved submissions become private, keep their moderation flag, and their file is not touched. The source topic need not be readable. Staff (`admin`, `content_creator`) move their own submissions under the same rules.",
   tags: ['me:submissions'],
   security: [{ bearerAuth: [] }],
   request: { body: { content: { 'application/json': { schema: MoveSubmissionsBodySchema } } } },
@@ -58,7 +58,7 @@ export const moveMySubmissionsRoute = createRoute({
       content: { 'application/json': { schema: MoveSubmissionsResultSchema } },
     },
     400: error('Malformed body (no ids, more than 10, or no target)'),
-    403: error('Staff do not move submissions'),
+    403: error('A staff caller named a submission another user authored; nothing is moved'),
     404: error("Target topic missing, draft, archived or outside the caller's access"),
     500: configInvalid,
   },

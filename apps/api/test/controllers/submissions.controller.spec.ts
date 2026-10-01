@@ -238,6 +238,7 @@ describe('SubmissionsController', () => {
 describe('SubmissionsController - read and move (Task 04)', () => {
   const OTHER: SubmissionCaller = { userId: 'student-2', roles: ['student'] };
   const ADMIN_CALLER: SubmissionCaller = { userId: 'admin-1', roles: ['admin'] };
+  const CREATOR_CALLER: SubmissionCaller = { userId: 'creator-1', roles: ['content_creator'] };
   const READY = Entities.Config.SubmissionStatus.READY;
   const SHARED = Entities.Config.ShareVisibility.SHARED;
   const signer = { getPresignedDownloadUrl: vi.fn().mockResolvedValue('https://r2.test/get') };
@@ -310,12 +311,27 @@ describe('SubmissionsController - read and move (Task 04)', () => {
     });
   });
 
-  it('move refuses staff with 403 and an unreadable target with 404, before the repository', async () => {
+  it("move refuses staff naming someone else's submission with 403 and an unreadable target with 404, before the repository", async () => {
     const moveFn = vi.fn();
+    // The default findById row is authored by the student.
     const { controller } = setup({ submissions: { move: moveFn } });
     expect(await controller.move(ADMIN_CALLER, { ids: ['a'], targetTopicId: TOPIC.id })).toMatchObject({ status: 403 });
+    expect(await controller.move(CREATOR_CALLER, { ids: ['a'], targetTopicId: TOPIC.id })).toMatchObject({ status: 403 });
     expect(await controller.move(STUDENT, { ids: ['a'], targetTopicId: 'not-mine' })).toMatchObject({ status: 404 });
     expect(moveFn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['admin', ADMIN_CALLER],
+    ['content_creator', CREATOR_CALLER],
+  ])('a %s moves their own submissions through the same guarded move (Task 11)', async (_label, caller) => {
+    const moveFn = vi.fn().mockResolvedValue({ moved: [record({ authorId: caller.userId, status: READY })], refused: [] });
+    const findById = vi.fn(async (id: string) => (id === 'gone' ? null : record({ id, authorId: caller.userId })));
+    const { controller } = setup({ submissions: { move: moveFn, findById } });
+    const result = await controller.move(caller, { ids: ['sub-1', 'gone'], targetTopicId: TOPIC.id });
+    expect(result).toMatchObject({ ok: true });
+    // A missing id is left to the repository's per-item `not_found`.
+    expect(moveFn).toHaveBeenCalledWith(caller.userId, ['sub-1', 'gone'], TOPIC.id, SUBMISSION_TUNABLE_DEFAULTS.perTopicMax);
   });
 
   it('move passes the effective per-topic limit and strips storage keys', async () => {
