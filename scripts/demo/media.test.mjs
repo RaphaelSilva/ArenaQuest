@@ -88,10 +88,10 @@ function syntheticDataset() {
 
 // ── keys ────────────────────────────────────────────────────────────────────
 
-test('sanitizeFileName matches the API controller (parity with the TS source)', async () => {
-  const source = readFileSync(join(ROOT, 'apps', 'api', 'src', 'controllers', 'admin-media.controller.ts'), 'utf8');
+test('sanitizeFileName matches the shared util the API uses (parity with the TS source)', async () => {
+  const source = readFileSync(join(ROOT, 'packages', 'shared', 'utils', 'sanitize-file-name.ts'), 'utf8');
   const match = source.match(/export function sanitizeFileName\(name: string\): string \{[\s\S]*?\n\}/);
-  assert.ok(match, 'sanitizeFileName(name: string): string not found in admin-media.controller.ts');
+  assert.ok(match, 'sanitizeFileName(name: string): string not found in packages/shared/utils/sanitize-file-name.ts');
   const js = match[0].replace('(name: string): string', '(name)');
   const api = (await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`)).sanitizeFileName;
   for (const name of ['Apollo 17 — Blue Marble.JPG', '--a--b--', '', '!!!', 'x'.repeat(150) + '.pdf', 'Chūdan Kata.mp4', 'a..b__c.PNG']) {

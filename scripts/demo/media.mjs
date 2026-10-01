@@ -60,7 +60,7 @@ export const DEFAULT_CONCURRENCY = 4;
 // ════════════════════════════════════════════════════════════════════════════
 
 /**
- * Port of `sanitizeFileName` in `apps/api/src/controllers/admin-media.controller.ts`
+ * Port of `sanitizeFileName` in `packages/shared/utils/sanitize-file-name.ts`
  * (parity pinned by media.test.mjs against the TS source itself).
  */
 export function sanitizeFileName(name) {
