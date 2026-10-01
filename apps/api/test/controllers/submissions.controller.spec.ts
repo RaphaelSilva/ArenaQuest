@@ -234,3 +234,102 @@ describe('SubmissionsController', () => {
     expect(submissions.usage).not.toHaveBeenCalled();
   });
 });
+
+describe('SubmissionsController - read and move (Task 04)', () => {
+  const OTHER: SubmissionCaller = { userId: 'student-2', roles: ['student'] };
+  const ADMIN_CALLER: SubmissionCaller = { userId: 'admin-1', roles: ['admin'] };
+  const READY = Entities.Config.SubmissionStatus.READY;
+  const SHARED = Entities.Config.ShareVisibility.SHARED;
+  const signer = { getPresignedDownloadUrl: vi.fn().mockResolvedValue('https://r2.test/get') };
+
+  it('scope=all is 403 before any read', async () => {
+    const listByTopic = vi.fn();
+    const { controller } = setup({ submissions: { listByTopic } });
+    expect(await controller.listForTopic(TOPIC.id, STUDENT, 'all', null)).toMatchObject({ ok: false, status: 403 });
+    expect(listByTopic).not.toHaveBeenCalled();
+  });
+
+  it('listing passes the sharing switch and filters any row the caller may not see', async () => {
+    const shared = record({ id: 'a', authorId: OTHER.userId, status: READY, visibility: SHARED });
+    const leaked = record({ id: 'b', authorId: OTHER.userId, status: READY });
+    const listByTopic = vi.fn().mockResolvedValue({ data: [shared, leaked], nextCursor: null });
+    const { controller } = setup({ submissions: { listByTopic }, storage: signer });
+    const result = await controller.listForTopic(TOPIC.id, STUDENT, 'class', null);
+    expect(listByTopic).toHaveBeenCalledWith(TOPIC.id, {
+      viewerId: STUDENT.userId,
+      scope: 'class',
+      sharingEnabled: true,
+      page: { cursor: null, limit: 20 },
+    });
+    expect(result).toMatchObject({ ok: true, data: { data: [{ id: 'a', isMine: false, url: 'https://r2.test/get' }] } });
+  });
+
+  it('single read signs a GET with a 1 h TTL on a ready submission only', async () => {
+    const ready = record({ status: READY });
+    const { controller, storage } = setup({
+      submissions: { findById: vi.fn().mockResolvedValue(ready) },
+      storage: { getPresignedDownloadUrl: vi.fn().mockResolvedValue('https://r2.test/get') },
+    });
+    expect(await controller.getOne(TOPIC.id, ready.id, STUDENT)).toMatchObject({ ok: true, data: { url: 'https://r2.test/get' } });
+    expect(storage.getPresignedDownloadUrl).toHaveBeenCalledWith(ready.storageKey, { expiresInSeconds: 3600 });
+
+    const { controller: pendingController } = setup({ storage: signer });
+    expect(await pendingController.getOne(TOPIC.id, 'sub-1', STUDENT)).toMatchObject({ ok: true, data: { url: null } });
+  });
+
+  it('single read of a shared submission by another student is 404 while sharing is off', async () => {
+    const shared = record({ status: READY, visibility: SHARED });
+    const { controller } = setup({
+      submissions: { findById: vi.fn().mockResolvedValue(shared) },
+      storage: signer,
+      config: { ok: true, config: { ...SUBMISSION_TUNABLE_DEFAULTS, sharingEnabled: false } },
+    });
+    expect(await controller.getOne(TOPIC.id, shared.id, OTHER)).toMatchObject({ ok: false, status: 404 });
+    expect(await controller.getOne(TOPIC.id, shared.id, STUDENT)).toMatchObject({ ok: true });
+  });
+
+  it('listMine flags topicAccessible from the topic and the effective access set', async () => {
+    const listByAuthor = vi.fn().mockResolvedValue({
+      data: [
+        { ...record({ id: 'a', status: READY }), topicTitle: 'Topic' },
+        { ...record({ id: 'b', topicNodeId: 'lost' }), topicTitle: 'Lost' },
+      ],
+      nextCursor: null,
+    });
+    const { controller } = setup({ submissions: { listByAuthor }, storage: signer });
+    const result = await controller.listMine(STUDENT, null);
+    expect(listByAuthor).toHaveBeenCalledWith(STUDENT.userId, { scope: 'self', page: { cursor: null, limit: 20 } });
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        data: [
+          { id: 'a', topicTitle: 'Topic', topicAccessible: true, url: 'https://r2.test/get' },
+          { id: 'b', topicTitle: 'Lost', topicAccessible: false, url: null },
+        ],
+      },
+    });
+  });
+
+  it('move refuses staff with 403 and an unreadable target with 404, before the repository', async () => {
+    const moveFn = vi.fn();
+    const { controller } = setup({ submissions: { move: moveFn } });
+    expect(await controller.move(ADMIN_CALLER, { ids: ['a'], targetTopicId: TOPIC.id })).toMatchObject({ status: 403 });
+    expect(await controller.move(STUDENT, { ids: ['a'], targetTopicId: 'not-mine' })).toMatchObject({ status: 404 });
+    expect(moveFn).not.toHaveBeenCalled();
+  });
+
+  it('move passes the effective per-topic limit and strips storage keys', async () => {
+    const moveFn = vi.fn().mockResolvedValue({
+      moved: [record({ status: READY })],
+      refused: [{ id: 'x', reason: 'quota' }],
+    });
+    const { controller } = setup({
+      submissions: { move: moveFn },
+      config: { ok: true, config: { ...SUBMISSION_TUNABLE_DEFAULTS, perTopicMax: 3 } },
+    });
+    const result = await controller.move(STUDENT, { ids: ['sub-1', 'x'], targetTopicId: TOPIC.id });
+    expect(moveFn).toHaveBeenCalledWith(STUDENT.userId, ['sub-1', 'x'], TOPIC.id, 3);
+    expect(result).toMatchObject({ ok: true, data: { refused: [{ id: 'x', reason: 'quota' }] } });
+    if (result.ok) expect(result.data.moved[0]).not.toHaveProperty('storageKey');
+  });
+});

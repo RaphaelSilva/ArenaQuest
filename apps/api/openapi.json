@@ -277,6 +277,63 @@
         ],
         "type": "object"
       },
+      "AuthoredSubmission": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Submission"
+          },
+          {
+            "properties": {
+              "topicAccessible": {
+                "description": "False when the topic is no longer readable: read-only except delete and move",
+                "example": true,
+                "type": "boolean"
+              },
+              "topicTitle": {
+                "example": "Kihon",
+                "type": "string"
+              },
+              "url": {
+                "description": "Signed GET URL (TTL 1 h) on a ready submission; null while pending or once removed",
+                "format": "uri",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "url",
+              "topicTitle",
+              "topicAccessible"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "AuthoredSubmissionPage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AuthoredSubmission"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "description": "Opaque cursor of the next page; null on the last page",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
       "BillingAgingBucket": {
         "properties": {
           "bucket": {
@@ -2666,6 +2723,74 @@
         ],
         "type": "object"
       },
+      "MoveSubmissionsBody": {
+        "properties": {
+          "ids": {
+            "description": "1..10 ids of the caller's own ready submissions, moved in this order",
+            "example": [
+              "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+            ],
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "type": "array"
+          },
+          "targetTopicId": {
+            "example": "topic-2",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ids",
+          "targetTopicId"
+        ],
+        "type": "object"
+      },
+      "MoveSubmissionsResult": {
+        "properties": {
+          "moved": {
+            "description": "Moved submissions, now private; moderation kept",
+            "items": {
+              "$ref": "#/components/schemas/Submission"
+            },
+            "type": "array"
+          },
+          "refused": {
+            "items": {
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "reason": {
+                  "description": "`quota`: the target is full; `not_found`: missing or not the caller's; `not_ready`: pending or removed; `same_topic`: already there",
+                  "enum": [
+                    "quota",
+                    "not_found",
+                    "not_ready",
+                    "same_topic"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "moved",
+          "refused"
+        ],
+        "type": "object"
+      },
       "MyBillingStatement": {
         "allOf": [
           {
@@ -3447,6 +3572,29 @@
         ],
         "type": "object"
       },
+      "SubmissionPage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SubmissionView"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "description": "Opaque cursor of the next page; null on the last page",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
       "SubmissionQuotaError": {
         "properties": {
           "error": {
@@ -3545,6 +3693,35 @@
           "classCount"
         ],
         "type": "object"
+      },
+      "SubmissionView": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Submission"
+          },
+          {
+            "properties": {
+              "isMine": {
+                "description": "True on the caller's own submission",
+                "example": false,
+                "type": "boolean"
+              },
+              "url": {
+                "description": "Signed GET URL (TTL 1 h) on a ready submission; null while pending or once removed",
+                "format": "uri",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "isMine",
+              "url"
+            ],
+            "type": "object"
+          }
+        ]
       },
       "Tag": {
         "properties": {
@@ -13771,6 +13948,180 @@
         ]
       }
     },
+    "/v1/me/submissions": {
+      "get": {
+        "description": "Every submission the caller owns, across topics, newest first, with the topic title and `topicAccessible`. On an inaccessible topic a submission is read-only except delete and move. Ready ones carry a signed GET `url` (TTL 1 h). Pages of 20.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Opaque cursor from a previous page (`nextCursor`); omit for the first page",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoredSubmissionPage"
+                }
+              }
+            },
+            "description": "One page of the caller's submissions"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Malformed cursor (`InvalidCursor`)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List my submissions",
+        "tags": [
+          "me:submissions"
+        ]
+      }
+    },
+    "/v1/me/submissions/move": {
+      "post": {
+        "description": "Moves up to 10 of the caller's ready submissions, in order, each guarded by the target's per-topic count. Partial success is normal. Moved submissions become private, keep their moderation flag, and their file is not touched. The source topic need not be readable.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveSubmissionsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveSubmissionsResult"
+                }
+              }
+            },
+            "description": "Moved and refused items, with a reason per refusal"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Malformed body (no ids, more than 10, or no target)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Staff do not move submissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Target topic missing, draft, archived or outside the caller's access"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Move my submissions to another topic",
+        "tags": [
+          "me:submissions"
+        ]
+      }
+    },
     "/v1/me/tasks/{id}/stages/{stageId}/check-in": {
       "post": {
         "description": "Checks in (completes) a stage in a task, granting XP rewards and triggering streaking / gamification engines.",
@@ -14688,6 +15039,138 @@
         ]
       }
     },
+    "/v1/topics/{id}/submissions": {
+      "get": {
+        "description": "Newest first, pages of 20. Ready submissions carry a signed GET `url` (TTL 1 h). `scope` only narrows what the caller may see; it never widens it.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "topic-1",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "mine",
+              "description": "`mine`: the caller's own, every status. `class`: shared ready submissions (empty while sharing is disabled). `all`: staff only",
+              "enum": [
+                "mine",
+                "class",
+                "all"
+              ],
+              "example": "mine",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Opaque cursor from a previous page (`nextCursor`); omit for the first page",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionPage"
+                }
+              }
+            },
+            "description": "One page of submissions"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Malformed query, or `InvalidCursor`"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`scope=all` requested by a non-staff caller"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Topic missing, draft, archived or outside the caller's access"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List submissions on a topic",
+        "tags": [
+          "topics:submissions"
+        ]
+      }
+    },
     "/v1/topics/{id}/submissions/presign": {
       "post": {
         "description": "Creates a `pending` submission and returns a presigned PUT under a server-built key. Rate limited to 30 per hour per user.",
@@ -15041,6 +15524,88 @@
           }
         ],
         "summary": "Delete a submission",
+        "tags": [
+          "topics:submissions"
+        ]
+      },
+      "get": {
+        "description": "The author reads their own in every status; anyone else only a shared, ready submission while sharing is enabled. Everything else is `404`.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "topic-1",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sid",
+            "required": true,
+            "schema": {
+              "description": "Submission ID",
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionView"
+                }
+              }
+            },
+            "description": "The submission"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Topic not readable, or the submission is missing, on another topic or not visible to the caller"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read one submission",
         "tags": [
           "topics:submissions"
         ]

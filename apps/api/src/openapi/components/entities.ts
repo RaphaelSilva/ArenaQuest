@@ -330,3 +330,49 @@ export const SubmissionSummarySchema = z.object({
   classCount: z.number().int().openapi({ description: 'Shared ready submissions on the topic; 0 when sharing is disabled', example: 8 }),
   totalCount: z.number().int().optional().openapi({ description: 'Staff only: every ready + removed submission on the topic', example: 12 }),
 }).openapi('SubmissionSummary');
+
+const submissionUrlField = z.string().url().nullable().openapi({
+  description: 'Signed GET URL (TTL 1 h) on a ready submission; null while pending or once removed',
+});
+
+export const SubmissionViewSchema = SubmissionSchema.extend({
+  isMine: z.boolean().openapi({ description: "True on the caller's own submission", example: false }),
+  url: submissionUrlField,
+}).openapi('SubmissionView');
+
+export const SubmissionPageSchema = z.object({
+  data: z.array(SubmissionViewSchema),
+  nextCursor: nextCursorField,
+}).openapi('SubmissionPage');
+
+export const AuthoredSubmissionSchema = SubmissionSchema.extend({
+  url: submissionUrlField,
+  topicTitle: z.string().openapi({ example: 'Kihon' }),
+  topicAccessible: z.boolean().openapi({
+    description: 'False when the topic is no longer readable: read-only except delete and move',
+    example: true,
+  }),
+}).openapi('AuthoredSubmission');
+
+export const AuthoredSubmissionPageSchema = z.object({
+  data: z.array(AuthoredSubmissionSchema),
+  nextCursor: nextCursorField,
+}).openapi('AuthoredSubmissionPage');
+
+export const MoveSubmissionsBodySchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(10).openapi({
+    description: '1..10 ids of the caller\'s own ready submissions, moved in this order',
+    example: ['a1b2c3d4-e5f6-7890-1234-567890abcdef'],
+  }),
+  targetTopicId: z.string().min(1).openapi({ example: 'topic-2' }),
+}).openapi('MoveSubmissionsBody');
+
+export const MoveSubmissionsResultSchema = z.object({
+  moved: z.array(SubmissionSchema).openapi({ description: 'Moved submissions, now private; moderation kept' }),
+  refused: z.array(z.object({
+    id: z.string(),
+    reason: z.enum(['quota', 'not_found', 'not_ready', 'same_topic']).openapi({
+      description: '`quota`: the target is full; `not_found`: missing or not the caller\'s; `not_ready`: pending or removed; `same_topic`: already there',
+    }),
+  })),
+}).openapi('MoveSubmissionsResult');

@@ -1,5 +1,8 @@
 import type {
+  AuthoredSubmissionRecord,
   IEnrollmentRepository,
+  MoveRefusal,
+  NoteCursorKey,
   IRateLimiter,
   IStorageAdapter,
   ISubmissionRepository,
@@ -25,6 +28,15 @@ import type { ControllerResult } from '@api/core/result';
 /** Lifetime of the presigned PUT (RFC 0020 §5), in seconds. */
 export const SUBMISSION_UPLOAD_URL_TTL_SECONDS = 3600;
 
+/** Lifetime of a signed GET URL on a ready submission (RFC 0020 §2), in seconds. */
+export const SUBMISSION_DOWNLOAD_URL_TTL_SECONDS = 3600;
+
+/** Page size of every submission listing (RFC 0020 §10). */
+export const SUBMISSIONS_PAGE_SIZE = 20;
+
+/** Most ids one move request may carry (RFC 0020 §6). */
+export const SUBMISSION_MOVE_MAX_IDS = 10;
+
 /** Leading bytes read at finalize for the signature check — never the whole object. */
 export const SUBMISSION_SIGNATURE_BYTES = 32;
 
@@ -39,6 +51,39 @@ export interface SubmissionCaller {
 
 /** A submission as the API returns it: no storage key, moderation reduced to a flag. */
 export type Submission = Entities.Engagement.Submission;
+
+/**
+ * A submission as a reader receives it: `isMine` flags the caller's own, and
+ * `url` is a signed GET (TTL 1 h) on a ready submission — null otherwise.
+ */
+export type SubmissionView = Submission & { isMine: boolean; url: string | null };
+
+/** One row of "My demonstrations": the caller's own submission plus its topic. */
+export type AuthoredSubmission = Submission & {
+  url: string | null;
+  topicTitle: string;
+  /** False when the topic is no longer readable: read-only except delete and move. */
+  topicAccessible: boolean;
+};
+
+/** One keyset page; the router encodes `nextCursor` into its opaque wire form. */
+export interface SubmissionPage<T> {
+  data: T[];
+  nextCursor: NoteCursorKey | null;
+}
+
+/** Scopes of the topic listing; `all` is staff-only (RFC 0020 §10). */
+export type TopicListScope = 'mine' | 'class' | 'all';
+
+export interface MoveSubmissionsInput {
+  ids: string[];
+  targetTopicId: string;
+}
+
+export interface MoveSubmissionsResult {
+  moved: Submission[];
+  refused: MoveRefusal[];
+}
 
 export interface PresignSubmissionInput {
   fileName: string;
@@ -192,6 +237,33 @@ export class SubmissionsController {
     if (isStaff(caller)) return true;
     const effectiveIds = await this.enrollment.getEffectiveAccessTopicIds(caller.userId);
     return effectiveIds.includes(topicId);
+  }
+
+  /** A signed GET on a ready submission's object; null for pending or removed rows. */
+  private async signedUrl(record: SubmissionRecord): Promise<string | null> {
+    if (record.status !== READY || !record.storageKey) return null;
+    return this.storage.getPresignedDownloadUrl(record.storageKey, {
+      expiresInSeconds: SUBMISSION_DOWNLOAD_URL_TTL_SECONDS,
+    });
+  }
+
+  private async toView(record: SubmissionRecord, caller: SubmissionCaller): Promise<SubmissionView> {
+    return {
+      ...toSubmission(record),
+      isMine: record.authorId === caller.userId,
+      url: await this.signedUrl(record),
+    };
+  }
+
+  /**
+   * Whether `caller` may read `record` through the student rules of RFC 0020 §7:
+   * the author always (pending and tombstones included, so the UI can resume or
+   * dismiss them); anyone else only a shared, ready submission while the label's
+   * sharing switch is on — the switch is a read-time filter, no row is rewritten.
+   */
+  private static visibleTo(record: SubmissionRecord, caller: SubmissionCaller, sharingEnabled: boolean): boolean {
+    if (record.authorId === caller.userId) return true;
+    return sharingEnabled && record.status === READY && record.visibility === SHARED;
   }
 
   /**
@@ -412,7 +484,9 @@ export class SubmissionsController {
   /**
    * `PATCH /topics/{id}/submissions/{sid}` — last-write-wins edit of title,
    * description (sanitised Markdown) and visibility. Sharing is refused while
-   * the label switch is off or the submission is moderated.
+   * the label switch is off or the submission is moderated. On a topic the
+   * author can no longer read the edit is refused (`404`, the gate's miss) —
+   * delete and move are the only actions left there (RFC 0020 §7).
    */
   async edit(
     topicId: string,
@@ -483,6 +557,135 @@ export class SubmissionsController {
     }
     await this.submissions.delete(record.id);
     return { ok: true, data: null };
+  }
+
+  /**
+   * `GET /topics/{id}/submissions?scope=` — newest first, pages of 20.
+   * `mine`: the caller's own rows in every status. `class`: the topic's shared
+   * ready rows (the caller's own flagged `isMine`), empty while sharing is off.
+   * `all` is staff-only: a non-staff caller gets `403`, the only `403` of the
+   * read side (Task 05 opens it to staff). The scope only ever narrows what the
+   * access table allows; the cursor is a position inside the scope's fixed WHERE.
+   */
+  async listForTopic(
+    topicId: string,
+    caller: SubmissionCaller,
+    scope: TopicListScope,
+    cursor: NoteCursorKey | null,
+  ): Promise<ControllerResult<SubmissionPage<SubmissionView>>> {
+    const cfg = this.effectiveConfig();
+    if (!cfg.ok) return cfg;
+    if (scope === 'all') return FORBIDDEN;
+    if (!(await this.isTopicReadable(topicId, caller))) return NOT_FOUND;
+
+    const page = await this.submissions.listByTopic(topicId, {
+      viewerId: caller.userId,
+      scope,
+      sharingEnabled: cfg.config.sharingEnabled,
+      page: { cursor, limit: SUBMISSIONS_PAGE_SIZE },
+    });
+    // Defence in depth: the repository's WHERE already decides the audience.
+    const visible = page.data.filter((r) => SubmissionsController.visibleTo(r, caller, cfg.config.sharingEnabled));
+    const data = await Promise.all(visible.map((r) => this.toView(r, caller)));
+    return { ok: true, data: { data, nextCursor: page.nextCursor } };
+  }
+
+  /**
+   * `GET /topics/{id}/submissions/{sid}` — one submission under the §7 rules
+   * (direct link, viewer). Anything the caller may not see — another student's
+   * private, pending or removed row, a shared one while sharing is off, a row on
+   * another topic or an unreadable topic — is `404`, never `403`.
+   */
+  async getOne(
+    topicId: string,
+    submissionId: string,
+    caller: SubmissionCaller,
+  ): Promise<ControllerResult<SubmissionView>> {
+    const cfg = this.effectiveConfig();
+    if (!cfg.ok) return cfg;
+    if (!(await this.isTopicReadable(topicId, caller))) return NOT_FOUND;
+
+    const record = await this.submissions.findById(submissionId);
+    if (!record || record.topicNodeId !== topicId) return NOT_FOUND;
+    if (!SubmissionsController.visibleTo(record, caller, cfg.config.sharingEnabled)) return NOT_FOUND;
+    return { ok: true, data: await this.toView(record, caller) };
+  }
+
+  /**
+   * `GET /me/submissions` — every submission the caller owns, across topics,
+   * newest first, with the topic title and `topicAccessible` (the catalog gate's
+   * rule). On an inaccessible topic the submission is read-only except delete
+   * and move (§7); it keeps its signed URL, since it is the author's own file.
+   */
+  async listMine(
+    caller: SubmissionCaller,
+    cursor: NoteCursorKey | null,
+  ): Promise<ControllerResult<SubmissionPage<AuthoredSubmission>>> {
+    const cfg = this.effectiveConfig();
+    if (!cfg.ok) return cfg;
+
+    const page = await this.submissions.listByAuthor(caller.userId, {
+      scope: 'self',
+      page: { cursor, limit: SUBMISSIONS_PAGE_SIZE },
+    });
+
+    const accessible = new Map<string, boolean>();
+    if (page.data.length > 0) {
+      const staff = isStaff(caller);
+      const effectiveIds = staff ? null : new Set(await this.enrollment.getEffectiveAccessTopicIds(caller.userId));
+      const topicIds = [...new Set(page.data.map((r) => r.topicNodeId))];
+      const topics = await Promise.all(topicIds.map((id) => this.topics.findById(id)));
+      topicIds.forEach((id, i) => {
+        const topic = topics[i];
+        accessible.set(
+          id,
+          !!topic &&
+            topic.status === Entities.Config.TopicNodeStatus.PUBLISHED &&
+            !topic.archived &&
+            (staff || (effectiveIds?.has(id) ?? false)),
+        );
+      });
+    }
+
+    const data = await Promise.all(
+      page.data.map(async (record: AuthoredSubmissionRecord) => ({
+        ...toSubmission(record),
+        url: await this.signedUrl(record),
+        topicTitle: record.topicTitle,
+        topicAccessible: accessible.get(record.topicNodeId) ?? false,
+      })),
+    );
+    return { ok: true, data: { data, nextCursor: page.nextCursor } };
+  }
+
+  /**
+   * `POST /me/submissions/move` — moves up to 10 of the caller's ready
+   * submissions to `targetTopicId`, in request order. The target must be
+   * readable (`404` otherwise); the source need not be — moving is how a
+   * student rescues uploads from a topic they lost. The repository's batched
+   * guarded `UPDATE`s decide each item (per-topic count on the target), reset
+   * visibility to private and keep moderation; the object is never touched.
+   * Staff have no move route (`403`).
+   */
+  async move(
+    caller: SubmissionCaller,
+    input: MoveSubmissionsInput,
+  ): Promise<ControllerResult<MoveSubmissionsResult>> {
+    const cfg = this.effectiveConfig();
+    if (!cfg.ok) return cfg;
+    if (isStaff(caller)) return FORBIDDEN;
+    if (!(await this.isTopicReadable(input.targetTopicId, caller))) return NOT_FOUND;
+
+    const result = await this.submissions.move(
+      caller.userId,
+      input.ids,
+      input.targetTopicId,
+      cfg.config.perTopicMax,
+    );
+    return {
+      ok: true,
+      data: { moved: result.moved.map(toSubmission), refused: result.refused },
+    };
   }
 
   /**
