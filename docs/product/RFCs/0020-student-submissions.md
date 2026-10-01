@@ -355,7 +355,7 @@ rules live in `SubmissionsController`.
 
 | Action | Author | Other student | `content_creator` | `admin` |
 |---|---|---|---|---|
-| Upload to T | ✅ if T readable | — | — | — |
+| Upload to T | ✅ if T readable | — | ✅ own (T published, not archived) | ✅ own (T published, not archived) |
 | Read a **private** submission | ✅ | ❌ `404` | ✅ read-only | ✅ read-only |
 | Read a **shared** submission | ✅ | ✅ if T readable | ✅ | ✅ |
 | List on T | own (all statuses) + shared | shared | all ready + removed | all ready + removed |
@@ -365,6 +365,11 @@ rules live in `SubmissionsController`.
 | Force-unshare / clear moderation | — | — | ✅ | ✅ |
 | List every submission by one student | — | — | ✅ | ✅ |
 
+- **Staff are authors too.** `admin` and `content_creator` may upload their own demonstrations
+  under the same type, size and quota rules, and on **their own** submissions they act exactly as
+  an author (edit, share, move, hard delete). The ❌ `403` cells above apply only to a submission
+  someone else authored. What differs for staff is the listing: their *Minhas* tab holds their
+  own uploads, and *Todos* lists every submission on the topic for moderation.
 - **Pending rows are visible only to their author**, so the UI can resume or discard them.
 - **Losing access to T** does not take uploads away: "My demonstrations" still lists them with
   `topicAccessible: false` — read-only except delete and **move** (§6). They leave the gallery.
@@ -664,6 +669,11 @@ None — all resolved on 2026-09-29 (below).
   `SUBMISSIONS_VIDEO_MAX_BYTES` (§3).
 - **2026-09-29 — The Demonstrations page has *Minhas* / *Da turma* tabs (staff: *Todos*), a
   full-screen viewer with previous/next, and a direct link per submission** (product owner) (§12).
+
+- **2026-10-01 — Staff also upload** (product owner). `admin` and `content_creator` post their own
+  demonstrations and act as authors on them; the difference is only the listing filter — staff
+  additionally list every submission on a topic and moderate (§7, §12). Amends the earlier
+  "Upload to T: student only" rule; delivered by M23 Tasks 11–12.
 
 - **2026-09-29 — Staff review is the next RFC** (product owner). Removed from this one; listed as
   a non-goal.
