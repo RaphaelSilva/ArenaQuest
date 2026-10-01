@@ -1,6 +1,6 @@
 # Task 03 — Backend: Student upload API — presign, finalize, edit, delete and summary (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md)
 **Team:** Backend API
@@ -77,29 +77,29 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] An iPhone `.mov`, an MP4, a JPEG and a PDF each go presign → PUT → finalize to `ready`
+- [x] An iPhone `.mov`, an MP4, a JPEG and a PDF each go presign → PUT → finalize to `ready`
       on a readable topic.
-- [ ] A text file uploaded as `video/mp4` fails finalize with `422 UPLOAD_MISMATCH` and leaves
+- [x] A text file uploaded as `video/mp4` fails finalize with `422 UPLOAD_MISMATCH` and leaves
       neither row nor object; finalize without an upload is `422 NotUploaded`.
-- [ ] A video over `SUBMISSIONS_VIDEO_MAX_BYTES` and an image over 5 MB are refused at presign
+- [x] A video over `SUBMISSIONS_VIDEO_MAX_BYTES` and an image over 5 MB are refused at presign
       with `422 FileTooLarge`.
-- [ ] With `SUBMISSIONS_PER_TOPIC_MAX=3`, the fourth presign on a topic answers
+- [x] With `SUBMISSIONS_PER_TOPIC_MAX=3`, the fourth presign on a topic answers
       `409 SUBMISSION_QUOTA` with `reason: 'count'`; a presign crossing the byte quota has
       `reason: 'storage'`.
-- [ ] The 31st presign within an hour by one user answers `429`.
-- [ ] Presign on a draft, archived or out-of-access topic answers `404`; every write route on
+- [x] The 31st presign within an hour by one user answers `429`.
+- [x] Presign on a draft, archived or out-of-access topic answers `404`; every write route on
       another student's submission answers `404`.
-- [ ] With `SUBMISSIONS_SHARING_ENABLED=false`, presign or `PATCH` with `shared` answers
+- [x] With `SUBMISSIONS_SHARING_ENABLED=false`, presign or `PATCH` with `shared` answers
       `409 SUBMISSION_SHARING_DISABLED`; sharing a moderated submission answers
       `409 SUBMISSION_MODERATED`.
-- [ ] A malformed `SUBMISSIONS_*` var makes every route here answer
+- [x] A malformed `SUBMISSIONS_*` var makes every route here answer
       `500 SUBMISSION_CONFIG_INVALID`.
-- [ ] `DELETE` removes the object then the row; with R2 failing it answers `502` and the row
+- [x] `DELETE` removes the object then the row; with R2 failing it answers `502` and the row
       remains.
-- [ ] `GET /v1/topics/{id}` returns byte-identical media before and after uploads.
-- [ ] No `@ValidateBody` / `@Body()` in the diff; no provider import in the controller.
-- [ ] Changed files lint clean; `make test-api` green; `pnpm dump-openapi` leaves no diff.
-- [ ] No diff outside the scope guardrail.
+- [x] `GET /v1/topics/{id}` returns byte-identical media before and after uploads.
+- [x] No `@ValidateBody` / `@Body()` in the diff; no provider import in the controller.
+- [x] Changed files lint clean; `make test-api` green; `pnpm dump-openapi` leaves no diff.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
