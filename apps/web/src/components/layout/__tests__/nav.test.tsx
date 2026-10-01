@@ -183,3 +183,31 @@ describe('Nav — the My notes entry', () => {
     expect(linksTo(drawer(), '/notes')).toHaveLength(1);
   });
 });
+
+describe('Nav — the My demonstrations entry', () => {
+  const label = dictEn.submissions.myDemonstrations.navLabel;
+
+  it('links a student to /submissions from the desktop bar', () => {
+    roles = [ROLES.STUDENT];
+    renderNav();
+    expect(soleLinkTo(document.body, '/submissions')).toHaveTextContent(label);
+    expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
+  });
+
+  it('links a student to /submissions from the mobile drawer and highlights it there', () => {
+    roles = [ROLES.STUDENT];
+    pathname = '/submissions';
+    drawerOpen = true;
+    renderNav();
+    const link = soleLinkTo(drawer(), '/submissions');
+    expect(link).toHaveTextContent(label);
+    expect(link.className).toContain('bg-zinc-100');
+  });
+
+  it('is not offered to staff, who do not upload or move submissions', () => {
+    roles = [ROLES.CONTENT_CREATOR];
+    drawerOpen = true;
+    renderNav();
+    expect(linksTo(document.body, '/submissions')).toHaveLength(0);
+  });
+});

@@ -4,7 +4,10 @@ import { dictPt } from '@web/i18n/dict-pt';
 import { summary, view } from './fixtures';
 
 const mockClient = {
+  topics: { list: vi.fn() },
   submissions: {
+    summary: vi.fn(),
+    move: vi.fn(),
     listMine: vi.fn(),
     remove: vi.fn(),
     presign: vi.fn(),
@@ -156,5 +159,75 @@ describe('MineTab', () => {
     const second = screen.getByRole('dialog', { name: t.viewer.label('Kata B') });
     expect(within(second).queryByRole('button', { name: t.viewer.copyLink })).not.toBeInTheDocument();
     expect(within(second).getByRole('button', { name: new RegExp(t.viewer.next) })).toBeDisabled();
+  });
+
+  it('moves one card: it leaves this topic\'s list and the counts are re-read', async () => {
+    mockClient.submissions.listMine
+      .mockResolvedValueOnce({ data: [view({ id: 'a', title: 'Kata A' }), view({ id: 'b', title: 'Kata B' })], nextCursor: null })
+      .mockResolvedValueOnce({ data: [view({ id: 'b', title: 'Kata B' })], nextCursor: null });
+    mockClient.topics.list.mockResolvedValue([
+      { id: 't1', title: 'Kihon', parentId: null, order: 1 },
+      { id: 't2', title: 'Kata', parentId: null, order: 2 },
+    ]);
+    mockClient.submissions.summary.mockResolvedValue(summary({ usage: { topicCount: 1, bytes: 0 } }));
+    mockClient.submissions.move.mockResolvedValue({
+      moved: [view({ id: 'a', title: 'Kata A', topicNodeId: 't2', visibility: 'private' })],
+      refused: [],
+    });
+    const onUsageChanged = vi.fn();
+    render(<MineTab topicId="t1" summary={summary()} onUsageChanged={onUsageChanged} />);
+
+    const card = await screen.findByRole('article', { name: 'Kata A' });
+    fireEvent.click(within(card).getByRole('button', { name: t.card.move }));
+    const dialog = screen.getByRole('dialog', { name: t.move.heading(1) });
+    expect(within(dialog).queryByText('Kihon')).not.toBeInTheDocument();
+    fireEvent.click(await within(dialog).findByRole('radio', { name: /^Kata / }));
+    fireEvent.click(within(dialog).getByRole('button', { name: t.move.submit }));
+
+    expect(await within(dialog).findByText(t.move.resultMoved(1, 'Kata'))).toBeInTheDocument();
+    expect(mockClient.submissions.move).toHaveBeenCalledWith(['a'], 't2');
+    expect(onUsageChanged).toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('article', { name: 'Kata A' })).not.toBeInTheDocument());
+    fireEvent.click(within(dialog).getByRole('button', { name: t.move.done }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'Kata B' })).toBeInTheDocument();
+  });
+
+  it('caps the selection at 10 ready cards and moves them in one request', async () => {
+    const ready = Array.from({ length: 11 }, (_, i) => view({ id: `r${i}`, title: `Kata ${i}` }));
+    mockClient.submissions.listMine.mockResolvedValue({
+      data: [...ready, view({ id: 'p', title: 'Half', status: 'pending', url: null })],
+      nextCursor: null,
+    });
+    mockClient.topics.list.mockResolvedValue([]);
+    render(<MineTab topicId="t1" summary={summary()} onUsageChanged={vi.fn()} />);
+
+    await screen.findByRole('article', { name: 'Kata 0' });
+    fireEvent.click(screen.getByRole('button', { name: t.select.start }));
+    // Only ready cards can be selected; the actions give way to the checkbox.
+    expect(within(screen.getByRole('article', { name: 'Half' })).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('article', { name: 'Kata 0' })).queryByRole('button', { name: t.card.move })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: t.select.moveSelected })).toBeDisabled();
+
+    for (let i = 0; i < 10; i++) fireEvent.click(screen.getByRole('checkbox', { name: t.select.toggle(`Kata ${i}`) }));
+    expect(screen.getByText(t.select.count(10, 10))).toBeInTheDocument();
+    expect(screen.getByText(t.select.limitReached(10))).toBeInTheDocument();
+    const eleventh = screen.getByRole('checkbox', { name: t.select.toggle('Kata 10') });
+    expect(eleventh).toBeDisabled();
+    fireEvent.click(eleventh);
+    expect(eleventh).not.toBeChecked();
+    expect(screen.getByText(t.select.count(10, 10))).toBeInTheDocument();
+
+    // Unticking one frees a slot again.
+    fireEvent.click(screen.getByRole('checkbox', { name: t.select.toggle('Kata 9') }));
+    expect(screen.getByRole('checkbox', { name: t.select.toggle('Kata 10') })).toBeEnabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: t.select.toggle('Kata 9') }));
+
+    fireEvent.click(screen.getByRole('button', { name: t.select.moveSelected }));
+    expect(screen.getByRole('dialog', { name: t.move.heading(10) })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: t.move.cancel }));
+    fireEvent.click(screen.getByRole('button', { name: t.select.cancel }));
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
 });

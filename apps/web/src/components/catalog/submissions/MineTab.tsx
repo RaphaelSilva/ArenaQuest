@@ -3,10 +3,17 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
-import type { Submission, SubmissionSummary, SubmissionView, uploadToPresignedUrl } from '@web/lib/submissions-api';
+import {
+  SUBMISSION_MOVE_MAX_IDS,
+  type Submission,
+  type SubmissionSummary,
+  type SubmissionView,
+  type uploadToPresignedUrl,
+} from '@web/lib/submissions-api';
 import { useNotePages } from '../notes/useNotePages';
 import { LoadMoreButton } from '../notes/LoadMoreButton';
 import { EditSubmissionDialog } from './EditSubmissionDialog';
+import { MoveDialog } from './MoveDialog';
 import { SubmissionCard } from './SubmissionCard';
 import { SubmissionViewer } from './SubmissionViewer';
 import { UploadForm, type UploadOutcome } from './UploadForm';
@@ -23,7 +30,8 @@ type MineTabProps = {
 /**
  * *Minhas*: the send button (sticky at the bottom on a phone), the upload
  * form, and the caller's own submissions newest first — ready cards,
- * interrupted uploads and staff tombstones.
+ * interrupted uploads and staff tombstones. A ready card moves to another
+ * topic on its own; *Select* picks up to 10 ready cards to move at once.
  */
 export function MineTab({ topicId, summary, onUsageChanged, upload }: MineTabProps) {
   const dict = useDict();
@@ -41,6 +49,9 @@ export function MineTab({ topicId, summary, onUsageChanged, upload }: MineTabPro
   const [notice, setNotice] = useState<string | null>(null);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [editing, setEditing] = useState<SubmissionView | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [moving, setMoving] = useState<SubmissionView[] | null>(null);
 
   const { reload, update } = pages;
 
@@ -68,6 +79,26 @@ export function MineTab({ topicId, summary, onUsageChanged, upload }: MineTabPro
     [client, onUsageChanged, reload, topicId],
   );
 
+  const toggleSelected = (submission: SubmissionView) => {
+    setSelectedIds((prev) => {
+      if (prev.includes(submission.id)) return prev.filter((id) => id !== submission.id);
+      // The API moves at most 10 per request; the UI never builds a larger one.
+      return prev.length >= SUBMISSION_MOVE_MAX_IDS ? prev : [...prev, submission.id];
+    });
+  };
+
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelectedIds([]);
+  };
+
+  const onMoved = useCallback(() => {
+    setSelecting(false);
+    setSelectedIds([]);
+    reload();
+    onUsageChanged();
+  }, [onUsageChanged, reload]);
+
   const onSaved = (saved: Submission) => {
     update(saved.id, saved);
     setEditing(null);
@@ -77,6 +108,15 @@ export function MineTab({ topicId, summary, onUsageChanged, upload }: MineTabPro
   const items = pages.items.filter((item) => item.id !== activeUploadId);
   // The viewer steps through the ready items only; pending rows and tombstones have no file.
   const readyItems = useMemo(() => pages.items.filter((item) => item.status === 'ready' && item.url), [pages.items]);
+  const canSelect = items.some((item) => item.status === 'ready');
+  const selectionFull = selectedIds.length >= SUBMISSION_MOVE_MAX_IDS;
+
+  const moveSelected = () => {
+    const chosen = pages.items.filter((item) => selectedIds.includes(item.id));
+    // Request order follows the selection order, as the API moves in order.
+    chosen.sort((a, b) => selectedIds.indexOf(a.id) - selectedIds.indexOf(b.id));
+    if (chosen.length > 0) setMoving(chosen);
+  };
 
   return (
     <div>
@@ -147,11 +187,69 @@ export function MineTab({ topicId, summary, onUsageChanged, upload }: MineTabPro
         </div>
       )}
 
+      {pages.state === 'ready' && canSelect && (
+        <div
+          role="toolbar"
+          aria-label={t.select.start}
+          className="mb-3 flex flex-wrap items-center gap-2"
+        >
+          {selecting ? (
+            <>
+              <span role="status" className="text-[12px] font-semibold" style={{ color: 'var(--aq-text)' }}>
+                {t.select.count(selectedIds.length, SUBMISSION_MOVE_MAX_IDS)}
+              </span>
+              <button
+                type="button"
+                onClick={moveSelected}
+                disabled={selectedIds.length === 0}
+                className="cursor-pointer rounded-[8px] px-3 py-1.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: 'var(--aq-accent)', color: 'var(--aq-bg)' }}
+              >
+                {t.select.moveSelected}
+              </button>
+              <button
+                type="button"
+                onClick={stopSelecting}
+                className="cursor-pointer rounded-[8px] border px-3 py-1.5 text-[12px] font-bold"
+                style={{ borderColor: 'var(--aq-border2)', color: 'var(--aq-text2)' }}
+              >
+                {t.select.cancel}
+              </button>
+              {selectionFull && (
+                <span className="w-full text-[12px]" style={{ color: 'var(--aq-text2)' }}>
+                  {t.select.limitReached(SUBMISSION_MOVE_MAX_IDS)}
+                </span>
+              )}
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSelecting(true)}
+              className="cursor-pointer rounded-[8px] border px-3 py-1.5 text-[12px] font-bold"
+              style={{ borderColor: 'var(--aq-border2)', color: 'var(--aq-text)' }}
+            >
+              {t.select.start}
+            </button>
+          )}
+        </div>
+      )}
+
       {pages.state === 'ready' && items.length > 0 && (
         <ul aria-label={t.list.label} className="flex flex-col gap-3">
           {items.map((item) => (
             <li key={item.id}>
-              <SubmissionCard submission={item} onOpen={(submission) => setViewingId(submission.id)} onEdit={setEditing} onDelete={onDelete} />
+              <SubmissionCard
+                submission={item}
+                onOpen={(submission) => setViewingId(submission.id)}
+                onEdit={setEditing}
+                onMove={(submission) => setMoving([submission])}
+                onDelete={onDelete}
+                selection={
+                  selecting && item.status === 'ready'
+                    ? { selected: selectedIds.includes(item.id), disabled: selectionFull, onToggle: toggleSelected }
+                    : undefined
+                }
+              />
             </li>
           ))}
         </ul>
@@ -180,6 +278,8 @@ export function MineTab({ topicId, summary, onUsageChanged, upload }: MineTabPro
           onLoadMore={pages.loadMore}
         />
       )}
+
+      {moving && <MoveDialog submissions={moving} onMoved={onMoved} onClose={() => setMoving(null)} />}
 
       {editing && (
         <EditSubmissionDialog

@@ -43,6 +43,26 @@ describe('submissions-api', () => {
     expect((await caught(api.getOne('t1', 'x'))).code).toBe('NotFound');
   });
 
+  it('lists every own submission across topics and moves a batch to a target', async () => {
+    const result = { moved: [], refused: [{ id: 'b', reason: 'quota' }] };
+    const http = vi
+      .fn()
+      .mockResolvedValueOnce(json(200, { data: [], nextCursor: null }))
+      .mockResolvedValueOnce(json(200, { data: [], nextCursor: null }))
+      .mockResolvedValueOnce(json(200, result))
+      .mockResolvedValueOnce(json(404, { error: 'NotFound' }));
+    const api = createSubmissionsApi(http);
+    await api.listMyAll();
+    expect(http).toHaveBeenLastCalledWith('GET', '/me/submissions', undefined);
+    await api.listMyAll('c 2');
+    expect(http).toHaveBeenLastCalledWith('GET', '/me/submissions?cursor=c+2', undefined);
+    await expect(api.move(['a', 'b'], 't2')).resolves.toEqual(result);
+    expect(http).toHaveBeenLastCalledWith('POST', '/me/submissions/move', {
+      body: JSON.stringify({ ids: ['a', 'b'], targetTopicId: 't2' }),
+    });
+    expect((await caught(api.move(['a'], 'gone'))).code).toBe('NotFound');
+  });
+
   it('maps 409 SUBMISSION_QUOTA with its spread meta', async () => {
     const http = vi.fn().mockResolvedValue(json(409, { error: 'SUBMISSION_QUOTA', reason: 'storage', used: 5, limit: 1024 }));
     const err = await caught(createSubmissionsApi(http).presign('t1', {
