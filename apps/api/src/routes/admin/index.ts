@@ -16,6 +16,7 @@ import { buildAdminGroupsRouter } from './groups';
 import { buildAdminBillingRouter } from './billing';
 import { buildAdminEventsRouter } from './events';
 import { buildAdminNotesRouter } from './notes';
+import { buildAdminSubmissionsRouter } from './submissions';
 import type { AppContainer } from '@api/container';
 
 export function buildAdminRouter(container: AppContainer) {
@@ -31,6 +32,10 @@ export function buildAdminRouter(container: AppContainer) {
   // '/users/*' middleware never runs for that path. Guarded by a spec asserting
   // a content creator gets 200 there (test/routes/admin-notes.router.spec.ts).
   app.route('/', buildAdminNotesRouter(container));
+  // Staff submissions (RFC 0020): same constraint as notes — before '/users',
+  // or 'GET /users/{userId}/submissions' would 403 a content creator. Guarded
+  // by test/routes/admin-submissions.router.spec.ts.
+  app.route('/', buildAdminSubmissionsRouter(container));
   app.route('/users', buildAdminUsersRouter(container));
   app.route('/topics', buildAdminTopicsRouter(container));
   // No stricter guard: tag lookup serves every role that may author a topic.

@@ -66,6 +66,21 @@ export type AuthoredSubmission = Submission & {
   topicAccessible: boolean;
 };
 
+/**
+ * A submission as staff receive it: the reader view plus the provenance staff
+ * need as their only audit trail (RFC 0020 §8) — who force-unshared it and
+ * when, who removed it.
+ */
+export type StaffSubmissionView = SubmissionView & {
+  moderatedAt: string | null;
+  moderatedBy: string | null;
+  removedBy: string | null;
+  removedByName: string | null;
+};
+
+/** One row of the staff per-student list: the staff view plus its topic. */
+export type StaffAuthoredSubmission = StaffSubmissionView & { topicTitle: string };
+
 /** One keyset page; the router encodes `nextCursor` into its opaque wire form. */
 export interface SubmissionPage<T> {
   data: T[];
@@ -134,6 +149,10 @@ const STORAGE_FAILED: Err = { ok: false, status: 502, error: 'StorageUnavailable
 /** "Staff" = `admin` or `content_creator`; a `tutor` is a student here (RFC 0020 §7). */
 function isStaff(caller: SubmissionCaller): boolean {
   return caller.roles.includes(ROLES.ADMIN) || caller.roles.includes(ROLES.CONTENT_CREATOR);
+}
+
+function isAdmin(caller: SubmissionCaller): boolean {
+  return caller.roles.includes(ROLES.ADMIN);
 }
 
 /** Drops the storage key and the moderation provenance. */
@@ -253,6 +272,25 @@ export class SubmissionsController {
       isMine: record.authorId === caller.userId,
       url: await this.signedUrl(record),
     };
+  }
+
+  private async toStaffView(record: SubmissionRecord, caller: SubmissionCaller): Promise<StaffSubmissionView> {
+    return {
+      ...(await this.toView(record, caller)),
+      moderatedAt: record.moderatedAt,
+      moderatedBy: record.moderatedBy,
+      removedBy: record.removedBy,
+      removedByName: record.removedByName,
+    };
+  }
+
+  /**
+   * Whether staff see `record` (RFC 0020 §7): every ready or removed
+   * submission, plus their own in any status. Pending rows stay the author's.
+   */
+  private static visibleToStaff(record: SubmissionRecord, caller: SubmissionCaller): boolean {
+    if (record.authorId === caller.userId) return true;
+    return record.status === READY || record.status === REMOVED;
   }
 
   /**
@@ -563,8 +601,9 @@ export class SubmissionsController {
    * `GET /topics/{id}/submissions?scope=` — newest first, pages of 20.
    * `mine`: the caller's own rows in every status. `class`: the topic's shared
    * ready rows (the caller's own flagged `isMine`), empty while sharing is off.
-   * `all` is staff-only: a non-staff caller gets `403`, the only `403` of the
-   * read side (Task 05 opens it to staff). The scope only ever narrows what the
+   * `all` is staff-only: every ready and removed row with its provenance, on any
+   * published topic (staff bypass the access set); a non-staff caller gets
+   * `403`, the only `403` of the read side. The scope only ever narrows what the
    * access table allows; the cursor is a position inside the scope's fixed WHERE.
    */
   async listForTopic(
@@ -572,10 +611,11 @@ export class SubmissionsController {
     caller: SubmissionCaller,
     scope: TopicListScope,
     cursor: NoteCursorKey | null,
-  ): Promise<ControllerResult<SubmissionPage<SubmissionView>>> {
+  ): Promise<ControllerResult<SubmissionPage<SubmissionView | StaffSubmissionView>>> {
     const cfg = this.effectiveConfig();
     if (!cfg.ok) return cfg;
-    if (scope === 'all') return FORBIDDEN;
+    const staffScope = scope === 'all';
+    if (staffScope && !isStaff(caller)) return FORBIDDEN;
     if (!(await this.isTopicReadable(topicId, caller))) return NOT_FOUND;
 
     const page = await this.submissions.listByTopic(topicId, {
@@ -584,6 +624,13 @@ export class SubmissionsController {
       sharingEnabled: cfg.config.sharingEnabled,
       page: { cursor, limit: SUBMISSIONS_PAGE_SIZE },
     });
+
+    if (staffScope) {
+      const visible = page.data.filter((r) => r.status === READY || r.status === REMOVED);
+      const data = await Promise.all(visible.map((r) => this.toStaffView(r, caller)));
+      return { ok: true, data: { data, nextCursor: page.nextCursor } };
+    }
+
     // Defence in depth: the repository's WHERE already decides the audience.
     const visible = page.data.filter((r) => SubmissionsController.visibleTo(r, caller, cfg.config.sharingEnabled));
     const data = await Promise.all(visible.map((r) => this.toView(r, caller)));
@@ -594,19 +641,25 @@ export class SubmissionsController {
    * `GET /topics/{id}/submissions/{sid}` — one submission under the §7 rules
    * (direct link, viewer). Anything the caller may not see — another student's
    * private, pending or removed row, a shared one while sharing is off, a row on
-   * another topic or an unreadable topic — is `404`, never `403`.
+   * another topic or an unreadable topic — is `404`, never `403`. Staff read any
+   * ready or removed submission, read-only, with its provenance; another
+   * student's pending row stays `404` for them too.
    */
   async getOne(
     topicId: string,
     submissionId: string,
     caller: SubmissionCaller,
-  ): Promise<ControllerResult<SubmissionView>> {
+  ): Promise<ControllerResult<SubmissionView | StaffSubmissionView>> {
     const cfg = this.effectiveConfig();
     if (!cfg.ok) return cfg;
     if (!(await this.isTopicReadable(topicId, caller))) return NOT_FOUND;
 
     const record = await this.submissions.findById(submissionId);
     if (!record || record.topicNodeId !== topicId) return NOT_FOUND;
+    if (isStaff(caller)) {
+      if (!SubmissionsController.visibleToStaff(record, caller)) return NOT_FOUND;
+      return { ok: true, data: await this.toStaffView(record, caller) };
+    }
     if (!SubmissionsController.visibleTo(record, caller, cfg.config.sharingEnabled)) return NOT_FOUND;
     return { ok: true, data: await this.toView(record, caller) };
   }
@@ -715,5 +768,99 @@ export class SubmissionsController {
     };
     if (isStaff(caller)) summary.totalCount = counts.total;
     return { ok: true, data: summary };
+  }
+
+  // -------------------------------------------------------------------------
+  // Staff (RFC 0020 §8; M23 Task 05) — mounted under `/v1/admin`, whose
+  // umbrella already admits both staff roles. The role checks are repeated
+  // here so the rules hold whatever router calls them.
+  // -------------------------------------------------------------------------
+
+  /**
+   * `GET /admin/users/{userId}/submissions` — every ready or removed
+   * submission by one student, across topics, newest first, with the topic
+   * title and provenance. Pending rows stay the author's. An unknown user
+   * yields an empty page.
+   */
+  async listByUserForStaff(
+    userId: string,
+    caller: SubmissionCaller,
+    cursor: NoteCursorKey | null,
+  ): Promise<ControllerResult<SubmissionPage<StaffAuthoredSubmission>>> {
+    const cfg = this.effectiveConfig();
+    if (!cfg.ok) return cfg;
+    if (!isStaff(caller)) return FORBIDDEN;
+
+    const page = await this.submissions.listByAuthor(userId, {
+      scope: 'staff',
+      page: { cursor, limit: SUBMISSIONS_PAGE_SIZE },
+    });
+    const visible = page.data.filter((r) => r.status === READY || r.status === REMOVED);
+    const data = await Promise.all(
+      visible.map(async (record: AuthoredSubmissionRecord) => ({
+        ...(await this.toStaffView(record, caller)),
+        topicTitle: record.topicTitle,
+      })),
+    );
+    return { ok: true, data: { data, nextCursor: page.nextCursor } };
+  }
+
+  /**
+   * `POST /admin/submissions/{id}/unshare` — force-unshare: the submission
+   * becomes (or stays) private and flagged with who and when; the author
+   * cannot share it again until the flag is cleared. Title, description and
+   * file are untouched. Pending rows are invisible to staff (`404`).
+   */
+  async forceUnshare(
+    submissionId: string,
+    caller: SubmissionCaller,
+  ): Promise<ControllerResult<StaffSubmissionView>> {
+    if (!isStaff(caller)) return FORBIDDEN;
+    const existing = await this.submissions.findById(submissionId);
+    if (!existing || existing.status === Entities.Config.SubmissionStatus.PENDING) return NOT_FOUND;
+
+    const record = await this.submissions.setModeration(submissionId, caller.userId);
+    if (!record) return NOT_FOUND;
+    return { ok: true, data: await this.toStaffView(record, caller) };
+  }
+
+  /**
+   * `DELETE /admin/submissions/{id}/moderation` — lifts the flag so the author
+   * may share again. It never re-shares on the author's behalf.
+   */
+  async clearModeration(submissionId: string, caller: SubmissionCaller): Promise<ControllerResult<null>> {
+    if (!isStaff(caller)) return FORBIDDEN;
+    const existing = await this.submissions.findById(submissionId);
+    if (!existing || existing.status === Entities.Config.SubmissionStatus.PENDING) return NOT_FOUND;
+
+    const record = await this.submissions.setModeration(submissionId, null);
+    if (!record) return NOT_FOUND;
+    return { ok: true, data: null };
+  }
+
+  /**
+   * `DELETE /admin/submissions/{id}` — `admin` only (a content creator gets
+   * `403`). Object first, then the tombstone: status `removed`, removal stamp
+   * and author, key nulled, description cleared, private — the author keeps a
+   * "Removed by the staff" card and the quota is freed. If the object delete
+   * fails nothing changes and the call answers `502`. Idempotent on a
+   * tombstone; a pending row is the author's and answers `404`.
+   */
+  async removeByStaff(submissionId: string, caller: SubmissionCaller): Promise<ControllerResult<null>> {
+    if (!isAdmin(caller)) return FORBIDDEN;
+    const record = await this.submissions.findById(submissionId);
+    if (!record || record.status === Entities.Config.SubmissionStatus.PENDING) return NOT_FOUND;
+    if (record.status === REMOVED) return { ok: true, data: null };
+
+    if (record.storageKey) {
+      try {
+        await this.storage.deleteObject(record.storageKey);
+      } catch (error) {
+        console.error('[submissions] staff removal: object delete failed; row unchanged', error);
+        return STORAGE_FAILED;
+      }
+    }
+    await this.submissions.markRemoved(record.id, caller.userId);
+    return { ok: true, data: null };
   }
 }
