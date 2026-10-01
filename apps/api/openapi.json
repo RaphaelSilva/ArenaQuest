@@ -339,6 +339,14 @@
           "invoiceCount": {
             "type": "integer"
           },
+          "rail": {
+            "enum": [
+              "contract",
+              "extras"
+            ],
+            "example": "contract",
+            "type": "string"
+          },
           "studentCount": {
             "type": "integer"
           },
@@ -349,11 +357,375 @@
         },
         "required": [
           "asOf",
+          "rail",
           "currency",
           "buckets",
           "totalMinor",
           "invoiceCount",
           "studentCount"
+        ],
+        "type": "object"
+      },
+      "BillingEventAudienceCheck": {
+        "properties": {
+          "audience": {
+            "enum": [
+              "public",
+              "members",
+              "restricted"
+            ],
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "outsideAudience": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "eventId",
+          "audience",
+          "outsideAudience"
+        ],
+        "type": "object"
+      },
+      "BillingEventCharge": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "dueDate": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "graceDays": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "issuedAt": {
+            "type": "string"
+          },
+          "issuedBy": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "paid",
+              "void"
+            ],
+            "type": "string"
+          },
+          "termsNote": {
+            "type": "string"
+          },
+          "termsSource": {
+            "enum": [
+              "standard",
+              "negotiated"
+            ],
+            "example": "standard",
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "voidReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "voidedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "userId",
+          "description",
+          "amountMinor",
+          "currency",
+          "termsSource",
+          "termsNote",
+          "dueDate",
+          "graceDays",
+          "status",
+          "issuedBy",
+          "issuedAt",
+          "voidedAt",
+          "voidReason"
+        ],
+        "type": "object"
+      },
+      "BillingEventChargeAdjustment": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "appliedAt": {
+            "type": "string"
+          },
+          "appliedBy": {
+            "type": "string"
+          },
+          "chargeId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "discount",
+              "credit",
+              "waiver",
+              "surcharge"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "chargeId",
+          "kind",
+          "amountMinor",
+          "reason",
+          "appliedBy",
+          "appliedAt"
+        ],
+        "type": "object"
+      },
+      "BillingEventChargeDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BillingEventChargeWithBalance"
+          },
+          {
+            "properties": {
+              "adjustments": {
+                "items": {
+                  "$ref": "#/components/schemas/BillingEventChargeAdjustment"
+                },
+                "type": "array"
+              },
+              "payments": {
+                "items": {
+                  "$ref": "#/components/schemas/BillingEventChargePayment"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "adjustments",
+              "payments"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "BillingEventChargePayment": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "chargeId": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "externalReference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "cash",
+              "pix",
+              "bank_transfer",
+              "card",
+              "gateway",
+              "other"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "paidAt": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string"
+          },
+          "recordedBy": {
+            "type": "string"
+          },
+          "reversesId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "chargeId",
+          "amountMinor",
+          "currency",
+          "method",
+          "paidAt",
+          "externalReference",
+          "note",
+          "reversesId",
+          "recordedBy",
+          "recordedAt"
+        ],
+        "type": "object"
+      },
+      "BillingEventChargeSummary": {
+        "properties": {
+          "adjustmentsMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "chargeCount": {
+            "type": "integer"
+          },
+          "chargedMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "counts": {
+            "properties": {
+              "open": {
+                "type": "integer"
+              },
+              "paid": {
+                "type": "integer"
+              },
+              "void": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "open",
+              "paid",
+              "void"
+            ],
+            "type": "object"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "outstandingMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "receivedMinor": {
+            "example": 15000,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "eventId",
+          "currency",
+          "chargedMinor",
+          "adjustmentsMinor",
+          "receivedMinor",
+          "outstandingMinor",
+          "chargeCount",
+          "counts"
+        ],
+        "type": "object"
+      },
+      "BillingEventChargeWithBalance": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BillingEventCharge"
+          },
+          {
+            "properties": {
+              "balanceMinor": {
+                "example": 15000,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "balanceMinor"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "BillingEventPrice": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "currency": {
+            "example": "BRL",
+            "type": "string"
+          },
+          "dueInDays": {
+            "type": "integer"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "graceDays": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "eventId",
+          "amountMinor",
+          "currency",
+          "dueInDays",
+          "graceDays",
+          "updatedBy",
+          "updatedAt"
         ],
         "type": "object"
       },
@@ -492,6 +864,77 @@
           }
         ]
       },
+      "BillingIssueEventChargesResult": {
+        "properties": {
+          "absorbed": {
+            "items": {
+              "properties": {
+                "eventId": {
+                  "type": "string"
+                },
+                "userId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "eventId",
+                "userId"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "created": {
+            "items": {
+              "$ref": "#/components/schemas/BillingEventCharge"
+            },
+            "type": "array"
+          },
+          "outsideAudience": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "created",
+          "absorbed",
+          "outsideAudience"
+        ],
+        "type": "object"
+      },
+      "BillingMovementExtras": {
+        "properties": {
+          "adjustmentsMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "chargedMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "chargesIssued": {
+            "type": "integer"
+          },
+          "receivableAtCloseMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "receivedMinor": {
+            "example": 15000,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chargedMinor",
+          "adjustmentsMinor",
+          "receivedMinor",
+          "chargesIssued",
+          "receivableAtCloseMinor"
+        ],
+        "type": "object"
+      },
       "BillingMovementReport": {
         "properties": {
           "activeStudents": {
@@ -505,8 +948,15 @@
             "example": 15000,
             "type": "integer"
           },
+          "cashReceivedMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
           "currency": {
             "$ref": "#/components/schemas/BillingReportCurrency"
+          },
+          "extras": {
+            "$ref": "#/components/schemas/BillingMovementExtras"
           },
           "invoicedMinor": {
             "example": 15000,
@@ -547,7 +997,9 @@
           "receivedMinor",
           "outstandingMinor",
           "invoicesIssued",
-          "activeStudents"
+          "activeStudents",
+          "extras",
+          "cashReceivedMinor"
         ],
         "type": "object"
       },
@@ -701,33 +1153,13 @@
         ],
         "type": "object"
       },
-      "BillingRosterEntry": {
+      "BillingRosterContract": {
         "properties": {
-          "asOf": {
-            "example": "2026-01-01",
+          "groupId": {
             "type": "string"
           },
-          "contractGroupId": {
+          "id": {
             "type": "string"
-          },
-          "contractId": {
-            "type": "string"
-          },
-          "contractStatus": {
-            "enum": [
-              "active",
-              "paused",
-              "cancelled",
-              "superseded"
-            ],
-            "type": "string"
-          },
-          "currency": {
-            "example": "BRL",
-            "type": "string"
-          },
-          "hold": {
-            "$ref": "#/components/schemas/BillingStandingHold"
           },
           "negotiatedTerms": {
             "type": "boolean"
@@ -760,6 +1192,50 @@
             "example": "delinquent",
             "type": "string"
           },
+          "status": {
+            "enum": [
+              "active",
+              "paused",
+              "cancelled",
+              "superseded"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "groupId",
+          "status",
+          "nextDueDate",
+          "negotiatedTerms",
+          "standing",
+          "oldestOverdueDate",
+          "outstandingMinor"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "BillingRosterEntry": {
+        "properties": {
+          "asOf": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "contract": {
+            "$ref": "#/components/schemas/BillingRosterContract"
+          },
+          "currency": {
+            "example": "BRL",
+            "type": "string"
+          },
+          "extras": {
+            "$ref": "#/components/schemas/BillingRosterExtras"
+          },
+          "hold": {
+            "$ref": "#/components/schemas/BillingStandingHold"
+          },
           "userId": {
             "type": "string"
           }
@@ -767,18 +1243,54 @@
         "required": [
           "userId",
           "asOf",
-          "standing",
-          "oldestOverdueDate",
-          "outstandingMinor",
-          "contractId",
-          "contractGroupId",
-          "contractStatus",
           "currency",
-          "nextDueDate",
-          "negotiatedTerms",
+          "contract",
+          "extras",
           "hold"
         ],
         "type": "object"
+      },
+      "BillingRosterExtras": {
+        "properties": {
+          "oldestOverdueDate": {
+            "example": "2026-01-01",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "openCharges": {
+            "type": "integer"
+          },
+          "outstandingMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "overdueCharges": {
+            "type": "integer"
+          },
+          "standing": {
+            "enum": [
+              "good",
+              "due",
+              "delinquent",
+              "exempt"
+            ],
+            "example": "delinquent",
+            "type": "string"
+          }
+        },
+        "required": [
+          "standing",
+          "oldestOverdueDate",
+          "outstandingMinor",
+          "openCharges",
+          "overdueCharges"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
       },
       "BillingRunReport": {
         "properties": {
@@ -889,6 +1401,116 @@
           "eligibleContracts": {
             "type": "integer"
           },
+          "extrasCrossings": {
+            "items": {
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "from": {
+                  "enum": [
+                    "good",
+                    "due",
+                    "delinquent",
+                    "exempt"
+                  ],
+                  "example": "delinquent",
+                  "type": "string"
+                },
+                "oldestOverdueDate": {
+                  "example": "2026-01-01",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "outstandingMinor": {
+                  "example": 15000,
+                  "type": "integer"
+                },
+                "to": {
+                  "enum": [
+                    "good",
+                    "due",
+                    "delinquent",
+                    "exempt"
+                  ],
+                  "example": "delinquent",
+                  "type": "string"
+                },
+                "userId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "userId",
+                "from",
+                "to",
+                "oldestOverdueDate",
+                "outstandingMinor",
+                "currency"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "extrasReminders": {
+            "items": {
+              "properties": {
+                "balanceMinor": {
+                  "example": 15000,
+                  "type": "integer"
+                },
+                "chargeId": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "dueDate": {
+                  "example": "2026-01-01",
+                  "type": "string"
+                },
+                "eventId": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "extras_due_date",
+                    "extras_grace_lapsed"
+                  ],
+                  "type": "string"
+                },
+                "sent": {
+                  "type": "boolean"
+                },
+                "triggerOn": {
+                  "example": "2026-01-01",
+                  "type": "string"
+                },
+                "userId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "chargeId",
+                "eventId",
+                "description",
+                "userId",
+                "kind",
+                "dueDate",
+                "triggerOn",
+                "balanceMinor",
+                "currency",
+                "sent"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
           "issued": {
             "items": {
               "properties": {
@@ -941,6 +1563,53 @@
           },
           "mailsSent": {
             "type": "integer"
+          },
+          "reminderCounts": {
+            "properties": {
+              "contract": {
+                "properties": {
+                  "sent": {
+                    "type": "integer"
+                  },
+                  "suppressed": {
+                    "type": "integer"
+                  },
+                  "undeliverable": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "sent",
+                  "suppressed",
+                  "undeliverable"
+                ],
+                "type": "object"
+              },
+              "extras": {
+                "properties": {
+                  "sent": {
+                    "type": "integer"
+                  },
+                  "suppressed": {
+                    "type": "integer"
+                  },
+                  "undeliverable": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "sent",
+                  "suppressed",
+                  "undeliverable"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "contract",
+              "extras"
+            ],
+            "type": "object"
           },
           "reminders": {
             "items": {
@@ -1030,7 +1699,10 @@
           "suppressedByHold",
           "divergences",
           "mailsSent",
-          "adminsNotified"
+          "adminsNotified",
+          "extrasReminders",
+          "extrasCrossings",
+          "reminderCounts"
         ],
         "type": "object"
       },
@@ -1066,6 +1738,33 @@
         "type": [
           "object",
           "null"
+        ]
+      },
+      "BillingStatementCharge": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BillingEventChargeDetail"
+          },
+          {
+            "properties": {
+              "eventStartsAt": {
+                "example": "2026-07-18T13:00:00.000Z",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "eventTitle": {
+                "example": "Seminário de Inverno",
+                "type": "string"
+              }
+            },
+            "required": [
+              "eventTitle",
+              "eventStartsAt"
+            ],
+            "type": "object"
+          }
         ]
       },
       "BillingStatementContractGroup": {
@@ -1106,6 +1805,44 @@
           "endDate",
           "status",
           "versions"
+        ],
+        "type": "object"
+      },
+      "BillingStatementExtras": {
+        "properties": {
+          "charges": {
+            "items": {
+              "$ref": "#/components/schemas/BillingStatementCharge"
+            },
+            "type": "array"
+          },
+          "oldestOverdueDate": {
+            "example": "2026-01-01",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outstandingMinor": {
+            "example": 15000,
+            "type": "integer"
+          },
+          "standing": {
+            "enum": [
+              "good",
+              "due",
+              "delinquent",
+              "exempt"
+            ],
+            "example": "delinquent",
+            "type": "string"
+          }
+        },
+        "required": [
+          "standing",
+          "oldestOverdueDate",
+          "outstandingMinor",
+          "charges"
         ],
         "type": "object"
       },
@@ -1155,6 +1892,9 @@
               "null"
             ]
           },
+          "extras": {
+            "$ref": "#/components/schemas/BillingStatementExtras"
+          },
           "invoices": {
             "items": {
               "$ref": "#/components/schemas/BillingStatementInvoice"
@@ -1183,7 +1923,8 @@
           "currentMembershipSince",
           "outstandingMinor",
           "contractGroups",
-          "invoices"
+          "invoices",
+          "extras"
         ],
         "type": "object"
       },
@@ -1557,6 +2298,30 @@
         ],
         "type": "object"
       },
+      "EditSubmissionBody": {
+        "properties": {
+          "description": {
+            "description": "Markdown; sanitised, then must be ≤ SUBMISSION_DESCRIPTION_MAX characters",
+            "maxLength": 8000,
+            "type": "string"
+          },
+          "title": {
+            "example": "Kata, final",
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "visibility": {
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "example": "shared",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ErrorBody": {
         "additionalProperties": true,
         "description": "Standard error response body with optional metadata fields",
@@ -1690,6 +2455,47 @@
           "version",
           "timestamp",
           "adapters"
+        ],
+        "type": "object"
+      },
+      "IssueEventChargesBody": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "dueDate": {
+            "example": "2026-01-01",
+            "type": "string"
+          },
+          "eventId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "graceDays": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "termsNote": {
+            "type": "string"
+          },
+          "userIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "eventId",
+          "userIds"
         ],
         "type": "object"
       },
@@ -2087,6 +2893,85 @@
         ],
         "type": "object"
       },
+      "PresignSubmissionBody": {
+        "properties": {
+          "contentType": {
+            "enum": [
+              "application/pdf",
+              "video/mp4",
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "video/quicktime"
+            ],
+            "example": "video/quicktime",
+            "type": "string"
+          },
+          "description": {
+            "description": "Markdown; sanitised, then must be ≤ SUBMISSION_DESCRIPTION_MAX characters",
+            "example": "Left side",
+            "maxLength": 8000,
+            "type": "string"
+          },
+          "fileName": {
+            "example": "IMG_0042.MOV",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "sizeBytes": {
+            "description": "Exact byte length of the file; the presigned PUT signs it",
+            "example": 52428800,
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          "title": {
+            "example": "Kata, 2nd attempt",
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "visibility": {
+            "description": "Defaults to private",
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "example": "private",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fileName",
+          "contentType",
+          "sizeBytes",
+          "title"
+        ],
+        "type": "object"
+      },
+      "PresignSubmissionResponse": {
+        "properties": {
+          "expiresAt": {
+            "description": "ISO-8601 instant the upload URL expires",
+            "example": "2026-09-29T13:00:00.000Z",
+            "type": "string"
+          },
+          "submission": {
+            "$ref": "#/components/schemas/Submission"
+          },
+          "uploadUrl": {
+            "description": "Presigned PUT; send the declared Content-Type and length",
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "submission",
+          "uploadUrl",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
       "RecordPaymentBody": {
         "properties": {
           "amountMinor": {
@@ -2285,6 +3170,33 @@
         ],
         "type": "object"
       },
+      "SetEventPriceBody": {
+        "properties": {
+          "amountMinor": {
+            "example": 15000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "currency": {
+            "example": "BRL",
+            "type": "string"
+          },
+          "dueInDays": {
+            "example": 7,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "graceDays": {
+            "example": 5,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "amountMinor"
+        ],
+        "type": "object"
+      },
       "SignContractBody": {
         "properties": {
           "amountMinor": {
@@ -2416,6 +3328,223 @@
             "type": "object"
           }
         ]
+      },
+      "Submission": {
+        "properties": {
+          "authorId": {
+            "example": "student-a",
+            "type": "string"
+          },
+          "authorName": {
+            "example": "Student A",
+            "type": "string"
+          },
+          "contentType": {
+            "enum": [
+              "application/pdf",
+              "video/mp4",
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "video/quicktime"
+            ],
+            "example": "video/quicktime",
+            "type": "string"
+          },
+          "createdAt": {
+            "example": "2026-09-29 12:00:00",
+            "type": "string"
+          },
+          "description": {
+            "description": "Sanitised Markdown, ≤ SUBMISSION_DESCRIPTION_MAX; '' when empty or removed",
+            "example": "",
+            "type": "string"
+          },
+          "id": {
+            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+            "format": "uuid",
+            "type": "string"
+          },
+          "moderated": {
+            "description": "True while a staff force-unshare blocks re-sharing",
+            "example": false,
+            "type": "boolean"
+          },
+          "originalName": {
+            "example": "IMG_0042.MOV",
+            "type": "string"
+          },
+          "removedAt": {
+            "description": "Null unless status is `removed`",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sharedAt": {
+            "description": "Null while private",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sizeBytes": {
+            "description": "Declared at presign, verified at finalize",
+            "example": 52428800,
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "ready",
+              "removed"
+            ],
+            "example": "ready",
+            "type": "string"
+          },
+          "title": {
+            "description": "1..SUBMISSION_TITLE_MAX characters",
+            "example": "Kata, 2nd attempt",
+            "type": "string"
+          },
+          "topicNodeId": {
+            "example": "topic-1",
+            "type": "string"
+          },
+          "updatedAt": {
+            "example": "2026-09-29 12:00:00",
+            "type": "string"
+          },
+          "visibility": {
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "example": "private",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "topicNodeId",
+          "authorId",
+          "authorName",
+          "title",
+          "description",
+          "originalName",
+          "contentType",
+          "sizeBytes",
+          "status",
+          "visibility",
+          "sharedAt",
+          "moderated",
+          "removedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "SubmissionQuotaError": {
+        "properties": {
+          "error": {
+            "enum": [
+              "SUBMISSION_QUOTA"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "example": 10,
+            "type": "integer"
+          },
+          "reason": {
+            "description": "`count`: per-topic limit; `storage`: per-student bytes",
+            "enum": [
+              "count",
+              "storage"
+            ],
+            "type": "string"
+          },
+          "used": {
+            "example": 10,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "error",
+          "reason",
+          "used",
+          "limit"
+        ],
+        "type": "object"
+      },
+      "SubmissionSummary": {
+        "properties": {
+          "classCount": {
+            "description": "Shared ready submissions on the topic; 0 when sharing is disabled",
+            "example": 8,
+            "type": "integer"
+          },
+          "limits": {
+            "properties": {
+              "perTopicMax": {
+                "example": 10,
+                "type": "integer"
+              },
+              "storagePerStudentBytes": {
+                "example": 1073741824,
+                "type": "integer"
+              },
+              "videoMaxBytes": {
+                "example": 262144000,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "perTopicMax",
+              "storagePerStudentBytes",
+              "videoMaxBytes"
+            ],
+            "type": "object"
+          },
+          "sharingEnabled": {
+            "example": true,
+            "type": "boolean"
+          },
+          "totalCount": {
+            "description": "Staff only: every ready + removed submission on the topic",
+            "example": 12,
+            "type": "integer"
+          },
+          "usage": {
+            "properties": {
+              "bytes": {
+                "description": "Caller's pending + ready bytes across all topics",
+                "example": 104857600,
+                "type": "integer"
+              },
+              "topicCount": {
+                "description": "Caller's pending + ready submissions on this topic",
+                "example": 2,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "topicCount",
+              "bytes"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "limits",
+          "sharingEnabled",
+          "usage",
+          "classCount"
+        ],
+        "type": "object"
       },
       "Tag": {
         "properties": {
@@ -2747,6 +3876,18 @@
         "required": [
           "error",
           "issues"
+        ],
+        "type": "object"
+      },
+      "VoidEventChargeBody": {
+        "properties": {
+          "reason": {
+            "example": "Seminar cancelled for this student.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
         ],
         "type": "object"
       },
@@ -3247,6 +4388,663 @@
         "summary": "Update Badge",
         "tags": [
           "admin:badges"
+        ]
+      }
+    },
+    "/v1/admin/billing/charge-payments/{id}/reverse": {
+      "post": {
+        "description": "Appends the mirror-image row. A reversal cannot be reversed, and a payment is reversed at most once.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "plan-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReversePaymentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingEventChargePayment"
+                }
+              }
+            },
+            "description": "Reversal recorded"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Reverse an Event Charge Payment",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/charges": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "eventId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "userId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "open",
+                "paid",
+                "void"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BillingEventChargeWithBalance"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Charges with their balances"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List Event Charges",
+        "tags": [
+          "admin:billing"
+        ]
+      },
+      "post": {
+        "description": "Issues one charge per user (1–200) for one published event (`409` for draft or archived). Idempotent: a pair with a live charge is reported under `absorbed`. Without `amountMinor` the price is snapshot as standard; any other amount is negotiated and needs a `termsNote`. For a restricted event, `outsideAudience` lists the users who cannot see it — the charge is still issued and no audience row is written.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueEventChargesBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingIssueEventChargesResult"
+                }
+              }
+            },
+            "description": "Nothing created; every pair was absorbed"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingIssueEventChargesResult"
+                }
+              }
+            },
+            "description": "At least one charge created"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Charge Users for an Event",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/charges/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "plan-id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingEventChargeDetail"
+                }
+              }
+            },
+            "description": "Charge with its ledger"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "An Event Charge with its Ledger",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/charges/{id}/adjustments": {
+      "post": {
+        "description": "Append-only, signed, non-zero and reasoned. Negative reduces what is owed.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "plan-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyAdjustmentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingEventChargeAdjustment"
+                }
+              }
+            },
+            "description": "Adjustment applied"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Apply an Event Charge Adjustment",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/charges/{id}/payments": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "plan-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordPaymentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingEventChargePayment"
+                }
+              }
+            },
+            "description": "Payment recorded"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Record an Event Charge Payment",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/charges/{id}/void": {
+      "post": {
+        "description": "The reason is mandatory. Refused with `409` while the charge has net payments — reverse them first.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "plan-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidEventChargeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingEventCharge"
+                }
+              }
+            },
+            "description": "Charge voided"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Void an Event Charge",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/event-prices/{eventId}": {
+      "delete": {
+        "description": "Stops offering the event. Existing charges are untouched.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "example": "event-id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Price cleared"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Clear an Event's Price",
+        "tags": [
+          "admin:billing"
+        ]
+      },
+      "get": {
+        "description": "The list price of an event, or `404` when the event is not for sale.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "example": "event-id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingEventPrice"
+                }
+              }
+            },
+            "description": "Event price"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "An Event's Price",
+        "tags": [
+          "admin:billing"
+        ]
+      },
+      "put": {
+        "description": "Creates or replaces the event's price in the tenant's active currency. Charges already issued keep their own snapshot.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "example": "event-id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetEventPriceBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingEventPrice"
+                }
+              }
+            },
+            "description": "Event price set"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set an Event's Price",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/events/{eventId}/audience-check": {
+      "get": {
+        "description": "Read-only: lists the given users a restricted event is not addressed to. Always empty for public and members events.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "example": "event-id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "userIds",
+            "required": true,
+            "schema": {
+              "example": "user-a,user-b",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingEventAudienceCheck"
+                }
+              }
+            },
+            "description": "Audience check"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Check Buyers Against an Event Audience",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/events/{eventId}/summary": {
+      "get": {
+        "description": "Charged, signed adjustments, received and outstanding over the non-void charges (`chargedMinor + adjustmentsMinor - receivedMinor = outstandingMinor`), plus counts by status.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "example": "event-id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingEventChargeSummary"
+                }
+              }
+            },
+            "description": "Event charge summary"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "An Event's Charge Summary",
+        "tags": [
+          "admin:billing"
         ]
       }
     },
@@ -3941,7 +5739,7 @@
     },
     "/v1/admin/billing/reports/aging": {
       "get": {
-        "description": "Open balances bucketed 0-30 / 31-60 / 61-90 / 90+ by days past each invoice's own due date. Boundaries are exclusive: 30 days past due and 31 days past due land in different buckets.",
+        "description": "Open balances bucketed 0-30 / 31-60 / 61-90 / 90+ by days past each item's own due date. Boundaries are exclusive: 30 days past due and 31 days past due land in different buckets. `rail` picks the one rail aged — `contract` (invoices, the default, unchanged) or `extras` (event charges); the two are never bucketed together.",
         "parameters": [
           {
             "in": "query",
@@ -3949,6 +5747,19 @@
             "required": false,
             "schema": {
               "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rail",
+            "required": false,
+            "schema": {
+              "enum": [
+                "contract",
+                "extras"
+              ],
+              "example": "contract",
               "type": "string"
             }
           }
@@ -3987,7 +5798,7 @@
     },
     "/v1/admin/billing/reports/movement": {
       "get": {
-        "description": "Billed, received and outstanding for one month, recomputed from the ledger rows. Billed is keyed off the invoice's issue date and the adjustment's applied date; received is keyed off the payment's paid date — a payment in September against an August invoice is September's received and August's billed.",
+        "description": "Billed, received and outstanding for one month, recomputed from the ledger rows. Billed is keyed off the invoice's issue date and the adjustment's applied date; received is keyed off the payment's paid date — a payment in September against an August invoice is September's received and August's billed. Every top-level field is the contract rail only; `extras` reports event charges on the same date rules, and `cashReceivedMinor` is the one cross-rail figure — money that entered the till.",
         "parameters": [
           {
             "in": "query",
@@ -4034,13 +5845,44 @@
     },
     "/v1/admin/billing/students": {
       "get": {
-        "description": "Every student with a contract, with their standing resolved from their invoices rather than read from a column: outstanding balance, oldest overdue date, next due date and whether the terms were negotiated. `standing=exempt` is the held filter — a hold is the only way to reach it. Reporting only: nothing here gates a student's access.",
+        "description": "Every user with a contract or any event charge, with two standings resolved side by side and never merged: `contract` (from contract invoices only — outstanding balance, oldest overdue date, next due date, negotiated terms; null when there is no contract) and `extras` (from event charges only — outstanding balance, oldest overdue date, open and overdue charge counts; null when never charged). There is no top-level standing or total. `contractStanding` and `extrasStanding` filter independently; `standing` is kept as an alias of `contractStanding`. `contractStanding=exempt` is the held filter — a hold applies to the contract rail only. Reporting only: nothing here gates a student's access.",
         "parameters": [
+          {
+            "in": "query",
+            "name": "contractStanding",
+            "required": false,
+            "schema": {
+              "enum": [
+                "good",
+                "due",
+                "delinquent",
+                "exempt"
+              ],
+              "example": "delinquent",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "extrasStanding",
+            "required": false,
+            "schema": {
+              "enum": [
+                "good",
+                "due",
+                "delinquent",
+                "exempt"
+              ],
+              "example": "delinquent",
+              "type": "string"
+            }
+          },
           {
             "in": "query",
             "name": "standing",
             "required": false,
             "schema": {
+              "description": "Deprecated alias of `contractStanding`.",
               "enum": [
                 "good",
                 "due",
@@ -4101,7 +5943,7 @@
     },
     "/v1/admin/billing/students/{userId}/statement": {
       "get": {
-        "description": "The student's contracts with their chains, invoices with their adjustments and payments, the outstanding total, and the two derived membership dates: \"student since\" spans every contract group, \"current membership since\" is the root of the group now active.",
+        "description": "The student's contracts with their chains, invoices with their adjustments and payments, the outstanding total, and the two derived membership dates: \"student since\" spans every contract group, \"current membership since\" is the root of the group now active. `outstandingMinor` is the contract rail only; the sibling `extras` object carries the extras rail — its own standing, outstanding and each event charge with its event title, date and ledger.",
         "parameters": [
           {
             "in": "path",
@@ -6981,6 +8823,72 @@
         ]
       }
     },
+    "/v1/admin/tags": {
+      "get": {
+        "description": "Tags whose slug starts with `slugify(q)`, ordered by slug. Backs the admin tag combobox. Readable by `admin` and `content_creator`.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "description": "Free text; slugified server-side and matched as a slug prefix.",
+              "example": "chu",
+              "maxLength": 80,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "description": "Maximum number of tags to return (1–100).",
+              "example": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/Tag"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Matching tags"
+          },
+          "400": {
+            "description": "Bad Request / Validation Failed (e.g. `limit` outside 1–100)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List Tags",
+        "tags": [
+          "admin:tags"
+        ]
+      }
+    },
     "/v1/admin/tasks": {
       "get": {
         "description": "Retrieve all tasks, optionally filtered by status with pagination.",
@@ -8312,9 +10220,24 @@
                     "type": "string"
                   },
                   "tagIds": {
+                    "description": "Tag IDs to link. Mutually exclusive with `tags`; an unknown ID returns 422 UNKNOWN_TAG.",
                     "items": {
                       "type": "string"
                     },
+                    "type": "array"
+                  },
+                  "tags": {
+                    "description": "Tag names (1–40 characters each after trim, at most 20). Each name is slugified; an existing slug is reused with its stored name, a new one is created. Mutually exclusive with `tagIds`. On PATCH, `[]` removes every tag and omitting the field leaves them unchanged.",
+                    "example": [
+                      "Chūdan",
+                      "Kata"
+                    ],
+                    "items": {
+                      "maxLength": 40,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 20,
                     "type": "array"
                   },
                   "title": {
@@ -8494,7 +10417,13 @@
             "description": "Topic successfully created"
           },
           "400": {
-            "description": "Bad Request / Validation Failed"
+            "description": "Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters)"
+          },
+          "404": {
+            "description": "Parent topic not found"
+          },
+          "422": {
+            "description": "UNKNOWN_TAG or UNKNOWN_PREREQ — a referenced ID does not exist; nothing is written"
           }
         },
         "security": [
@@ -8762,9 +10691,24 @@
                     "type": "string"
                   },
                   "tagIds": {
+                    "description": "Tag IDs to link. Mutually exclusive with `tags`; an unknown ID returns 422 UNKNOWN_TAG.",
                     "items": {
                       "type": "string"
                     },
+                    "type": "array"
+                  },
+                  "tags": {
+                    "description": "Tag names (1–40 characters each after trim, at most 20). Each name is slugified; an existing slug is reused with its stored name, a new one is created. Mutually exclusive with `tagIds`. On PATCH, `[]` removes every tag and omitting the field leaves them unchanged.",
+                    "example": [
+                      "Chūdan",
+                      "Kata"
+                    ],
+                    "items": {
+                      "maxLength": 40,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "maxItems": 20,
                     "type": "array"
                   },
                   "title": {
@@ -8941,10 +10885,13 @@
             "description": "Successfully updated topic node"
           },
           "400": {
-            "description": "Bad Request / Validation Failed"
+            "description": "Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters)"
           },
           "404": {
             "description": "Topic not found"
+          },
+          "422": {
+            "description": "UNKNOWN_TAG or UNKNOWN_PREREQ — a referenced ID does not exist; nothing is written"
           }
         },
         "security": [
@@ -11321,7 +13268,7 @@
     },
     "/v1/me/billing": {
       "get": {
-        "description": "The caller's own standing, contracts, invoices with their payments, and outstanding total. It takes no parameters: the subject is the authenticated caller and there is no request that names another student. A member with no contract gets an empty statement with standing `good`, not a 404.",
+        "description": "The caller's own standing, contracts, invoices with their payments, and outstanding total. It takes no parameters: the subject is the authenticated caller and there is no request that names another student. A member with no contract gets an empty statement with standing `good`, not a 404. `standing` and `outstandingMinor` are the contract rail only; the sibling `extras` object carries the caller's own event charges with their own standing — the two are never summed.",
         "responses": {
           "200": {
             "content": {
@@ -12738,6 +14685,658 @@
         "summary": "Create or update my note on a topic",
         "tags": [
           "topics:notes"
+        ]
+      }
+    },
+    "/v1/topics/{id}/submissions/presign": {
+      "post": {
+        "description": "Creates a `pending` submission and returns a presigned PUT under a server-built key. Rate limited to 30 per hour per user.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "topic-1",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignSubmissionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignSubmissionResponse"
+                }
+              }
+            },
+            "description": "Pending submission and its upload URL"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Malformed body, or `SUBMISSION_TITLE_INVALID` / `SUBMISSION_DESCRIPTION_TOO_LONG`"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Staff do not upload submissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Topic missing, draft, archived or outside the caller's access"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SubmissionQuotaError"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/ErrorBody"
+                        },
+                        {
+                          "additionalProperties": {}
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`SUBMISSION_QUOTA` (with `reason`, `used`, `limit`), or `SUBMISSION_SHARING_DISABLED` when asking for `shared` on a label with sharing off"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`FileTooLarge` — over the per-type limit (`maxBytes`)"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`TooManyRequests` — over 30 presigns in an hour"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Start a submission upload",
+        "tags": [
+          "topics:submissions"
+        ]
+      }
+    },
+    "/v1/topics/{id}/submissions/summary": {
+      "get": {
+        "description": "Effective limits, `sharingEnabled`, the caller's usage and the class count; admins and content creators also get `totalCount`.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "topic-1",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionSummary"
+                }
+              }
+            },
+            "description": "Summary"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Topic missing, draft, archived or outside the caller's access"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Submission limits and counts for a topic",
+        "tags": [
+          "topics:submissions"
+        ]
+      }
+    },
+    "/v1/topics/{id}/submissions/{sid}": {
+      "delete": {
+        "description": "Deletes the stored object, then the row — a pending or ready submission, or a tombstone being dismissed. Allowed even when the topic is no longer readable.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "topic-1",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sid",
+            "required": true,
+            "schema": {
+              "description": "Submission ID",
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Submission deleted"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Staff acting on someone else's submission (they read and moderate only)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "The submission is missing, on another topic or another student's"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`StorageUnavailable` — the object could not be deleted; the row is kept, retry"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a submission",
+        "tags": [
+          "topics:submissions"
+        ]
+      },
+      "patch": {
+        "description": "Last-write-wins edit of title, description (sanitised Markdown) and visibility.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "topic-1",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sid",
+            "required": true,
+            "schema": {
+              "description": "Submission ID",
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditSubmissionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            },
+            "description": "Submission updated"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Malformed body, or `SUBMISSION_TITLE_INVALID` / `SUBMISSION_DESCRIPTION_TOO_LONG`"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Staff acting on someone else's submission (they read and moderate only)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Topic not readable, or the submission is missing, on another topic or another student's"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`SUBMISSION_MODERATED` (sharing a force-unshared submission), `SUBMISSION_SHARING_DISABLED` or `SUBMISSION_REMOVED`"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Edit a submission",
+        "tags": [
+          "topics:submissions"
+        ]
+      }
+    },
+    "/v1/topics/{id}/submissions/{sid}/finalize": {
+      "post": {
+        "description": "Verifies the stored object — length, content type and leading signature bytes — and marks the submission `ready`. On a mismatch the object and the row are deleted. Idempotent on a `ready` submission.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Topic node ID",
+              "example": "topic-1",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sid",
+            "required": true,
+            "schema": {
+              "description": "Submission ID",
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            },
+            "description": "Submission ready"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Staff acting on someone else's submission (they read and moderate only)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Topic not readable, or the submission is missing, on another topic or another student's"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`SUBMISSION_REMOVED` — the submission was removed by the staff"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`NotUploaded` — no object stored yet; `UPLOAD_MISMATCH` — the stored file differs from what was declared"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`StorageUnavailable` — the mismatched object could not be deleted; retry"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Finish a submission upload",
+        "tags": [
+          "topics:submissions"
         ]
       }
     }

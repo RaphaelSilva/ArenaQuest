@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@hono/zod-openapi';
+import { SUBMISSION_MEDIA_TYPES } from '@arenaquest/shared/domain/media/limits';
+import {
+  SUBMISSION_DESCRIPTION_MAX,
+  SUBMISSION_TITLE_MAX,
+} from '@arenaquest/shared/domain/submissions/limits';
 
 extendZodWithOpenApi(z);
 
@@ -254,3 +259,74 @@ export const NoteConflictBodySchema = z.object({
     description: 'NOTE_STALE only: the stored note (null when it no longer exists)',
   }),
 }).openapi('NoteConflictBody');
+
+// ---------------------------------------------------------------------------
+// Student submissions (RFC 0020)
+// ---------------------------------------------------------------------------
+
+export const SubmissionSchema = z.object({
+  id: z.string().uuid().openapi({ example: 'a1b2c3d4-e5f6-7890-1234-567890abcdef' }),
+  topicNodeId: z.string().openapi({ example: 'topic-1' }),
+  authorId: z.string().openapi({ example: 'student-a' }),
+  authorName: z.string().openapi({ example: 'Student A' }),
+  title: z.string().openapi({ description: '1..SUBMISSION_TITLE_MAX characters', example: 'Kata, 2nd attempt' }),
+  description: z.string().openapi({ description: "Sanitised Markdown, ≤ SUBMISSION_DESCRIPTION_MAX; '' when empty or removed", example: '' }),
+  originalName: z.string().openapi({ example: 'IMG_0042.MOV' }),
+  contentType: z.enum(SUBMISSION_MEDIA_TYPES).openapi({ example: 'video/quicktime' }),
+  sizeBytes: z.number().int().positive().openapi({ description: 'Declared at presign, verified at finalize', example: 52_428_800 }),
+  status: z.enum(['pending', 'ready', 'removed']).openapi({ example: 'ready' }),
+  visibility: z.enum(NOTE_VISIBILITIES).openapi({ example: 'private' }),
+  sharedAt: z.string().nullable().openapi({ description: 'Null while private', example: null }),
+  moderated: z.boolean().openapi({ description: 'True while a staff force-unshare blocks re-sharing', example: false }),
+  removedAt: z.string().nullable().openapi({ description: 'Null unless status is `removed`', example: null }),
+  createdAt: z.string().openapi({ example: '2026-09-29 12:00:00' }),
+  updatedAt: z.string().openapi({ example: '2026-09-29 12:00:00' }),
+}).openapi('Submission');
+
+export const PresignSubmissionBodySchema = z.object({
+  fileName: z.string().min(1).max(255).openapi({ example: 'IMG_0042.MOV' }),
+  contentType: z.enum(SUBMISSION_MEDIA_TYPES).openapi({ example: 'video/quicktime' }),
+  sizeBytes: z.number().int().positive().openapi({ description: 'Exact byte length of the file; the presigned PUT signs it', example: 52_428_800 }),
+  title: z.string().trim().min(1).max(SUBMISSION_TITLE_MAX).openapi({ example: 'Kata, 2nd attempt' }),
+  description: z.string().max(SUBMISSION_DESCRIPTION_MAX * 4).optional().openapi({
+    description: 'Markdown; sanitised, then must be ≤ SUBMISSION_DESCRIPTION_MAX characters',
+    example: 'Left side',
+  }),
+  visibility: z.enum(NOTE_VISIBILITIES).optional().openapi({ description: 'Defaults to private', example: 'private' }),
+}).openapi('PresignSubmissionBody');
+
+export const PresignSubmissionResponseSchema = z.object({
+  submission: SubmissionSchema,
+  uploadUrl: z.string().url().openapi({ description: 'Presigned PUT; send the declared Content-Type and length' }),
+  expiresAt: z.string().openapi({ description: 'ISO-8601 instant the upload URL expires', example: '2026-09-29T13:00:00.000Z' }),
+}).openapi('PresignSubmissionResponse');
+
+export const EditSubmissionBodySchema = z.object({
+  title: z.string().trim().min(1).max(SUBMISSION_TITLE_MAX).optional().openapi({ example: 'Kata, final' }),
+  description: z.string().max(SUBMISSION_DESCRIPTION_MAX * 4).optional().openapi({
+    description: 'Markdown; sanitised, then must be ≤ SUBMISSION_DESCRIPTION_MAX characters',
+  }),
+  visibility: z.enum(NOTE_VISIBILITIES).optional().openapi({ example: 'shared' }),
+}).openapi('EditSubmissionBody');
+
+export const SubmissionQuotaErrorSchema = z.object({
+  error: z.literal('SUBMISSION_QUOTA'),
+  reason: z.enum(['count', 'storage']).openapi({ description: '`count`: per-topic limit; `storage`: per-student bytes' }),
+  used: z.number().int().openapi({ example: 10 }),
+  limit: z.number().int().openapi({ example: 10 }),
+}).openapi('SubmissionQuotaError');
+
+export const SubmissionSummarySchema = z.object({
+  limits: z.object({
+    perTopicMax: z.number().int().openapi({ example: 10 }),
+    storagePerStudentBytes: z.number().int().openapi({ example: 1_073_741_824 }),
+    videoMaxBytes: z.number().int().openapi({ example: 262_144_000 }),
+  }),
+  sharingEnabled: z.boolean().openapi({ example: true }),
+  usage: z.object({
+    topicCount: z.number().int().openapi({ description: "Caller's pending + ready submissions on this topic", example: 2 }),
+    bytes: z.number().int().openapi({ description: "Caller's pending + ready bytes across all topics", example: 104_857_600 }),
+  }),
+  classCount: z.number().int().openapi({ description: 'Shared ready submissions on the topic; 0 when sharing is disabled', example: 8 }),
+  totalCount: z.number().int().optional().openapi({ description: 'Staff only: every ready + removed submission on the topic', example: 12 }),
+}).openapi('SubmissionSummary');

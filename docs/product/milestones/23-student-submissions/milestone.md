@@ -119,7 +119,7 @@ Each task is one independent PR with one owner and one review surface. Backend a
 |---|-----------|-------|------|--------|
 | 01 | [Submission contracts — entity, media types, limits and ports](./01-shared-contracts.task.md) | 0 | Backend | ✅ Done |
 | 02 | [Submission config, schema and D1 repository](./02-config-schema-and-repository.task.md) | 1 | Backend | ✅ Done |
-| 03 | [Student upload API — presign, finalize, edit, delete and summary](./03-student-upload-api.task.md) | 2 | Backend | ☐ Open |
+| 03 | [Student upload API — presign, finalize, edit, delete and summary](./03-student-upload-api.task.md) | 2 | Backend | ✅ Done |
 | 04 | [Student read and move API](./04-student-read-and-move-api.task.md) | 2 | Backend | ☐ Open |
 | 05 | [Staff submissions API, tombstone and housekeeping](./05-staff-api-and-housekeeping.task.md) | 3 | Backend | ☐ Open |
 | 06 | [Demonstrations page — Mine tab and upload](./06-mine-tab-and-upload-web.task.md) | 4 | Frontend | ☐ Open |
