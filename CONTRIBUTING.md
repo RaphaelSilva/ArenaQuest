@@ -93,6 +93,9 @@ The worktree is named after the feature's candidate branch:
 `feature/epic/<name>/candidate` → `.worktrees/epic-<name>-candidate`. A backlog
 change without a candidate uses `.worktrees/backlog-<topic>-<slug>`.
 
+The Claude Code skills that drive this workflow (planning → per-task loop → PR)
+are diagrammed in [`.claude/skills/README.md`](./.claude/skills/README.md).
+
 ### Step-by-step
 
 1. **From the root checkout, open the feature worktree**
