@@ -1,6 +1,6 @@
 # Task 07 — Frontend: Class tab, full-screen viewer and direct link (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md)
 **Team:** Frontend Web
@@ -62,18 +62,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] *Da turma* lists shared submissions with author names and marks the caller's own as
+- [x] *Da turma* lists shared submissions with author names and marks the caller's own as
       **Você**; it is absent when sharing is off.
-- [ ] In the viewer, **próximo** past the last loaded item fetches the next page and shows
+- [x] In the viewer, **próximo** past the last loaded item fetches the next page and shows
       its first item (component test with a mocked two-page cursor).
-- [ ] A `MEDIA_ERR_SRC_NOT_SUPPORTED` error replaces the player with the translated message
+- [x] A `MEDIA_ERR_SRC_NOT_SUPPORTED` error replaces the player with the translated message
       and a working **Baixar** link (component test).
-- [ ] Opening `/catalog/[id]/submissions/[sid]` shows the viewer on that submission; a `404`
+- [x] Opening `/catalog/[id]/submissions/[sid]` shows the viewer on that submission; a `404`
       from the API renders the catalog not-found page.
-- [ ] **Copiar link** copies the `[sid]` URL.
-- [ ] `check-i18n-coverage.js` passes; `pt` and `en` builds both render.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] **Copiar link** copies the `[sid]` URL.
+- [x] `check-i18n-coverage.js` passes; `pt` and `en` builds both render.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
