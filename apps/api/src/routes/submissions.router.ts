@@ -13,10 +13,13 @@ import {
   PresignSubmissionResponseSchema,
   SubmissionQuotaErrorSchema,
   SubmissionSchema,
+  SubmissionPageSchema,
   SubmissionSummarySchema,
+  SubmissionViewSchema,
 } from '@api/openapi/components/entities';
 import { ErrorBody } from '@api/openapi/components/errors';
 import { respondNoContent, respondWith } from '@api/routes/_shared/envelope';
+import { encodeCursor, invalidCursorResponse, parseCursorParam } from '@api/routes/_shared/cursor';
 import type { ContentContext, EngagementContext, ProgressContext } from '@api/container';
 
 const topicParamSchema = z.object({
@@ -40,7 +43,52 @@ const configInvalid = error('`SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var 
 const staffForbidden = error("Staff acting on someone else's submission (they read and moderate only)");
 
 /** Responses carrying a presigned URL, or a student's private file metadata, are never cached. */
-const NO_STORE = 'private, no-store';
+export const NO_STORE = 'private, no-store';
+
+const listQuerySchema = z.object({
+  scope: z.enum(['mine', 'class', 'all']).default('mine').openapi({
+    description:
+      "`mine`: the caller's own, every status. `class`: shared ready submissions (empty while sharing is disabled). `all`: staff only",
+    example: 'mine',
+  }),
+  cursor: z.string().optional().openapi({
+    description: 'Opaque cursor from a previous page (`nextCursor`); omit for the first page',
+  }),
+});
+
+export const listSubmissionsRoute = createRoute({
+  method: 'get',
+  path: '/topics/{id}/submissions',
+  summary: 'List submissions on a topic',
+  description:
+    'Newest first, pages of 20. Ready submissions carry a signed GET `url` (TTL 1 h). `scope` only narrows what the caller may see; it never widens it.',
+  tags: ['topics:submissions'],
+  security: [{ bearerAuth: [] }],
+  request: { params: topicParamSchema, query: listQuerySchema },
+  responses: {
+    200: { description: 'One page of submissions', content: { 'application/json': { schema: SubmissionPageSchema } } },
+    400: error('Malformed query, or `InvalidCursor`'),
+    403: error('`scope=all` requested by a non-staff caller'),
+    404: topicNotFound,
+    500: configInvalid,
+  },
+});
+
+export const getSubmissionRoute = createRoute({
+  method: 'get',
+  path: '/topics/{id}/submissions/{sid}',
+  summary: 'Read one submission',
+  description:
+    "The author reads their own in every status; anyone else only a shared, ready submission while sharing is enabled. Everything else is `404`.",
+  tags: ['topics:submissions'],
+  security: [{ bearerAuth: [] }],
+  request: { params: submissionParamSchema },
+  responses: {
+    200: { description: 'The submission', content: { 'application/json': { schema: SubmissionViewSchema } } },
+    404: error("Topic not readable, or the submission is missing, on another topic or not visible to the caller"),
+    500: configInvalid,
+  },
+});
 
 export const presignSubmissionRoute = createRoute({
   method: 'post',
@@ -172,6 +220,7 @@ export function buildSubmissionsRouter(slice: {
 
   const router = new OpenAPIHono();
 
+  // `/*` also matches the bare `/topics/:id/submissions` listing.
   router.use('/topics/:id/submissions/*', authGuard);
   router.use('/topics/:id/submissions/*', async (c, next) => {
     await next();
@@ -209,8 +258,30 @@ export function buildSubmissionsRouter(slice: {
     return respondNoContent(c, result) as any;
   });
 
+  // Registered before `{sid}` so `summary` is never read as a submission id.
   router.openapi(submissionSummaryRoute, async (c) => {
     const result = await controller.summary(c.req.valid('param').id, submissionCaller(c));
+    return respondWith(c, result) as any;
+  });
+
+  router.openapi(listSubmissionsRoute, async (c) => {
+    const { scope, cursor: raw } = c.req.valid('query');
+    const cursor = parseCursorParam(raw);
+    if (cursor === undefined) return invalidCursorResponse(c) as any;
+    const result = await controller.listForTopic(c.req.valid('param').id, submissionCaller(c), scope, cursor);
+    if (!result.ok) return respondWith(c, result) as any;
+    return c.json(
+      {
+        data: result.data.data,
+        nextCursor: result.data.nextCursor ? encodeCursor(result.data.nextCursor) : null,
+      },
+      200,
+    ) as any;
+  });
+
+  router.openapi(getSubmissionRoute, async (c) => {
+    const { id, sid } = c.req.valid('param');
+    const result = await controller.getOne(id, sid, submissionCaller(c));
     return respondWith(c, result) as any;
   });
 
