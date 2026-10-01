@@ -1,18 +1,28 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
 import { useHasRole } from '@web/hooks/use-auth';
-import { SubmissionsApiError, type SubmissionSummary, type uploadToPresignedUrl } from '@web/lib/submissions-api';
+import {
+  SubmissionsApiError,
+  type SubmissionSummary,
+  type SubmissionView,
+  type uploadToPresignedUrl,
+} from '@web/lib/submissions-api';
 import { CatalogBreadcrumb } from '../CatalogBreadcrumb';
 import { MainPaneSkeleton } from '../MainPaneSkeleton';
+import { ClassTab } from './ClassTab';
 import { MineTab } from './MineTab';
 import { QuotaLine } from './QuotaLine';
+import { SubmissionViewer } from './SubmissionViewer';
 
 export type SubmissionsTab = 'mine' | 'class' | 'all';
+
+/** The direct-link viewer holds one item, so there is nowhere to step to. */
+const stayOnLinked = () => undefined;
 
 /** Tabs the caller gets: staff a single *All*; students *Mine*, plus *Class* while sharing is on. */
 export function tabsFor(isStaff: boolean, sharingEnabled: boolean): SubmissionsTab[] {
@@ -22,50 +32,62 @@ export function tabsFor(isStaff: boolean, sharingEnabled: boolean): SubmissionsT
 
 type SubmissionsPageProps = {
   topicId: string;
+  /**
+   * The direct link (`/catalog/[id]/submissions/[sid]`): opens the viewer on
+   * this submission. A submission the caller cannot see renders the same
+   * not-found state as an unreadable topic, so the link reveals nothing.
+   */
+  submissionId?: string;
   /** The PUT; injectable for tests. */
   upload?: typeof uploadToPresignedUrl;
 };
 
 /**
  * The Demonstrations page of a topic: breadcrumb back to the topic, the tab
- * bar driven by `?tab=`, the quota line and the active tab. *Class* and *All*
- * are filled by later tasks.
+ * bar driven by `?tab=`, the quota line and the active tab. *All* is filled by
+ * a later task.
  */
-export function SubmissionsPage({ topicId, upload }: SubmissionsPageProps) {
+export function SubmissionsPage({ topicId, submissionId, upload }: SubmissionsPageProps) {
   const dict = useDict();
   const t = dict.submissions;
   const client = useApiClient();
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const isStaff = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
   const baseId = useId();
 
   const [topicTitle, setTopicTitle] = useState<string | null>(null);
   const [summary, setSummary] = useState<SubmissionSummary | null>(null);
+  const [linked, setLinked] = useState<SubmissionView | null>(null);
+  const [linkedOpen, setLinkedOpen] = useState(true);
   const [state, setState] = useState<'loading' | 'ready' | 'notFound' | 'error'>('loading');
   const tabRefs = useRef<Partial<Record<SubmissionsTab, HTMLButtonElement | null>>>({});
 
   useEffect(() => {
     let active = true;
-    Promise.allSettled([client.topics.getById(topicId), client.submissions.summary(topicId)]).then(
-      ([topic, s]) => {
-        if (!active) return;
-        if (topic.status === 'fulfilled' && s.status === 'fulfilled') {
-          setTopicTitle(topic.value.title);
-          setSummary(s.value);
-          setState('ready');
-          return;
-        }
-        // The summary shares the catalog gate: its 404 means the topic is not readable.
-        const notFound = s.status === 'rejected' && s.reason instanceof SubmissionsApiError && s.reason.code === 'NotFound';
-        setState(notFound ? 'notFound' : 'error');
-      },
-    );
+    Promise.allSettled([
+      client.topics.getById(topicId),
+      client.submissions.summary(topicId),
+      submissionId ? client.submissions.getOne(topicId, submissionId) : Promise.resolve(null),
+    ]).then(([topic, s, one]) => {
+      if (!active) return;
+      if (topic.status === 'fulfilled' && s.status === 'fulfilled' && one.status === 'fulfilled') {
+        setTopicTitle(topic.value.title);
+        setSummary(s.value);
+        setLinked(one.value);
+        setState('ready');
+        return;
+      }
+      // The summary shares the catalog gate: its 404 means the topic is not readable.
+      // The single read answers 404 for anything the caller may not see.
+      const isNotFound = (r: PromiseSettledResult<unknown>) =>
+        r.status === 'rejected' && r.reason instanceof SubmissionsApiError && r.reason.code === 'NotFound';
+      setState(isNotFound(s) || isNotFound(one) ? 'notFound' : 'error');
+    });
     return () => {
       active = false;
     };
-  }, [client, topicId]);
+  }, [client, topicId, submissionId]);
 
   const refreshSummary = useCallback(() => {
     client.submissions.summary(topicId).then(setSummary, () => {
@@ -75,12 +97,16 @@ export function SubmissionsPage({ topicId, upload }: SubmissionsPageProps) {
 
   const tabs = summary ? tabsFor(isStaff, summary.sharingEnabled) : [];
   const requested = searchParams.get('tab') as SubmissionsTab | null;
-  const active: SubmissionsTab = requested && tabs.includes(requested) ? requested : (tabs[0] ?? 'mine');
+  // A direct link to a classmate's submission lands on *Class* behind the viewer.
+  const linkedTab: SubmissionsTab | null = linked && !linked.isMine && tabs.includes('class') ? 'class' : null;
+  const active: SubmissionsTab =
+    requested && tabs.includes(requested) ? requested : (linkedTab ?? tabs[0] ?? 'mine');
 
+  // Always the page's own path, so switching tabs from a direct link leaves the `[sid]` route.
   const selectTab = (tab: SubmissionsTab) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', tab);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    router.replace(`/catalog/${encodeURIComponent(topicId)}/submissions?${params.toString()}`, { scroll: false });
   };
 
   const focusTab = (tab: SubmissionsTab) => {
@@ -189,12 +215,23 @@ export function SubmissionsPage({ topicId, upload }: SubmissionsPageProps) {
       <div id={panelId(active)} role="tabpanel" aria-labelledby={tabId(active)}>
         {active === 'mine' ? (
           <MineTab topicId={topicId} summary={summary} onUsageChanged={refreshSummary} upload={upload} />
+        ) : active === 'class' ? (
+          <ClassTab topicId={topicId} onGoToMine={() => selectTab('mine')} />
         ) : (
           <p className="py-10 text-center text-[14px]" style={{ color: 'var(--aq-text3)' }}>
             {t.tabs.comingSoon}
           </p>
         )}
       </div>
+
+      {linked && linkedOpen && (
+        <SubmissionViewer
+          items={[linked]}
+          currentId={linked.id}
+          onNavigate={stayOnLinked}
+          onClose={() => setLinkedOpen(false)}
+        />
+      )}
     </div>
   );
 }

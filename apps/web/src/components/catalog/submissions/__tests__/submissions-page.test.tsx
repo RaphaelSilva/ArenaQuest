@@ -3,11 +3,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dictPt } from '@web/i18n/dict-pt';
 import { SubmissionsApiError } from '@web/lib/submissions-api';
-import { summary } from './fixtures';
+import { summary, view } from './fixtures';
 
 const mockClient = {
   topics: { getById: vi.fn() },
-  submissions: { summary: vi.fn(), listMine: vi.fn() },
+  submissions: { summary: vi.fn(), listMine: vi.fn(), listClass: vi.fn(), getOne: vi.fn() },
 };
 
 const mockReplace = vi.fn();
@@ -44,6 +44,7 @@ describe('SubmissionsPage', () => {
     mockStaff = false;
     mockClient.topics.getById.mockResolvedValue({ id: 't1', title: 'Kihon' });
     mockClient.submissions.listMine.mockResolvedValue({ data: [], nextCursor: null });
+    mockClient.submissions.listClass.mockResolvedValue({ data: [], nextCursor: null });
   });
 
   it('shows Mine and Class tabs, the quota line and the Mine tab by default', async () => {
@@ -93,6 +94,52 @@ describe('SubmissionsPage', () => {
     mockClient.submissions.summary.mockRejectedValue(new SubmissionsApiError('NotFound', 404, 'Not found.'));
     render(<SubmissionsPage topicId="t1" />);
     expect(await screen.findByRole('alert')).toHaveTextContent(t.page.notFound);
+  });
+});
+
+describe('SubmissionsPage direct link', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSearch = new URLSearchParams();
+    mockStaff = false;
+    mockClient.topics.getById.mockResolvedValue({ id: 't1', title: 'Kihon' });
+    mockClient.submissions.summary.mockResolvedValue(summary());
+    mockClient.submissions.listMine.mockResolvedValue({ data: [], nextCursor: null });
+    mockClient.submissions.listClass.mockResolvedValue({ data: [], nextCursor: null });
+  });
+
+  it('opens the viewer on the linked submission, over the Class tab for a classmate’s', async () => {
+    mockClient.submissions.getOne.mockResolvedValue(
+      view({ id: 's9', title: 'Kata da Ana', authorName: 'Ana', isMine: false, visibility: 'shared' }),
+    );
+    render(<SubmissionsPage topicId="t1" submissionId="s9" />);
+
+    const dialog = await screen.findByRole('dialog', { name: t.viewer.label('Kata da Ana') });
+    expect(dialog).toHaveTextContent(t.viewer.by('Ana'));
+    expect(mockClient.submissions.getOne).toHaveBeenCalledWith('t1', 's9');
+    expect(screen.getByRole('tab', { name: t.tabs.class })).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: t.viewer.close }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('renders the not-found state, and no page, when the API answers 404 for the submission', async () => {
+    mockClient.submissions.getOne.mockRejectedValue(new SubmissionsApiError('NotFound', 404, 'Not found.'));
+    render(<SubmissionsPage topicId="t1" submissionId="hidden" />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(t.page.notFound);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+  });
+
+  it('switches tabs back onto the page’s own path from a direct link', async () => {
+    mockClient.submissions.getOne.mockResolvedValue(view({ id: 's1', isMine: true }));
+    render(<SubmissionsPage topicId="t1" submissionId="s1" />);
+
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: t.viewer.close }));
+    fireEvent.click(screen.getByRole('tab', { name: t.tabs.class }));
+    expect(mockReplace).toHaveBeenCalledWith('/catalog/t1/submissions?tab=class', { scroll: false });
   });
 });
 

@@ -21,7 +21,7 @@ type SubmissionCardProps = {
   onDelete: (submission: SubmissionView) => Promise<void>;
 };
 
-const KIND_ICONS = { video: '🎬', image: '🖼️', pdf: '📄' } as const;
+export const KIND_ICONS = { video: '🎬', image: '🖼️', pdf: '📄' } as const;
 
 const secondaryButton = 'cursor-pointer rounded-[8px] border px-3 py-1.5 text-[12px] font-bold disabled:cursor-wait disabled:opacity-60';
 

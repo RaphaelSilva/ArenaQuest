@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
 import type { Submission, SubmissionSummary, SubmissionView, uploadToPresignedUrl } from '@web/lib/submissions-api';
@@ -39,7 +39,7 @@ export function MineTab({ topicId, summary, onUsageChanged, upload }: MineTabPro
   const [formOpen, setFormOpen] = useState(false);
   const [activeUploadId, setActiveUploadId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [viewing, setViewing] = useState<SubmissionView | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const [editing, setEditing] = useState<SubmissionView | null>(null);
 
   const { reload, update } = pages;
@@ -75,6 +75,8 @@ export function MineTab({ topicId, summary, onUsageChanged, upload }: MineTabPro
 
   // The upload in flight is shown by its progress bar, not as an interrupted row.
   const items = pages.items.filter((item) => item.id !== activeUploadId);
+  // The viewer steps through the ready items only; pending rows and tombstones have no file.
+  const readyItems = useMemo(() => pages.items.filter((item) => item.status === 'ready' && item.url), [pages.items]);
 
   return (
     <div>
@@ -149,7 +151,7 @@ export function MineTab({ topicId, summary, onUsageChanged, upload }: MineTabPro
         <ul aria-label={t.list.label} className="flex flex-col gap-3">
           {items.map((item) => (
             <li key={item.id}>
-              <SubmissionCard submission={item} onOpen={setViewing} onEdit={setEditing} onDelete={onDelete} />
+              <SubmissionCard submission={item} onOpen={(submission) => setViewingId(submission.id)} onEdit={setEditing} onDelete={onDelete} />
             </li>
           ))}
         </ul>
@@ -166,7 +168,18 @@ export function MineTab({ topicId, summary, onUsageChanged, upload }: MineTabPro
         />
       )}
 
-      {viewing && <SubmissionViewer submission={viewing} onClose={() => setViewing(null)} />}
+      {viewingId && (
+        <SubmissionViewer
+          items={readyItems}
+          currentId={viewingId}
+          onNavigate={setViewingId}
+          onClose={() => setViewingId(null)}
+          hasMore={pages.hasMore}
+          loadingMore={pages.loadingMore}
+          loadMoreFailed={pages.loadMoreFailed}
+          onLoadMore={pages.loadMore}
+        />
+      )}
 
       {editing && (
         <EditSubmissionDialog
