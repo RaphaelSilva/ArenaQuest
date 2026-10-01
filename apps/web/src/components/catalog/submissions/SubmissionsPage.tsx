@@ -14,6 +14,7 @@ import {
 } from '@web/lib/submissions-api';
 import { CatalogBreadcrumb } from '../CatalogBreadcrumb';
 import { MainPaneSkeleton } from '../MainPaneSkeleton';
+import { AllTab } from './AllTab';
 import { ClassTab } from './ClassTab';
 import { MineTab } from './MineTab';
 import { QuotaLine } from './QuotaLine';
@@ -44,8 +45,8 @@ type SubmissionsPageProps = {
 
 /**
  * The Demonstrations page of a topic: breadcrumb back to the topic, the tab
- * bar driven by `?tab=`, the quota line and the active tab. *All* is filled by
- * a later task.
+ * bar driven by `?tab=`, the quota line and the active tab. Staff get only
+ * *All*, with no quota line and no upload.
  */
 export function SubmissionsPage({ topicId, submissionId, upload }: SubmissionsPageProps) {
   const dict = useDict();
@@ -218,9 +219,7 @@ export function SubmissionsPage({ topicId, submissionId, upload }: SubmissionsPa
         ) : active === 'class' ? (
           <ClassTab topicId={topicId} onGoToMine={() => selectTab('mine')} />
         ) : (
-          <p className="py-10 text-center text-[14px]" style={{ color: 'var(--aq-text3)' }}>
-            {t.tabs.comingSoon}
-          </p>
+          <AllTab topicId={topicId} />
         )}
       </div>
 

@@ -26,6 +26,12 @@ export type EditSubmissionInput = components['schemas']['EditSubmissionBody'];
 /** One row of "My demonstrations": the caller's own submission, its topic title and whether that topic is still readable. */
 export type AuthoredSubmission = components['schemas']['AuthoredSubmission'];
 
+/** A submission as staff receive it: the reader view plus moderation and removal provenance. */
+export type StaffSubmissionView = components['schemas']['StaffSubmissionView'];
+
+/** One row of the staff per-student list: the staff view plus its topic title. */
+export type StaffAuthoredSubmission = components['schemas']['StaffAuthoredSubmission'];
+
 /** What a move did: the moved submissions (now private) and a reason per refused id. */
 export type MoveSubmissionsResult = components['schemas']['MoveSubmissionsResult'];
 
@@ -282,6 +288,50 @@ export function createSubmissionsApi(http: HttpTransport) {
       const res = await send(http, 'POST', '/me/submissions/move', { ids, targetTopicId });
       if (!res.ok) throw await toError(res);
       return (await res.json()) as MoveSubmissionsResult;
+    },
+
+    /**
+     * Staff only: a page of every ready and removed submission on a topic,
+     * newest first, with moderation and removal provenance.
+     */
+    async listAll(topicId: string, cursor?: string | null): Promise<SubmissionPage<StaffSubmissionView>> {
+      const query = new URLSearchParams({ scope: 'all' });
+      if (cursor) query.set('cursor', cursor);
+      const res = await send(http, 'GET', `${base(topicId)}?${query.toString()}`);
+      if (!res.ok) throw await toError(res);
+      return (await res.json()) as SubmissionPage<StaffSubmissionView>;
+    },
+
+    /** Staff only: a page of every ready and removed submission by one user, across topics. */
+    async listByUser(userId: string, cursor?: string | null): Promise<SubmissionPage<StaffAuthoredSubmission>> {
+      const query = cursor ? `?${new URLSearchParams({ cursor }).toString()}` : '';
+      const res = await send(http, 'GET', `/admin/users/${encodeURIComponent(userId)}/submissions${query}`);
+      if (!res.ok) throw await toError(res);
+      return (await res.json()) as SubmissionPage<StaffAuthoredSubmission>;
+    },
+
+    /** Staff only: force-unshare — private and moderated until the flag is cleared. */
+    async unshare(submissionId: string): Promise<StaffSubmissionView> {
+      const res = await send(http, 'POST', `/admin/submissions/${encodeURIComponent(submissionId)}/unshare`);
+      if (!res.ok) throw await toError(res);
+      return (await res.json()) as StaffSubmissionView;
+    },
+
+    /** Staff only: lifts the moderation flag so the author may share again. It does not re-share. */
+    async clearModeration(submissionId: string): Promise<void> {
+      const res = await send(http, 'DELETE', `/admin/submissions/${encodeURIComponent(submissionId)}/moderation`);
+      if (res.ok) return;
+      throw await toError(res);
+    },
+
+    /**
+     * Admin only: deletes the stored file and leaves a tombstone the author
+     * sees as "Removed by the staff". `StorageUnavailable` (502) changes nothing.
+     */
+    async removeByStaff(submissionId: string): Promise<void> {
+      const res = await send(http, 'DELETE', `/admin/submissions/${encodeURIComponent(submissionId)}`);
+      if (res.ok) return;
+      throw await toError(res);
     },
 
     /** Deletes a pending or ready submission, or dismisses a tombstone. */

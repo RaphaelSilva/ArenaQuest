@@ -2480,6 +2480,8 @@ export const dictEn = {
       label: 'Demonstrations',
       mine: (count: number) => `${count} mine`,
       mineAndClass: (mine: number, cls: number) => `${mine} mine · ${cls} from the class`,
+      staffLabel: 'Student demonstrations',
+      total: (count: number) => (count === 1 ? '1 in total' : `${count} in total`),
     },
     size: {
       bytes: (n: number) => `${n} B`,
@@ -2500,7 +2502,6 @@ export const dictEn = {
       mine: 'Mine',
       class: 'Class',
       all: 'All',
-      comingSoon: 'This tab will be available soon.',
     },
     quota: {
       line: (count: number, max: number, used: string, limit: string) =>
@@ -2680,6 +2681,37 @@ export const dictEn = {
       inaccessible:
         'You no longer have access to this topic, so this demonstration is read-only. You can still delete it or move it to another topic.',
       editLoadError: 'Could not open the editor. Try again.',
+    },
+    staff: {
+      allLabel: 'Every demonstration on this topic, by student',
+      loading: 'Loading the demonstrations…',
+      loadError: 'The demonstrations could not be loaded.',
+      empty: 'No student has sent a demonstration on this topic yet.',
+      groupLabel: (name: string) => `Demonstrations by ${name}`,
+      groupCount: (count: number) => (count === 1 ? '1 demonstration' : `${count} demonstrations`),
+      removedBadge: 'Removed',
+      removedBy: (name: string, date: string) => `Removed by ${name} on ${date}`,
+      removedOn: (date: string) => `Removed on ${date}`,
+      unshare: 'Remove sharing',
+      confirmUnshare: 'Make this demonstration private? The student cannot share it again until you allow it.',
+      unshareError: 'Sharing could not be removed. Try again.',
+      allowSharing: 'Allow sharing again',
+      confirmAllowSharing: 'Let the student share this demonstration again? It stays private until they share it.',
+      allowSharingError: 'Sharing could not be allowed again. Try again.',
+      remove: 'Remove',
+      confirmRemove:
+        'Remove this demonstration? The file will be deleted and the student will see "Removed by staff". This cannot be undone.',
+      confirm: 'Confirm',
+      cancel: 'Cancel',
+      pending: 'Saving…',
+      userSection: {
+        title: 'Demonstrations',
+        loading: 'Loading the demonstrations…',
+        loadError: 'The demonstrations could not be loaded.',
+        empty: 'This user has not sent any demonstration.',
+        emptyHint: 'Demonstrations they send on catalog topics appear here.',
+        groupLabel: (topic: string) => `Demonstrations on ${topic}`,
+      },
     },
     errors: {
       quotaCount: (limit: number) => `You reached the limit of ${limit} demonstrations on this topic.`,
