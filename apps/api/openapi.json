@@ -14406,7 +14406,7 @@
     },
     "/v1/me/submissions/move": {
       "post": {
-        "description": "Moves up to 10 of the caller's ready submissions, in order, each guarded by the target's per-topic count. Partial success is normal. Moved submissions become private, keep their moderation flag, and their file is not touched. The source topic need not be readable.",
+        "description": "Moves up to 10 of the caller's ready submissions, in order, each guarded by the target's per-topic count. Partial success is normal. Moved submissions become private, keep their moderation flag, and their file is not touched. The source topic need not be readable. Staff (`admin`, `content_creator`) move their own submissions under the same rules.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -14459,7 +14459,7 @@
                 }
               }
             },
-            "description": "Staff do not move submissions"
+            "description": "A staff caller named a submission another user authored; nothing is moved"
           },
           "404": {
             "content": {
@@ -15565,7 +15565,7 @@
     },
     "/v1/topics/{id}/submissions/presign": {
       "post": {
-        "description": "Creates a `pending` submission and returns a presigned PUT under a server-built key. Rate limited to 30 per hour per user.",
+        "description": "Creates a `pending` submission and returns a presigned PUT under a server-built key. Rate limited to 30 per hour per user. Staff (`admin`, `content_creator`) upload too, under the same type, size, quota and sharing rules, on any published, non-archived topic.",
         "parameters": [
           {
             "in": "path",
@@ -15615,23 +15615,6 @@
               }
             },
             "description": "Malformed body, or `SUBMISSION_TITLE_INVALID` / `SUBMISSION_DESCRIPTION_TOO_LONG`"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/ErrorBody"
-                    },
-                    {
-                      "additionalProperties": {}
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Staff do not upload submissions"
           },
           "404": {
             "content": {
@@ -15856,7 +15839,7 @@
                 }
               }
             },
-            "description": "Staff acting on someone else's submission (they read and moderate only)"
+            "description": "Staff acting on a submission someone else authored (they read and moderate it, they do not change it)"
           },
           "404": {
             "content": {
@@ -16087,7 +16070,7 @@
                 }
               }
             },
-            "description": "Staff acting on someone else's submission (they read and moderate only)"
+            "description": "Staff acting on a submission someone else authored (they read and moderate it, they do not change it)"
           },
           "404": {
             "content": {
@@ -16205,7 +16188,7 @@
                 }
               }
             },
-            "description": "Staff acting on someone else's submission (they read and moderate only)"
+            "description": "Staff acting on a submission someone else authored (they read and moderate it, they do not change it)"
           },
           "404": {
             "content": {

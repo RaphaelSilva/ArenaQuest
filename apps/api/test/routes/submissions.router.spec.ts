@@ -369,10 +369,8 @@ describe('presign - validation and limits', () => {
     expect(res.status).toBe(404);
   });
 
-  it('a tutor uploads like a student; staff are refused with 403', async () => {
+  it('a tutor uploads like a student', async () => {
     expect((await presign(T_MAIN, tutorToken, presignBody())).status).toBe(201);
-    expect((await presign(T_MAIN, adminToken, presignBody())).status).toBe(403);
-    expect((await presign(T_MAIN, creatorToken, presignBody())).status).toBe(403);
   });
 });
 
@@ -392,11 +390,124 @@ describe("another student's submission", () => {
     expect((await finalize(T_MAIN, id, tokenA)).status).toBe(200);
   });
 
-  it('staff get 403 - they read and moderate, they do not edit or delete here', async () => {
+  it("staff get 403 on a submission someone else authored - they read and moderate it, they do not edit or delete it", async () => {
     const { id } = await readySubmission(T_MAIN, tokenA);
     expect((await req('PATCH', `/topics/${T_MAIN}/submissions/${id}`, { token: adminToken, body: { title: 'x' } })).status).toBe(403);
     expect((await req('DELETE', `/topics/${T_MAIN}/submissions/${id}`, { token: creatorToken })).status).toBe(403);
     expect(await rowExists(id)).toBe(true);
+  });
+});
+
+describe('staff authors (RFC 0020 §7 amended 2026-10-01; M23 Task 11)', () => {
+  const STAFF = [
+    ['admin', ADMIN, () => adminToken],
+    ['content_creator', CREATOR, () => creatorToken],
+  ] as const;
+
+  it.each(STAFF)(
+    'a %s presigns, uploads and finalizes to ready on a published topic they are not enrolled in',
+    async (_label, userId, token) => {
+      const { id, key } = await presignAndUpload(T_OUTSIDE, token(), FIXTURES.mp4);
+      expect(key.startsWith(`submissions/${userId}/${id}-`)).toBe(true);
+      const done = await finalize(T_OUTSIDE, id, token());
+      expect(done.status).toBe(200);
+      expect(await done.json()).toMatchObject({ id, authorId: userId, topicNodeId: T_OUTSIDE, status: 'ready' });
+    },
+  );
+
+  it.each(STAFF)('a %s presign on a draft, archived or missing topic is 404', async (_label, _userId, token) => {
+    for (const topicId of [T_DRAFT, T_ARCHIVED, 'sub-t-missing']) {
+      expect((await presign(topicId, token(), presignBody())).status).toBe(404);
+    }
+  });
+
+  it.each(STAFF)('a %s is bound by the size and type limits', async (_label, _userId, token) => {
+    const overrides = { SUBMISSIONS_VIDEO_MAX_BYTES: String(10 * MB) };
+    const video = await presign(T_MAIN, token(), presignBody({ sizeBytes: 10 * MB + 1 }), overrides);
+    expect(video.status).toBe(422);
+    expect(await video.json()).toMatchObject({ error: 'FileTooLarge', maxBytes: 10 * MB });
+
+    const image = await presign(T_MAIN, token(), presignBody({ contentType: 'image/jpeg', fileName: 'a.jpg', sizeBytes: 5 * MB + 1 }));
+    expect(image.status).toBe(422);
+    expect((await presign(T_MAIN, token(), presignBody({ contentType: 'text/plain' }))).status).toBe(400);
+
+    // The finalize signature check applies too.
+    const { id, key } = await presignAndUpload(T_MAIN, token(), FIXTURES.text, 'video/mp4');
+    const mismatch = await finalize(T_MAIN, id, token());
+    expect(mismatch.status).toBe(422);
+    expect(((await mismatch.json()) as Json).error).toBe('UPLOAD_MISMATCH');
+    expect(await env.R2.head(key)).toBeNull();
+  });
+
+  it.each(STAFF)('a %s is bound by the per-topic and storage quotas', async (_label, _userId, token) => {
+    const count = { SUBMISSIONS_PER_TOPIC_MAX: '1' };
+    expect((await presign(T_MAIN, token(), presignBody(), count)).status).toBe(201);
+    const second = await presign(T_MAIN, token(), presignBody(), count);
+    expect(second.status).toBe(409);
+    expect(await second.json()).toEqual({ error: 'SUBMISSION_QUOTA', reason: 'count', used: 1, limit: 1 });
+
+    const storage = { SUBMISSIONS_STORAGE_PER_STUDENT_BYTES: '5000', SUBMISSIONS_VIDEO_MAX_BYTES: '5000' };
+    const over = await presign(T_OTHER, token(), presignBody({ sizeBytes: 4500 }), storage);
+    expect(over.status).toBe(409);
+    expect(await over.json()).toEqual({ error: 'SUBMISSION_QUOTA', reason: 'storage', used: 1000, limit: 5000 });
+  });
+
+  it.each(STAFF)('a %s is bound by the presign rate limit and the sharing switch', async (_label, _userId, token) => {
+    const off = { SUBMISSIONS_SHARING_ENABLED: 'false' };
+    const shared = await presign(T_MAIN, token(), presignBody({ visibility: 'shared' }), off);
+    expect(shared.status).toBe(409);
+    expect(((await shared.json()) as Json).error).toBe('SUBMISSION_SHARING_DISABLED');
+
+    // The refused presign above already counted against the budget.
+    const body = presignBody({ contentType: 'image/png', fileName: 'a.png', sizeBytes: 6 * MB });
+    for (let i = 0; i < 29; i++) {
+      expect((await presign(T_MAIN, token(), body)).status).toBe(422);
+    }
+    const blocked = await presign(T_MAIN, token(), presignBody());
+    expect(blocked.status).toBe(429);
+    expect(((await blocked.json()) as Json).error).toBe('TooManyRequests');
+  });
+
+  it.each(STAFF)('a %s edits, shares and hard-deletes their own submission', async (_label, _userId, token) => {
+    const { id, key } = await readySubmission(T_OUTSIDE, token());
+    const patch = await req('PATCH', `/topics/${T_OUTSIDE}/submissions/${id}`, {
+      token: token(),
+      body: { title: 'Reference kata', description: '**Watch** the hips', visibility: 'shared' },
+    });
+    expect(patch.status).toBe(200);
+    const body = (await patch.json()) as Json;
+    expect(body).toMatchObject({ title: 'Reference kata', visibility: 'shared' });
+    expect(body.sharedAt).not.toBeNull();
+
+    const sharingOff = await req('PATCH', `/topics/${T_OUTSIDE}/submissions/${id}`, {
+      token: token(),
+      body: { visibility: 'shared' },
+      envOverrides: { SUBMISSIONS_SHARING_ENABLED: 'false' },
+    });
+    expect(sharingOff.status).toBe(409);
+
+    expect((await req('DELETE', `/topics/${T_OUTSIDE}/submissions/${id}`, { token: token() })).status).toBe(204);
+    expect(await rowExists(id)).toBe(false);
+    expect(await env.R2.head(key)).toBeNull();
+  });
+
+  it("a staff member gets 403 on another staff member's submission", async () => {
+    const { id } = await readySubmission(T_MAIN, adminToken);
+    expect((await req('PATCH', `/topics/${T_MAIN}/submissions/${id}`, { token: creatorToken, body: { title: 'x' } })).status).toBe(403);
+    expect((await req('DELETE', `/topics/${T_MAIN}/submissions/${id}`, { token: creatorToken })).status).toBe(403);
+    expect((await finalize(T_MAIN, id, creatorToken)).status).toBe(403);
+    expect(await rowExists(id)).toBe(true);
+  });
+
+  it.each(STAFF)("the summary gives a %s their own usage and the topic total", async (_label, _userId, token) => {
+    await readySubmission(T_MAIN, tokenA);
+    await readySubmission(T_MAIN, token());
+    const res = await req('GET', `/topics/${T_MAIN}/submissions/summary`, { token: token() });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      usage: { topicCount: 1, bytes: FIXTURES.mp4.bytes.byteLength },
+      totalCount: 2,
+    });
   });
 });
 

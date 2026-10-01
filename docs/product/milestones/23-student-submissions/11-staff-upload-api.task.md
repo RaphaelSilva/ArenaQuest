@@ -1,6 +1,6 @@
 # Task 11 — Backend: Staff upload and author rights on their own submissions (Phase 6)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md) — §7 as amended on 2026-10-01 ("Staff also upload")
 **Team:** Backend API
@@ -53,18 +53,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] An `admin` and a `content_creator` can each presign, upload and finalize to `ready` on a
+- [x] An `admin` and a `content_creator` can each presign, upload and finalize to `ready` on a
       published topic they are not enrolled in; a draft or archived topic is `404`.
-- [ ] Quota, size, type, rate-limit and sharing-switch rules apply to staff uploads as to
+- [x] Quota, size, type, rate-limit and sharing-switch rules apply to staff uploads as to
       students'.
-- [ ] Staff can edit, share, move and hard-delete their own submission; their own shows in
+- [x] Staff can edit, share, move and hard-delete their own submission; their own shows in
       `scope=mine` and in `GET /v1/me/submissions`.
-- [ ] Staff still get `403` on `PATCH`, `DELETE` and move of a submission another user
+- [x] Staff still get `403` on `PATCH`, `DELETE` and move of a submission another user
       authored; force-unshare, clear moderation and admin-only remove behave as before.
-- [ ] A staff upload shared on a topic appears in students' `scope=class` with the staff
+- [x] A staff upload shared on a topic appears in students' `scope=class` with the staff
       author's name, and in `scope=all`.
-- [ ] `make lint` and `make test-api` green; `pnpm dump-openapi` leaves no diff.
-- [ ] No diff outside the scope guardrail.
+- [x] `make lint` and `make test-api` green; `pnpm dump-openapi` leaves no diff.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

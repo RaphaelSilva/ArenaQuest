@@ -498,7 +498,7 @@ describe('POST /me/submissions/move', () => {
     expect((await move(tokenA, { ids: ['x'] })).status).toBe(400);
   });
 
-  it('a tutor moves like a student; staff get 403', async () => {
+  it("a tutor moves like a student; staff get 403 on a submission another user authored", async () => {
     const { id } = await insert({ author: TUTOR });
     const res = await move(tutorToken, { ids: [id], targetTopicId: T_TARGET });
     expect(res.status).toBe(200);
@@ -508,5 +508,77 @@ describe('POST /me/submissions/move', () => {
     expect((await move(adminToken, { ids: [own.id], targetTopicId: T_TARGET })).status).toBe(403);
     expect((await move(creatorToken, { ids: [own.id], targetTopicId: T_TARGET })).status).toBe(403);
     expect((await rowOf(own.id))!.topic_node_id).toBe(T_MAIN);
+  });
+});
+
+describe('staff authors (RFC 0020 §7 amended 2026-10-01; M23 Task 11)', () => {
+  const STAFF = [
+    ['admin', ADMIN, () => adminToken],
+    ['content_creator', CREATOR, () => creatorToken],
+  ] as const;
+
+  it.each(STAFF)("a %s's own submissions show in scope=mine and in GET /me/submissions", async (_label, userId, token) => {
+    const pending = await insert({ author: userId, topic: T_OUTSIDE, status: 'pending', ageSeconds: 20 });
+    const ready = await insert({ author: userId, topic: T_OUTSIDE, ageSeconds: 10 });
+    await insert({ author: STUDENT_A, topic: T_OUTSIDE, visibility: 'shared' });
+
+    const mine = await list(T_OUTSIDE, token(), '?scope=mine');
+    expect(mine.status).toBe(200);
+    const mineBody = (await mine.json()) as Json;
+    expect(ids(mineBody)).toEqual([ready.id, pending.id]);
+    expect(mineBody.data[0]).toMatchObject({ isMine: true, authorId: userId });
+
+    const me = await req('GET', '/me/submissions', { token: token() });
+    expect(me.status).toBe(200);
+    const meBody = (await me.json()) as Json;
+    expect(ids(meBody)).toEqual([ready.id, pending.id]);
+    // Staff bypass the access set, so an unenrolled published topic is accessible.
+    expect(meBody.data[0]).toMatchObject({ topicTitle: `Title ${T_OUTSIDE}`, topicAccessible: true });
+  });
+
+  it.each(STAFF)(
+    "a %s's shared upload appears in students' scope=class with the author's name, and in scope=all",
+    async (_label, userId, token) => {
+      const shared = await insert({ author: userId, visibility: 'shared' });
+
+      const cls = (await (await list(T_MAIN, tokenA, '?scope=class')).json()) as Json;
+      expect(ids(cls)).toEqual([shared.id]);
+      expect(cls.data[0]).toMatchObject({ isMine: false, authorName: `Name ${userId}` });
+
+      const all = (await (await list(T_MAIN, creatorToken, '?scope=all')).json()) as Json;
+      expect(ids(all)).toEqual([shared.id]);
+      expect(all.data[0]).toMatchObject({ authorName: `Name ${userId}`, isMine: userId === CREATOR });
+
+      // A private staff upload stays out of the class gallery.
+      await insert({ author: userId });
+      expect(ids((await (await list(T_MAIN, tokenB, '?scope=class')).json()) as Json)).toEqual([shared.id]);
+      // The author sees it flagged as their own.
+      const own = (await (await list(T_MAIN, token(), '?scope=class')).json()) as Json;
+      expect(own.data[0]).toMatchObject({ id: shared.id, isMine: true });
+    },
+  );
+
+  it.each(STAFF)('a %s moves their own submissions, from a topic they are not enrolled in', async (_label, userId, token) => {
+    const first = await insert({ author: userId, topic: T_OUTSIDE, visibility: 'shared' });
+    const second = await insert({ author: userId, topic: T_OUTSIDE });
+
+    const res = await move(token(), { ids: [first.id, second.id, 'rd-does-not-exist'], targetTopicId: T_TARGET });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Json;
+    expect((body.moved as Json[]).map((s) => s.id)).toEqual([first.id, second.id]);
+    expect(body.refused).toEqual([{ id: 'rd-does-not-exist', reason: 'not_found' }]);
+    expect(await rowOf(first.id)).toMatchObject({ topic_node_id: T_TARGET, visibility: 'private', storage_key: first.key });
+
+    // The target gate still applies: a draft topic is 404.
+    expect((await move(token(), { ids: [first.id], targetTopicId: T_DRAFT })).status).toBe(404);
+  });
+
+  it.each(STAFF)("a %s mixing their own and another user's submission gets 403 and nothing moves", async (_label, userId, token) => {
+    const own = await insert({ author: userId });
+    const foreign = await insert({ author: STUDENT_B });
+    const res = await move(token(), { ids: [own.id, foreign.id], targetTopicId: T_TARGET });
+    expect(res.status).toBe(403);
+    expect((await rowOf(own.id))!.topic_node_id).toBe(T_MAIN);
+    expect((await rowOf(foreign.id))!.topic_node_id).toBe(T_MAIN);
   });
 });
