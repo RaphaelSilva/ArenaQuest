@@ -1,6 +1,6 @@
 # Task 06 — Frontend: Demonstrations page — Mine tab and upload (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md)
 **Team:** Frontend Web
@@ -75,18 +75,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The topic page shows the Demonstrations button with both counts, and only the own count
+- [x] The topic page shows the Demonstrations button with both counts, and only the own count
       when the summary reports sharing off.
-- [ ] Selecting a file over its limit, or when the topic quota is full, shows the limit in a
+- [x] Selecting a file over its limit, or when the topic quota is full, shows the limit in a
       translated message and sends **no** presign request (asserted on the mocked client).
-- [ ] A successful upload shows progress, then the new card at the top of *Minhas*; **Cancel**
+- [x] A successful upload shows progress, then the new card at the top of *Minhas*; **Cancel**
       aborts the PUT and deletes the pending row.
-- [ ] Edit changes title, description and visibility; sharing asks for confirmation naming
+- [x] Edit changes title, description and visibility; sharing asks for confirmation naming
       that classmates will see the author's name; the switch is absent when sharing is off.
-- [ ] A tombstone renders *"Removido pela equipe"* with only **Dispensar**.
-- [ ] `check-i18n-coverage.js` passes; `pt` and `en` builds both render the page.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A tombstone renders *"Removido pela equipe"* with only **Dispensar**.
+- [x] `check-i18n-coverage.js` passes; `pt` and `en` builds both render the page.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

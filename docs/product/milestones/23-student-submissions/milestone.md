@@ -122,7 +122,7 @@ Each task is one independent PR with one owner and one review surface. Backend a
 | 03 | [Student upload API — presign, finalize, edit, delete and summary](./03-student-upload-api.task.md) | 2 | Backend | ✅ Done |
 | 04 | [Student read and move API](./04-student-read-and-move-api.task.md) | 2 | Backend | ✅ Done |
 | 05 | [Staff submissions API, tombstone and housekeeping](./05-staff-api-and-housekeeping.task.md) | 3 | Backend | ✅ Done |
-| 06 | [Demonstrations page — Mine tab and upload](./06-mine-tab-and-upload-web.task.md) | 4 | Frontend | ☐ Open |
+| 06 | [Demonstrations page — Mine tab and upload](./06-mine-tab-and-upload-web.task.md) | 4 | Frontend | ✅ Done |
 | 07 | [Class tab, full-screen viewer and direct link](./07-class-tab-and-viewer-web.task.md) | 4 | Frontend | ☐ Open |
 | 08 | [Move dialog and My demonstrations page](./08-move-and-my-demonstrations-web.task.md) | 4 | Frontend | ☐ Open |
 | 09 | [Staff submission surfaces](./09-staff-surfaces-web.task.md) | 4 | Frontend | ☐ Open |
