@@ -80,13 +80,14 @@ describe('SubmissionsPage', () => {
     expect(screen.queryByRole('tab', { name: t.tabs.class })).not.toBeInTheDocument();
   });
 
-  it('gives staff a single All tab and no upload button', async () => {
+  it('gives staff All (default) and Mine, never Class, with no upload button on All', async () => {
     mockStaff = true;
     mockClient.submissions.summary.mockResolvedValue(summary({ totalCount: 4 }));
     render(<SubmissionsPage topicId="t1" />);
 
     expect(await screen.findByRole('tab', { name: t.tabs.all })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getAllByRole('tab')).toHaveLength(1);
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([t.tabs.all, t.tabs.mine]);
+    expect(screen.queryByRole('tab', { name: t.tabs.class })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: t.upload.open })).not.toBeInTheDocument();
   });
 

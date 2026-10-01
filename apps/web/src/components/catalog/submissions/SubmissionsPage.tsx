@@ -25,9 +25,13 @@ export type SubmissionsTab = 'mine' | 'class' | 'all';
 /** The direct-link viewer holds one item, so there is nowhere to step to. */
 const stayOnLinked = () => undefined;
 
-/** Tabs the caller gets: staff a single *All*; students *Mine*, plus *Class* while sharing is on. */
+/**
+ * Tabs the caller gets: staff *All* (the default, so moderation stays in front)
+ * and *Mine*; students *Mine*, plus *Class* while sharing is on. Staff get no
+ * *Class* tab — *All* already holds everything shared.
+ */
 export function tabsFor(isStaff: boolean, sharingEnabled: boolean): SubmissionsTab[] {
-  if (isStaff) return ['all'];
+  if (isStaff) return ['all', 'mine'];
   return sharingEnabled ? ['mine', 'class'] : ['mine'];
 }
 
@@ -45,8 +49,8 @@ type SubmissionsPageProps = {
 
 /**
  * The Demonstrations page of a topic: breadcrumb back to the topic, the tab
- * bar driven by `?tab=`, the quota line and the active tab. Staff get only
- * *All*, with no quota line and no upload.
+ * bar driven by `?tab=`, the quota line and the active tab. Staff land on
+ * *All* and upload from *Mine*, where their quota line shows.
  */
 export function SubmissionsPage({ topicId, submissionId, upload }: SubmissionsPageProps) {
   const dict = useDict();
@@ -172,7 +176,7 @@ export function SubmissionsPage({ topicId, submissionId, upload }: SubmissionsPa
         <p className="mt-1 text-[14px]" style={{ color: 'var(--aq-text2)' }}>
           {t.page.subtitle}
         </p>
-        {!isStaff && (
+        {(!isStaff || active === 'mine') && (
           <div className="mt-2">
             <QuotaLine summary={summary} />
           </div>

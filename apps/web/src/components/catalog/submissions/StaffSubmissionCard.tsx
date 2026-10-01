@@ -18,10 +18,10 @@ type StaffSubmissionCardProps = {
 };
 
 /**
- * A student's submission as staff see it: preview, title, date, kind and size
+ * A submission as staff see it on *Todos*: preview, title, date, kind and size
  * with the private / shared / moderated badges and the staff actions. A
  * removed one is a tombstone that says who removed it and when. No edit, move
- * or upload control — staff only moderate.
+ * or upload control here — staff author their own from *Minhas*.
  */
 export function StaffSubmissionCard({ submission, onOpen, onChange }: StaffSubmissionCardProps) {
   const dict = useDict();
