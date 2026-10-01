@@ -333,3 +333,121 @@ describe('SubmissionsController - read and move (Task 04)', () => {
     if (result.ok) expect(result.data.moved[0]).not.toHaveProperty('storageKey');
   });
 });
+
+describe('SubmissionsController - staff (Task 05)', () => {
+  const ADMIN_CALLER: SubmissionCaller = { userId: 'admin-1', roles: ['admin'] };
+  const CREATOR_CALLER: SubmissionCaller = { userId: 'creator-1', roles: ['content_creator'] };
+  const TUTOR_CALLER: SubmissionCaller = { userId: 'tutor-1', roles: ['tutor'] };
+  const { READY, REMOVED, PENDING } = Entities.Config.SubmissionStatus;
+  const signer = { getPresignedDownloadUrl: vi.fn().mockResolvedValue('https://r2.test/get') };
+
+  it.each([ADMIN_CALLER, CREATOR_CALLER])('scope=all gives $roles every ready and removed row with provenance, bypassing access', async (caller) => {
+    const ready = record({ id: 'a', status: READY, moderatedAt: '2026-09-29 11:00:00', moderatedBy: 'creator-1' });
+    const removed = record({ id: 'b', status: REMOVED, storageKey: null, removedAt: '2026-09-29 12:00:00', removedBy: 'admin-1', removedByName: 'Admin' });
+    const pending = record({ id: 'c', status: PENDING });
+    const listByTopic = vi.fn().mockResolvedValue({ data: [ready, removed, pending], nextCursor: null });
+    const { controller } = setup({ submissions: { listByTopic }, storage: signer });
+    const result = await controller.listForTopic(TOPIC.id, caller, 'all', null);
+    expect(listByTopic).toHaveBeenCalledWith(TOPIC.id, expect.objectContaining({ scope: 'all' }));
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        data: [
+          { id: 'a', url: 'https://r2.test/get', moderated: true, moderatedBy: 'creator-1', isMine: false },
+          { id: 'b', url: null, removedBy: 'admin-1', removedByName: 'Admin' },
+        ],
+      },
+    });
+    if (result.ok) {
+      expect(result.data.data).toHaveLength(2);
+      for (const s of result.data.data) expect(s).not.toHaveProperty('storageKey');
+    }
+  });
+
+  it('scope=all stays 403 for a tutor', async () => {
+    const listByTopic = vi.fn();
+    const { controller } = setup({ submissions: { listByTopic } });
+    expect(await controller.listForTopic(TOPIC.id, TUTOR_CALLER, 'all', null)).toMatchObject({ status: 403 });
+    expect(listByTopic).not.toHaveBeenCalled();
+  });
+
+  it("staff read any ready or removed submission, but not another student's pending one", async () => {
+    for (const status of [READY, REMOVED] as const) {
+      const { controller } = setup({ submissions: { findById: vi.fn().mockResolvedValue(record({ status })) }, storage: signer });
+      expect(await controller.getOne(TOPIC.id, 'sub-1', CREATOR_CALLER)).toMatchObject({ ok: true, data: { status, moderatedAt: null } });
+    }
+    const { controller } = setup({ submissions: { findById: vi.fn().mockResolvedValue(record({ status: PENDING })) } });
+    expect(await controller.getOne(TOPIC.id, 'sub-1', ADMIN_CALLER)).toMatchObject({ status: 404 });
+  });
+
+  it('per-student list uses the staff scope and adds the topic title', async () => {
+    const listByAuthor = vi.fn().mockResolvedValue({
+      data: [{ ...record({ status: READY }), topicTitle: 'Topic' }],
+      nextCursor: null,
+    });
+    const { controller } = setup({ submissions: { listByAuthor }, storage: signer });
+    const result = await controller.listByUserForStaff(STUDENT.userId, CREATOR_CALLER, null);
+    expect(listByAuthor).toHaveBeenCalledWith(STUDENT.userId, { scope: 'staff', page: { cursor: null, limit: 20 } });
+    expect(result).toMatchObject({ ok: true, data: { data: [{ id: 'sub-1', topicTitle: 'Topic', url: 'https://r2.test/get' }] } });
+    expect(await controller.listByUserForStaff(STUDENT.userId, STUDENT, null)).toMatchObject({ status: 403 });
+  });
+
+  it('force-unshare records the staff member; clear passes null; both 404 on a missing or pending row', async () => {
+    const setModeration = vi.fn().mockResolvedValue(record({ status: READY, moderatedAt: 'now', moderatedBy: 'creator-1' }));
+    const findById = vi.fn().mockResolvedValue(record({ status: READY }));
+    const { controller } = setup({ submissions: { setModeration, findById }, storage: signer });
+    expect(await controller.forceUnshare('sub-1', CREATOR_CALLER)).toMatchObject({ ok: true, data: { moderated: true, moderatedBy: 'creator-1' } });
+    expect(setModeration).toHaveBeenLastCalledWith('sub-1', 'creator-1');
+    expect(await controller.clearModeration('sub-1', ADMIN_CALLER)).toEqual({ ok: true, data: null });
+    expect(setModeration).toHaveBeenLastCalledWith('sub-1', null);
+
+    findById.mockResolvedValueOnce(null);
+    expect(await controller.forceUnshare('x', ADMIN_CALLER)).toMatchObject({ status: 404 });
+    findById.mockResolvedValueOnce(record({ status: PENDING }));
+    expect(await controller.clearModeration('sub-1', ADMIN_CALLER)).toMatchObject({ status: 404 });
+    expect(await controller.forceUnshare('sub-1', STUDENT)).toMatchObject({ status: 403 });
+  });
+
+  it('remove is admin-only: a content creator gets 403 before anything is read', async () => {
+    const findById = vi.fn();
+    const { controller, storage } = setup({ submissions: { findById } });
+    expect(await controller.removeByStaff('sub-1', CREATOR_CALLER)).toMatchObject({ status: 403 });
+    expect(findById).not.toHaveBeenCalled();
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('remove deletes the object first, then writes the tombstone', async () => {
+    const order: string[] = [];
+    const markRemoved = vi.fn().mockImplementation(async () => { order.push('row'); return record({ status: REMOVED }); });
+    const deleteObject = vi.fn().mockImplementation(async () => { order.push('object'); });
+    const { controller } = setup({
+      submissions: { findById: vi.fn().mockResolvedValue(record({ status: READY })), markRemoved },
+      storage: { deleteObject },
+    });
+    expect(await controller.removeByStaff('sub-1', ADMIN_CALLER)).toEqual({ ok: true, data: null });
+    expect(deleteObject).toHaveBeenCalledWith('submissions/student-1/sub-1-kata.mp4');
+    expect(markRemoved).toHaveBeenCalledWith('sub-1', 'admin-1');
+    expect(order).toEqual(['object', 'row']);
+  });
+
+  it('remove answers 502 and leaves the row alone when storage fails', async () => {
+    const markRemoved = vi.fn();
+    const { controller } = setup({
+      submissions: { findById: vi.fn().mockResolvedValue(record({ status: READY })), markRemoved },
+      storage: { deleteObject: vi.fn().mockRejectedValue(new Error('down')) },
+    });
+    expect(await controller.removeByStaff('sub-1', ADMIN_CALLER)).toMatchObject({ status: 502, error: 'StorageUnavailable' });
+    expect(markRemoved).not.toHaveBeenCalled();
+  });
+
+  it('remove is idempotent on a tombstone and 404 on a pending row', async () => {
+    const markRemoved = vi.fn();
+    const findById = vi.fn().mockResolvedValueOnce(record({ status: REMOVED, storageKey: null }))
+      .mockResolvedValueOnce(record({ status: PENDING }));
+    const { controller, storage } = setup({ submissions: { findById, markRemoved } });
+    expect(await controller.removeByStaff('sub-1', ADMIN_CALLER)).toEqual({ ok: true, data: null });
+    expect(await controller.removeByStaff('sub-1', ADMIN_CALLER)).toMatchObject({ status: 404 });
+    expect(markRemoved).not.toHaveBeenCalled();
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+  });
+});

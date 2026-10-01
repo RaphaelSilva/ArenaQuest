@@ -16,6 +16,8 @@ import {
   SubmissionPageSchema,
   SubmissionSummarySchema,
   SubmissionViewSchema,
+  StaffSubmissionPageSchema,
+  StaffSubmissionViewSchema,
 } from '@api/openapi/components/entities';
 import { ErrorBody } from '@api/openapi/components/errors';
 import { respondNoContent, respondWith } from '@api/routes/_shared/envelope';
@@ -48,7 +50,7 @@ export const NO_STORE = 'private, no-store';
 const listQuerySchema = z.object({
   scope: z.enum(['mine', 'class', 'all']).default('mine').openapi({
     description:
-      "`mine`: the caller's own, every status. `class`: shared ready submissions (empty while sharing is disabled). `all`: staff only",
+      "`mine`: the caller's own, every status. `class`: shared ready submissions (empty while sharing is disabled). `all`: staff only (`admin`, `content_creator`) — every ready and removed submission with its provenance",
     example: 'mine',
   }),
   cursor: z.string().optional().openapi({
@@ -61,12 +63,15 @@ export const listSubmissionsRoute = createRoute({
   path: '/topics/{id}/submissions',
   summary: 'List submissions on a topic',
   description:
-    'Newest first, pages of 20. Ready submissions carry a signed GET `url` (TTL 1 h). `scope` only narrows what the caller may see; it never widens it.',
+    'Newest first, pages of 20. Ready submissions carry a signed GET `url` (TTL 1 h). `scope` only narrows what the caller may see; it never widens it. With `scope=all`, staff get every ready and removed submission on any published topic (the access set is bypassed), each with its moderation and removal provenance.',
   tags: ['topics:submissions'],
   security: [{ bearerAuth: [] }],
   request: { params: topicParamSchema, query: listQuerySchema },
   responses: {
-    200: { description: 'One page of submissions', content: { 'application/json': { schema: SubmissionPageSchema } } },
+    200: {
+      description: 'One page of submissions (`StaffSubmissionPage` for `scope=all`)',
+      content: { 'application/json': { schema: z.union([SubmissionPageSchema, StaffSubmissionPageSchema]) } },
+    },
     400: error('Malformed query, or `InvalidCursor`'),
     403: error('`scope=all` requested by a non-staff caller'),
     404: topicNotFound,
@@ -79,12 +84,15 @@ export const getSubmissionRoute = createRoute({
   path: '/topics/{id}/submissions/{sid}',
   summary: 'Read one submission',
   description:
-    "The author reads their own in every status; anyone else only a shared, ready submission while sharing is enabled. Everything else is `404`.",
+    "The author reads their own in every status; anyone else only a shared, ready submission while sharing is enabled. Staff (`admin`, `content_creator`) read any ready or removed submission, read-only, with its provenance (`StaffSubmissionView`). Everything else is `404`.",
   tags: ['topics:submissions'],
   security: [{ bearerAuth: [] }],
   request: { params: submissionParamSchema },
   responses: {
-    200: { description: 'The submission', content: { 'application/json': { schema: SubmissionViewSchema } } },
+    200: {
+      description: 'The submission (`StaffSubmissionView` for staff)',
+      content: { 'application/json': { schema: z.union([SubmissionViewSchema, StaffSubmissionViewSchema]) } },
+    },
     404: error("Topic not readable, or the submission is missing, on another topic or not visible to the caller"),
     500: configInvalid,
   },

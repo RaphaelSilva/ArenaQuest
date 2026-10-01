@@ -14,6 +14,7 @@ import { Scalar } from '@scalar/hono-api-reference';
 
 import { buildContainer } from '@api/container';
 import { runScheduledBilling } from '@api/core/billing/billing-service';
+import { sweepPendingSubmissions } from '@api/jobs/sweep-pending-submissions';
 import { AppRouter } from '@api/routes';
 import { configureOpenAPIDocument } from '@api/openapi/document';
 import '@api/types/hono-env';
@@ -48,12 +49,24 @@ export default {
    * calls too — one routine, two callers. The container is built **inside** the
    * handler for the same reason `fetch` builds it per request: Workers share no
    * memory between invocations, so a hoisted adapter is a correctness bug.
+   *
+   * The abandoned-upload sweep (RFC 0020 §9) runs after billing on the same
+   * daily trigger, in a `finally` so a billing failure never skips it; the
+   * sweep itself never throws, so it cannot affect billing either.
    */
   async scheduled(
     _controller: ScheduledController,
     env: AppEnv,
     _ctx: ExecutionContext,
   ): Promise<void> {
-    await runScheduledBilling(buildContainer(env));
+    const container = buildContainer(env);
+    try {
+      await runScheduledBilling(container);
+    } finally {
+      await sweepPendingSubmissions({
+        submissions: container.engagement.submissionRepo,
+        storage: container.content.storage,
+      });
+    }
   },
 } satisfies ExportedHandler<AppEnv>;

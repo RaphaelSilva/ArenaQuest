@@ -345,6 +345,29 @@ export const SubmissionPageSchema = z.object({
   nextCursor: nextCursorField,
 }).openapi('SubmissionPage');
 
+const submissionProvenanceFields = {
+  moderatedAt: z.string().nullable().openapi({ description: 'When staff force-unshared the submission; null when not moderated', example: null }),
+  moderatedBy: z.string().nullable().openapi({ description: 'The staff member who force-unshared it; null when not moderated', example: null }),
+  removedBy: z.string().nullable().openapi({ description: 'The admin who removed it; null unless removed (or the account is gone)', example: null }),
+  removedByName: z.string().nullable().openapi({ description: 'Display name of `removedBy`; null when unknown', example: null }),
+};
+
+export const StaffSubmissionViewSchema = SubmissionViewSchema.extend(submissionProvenanceFields).openapi('StaffSubmissionView');
+
+export const StaffSubmissionPageSchema = z.object({
+  data: z.array(StaffSubmissionViewSchema),
+  nextCursor: nextCursorField,
+}).openapi('StaffSubmissionPage');
+
+export const StaffAuthoredSubmissionSchema = StaffSubmissionViewSchema.extend({
+  topicTitle: z.string().openapi({ example: 'Kihon' }),
+}).openapi('StaffAuthoredSubmission');
+
+export const StaffAuthoredSubmissionPageSchema = z.object({
+  data: z.array(StaffAuthoredSubmissionSchema),
+  nextCursor: nextCursorField,
+}).openapi('StaffAuthoredSubmissionPage');
+
 export const AuthoredSubmissionSchema = SubmissionSchema.extend({
   url: submissionUrlField,
   topicTitle: z.string().openapi({ example: 'Kihon' }),
