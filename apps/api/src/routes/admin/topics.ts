@@ -75,6 +75,12 @@ const PresignResultSchema = z.object({
   media: MediaSchema,
 });
 
+const MoveMediaBodySchema = z.object({
+  targetTopicId: z.string().uuid().openapi({
+    description: 'The topic the media item moves to. Any existing topic other than the current one, archived included.',
+  }),
+});
+
 // ---------------------------------------------------------------------------
 // Routes Definitions
 // ---------------------------------------------------------------------------
@@ -410,6 +416,50 @@ export const deleteMediaRoute = createRoute({
   },
 });
 
+export const moveMediaRoute = createRoute({
+  method: 'post',
+  path: '/{topicId}/media/{mediaId}/move',
+  summary: 'Move Media',
+  description:
+    'Reassign a ready media item to another topic (logical transfer). Only the row\'s topic changes: the ' +
+    'storage object is neither copied nor renamed, and its storage key keeps the original topic id. ' +
+    'The item\'s catalog audience becomes the target topic\'s.',
+  tags: ['admin:media'],
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: z.object({
+      topicId: z.string().uuid(),
+      mediaId: z.string().uuid(),
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: MoveMediaBodySchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: 'Media moved; the updated item with a fresh signed `url`',
+      content: {
+        'application/json': {
+          schema: MediaSchema,
+        },
+      },
+    },
+    400: {
+      description: 'SameTopic — the target equals the current topic; or Bad Request / Validation Failed',
+    },
+    404: {
+      description: 'Media not found, deleted or not on `{topicId}`; or target topic not found',
+    },
+    409: {
+      description: 'MediaNotReady — only ready media can be moved',
+    },
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Builder
 // ---------------------------------------------------------------------------
@@ -484,6 +534,13 @@ export function buildAdminTopicsRouter(container: AppContainer) {
     const { topicId, mediaId } = c.req.valid('param');
     const result = await mediaController.deleteMedia(topicId, mediaId);
     return respondNoContent(c, result);
+  });
+
+  router.openapi(moveMediaRoute, async (c) => {
+    const { topicId, mediaId } = c.req.valid('param');
+    const { targetTopicId } = c.req.valid('json');
+    const result = await mediaController.moveMedia(topicId, mediaId, targetTopicId);
+    return respondWith(c, result);
   });
 
   return router;

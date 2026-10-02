@@ -68,6 +68,7 @@ function makeMediaRepo(overrides: Partial<IMediaRepository> = {}): IMediaReposit
     listByTopic: vi.fn(async () => [READY_MEDIA]),
     create: vi.fn(async () => READY_MEDIA),
     markReady: vi.fn(async () => READY_MEDIA),
+    moveToTopic: vi.fn(async () => READY_MEDIA),
     softDelete: vi.fn(async () => {}),
     hardDelete: vi.fn(async () => {}),
     ...overrides,

@@ -218,3 +218,153 @@ describe('Full media lifecycle', () => {
     expect(obj).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// POST /admin/topics/:topicId/media/:mediaId/move
+// ---------------------------------------------------------------------------
+
+describe('POST /admin/topics/:topicId/media/:mediaId/move', () => {
+  type MediaBody = { id: string; topicNodeId: string; storageKey: string; status: string; url: string; createdAt: string; updatedAt: string };
+
+  let studentToken: string;
+
+  beforeAll(async () => {
+    const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
+    studentToken = await adapter.signAccessToken({ sub: 'student-media-test', email: 'student@media.test', roles: ['student'] });
+  });
+
+  async function createTopic(title: string): Promise<string> {
+    const res = await req('POST', '/admin/topics', { token: adminToken, body: { title } });
+    expect(res.status).toBe(201);
+    return (await res.json<{ id: string }>()).id;
+  }
+
+  /** Presign, put the object in R2 and mark the row ready (S3 HEAD is unreachable in the sandbox). Backdated so an `updatedAt` bump is observable. */
+  async function readyMedia(topicId: string, fileName = 'move-me.mp4') {
+    const { data } = await presign(topicId, { fileName, contentType: 'video/mp4', sizeBytes: 1_000_000 });
+    const { id, storageKey } = data!.media;
+    await env.R2.put(storageKey, new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]));
+    await env.DB
+      .prepare("UPDATE media SET status = 'ready', created_at = '2020-01-01 00:00:00', updated_at = '2020-01-01 00:00:00' WHERE id = ?")
+      .bind(id)
+      .run();
+    return { id, storageKey };
+  }
+
+  async function listIds(topicId: string): Promise<string[]> {
+    const res = await req('GET', `/admin/topics/${topicId}/media`, { token: adminToken });
+    expect(res.status).toBe(200);
+    return (await res.json<{ data: { id: string }[] }>()).data.map(m => m.id);
+  }
+
+  /** `token: null` sends no Authorization header. */
+  const move = (topicId: string, mediaId: string, targetTopicId: unknown, token: string | null = adminToken) =>
+    req('POST', `/admin/topics/${topicId}/media/${mediaId}/move`, { token: token ?? undefined, body: { targetTopicId } });
+
+  it.each([
+    ['admin', () => adminToken],
+    ['content_creator', () => contentCreatorToken],
+  ])('%s moves a ready item: 200, listed under the target only, key and object unchanged', async (_role, token) => {
+    const source = await createTopic('Move Source');
+    const target = await createTopic('Move Target');
+    const { id, storageKey } = await readyMedia(source);
+    const before = await env.DB
+      .prepare('SELECT created_at, updated_at FROM media WHERE id = ?')
+      .bind(id)
+      .first<{ created_at: string; updated_at: string }>();
+
+    const res = await move(source, id, target, token());
+    expect(res.status).toBe(200);
+    const body = await res.json<MediaBody>();
+    expect(body.id).toBe(id);
+    expect(body.topicNodeId).toBe(target);
+    expect(body.status).toBe('ready');
+    expect(body.storageKey).toBe(storageKey);
+    expect(body.url).toMatch(/^https?:\/\//);
+    expect(new Date(body.createdAt).getTime()).toBe(new Date(before!.created_at).getTime());
+    expect(new Date(body.updatedAt).getTime()).toBeGreaterThan(new Date(before!.updated_at).getTime());
+
+    expect(await listIds(target)).toContain(id);
+    expect(await listIds(source)).not.toContain(id);
+
+    // The R2 object is neither copied nor renamed.
+    const obj = await env.R2.get(storageKey);
+    expect(obj).not.toBeNull();
+    expect(new Uint8Array(await obj!.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]));
+    const listed = await env.R2.list({ prefix: `topics/${target}/` });
+    expect(listed.objects).toHaveLength(0);
+  });
+
+  it('accepts an archived target topic', async () => {
+    const source = await createTopic('Move Source (archived target)');
+    const target = await createTopic('Archived Target');
+    expect((await req('DELETE', `/admin/topics/${target}`, { token: adminToken })).status).toBe(204);
+    const { id } = await readyMedia(source);
+
+    const res = await move(source, id, target);
+    expect(res.status).toBe(200);
+  });
+
+  it('returns 401 without a token and 403 for a student', async () => {
+    const source = await createTopic('Move Guard Source');
+    const target = await createTopic('Move Guard Target');
+    const { id } = await readyMedia(source);
+
+    expect((await move(source, id, target, null)).status).toBe(401);
+    expect((await move(source, id, target, studentToken)).status).toBe(403);
+    expect(await listIds(source)).toContain(id);
+  });
+
+  it('returns 404 for a missing, deleted or wrong-topic media item', async () => {
+    const source = await createTopic('Move 404 Source');
+    const target = await createTopic('Move 404 Target');
+    const { id } = await readyMedia(source);
+
+    expect((await move(source, crypto.randomUUID(), target)).status).toBe(404);
+    expect((await move(target, id, source)).status).toBe(404);
+
+    const { id: deletedId } = await readyMedia(source, 'deleted.mp4');
+    expect((await req('DELETE', `/admin/topics/${source}/media/${deletedId}`, { token: adminToken })).status).toBe(204);
+    expect((await move(source, deletedId, target)).status).toBe(404);
+  });
+
+  it('returns 404 with detail when the target topic does not exist', async () => {
+    const source = await createTopic('Move Missing Target Source');
+    const { id } = await readyMedia(source);
+
+    const res = await move(source, id, crypto.randomUUID());
+    expect(res.status).toBe(404);
+    const body = await res.json<{ error: string; detail?: string }>();
+    expect(body.error).toBe('NotFound');
+    expect(body.detail).toBe('target topic not found');
+    expect(await listIds(source)).toContain(id);
+  });
+
+  it('returns 409 MediaNotReady for a pending item', async () => {
+    const source = await createTopic('Move Pending Source');
+    const target = await createTopic('Move Pending Target');
+    const { data } = await presign(source, { fileName: 'pending.mp4', contentType: 'video/mp4', sizeBytes: 1_000 });
+
+    const res = await move(source, data!.media.id, target);
+    expect(res.status).toBe(409);
+    expect((await res.json<{ error: string }>()).error).toBe('MediaNotReady');
+  });
+
+  it('returns 400 SameTopic when the target equals the source', async () => {
+    const source = await createTopic('Move Same Source');
+    const { id } = await readyMedia(source);
+
+    const res = await move(source, id, source);
+    expect(res.status).toBe(400);
+    expect((await res.json<{ error: string }>()).error).toBe('SameTopic');
+  });
+
+  it('returns 400 for an invalid body or params', async () => {
+    const source = await createTopic('Move Invalid Source');
+    const { id } = await readyMedia(source);
+
+    expect((await move(source, id, 'not-a-uuid')).status).toBe(400);
+    expect((await move(source, id, undefined)).status).toBe(400);
+    expect((await move('not-a-uuid', id, crypto.randomUUID())).status).toBe(400);
+  });
+});
