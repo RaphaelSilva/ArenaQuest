@@ -23,6 +23,8 @@ export const STORAGE_KEY_OWNERS: readonly StorageKeyOwner[] = [
   { table: 'events', column: 'flyer_key' },
   // The flyer a pending re-upload is about to displace (see migration 0027).
   { table: 'events', column: 'flyer_replaced_key' },
+  // Student submissions (migration 0030); NULL on a `removed` tombstone.
+  { table: 'topic_submissions', column: 'storage_key' },
 ] as const;
 
 /**
@@ -47,6 +49,7 @@ export const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
 export type ParsedStorageKey =
   | { kind: 'topic-media'; topicId: string; mediaId: string; fileName: string }
   | { kind: 'event-flyer'; eventId: string; fileName: string }
+  | { kind: 'submission'; authorId: string; submissionId: string; fileName: string }
   | { kind: 'unknown' };
 
 const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
@@ -54,10 +57,12 @@ const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-
 // Mirrors the key builders:
 //   admin-media.controller  → `topics/${topicId}/${mediaId}-${sanitizeFileName(name)}`
 //   admin-events.controller → `events/${id}/flyer-${randomUUID()}-${sanitizeFileName(name)}`
+//   submissions.controller  → `submissions/${authorId}/${randomUUID()}-${sanitizeFileName(name)}`
 // `sanitizeFileName` never emits `/`, so the file-name segment is slash-free;
 // a key with deeper nesting is not one of ours and parses as `unknown`.
 const TOPIC_MEDIA_RE = new RegExp(`^topics/([^/]+)/(${UUID})-([^/]+)$`);
 const EVENT_FLYER_RE = new RegExp(`^events/([^/]+)/flyer-${UUID}-([^/]+)$`);
+const SUBMISSION_RE = new RegExp(`^submissions/([^/]+)/(${UUID})-([^/]+)$`);
 
 /**
  * Decode a storage key into the owner its path claims. The result is only a
@@ -71,6 +76,15 @@ export function parseStorageKey(key: string): ParsedStorageKey {
   const flyer = EVENT_FLYER_RE.exec(key);
   if (flyer) {
     return { kind: 'event-flyer', eventId: flyer[1], fileName: flyer[2] };
+  }
+  const submission = SUBMISSION_RE.exec(key);
+  if (submission) {
+    return {
+      kind: 'submission',
+      authorId: submission[1],
+      submissionId: submission[2],
+      fileName: submission[3],
+    };
   }
   return { kind: 'unknown' };
 }

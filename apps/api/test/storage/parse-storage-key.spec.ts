@@ -24,6 +24,21 @@ describe('parseStorageKey', () => {
     });
   });
 
+  it('decodes a submission key into author id, submission id and file name', () => {
+    expect(parseStorageKey(`submissions/student-a/${MEDIA_ID}-kata-2nd-attempt.mp4`)).toEqual({
+      kind: 'submission',
+      authorId: 'student-a',
+      submissionId: MEDIA_ID,
+      fileName: 'kata-2nd-attempt.mp4',
+    });
+  });
+
+  it('returns unknown for a submission key that does not match the builder shape', () => {
+    expect(parseStorageKey('submissions/student-a/not-a-uuid-file.mp4')).toEqual({ kind: 'unknown' });
+    expect(parseStorageKey(`submissions/student-a/extra/${MEDIA_ID}-a.mp4`)).toEqual({ kind: 'unknown' });
+    expect(parseStorageKey(`submissions/${MEDIA_ID}-a.mp4`)).toEqual({ kind: 'unknown' });
+  });
+
   it('returns unknown for a nested path under a topic folder', () => {
     expect(parseStorageKey(`topics/${TOPIC_ID}/extra/${MEDIA_ID}-a.pdf`)).toEqual({ kind: 'unknown' });
   });

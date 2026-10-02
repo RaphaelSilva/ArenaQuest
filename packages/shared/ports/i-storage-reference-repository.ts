@@ -47,7 +47,33 @@ export interface EventFlyerStorageReference {
   flyerName: string | null;
 }
 
-export type StorageReference = MediaStorageReference | EventFlyerStorageReference;
+/** A `topic_submissions` row whose `storage_key` is the key (RFC 0020). */
+export interface SubmissionStorageReference {
+  kind: 'submission';
+  key: string;
+  submissionId: string;
+  /**
+   * Every status the key can match. A `removed` tombstone has
+   * `storage_key = NULL`, so in practice only `pending` and `ready` resolve.
+   */
+  status: Entities.Config.SubmissionStatus;
+  title: string;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+  /** The author id is kept even when the user row no longer resolves. */
+  authorId: string;
+  author: { id: string; name: string } | null;
+  /** The topic id is kept even when the topic row is gone (`topic: null`). */
+  topicId: string;
+  topic: { id: string; title: string; status: Entities.Config.TopicNodeStatus } | null;
+  createdAt: Date;
+}
+
+export type StorageReference =
+  | MediaStorageReference
+  | EventFlyerStorageReference
+  | SubmissionStorageReference;
 
 export interface ExistingOwnersQuery {
   topicIds?: readonly string[];
@@ -85,8 +111,9 @@ export interface IStorageReferenceRepository {
 
   /**
    * Stable, cursor-paged walk over every live reference: `ready` and `pending`
-   * media keys and every non-null flyer key (`flyer_key` and
-   * `flyer_replaced_key`). `deleted` media rows are omitted. Each reference is
+   * media keys, every non-null flyer key (`flyer_key` and
+   * `flyer_replaced_key`) and `ready` / `pending` submission keys. `deleted`
+   * media rows and `removed` submissions are omitted. Each reference is
    * returned exactly once across the pages.
    */
   listReferencedKeys(options: ListReferencedKeysOptions): Promise<ReferencedKeysPage>;
