@@ -100,6 +100,8 @@ Out of scope (explicit, from RFC 0018 Non-Goals):
 | 06 | [Guarded orphan delete API](./06-guarded-orphan-delete-api.task.md) | 2 | Backend | ✅ Done |
 | 07 | [Delete orphan action in the browser](./07-delete-orphan-action.task.md) | 2 | Frontend | ✅ Done |
 | 08 | [Docs and rollout closeout](./08-docs-and-rollout-closeout.task.md) | 3 | Backend | 🚧 In Progress |
+| 09 | [Register student submissions as a storage key owner](./09-submission-storage-owner-api.task.md) | 2 | Backend | ☐ Open |
+| 10 | [Show student submissions as storage owners](./10-submission-storage-owner-web.task.md) | 2 | Frontend | ☐ Open |
 
 Dependency graph:
 
