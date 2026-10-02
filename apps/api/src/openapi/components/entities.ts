@@ -223,8 +223,27 @@ export const EventFlyerStorageReferenceSchema = z.object({
   flyerName: z.string().nullable(),
 }).openapi('EventFlyerStorageReference');
 
+export const SubmissionStorageReferenceSchema = z.object({
+  kind: z.literal('submission'),
+  key: z.string().openapi({ example: 'submissions/student-a/9a1b…-kata.mp4' }),
+  submissionId: z.string(),
+  status: z.enum(['pending', 'ready', 'removed']).openapi({
+    description: 'A `removed` tombstone has no key, so only `pending` / `ready` resolve in practice.',
+    example: 'ready',
+  }),
+  title: z.string().openapi({ example: 'Kata, 2nd attempt' }),
+  originalName: z.string().openapi({ example: 'IMG_0042.MOV' }),
+  contentType: z.string().openapi({ example: 'video/quicktime' }),
+  sizeBytes: z.number().int(),
+  authorId: z.string(),
+  author: z.object({ id: z.string(), name: z.string() }).nullable(),
+  topicId: z.string(),
+  topic: z.object({ id: z.string(), title: z.string(), status: TopicNodeStatusSchema }).nullable(),
+  createdAt: z.string().openapi({ example: '2026-09-29T12:00:00.000Z' }),
+}).openapi('SubmissionStorageReference');
+
 export const StorageReferenceSchema = z
-  .union([MediaStorageReferenceSchema, EventFlyerStorageReferenceSchema])
+  .union([MediaStorageReferenceSchema, EventFlyerStorageReferenceSchema, SubmissionStorageReferenceSchema])
   .openapi('StorageReference');
 
 export const ClassifiedObjectSchema = z.object({

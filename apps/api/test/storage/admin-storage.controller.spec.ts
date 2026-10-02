@@ -14,6 +14,7 @@ import type {
   StorageReference,
   MediaStorageReference,
   EventFlyerStorageReference,
+  SubmissionStorageReference,
   ExistingOwnersQuery,
   ListReferencedKeysOptions,
 } from '@arenaquest/shared/ports';
@@ -152,6 +153,26 @@ function flyer(
   flyerStatus: EventFlyerStorageReference['flyerStatus'],
 ): EventFlyerStorageReference {
   return { kind, key, eventId: EVENT, title: 'Summer Seminar', slug: 'summer', flyerStatus, flyerName: 'flyer.png' };
+}
+
+const submissionKey = (author: string, n: number) => `submissions/${author}/${uuid(n)}-kata-${n}.mp4`;
+
+function submission(key: string, status: SubmissionStorageReference['status']): SubmissionStorageReference {
+  return {
+    kind: 'submission',
+    key,
+    submissionId: uuid(98),
+    status,
+    title: 'Kata, 2nd attempt',
+    originalName: 'IMG_0042.MOV',
+    contentType: 'video/quicktime',
+    sizeBytes: 10,
+    authorId: 'student-a',
+    author: { id: 'student-a', name: 'Student A' },
+    topicId: TOPIC,
+    topic: { id: TOPIC, title: 'Kata Basics', status: 'published' },
+    createdAt: new Date(NOW - HOUR),
+  };
 }
 
 /** One fixture object per status / hint, all inside TOPIC's folder or EVENT's. */
@@ -505,5 +526,118 @@ describe('AdminStorageController.deleteObject', () => {
     });
     expect(storage.deleteObject).not.toHaveBeenCalled();
     expect(auditLines(info)).toHaveLength(0);
+  });
+});
+
+describe('student submissions as a storage owner (M25 Task 09)', () => {
+  const OLD = ORPHAN_GRACE_MS + HOUR; // 25 h
+  afterEach(() => vi.restoreAllMocks());
+
+  function setup() {
+    const storage = new FakeStorage();
+    const refs = new FakeRefs();
+    const k = {
+      ready: submissionKey('student-a', 1),
+      pending: submissionKey('student-a', 2),
+      stalePending: submissionKey('student-a', 3),
+      unreferenced: submissionKey('student-a', 4),
+    };
+    for (const key of Object.values(k)) storage.put(key);
+    storage.put(k.stalePending, OLD);
+    refs.refs.push(
+      submission(k.ready, 'ready'),
+      submission(k.pending, 'pending'),
+      submission(k.stalePending, 'pending'),
+    );
+    return { storage, refs, k, controller: new AdminStorageController(storage, refs, () => NOW) };
+  }
+
+  it('classifies ready as linked, pending as pending (+ stale), and an unreferenced key as orphan / row-gone', async () => {
+    const { controller, refs, k } = setup();
+    const res = await controller.browse({ prefix: 'submissions/student-a/' });
+    if (!res.ok) throw new Error('expected ok');
+    const by = new Map(res.data.objects.map((o) => [o.key, o]));
+
+    expect(by.get(k.ready)).toMatchObject({ status: 'linked', stale: false, hint: null });
+    expect(by.get(k.pending)).toMatchObject({ status: 'pending', stale: false, hint: null });
+    expect(by.get(k.stalePending)).toMatchObject({ status: 'pending', stale: true, hint: null });
+    expect(by.get(k.unreferenced)).toMatchObject({ status: 'orphan', stale: false, hint: 'row-gone', references: [] });
+    // The author of an unreferenced submission key is not looked up.
+    expect(refs.existingOwnersCalls).toHaveLength(0);
+
+    expect(by.get(k.ready)!.references).toEqual([
+      {
+        kind: 'submission',
+        key: k.ready,
+        submissionId: uuid(98),
+        status: 'ready',
+        title: 'Kata, 2nd attempt',
+        originalName: 'IMG_0042.MOV',
+        contentType: 'video/quicktime',
+        sizeBytes: 10,
+        authorId: 'student-a',
+        author: { id: 'student-a', name: 'Student A' },
+        topicId: TOPIC,
+        topic: { id: TOPIC, title: 'Kata Basics', status: 'published' },
+        createdAt: new Date(NOW - HOUR).toISOString(),
+      },
+    ]);
+  });
+
+  it('labels a submissions/<authorId>/ folder with no owner and not gone', async () => {
+    const { controller } = setup();
+    const res = await controller.browse({ prefix: 'submissions/' });
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.folders).toEqual([
+      { prefix: 'submissions/student-a/', name: 'student-a', owner: null, ownerGone: false },
+    ]);
+  });
+
+  it('refuses to delete a 25 h old ready submission object with 409, keeping it', async () => {
+    const { controller, storage, k } = setup();
+    storage.put(k.ready, OLD);
+
+    const res = await controller.deleteObject(k.ready, 'admin-1');
+
+    expect(res).toMatchObject({
+      ok: false,
+      status: 409,
+      error: 'StorageObjectNotDeletable',
+      meta: { reason: 'not-deletable-status', object: { key: k.ready, status: 'linked' } },
+    });
+    expect(storage.objects.has(k.ready)).toBe(true);
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('refuses a stale pending submission and deletes an unreferenced one past the grace window', async () => {
+    const { controller, storage, k } = setup();
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    storage.put(k.unreferenced, OLD);
+
+    expect(await controller.deleteObject(k.stalePending, 'admin-1')).toMatchObject({
+      ok: false,
+      status: 409,
+      meta: { reason: 'not-deletable-status' },
+    });
+    expect(await controller.deleteObject(k.unreferenced, 'admin-1')).toEqual({
+      ok: true,
+      data: { deleted: true, key: k.unreferenced, size: 10, status: 'orphan' },
+    });
+  });
+
+  it('reports a ready submission whose object was never put on /audit/missing', async () => {
+    const { controller, refs } = setup();
+    const ghost = submissionKey('student-a', 50);
+    refs.refs.push(submission(ghost, 'ready'));
+
+    const res = await controller.auditMissing({});
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.items).toEqual([
+      {
+        key: ghost,
+        status: 'missing-object',
+        reference: expect.objectContaining({ kind: 'submission', status: 'ready', title: 'Kata, 2nd attempt' }),
+      },
+    ]);
   });
 });

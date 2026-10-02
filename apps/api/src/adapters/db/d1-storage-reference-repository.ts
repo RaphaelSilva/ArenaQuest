@@ -41,7 +41,25 @@ type EventRefRow = {
   flyer_name: string | null;
 };
 
-type RefRow = MediaRefRow | EventRefRow;
+type SubmissionRefRow = {
+  ref_key: string;
+  id: string;
+  status: string;
+  title: string;
+  original_name: string;
+  content_type: string;
+  size_bytes: number;
+  author_id: string;
+  topic_node_id: string;
+  created_at: string;
+  topic_id: string | null;
+  topic_title: string | null;
+  topic_status: string | null;
+  user_id: string | null;
+  user_name: string | null;
+};
+
+type RefRow = MediaRefRow | EventRefRow | SubmissionRefRow;
 
 /**
  * How one registered owner column is read. Every entry of
@@ -115,6 +133,40 @@ function eventReader(column: string, kind: 'event-flyer' | 'event-flyer-displace
   };
 }
 
+const SUBMISSION_SELECT = `
+  SELECT s.storage_key AS ref_key, s.id, s.status, s.title, s.original_name, s.content_type,
+         s.size_bytes, s.author_id, s.topic_node_id, s.created_at,
+         t.id AS topic_id, t.title AS topic_title, t.status AS topic_status,
+         u.id AS user_id, u.name AS user_name
+    FROM topic_submissions s
+    LEFT JOIN topic_nodes t ON t.id = s.topic_node_id
+    LEFT JOIN users u ON u.id = s.author_id`;
+
+function submissionReference(raw: RefRow): StorageReference {
+  const row = raw as SubmissionRefRow;
+  return {
+    kind: 'submission',
+    key: row.ref_key,
+    submissionId: row.id,
+    status: row.status as Entities.Config.SubmissionStatus,
+    title: row.title,
+    originalName: row.original_name,
+    contentType: row.content_type,
+    sizeBytes: row.size_bytes,
+    authorId: row.author_id,
+    author: row.user_id !== null ? { id: row.user_id, name: row.user_name ?? '' } : null,
+    topicId: row.topic_node_id,
+    topic: row.topic_id !== null
+      ? {
+          id: row.topic_id,
+          title: row.topic_title ?? '',
+          status: row.topic_status as Entities.Config.TopicNodeStatus,
+        }
+      : null,
+    createdAt: parseUtc(row.created_at),
+  };
+}
+
 const OWNER_READERS: Record<string, OwnerReader> = {
   'media.storage_key': {
     resolveSql: (placeholders) =>
@@ -124,6 +176,16 @@ const OWNER_READERS: Record<string, OwnerReader> = {
   },
   'events.flyer_key': eventReader('flyer_key', 'event-flyer'),
   'events.flyer_replaced_key': eventReader('flyer_replaced_key', 'event-flyer-displaced'),
+  // A `removed` tombstone has a NULL key, so it can never match a resolve; the
+  // walk filters on status and on the key explicitly all the same.
+  'topic_submissions.storage_key': {
+    resolveSql: (placeholders) =>
+      `${SUBMISSION_SELECT} WHERE s.storage_key IN (${placeholders}) ORDER BY s.created_at, s.id`,
+    walkSql: `${SUBMISSION_SELECT}
+      WHERE s.status IN ('ready', 'pending') AND s.storage_key IS NOT NULL AND s.id > ?
+      ORDER BY s.id LIMIT ?`,
+    toReference: submissionReference,
+  },
 };
 
 const ownerId = (owner: StorageKeyOwner) => `${owner.table}.${owner.column}`;

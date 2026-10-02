@@ -1,6 +1,6 @@
 # Task 09 — Backend: Register student submissions as a storage key owner (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [25 — Admin storage browser and orphan audit](./milestone.md)
 **RFC:** [RFC 0018](../../RFCs/0018-admin-storage-browser-and-orphan-audit.md)
 **Team:** Backend API
@@ -58,17 +58,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `key-owners-coverage.spec.ts` passes on the merged migrations, `0030` included.
-- [ ] `parseStorageKey` returns `submission` with author id, submission id and file name for a
+- [x] `key-owners-coverage.spec.ts` passes on the merged migrations, `0030` included.
+- [x] `parseStorageKey` returns `submission` with author id, submission id and file name for a
       `submissions/` key.
-- [ ] `resolveKeys` returns a `submission` reference with author name and topic title, and
+- [x] `resolveKeys` returns a `submission` reference with author name and topic title, and
       stays at one `db.batch` per 90-key chunk.
-- [ ] A `ready` submission object is `linked`, a `pending` one is `pending`, and an
+- [x] A `ready` submission object is `linked`, a `pending` one is `pending`, and an
       unreferenced `submissions/` key is `orphan` with hint `row-gone`.
-- [ ] `DELETE /object` returns `409` for a 25 h old `ready` submission object, and the object stays.
-- [ ] `/audit/missing` includes a `ready` submission whose object was never put.
-- [ ] `apps/api/openapi.json` is regenerated; changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `DELETE /object` returns `409` for a 25 h old `ready` submission object, and the object stays.
+- [x] `/audit/missing` includes a `ready` submission whose object was never put.
+- [x] `apps/api/openapi.json` is regenerated; changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

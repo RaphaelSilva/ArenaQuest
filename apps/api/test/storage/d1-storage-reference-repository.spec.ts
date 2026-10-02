@@ -52,6 +52,23 @@ async function insertEvent(opts: {
   return id;
 }
 
+async function insertSubmission(opts: {
+  key: string | null;
+  status?: 'pending' | 'ready' | 'removed';
+  title?: string;
+}): Promise<string> {
+  const id = crypto.randomUUID();
+  await env.DB
+    .prepare(
+      `INSERT INTO topic_submissions
+         (id, topic_node_id, author_id, title, storage_key, original_name, content_type, size_bytes, status)
+       VALUES (?, ?, ?, ?, ?, 'IMG_0042.MOV', 'video/quicktime', 2048, ?)`,
+    )
+    .bind(id, topicId, userId, opts.title ?? 'Kata, 2nd attempt', opts.key, opts.status ?? 'ready')
+    .run();
+  return id;
+}
+
 async function walkAll(repo: D1StorageReferenceRepository, limit: number) {
   const items: StorageReference[] = [];
   let cursor: string | undefined;
@@ -100,6 +117,47 @@ describe('D1StorageReferenceRepository', () => {
       } finally {
         batchSpy.mockRestore();
       }
+    });
+
+    it('reads every registered owner, submissions included, in the one batch per chunk', async () => {
+      const keys = Array.from({ length: 91 }, (_, i) => `submissions/${userId}/chunk-${i}.mp4`);
+      for (const key of keys) await insertSubmission({ key });
+
+      const batchSpy = vi.spyOn(env.DB, 'batch');
+      try {
+        const refs = await repo.resolveKeys(keys);
+        expect(batchSpy).toHaveBeenCalledTimes(2);
+        // media + flyer_key + flyer_replaced_key + topic_submissions
+        for (const call of batchSpy.mock.calls) expect(call[0]).toHaveLength(4);
+        expect(refs.size).toBe(91);
+        for (const key of keys) {
+          expect(refs.get(key)).toEqual([expect.objectContaining({ kind: 'submission', key, status: 'ready' })]);
+        }
+      } finally {
+        batchSpy.mockRestore();
+      }
+    });
+
+    it('resolves a submission key with its author name and topic title', async () => {
+      const key = `submissions/${userId}/${crypto.randomUUID()}-img_0042.mov`;
+      const submissionId = await insertSubmission({ key, status: 'pending', title: 'Kata, 2nd attempt' });
+
+      const [ref] = (await repo.resolveKeys([key])).get(key)!;
+      expect(ref).toMatchObject({
+        kind: 'submission',
+        key,
+        submissionId,
+        status: 'pending',
+        title: 'Kata, 2nd attempt',
+        originalName: 'IMG_0042.MOV',
+        contentType: 'video/quicktime',
+        sizeBytes: 2048,
+        authorId: userId,
+        author: { id: userId, name: 'Ada Uploader' },
+        topicId,
+        topic: { id: topicId, title: 'Kata Basics', status: 'published' },
+      });
+      expect(ref.kind === 'submission' && Number.isNaN(ref.createdAt.getTime())).toBe(false);
     });
 
     it('issues no batch for an empty key list', async () => {
@@ -243,6 +301,26 @@ describe('D1StorageReferenceRepository', () => {
       expect(seen).toEqual(expected);
       expect(new Set(seen).size).toBe(seen.length);
       expect(items.some((r) => r.kind === 'media' && r.mediaId === deletedId)).toBe(false);
+    });
+
+    it('walks ready/pending submission keys exactly once and skips removed tombstones', async () => {
+      const live: string[] = [];
+      for (let i = 0; i < 7; i++) {
+        live.push(await insertSubmission({
+          key: `submissions/${userId}/walk-${i}.mp4`,
+          status: i % 2 ? 'ready' : 'pending',
+        }));
+      }
+      const removedId = await insertSubmission({ key: null, status: 'removed' });
+      await insertMedia({ key: `topics/${topicId}/walk-with-submissions.pdf` });
+
+      const { items, pages } = await walkAll(repo, 3);
+      const submissions = items.filter((r) => r.kind === 'submission');
+
+      expect(pages).toBeGreaterThan(1);
+      expect(items).toHaveLength(8);
+      expect(submissions.map((r) => r.kind === 'submission' && r.submissionId).sort()).toEqual([...live].sort());
+      expect(submissions.some((r) => r.kind === 'submission' && r.submissionId === removedId)).toBe(false);
     });
 
     it('returns an empty last page without a cursor when nothing is referenced', async () => {

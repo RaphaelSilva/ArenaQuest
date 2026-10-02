@@ -83,12 +83,16 @@ export function classifyObject(
   now: number,
 ): Classification {
   const isReady = (r: StorageReference) =>
-    (r.kind === 'media' && r.status === 'ready') || (r.kind === 'event-flyer' && r.flyerStatus === 'ready');
+    (r.kind === 'media' && r.status === 'ready')
+    || (r.kind === 'event-flyer' && r.flyerStatus === 'ready')
+    || (r.kind === 'submission' && r.status === 'ready');
   if (refs.some(isReady)) return { status: 'linked', stale: false, hint: null };
 
   // A live flyer column that is not `ready` is an upload in flight.
   const isPending = (r: StorageReference) =>
-    (r.kind === 'media' && r.status === 'pending') || r.kind === 'event-flyer';
+    (r.kind === 'media' && r.status === 'pending')
+    || r.kind === 'event-flyer'
+    || (r.kind === 'submission' && r.status === 'pending');
   if (refs.some(isPending)) {
     return { status: 'pending', stale: now - object.lastModified.getTime() > ORPHAN_GRACE_MS, hint: null };
   }
@@ -105,6 +109,10 @@ export function classifyObject(
     hint = owners.topicExists(parsed.topicId) ? 'row-gone' : 'owner-topic-gone';
   } else if (parsed.kind === 'event-flyer') {
     hint = owners.eventExists(parsed.eventId) ? 'row-gone' : 'owner-event-gone';
+  } else if (parsed.kind === 'submission') {
+    // The submission row is what is gone; the hint vocabulary has no
+    // "author gone" case, so the author is not looked up.
+    hint = 'row-gone';
   } else {
     hint = 'unknown-shape';
   }
@@ -120,7 +128,9 @@ function lastSegment(path: string): string {
 }
 
 function toReferenceDto(ref: StorageReference): StorageReferenceDto {
-  if (ref.kind === 'media') return { ...ref, createdAt: ref.createdAt.toISOString() };
+  if (ref.kind === 'media' || ref.kind === 'submission') {
+    return { ...ref, createdAt: ref.createdAt.toISOString() };
+  }
   return { ...ref };
 }
 

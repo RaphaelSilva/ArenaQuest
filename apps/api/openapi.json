@@ -4040,6 +4040,9 @@
           },
           {
             "$ref": "#/components/schemas/EventFlyerStorageReference"
+          },
+          {
+            "$ref": "#/components/schemas/SubmissionStorageReference"
           }
         ]
       },
@@ -4214,6 +4217,121 @@
           "reason",
           "used",
           "limit"
+        ],
+        "type": "object"
+      },
+      "SubmissionStorageReference": {
+        "properties": {
+          "author": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "contentType": {
+            "example": "video/quicktime",
+            "type": "string"
+          },
+          "createdAt": {
+            "example": "2026-09-29T12:00:00.000Z",
+            "type": "string"
+          },
+          "key": {
+            "example": "submissions/student-a/9a1b…-kata.mp4",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "submission"
+            ],
+            "type": "string"
+          },
+          "originalName": {
+            "example": "IMG_0042.MOV",
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "status": {
+            "description": "A `removed` tombstone has no key, so only `pending` / `ready` resolve in practice.",
+            "enum": [
+              "pending",
+              "ready",
+              "removed"
+            ],
+            "example": "ready",
+            "type": "string"
+          },
+          "submissionId": {
+            "type": "string"
+          },
+          "title": {
+            "example": "Kata, 2nd attempt",
+            "type": "string"
+          },
+          "topic": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "description": "The status of the topic node.",
+                "enum": [
+                  "draft",
+                  "published",
+                  "archived"
+                ],
+                "example": "published",
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "status"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "topicId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "submissionId",
+          "status",
+          "title",
+          "originalName",
+          "contentType",
+          "sizeBytes",
+          "authorId",
+          "author",
+          "topicId",
+          "topic",
+          "createdAt"
         ],
         "type": "object"
       },
