@@ -17,6 +17,7 @@ export type OrphanHint = NonNullable<ClassifiedObject['hint']>;
 export type StorageReference = Schemas['StorageReference'];
 export type MediaStorageReference = Schemas['MediaStorageReference'];
 export type EventFlyerStorageReference = Schemas['EventFlyerStorageReference'];
+export type SubmissionStorageReference = Schemas['SubmissionStorageReference'];
 export type StorageFolder = Schemas['StorageFolder'];
 export type StorageBrowseResponse = Schemas['StorageBrowseResponse'];
 export type StorageObjectDetail = Schemas['StorageObjectDetail'];

@@ -5,7 +5,7 @@ import { useDict } from '@web/context/dict-context';
 import type { ClassifiedObject, StorageFolder } from '@web/lib/admin-storage-api';
 import { StorageStatusBadge } from './storage-status-badge';
 import { StorageOwnerCell } from './storage-owner-cell';
-import { formatBytes, formatTimestamp } from './storage-format';
+import { SUBMISSIONS_ROOT, formatBytes, formatTimestamp } from './storage-format';
 
 /**
  * One grid for both breakpoints: rows stack on mobile and line up as table
@@ -121,7 +121,9 @@ export function StorageListing({
 
 function FolderRow({ folder, onOpen }: { folder: StorageFolder; onOpen: (folder: StorageFolder) => void }) {
   const d = useDict().adminStorage;
-  const label = folder.owner?.title ?? folder.name;
+  // `submissions/<authorId>/` folders carry no owner; only the root is labelled.
+  const rootLabel = folder.prefix === SUBMISSIONS_ROOT ? d.folder.submissionsRoot : null;
+  const label = folder.owner?.title ?? rootLabel ?? folder.name;
 
   return (
     <button
@@ -138,6 +140,9 @@ function FolderRow({ folder, onOpen }: { folder: StorageFolder; onOpen: (folder:
             <span className="block truncate text-xs text-zinc-500 dark:text-zinc-400">
               {d.folder.kind[folder.owner.kind]} · {folder.name}
             </span>
+          )}
+          {!folder.owner && rootLabel && (
+            <span className="block truncate text-xs text-zinc-500 dark:text-zinc-400">{folder.name}</span>
           )}
         </span>
       </span>

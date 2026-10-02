@@ -134,3 +134,38 @@ export function detailOf(object: ClassifiedObject): StorageObjectDetail {
     downloadUrlExpiresAt: '2026-09-29T12:05:00.000Z',
   };
 }
+
+export const AUTHOR_ID = 'student-a';
+export const SUBMISSION_ID = 's1b20000-0000-4000-8000-000000000003';
+
+export function submissionObject(overrides: Partial<ClassifiedObject> = {}): ClassifiedObject {
+  const key = overrides.key ?? `submissions/${AUTHOR_ID}/9a1b-kata.mp4`;
+  return {
+    key,
+    name: key.split('/').pop()!,
+    size: 3 * 1024 * 1024,
+    uploadedAt: '2026-09-29T12:00:00.000Z',
+    contentType: 'video/mp4',
+    status: 'linked',
+    stale: false,
+    hint: null,
+    references: [
+      {
+        kind: 'submission',
+        key,
+        submissionId: SUBMISSION_ID,
+        status: 'ready',
+        title: 'Kata, 2nd attempt',
+        originalName: 'IMG_0042.MOV',
+        contentType: 'video/mp4',
+        sizeBytes: 3 * 1024 * 1024,
+        authorId: AUTHOR_ID,
+        author: { id: AUTHOR_ID, name: 'Student A' },
+        topicId: TOPIC_ID,
+        topic: { id: TOPIC_ID, title: '9th Kyu', status: 'published' },
+        createdAt: '2026-09-29T12:00:00.000Z',
+      },
+    ],
+    ...overrides,
+  };
+}

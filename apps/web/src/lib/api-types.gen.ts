@@ -11368,7 +11368,7 @@ export interface components {
             /** @example 2026-09-29T12:05:00.000Z */
             downloadUrlExpiresAt: string;
         };
-        StorageReference: components["schemas"]["MediaStorageReference"] | components["schemas"]["EventFlyerStorageReference"];
+        StorageReference: components["schemas"]["MediaStorageReference"] | components["schemas"]["EventFlyerStorageReference"] | components["schemas"]["SubmissionStorageReference"];
         Submission: {
             /** @example student-a */
             authorId: string;
@@ -11453,6 +11453,44 @@ export interface components {
             reason: "count" | "storage";
             /** @example 10 */
             used: number;
+        };
+        SubmissionStorageReference: {
+            author: {
+                id: string;
+                name: string;
+            } | null;
+            authorId: string;
+            /** @example video/quicktime */
+            contentType: string;
+            /** @example 2026-09-29T12:00:00.000Z */
+            createdAt: string;
+            /** @example submissions/student-a/9a1b…-kata.mp4 */
+            key: string;
+            /** @enum {string} */
+            kind: "submission";
+            /** @example IMG_0042.MOV */
+            originalName: string;
+            sizeBytes: number;
+            /**
+             * @description A `removed` tombstone has no key, so only `pending` / `ready` resolve in practice.
+             * @example ready
+             * @enum {string}
+             */
+            status: "pending" | "ready" | "removed";
+            submissionId: string;
+            /** @example Kata, 2nd attempt */
+            title: string;
+            topic: {
+                id: string;
+                /**
+                 * @description The status of the topic node.
+                 * @example published
+                 * @enum {string}
+                 */
+                status: "draft" | "published" | "archived";
+                title: string;
+            } | null;
+            topicId: string;
         };
         SubmissionSummary: {
             /**

@@ -9,7 +9,8 @@ const LINK_CLASS =
 
 /**
  * The resolved owner of an object: the topic (with the original file name and
- * uploader) for topic media, the event for a flyer. Only the first reference is
+ * uploader) for topic media, the event for a flyer, and the submission (title,
+ * original name, author, linked to its topic) for a student submission. Only the first reference is
  * shown inline — the drawer lists all of them.
  */
 export function StorageOwnerCell({ references }: { references: StorageReference[] }) {
@@ -46,6 +47,27 @@ function OwnerLine({ reference }: { reference: StorageReference }) {
           {reference.originalName}
           {reference.uploader && <> · {d.owner.uploadedBy(reference.uploader.name)}</>}
         </span>
+      </span>
+    );
+  }
+
+  if (reference.kind === 'submission') {
+    return (
+      <span className="flex flex-col gap-0.5">
+        <span className="text-zinc-900 dark:text-zinc-100">
+          {d.owner.submission(reference.title)}
+        </span>
+        <span className="break-all text-xs text-zinc-600 dark:text-zinc-400">
+          {reference.originalName} · {d.owner.submittedBy(reference.author?.name ?? d.owner.unknownAuthor)}
+        </span>
+        {/* The topic's Demonstrations page — the staff view of its submissions. */}
+        {reference.topic ? (
+          <Link href={`/catalog/${reference.topicId}/submissions`} className={`${LINK_CLASS} text-xs`}>
+            {reference.topic.title}
+          </Link>
+        ) : (
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">{d.owner.topicGone}</span>
+        )}
       </span>
     );
   }

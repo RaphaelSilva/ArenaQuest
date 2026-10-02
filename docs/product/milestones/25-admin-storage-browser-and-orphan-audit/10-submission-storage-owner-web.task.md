@@ -1,6 +1,6 @@
 # Task 10 — Frontend: Show student submissions as storage owners (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [25 — Admin storage browser and orphan audit](./milestone.md)
 **RFC:** [RFC 0018](../../RFCs/0018-admin-storage-browser-and-orphan-audit.md)
 **Team:** Frontend Web
@@ -40,12 +40,12 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A `linked` submission object shows its title, original name and author, and links to its topic.
-- [ ] The drawer lists a `submission` reference with its status, author and topic.
-- [ ] No Delete action is offered for a `linked` or `pending` submission object.
-- [ ] No hardcoded user-facing string; the new keys exist in both dictionaries; `check-i18n-coverage.js` passes.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A `linked` submission object shows its title, original name and author, and links to its topic.
+- [x] The drawer lists a `submission` reference with its status, author and topic.
+- [x] No Delete action is offered for a `linked` or `pending` submission object.
+- [x] No hardcoded user-facing string; the new keys exist in both dictionaries; `check-i18n-coverage.js` passes.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

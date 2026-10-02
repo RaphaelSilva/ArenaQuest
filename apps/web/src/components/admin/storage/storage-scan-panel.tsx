@@ -26,7 +26,7 @@ const groupOf = (object: ClassifiedObject): ObjectGroupId =>
   object.status === 'pending' && object.stale ? 'stale-pending' : object.status;
 
 const missingBytes = (row: StorageMissingObject): number =>
-  row.reference.kind === 'media' ? row.reference.sizeBytes : 0;
+  row.reference.kind === 'media' || row.reference.kind === 'submission' ? row.reference.sizeBytes : 0;
 
 const BUTTON =
   'inline-flex items-center gap-2 rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800';
