@@ -1,6 +1,6 @@
 # Task 09 — Frontend: Move topic media to another topic
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Kind:** Feature
 **Team:** Frontend Web
 **Priority:** Medium
@@ -70,15 +70,15 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A `ready` item shows "Move to…"; a `pending` item does not.
-- [ ] The picker lists every non-archived topic except the current one; confirming sends the move request
+- [x] A `ready` item shows "Move to…"; a `pending` item does not.
+- [x] The picker lists every non-archived topic except the current one; confirming sends the move request
       with the chosen target, and cancelling sends nothing.
-- [ ] On success the item leaves the current topic's list and the confirmation names the destination.
-- [ ] On `409`, `404` or `403` the dialog stays open and shows the matching message.
-- [ ] The dialog is keyboard-usable, keeps focus inside and closes on Escape.
-- [ ] No hardcoded user-facing string; the new keys exist in both dictionaries; `check-i18n-coverage.js` passes.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] On success the item leaves the current topic's list and the confirmation names the destination.
+- [x] On `409`, `404` or `403` the dialog stays open and shows the matching message.
+- [x] The dialog is keyboard-usable, keeps focus inside and closes on Escape.
+- [x] No hardcoded user-facing string; the new keys exist in both dictionaries; `check-i18n-coverage.js` passes.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

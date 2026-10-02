@@ -1,6 +1,6 @@
 # Task 08 — Backend: Move topic media to another topic
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Kind:** Feature
 **Team:** Backend API
 **Priority:** Medium
@@ -91,21 +91,21 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] An `admin` and a `content_creator` token each move a `ready` media item from topic A to
+- [x] An `admin` and a `content_creator` token each move a `ready` media item from topic A to
       topic B and get `200` with the updated item.
-- [ ] Afterwards `GET /v1/admin/topics/B/media` lists the item and `GET /v1/admin/topics/A/media`
+- [x] Afterwards `GET /v1/admin/topics/B/media` lists the item and `GET /v1/admin/topics/A/media`
       does not.
-- [ ] The item's storage key and `createdAt` are identical before and after; `updatedAt` advances;
+- [x] The item's storage key and `createdAt` are identical before and after; `updatedAt` advances;
       no storage method is called.
-- [ ] A `student` token gets `403` and no token gets `401`.
-- [ ] A missing, `deleted` or wrong-topic media item gets `404`; a missing target topic gets `404`.
-- [ ] A `pending` media item gets `409 MediaNotReady`; a target equal to the source gets `400 SameTopic`;
+- [x] A `student` token gets `403` and no token gets `401`.
+- [x] A missing, `deleted` or wrong-topic media item gets `404`; a missing target topic gets `404`.
+- [x] A `pending` media item gets `409 MediaNotReady`; a target equal to the source gets `400 SameTopic`;
       an archived target topic is accepted.
-- [ ] The repository write is conditional: a row that is no longer `ready` or no longer on the
+- [x] The repository write is conditional: a row that is no longer `ready` or no longer on the
       source topic is left unchanged.
-- [ ] `apps/api/openapi.json` is regenerated and lists the route.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `apps/api/openapi.json` is regenerated and lists the route.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
