@@ -2,6 +2,7 @@
 
 **Date:** 2026-10-02
 **Status:** Draft
+**Revised:** 2026-10-02
 **Author:** raphaelsilva
 **Affected:**
 - `apps/api/migrations/0031_create_mission_requirements.sql` (new — `mission_requirements`, `mission_enrollments`, `mission_requirement_progress`, `mission_evidence`, `mission_audience_group`, `mission_audience_user`; adds `mode` and `enrollment_mode` to `missions`. No statement touches `topic_nodes`, `topic_progress`, `topic_submissions` or any billing table)
@@ -10,15 +11,15 @@
 - `packages/shared/domain/mission.ts`, `packages/shared/types/dashboard.ts` (`DashboardMissionEntry` gains `enrollment`, `joinable`, `steps` — additive)
 - `packages/shared/domain/gamification/mission-evaluator.ts` (new — pure evaluator: windowing, sequential unlock, write-once completion, rewards)
 - `packages/shared/domain/gamification/quest-evaluator.ts` (mission loop narrowed to legacy missions, lines 79-106)
-- `packages/shared/domain/gamification/xp-config.ts` (new `XpAction` `mission_step_reward`)
+- `packages/shared/domain/gamification/xp-config.ts` (new `XpAction` `mission_step_reward`); `streak-engine.ts` is called, not changed (a completed step is a streak activity)
 - `packages/shared/ports/i-mission-repository.ts` (extended — requirements and audience on the authoring side), `packages/shared/ports/i-mission-participation-repository.ts` (new — enrollments, step progress, captured evidence), `packages/shared/ports/i-mission-evidence-repository.ts` (new — set-based counting over the source tables), `packages/shared/ports/index.ts`
 - `apps/api/src/adapters/db/d1-mission-repository.ts` (extended), `apps/api/src/adapters/db/d1-mission-participation-repository.ts`, `apps/api/src/adapters/db/d1-mission-evidence-repository.ts` (new)
 - `apps/api/src/controllers/admin-missions.controller.ts` (typed requirements, lock after start, audience, participants), `apps/api/src/controllers/me-missions.controller.ts` (steps, enrollment, join, leave, manual check)
-- `apps/api/src/routes/admin/missions.ts` (`requireRole(ROLES.ADMIN)` on the router; new routes), `apps/api/src/routes/me/gamification.ts` (extended `GET /missions`), `apps/api/src/routes/me/missions.ts` (new — detail, join, leave, check)
+- `apps/api/src/routes/admin/missions.ts` (`requireRole(ROLES.ADMIN)` on every write route, reads stay open to `content_creator`; new routes), `apps/api/src/routes/me/gamification.ts` (extended `GET /missions`), `apps/api/src/routes/me/missions.ts` (new — detail, join, leave, check)
 - `apps/api/src/core/missions/hook.ts` (new — best-effort hook runner), called from `apps/api/src/routes/submissions.router.ts`, `apps/api/src/routes/me/submissions.ts`, `apps/api/src/routes/admin/submissions.ts`, `apps/api/src/routes/me/progress.ts`, `apps/api/src/routes/topics.router.ts`, `apps/api/src/routes/admin/billing.ts`
 - `apps/api/src/jobs/reconcile-missions.ts` (new) and `apps/api/src/index.ts` `scheduled()` (wiring), `apps/api/src/container.ts` (`missionEvaluator` in the gamification slice)
 - `apps/api/src/openapi/components/entities.ts` (new schemas)
-- `apps/web/src/app/(protected)/admin/missions/page.tsx` (list; the free `predicateKind` / `predicateParams` fields go away), `apps/web/src/app/(protected)/admin/missions/[id]/page.tsx` (new — editor and participants), `apps/web/src/app/(protected)/admin/page.tsx` (Missions card admin-only)
+- `apps/web/src/app/(protected)/admin/missions/page.tsx` (list; the free `predicateKind` / `predicateParams` fields go away), `apps/web/src/app/(protected)/admin/missions/[id]/page.tsx` (new — editor and participants), `apps/web/src/app/(protected)/admin/page.tsx` (Missions card read-only for content creators)
 - `apps/web/src/components/missions/*` (new — requirement editor, topic/event pickers, step list), reusing `apps/web/src/components/tasks/task-topic-picker.tsx`
 - `apps/web/src/components/dashboard/MissionsList.tsx` (per-step progress, *Join*), `apps/web/src/app/(protected)/missions/[id]/page.tsx` (new — the mission page, where a manual check is ticked)
 - `apps/web/src/components/catalog/MediaList/*` (Phase 0 — call the existing `markVideoWatched` from the live video viewer)
@@ -42,7 +43,7 @@ shows the missions they are in with per-step progress. Progress is evaluated **i
 the write that produced the evidence**, and a daily reconciliation in the existing `scheduled()` run
 recomputes it from the sources as a safeguard. Rewards are **write-once** through the `xp_events`
 ledger: nothing a student deletes afterwards takes XP back. Mission authoring becomes
-**admin-only**. Topics, submissions, tasks and quests keep their tables and their rules; the mission
+**admin-only**; content creators keep read access to follow their students. Topics, submissions, tasks and quests keep their tables and their rules; the mission
 runs on its own data and only *reads* theirs.
 
 ## Motivation
@@ -95,8 +96,14 @@ key. Quests are out of scope here; their seed/evaluator mismatch gets its own ba
 - **Write-once rewards**: per-step XP, mission XP and the mission badge, all through `xp_events`
   with deterministic idempotency keys.
 - **Admin-only authoring** with a structured requirements editor; content creators lose the write
-  access they hold today.
+  access they hold today and keep read access (list, detail, participants).
 - The dashboard shows the student's missions with per-step progress and a *Join* action.
+- A **completed mission step counts as a qualifying activity for the daily streak**
+  (`streak-engine`), the same way watching a video or checking into a stage does — one more call at
+  the hook site that closes the step.
+- The mission **badge is actually awarded** on completion (today `badge_id` is never granted), and
+  the admin editor **suggests a badge** for any mission whose window is 14 days or longer: the badge
+  is the durable trophy, XP is the currency.
 
 **Non-Goals**
 - **Changing topics or submissions.** No new column on `topic_nodes`, `topic_progress` or
@@ -117,6 +124,9 @@ key. Quests are out of scope here; their seed/evaluator mismatch gets its own ba
 - **Staff review of submissions** — still deferred by RFC 0020; a requirement only counts rows.
 - **Recommendations and manual badge approval** — owned by RFC 0008.
 - **Revoking XP** (Alternatives §6), notifications, leaderboards per mission, mission templates.
+
+The order in which the sibling concepts (quests, tasks) converge on this engine is laid out in
+*Roadmap for the sibling concepts* below; none of it blocks this RFC's milestone.
 
 ## Current State (for reference)
 
@@ -405,7 +415,7 @@ enrolled user:
   the next daily reconciliation (§4), since no write happens at the moment the event starts.
 - **Different XP for private and shared evidence** is expressed as **two requirements** — e.g.
   "3 demonstrations" (`visibility: 'any'`, 50 XP) and "1 shared demonstration" (`shared_only`,
-  +30 XP) in parallel mode. One requirement = one reward; the policy itself is Open Question 2.
+  +30 XP) in parallel mode. One requirement = one reward; the editor defaults follow the decision on Open Question 2.
 - A `shared_only` requirement cannot be created while `SUBMISSIONS_SHARING_ENABLED=false` for the
   label (`400 REQUIREMENT_SHARING_DISABLED`); if the switch is turned off later, shared rows stop
   qualifying, matching RFC 0020's read-time filter.
@@ -447,10 +457,11 @@ export class MissionEvaluator {
    `topic_node_id` / `event_id` is the signal's target, on missions with `active = 1` and
    `datetime(start_at) <= now <= datetime(end_at)`, with the user's enrollment state. Zero rows — the
    common case — ends the hook after **one** query.
-2. **Ensure enrollment** where the policy grants it implicitly: `auto` missions, and `assigned`
-   missions whose audience covers the user (directly or by group) — `INSERT OR IGNORE` with
-   `source = 'auto' | 'admin'` and `counts_from = start_at`. `open` missions are evaluated only for
-   users who joined. Enrollments with `left_at` set are skipped.
+2. **Ensure enrollment** where the policy grants it implicitly: `auto` missions for a non-staff
+   user whose effective access set contains **every** topic target of the mission (§5), and
+   `assigned` missions whose audience covers the user (directly or by group) — `INSERT OR IGNORE`
+   with `source = 'auto' | 'admin'` and `counts_from = start_at`. `open` missions are evaluated only
+   for users who joined. Enrollments with `left_at` set are skipped.
 3. **Capture** (`topic_visit`, `video_watch` only): for each candidate requirement whose step is
    **open** for this user right now (§3.3), `INSERT … ON CONFLICT DO NOTHING` into
    `mission_evidence` with `occurred_at = now`, `source = 'hook'`. For `video_watch` the evaluator
@@ -465,6 +476,11 @@ A hook is one call to `runMissionHook(container, signal)` (`apps/api/src/core/mi
 placed in the route **after** the originating write succeeded, wrapped exactly like today's
 `questEvaluator.evaluate` calls: `try { … } catch (err) { console.error('[mission] …', ids) }`. A
 hook failure never changes the originating response; the reconciliation repairs what it missed.
+When the evaluation closes at least one step for the user, the same hook site also calls
+`streakEngine.recordActivity(userId, now)`, so a completed step keeps the daily streak alive like
+any other action. Only the hook path does this (and the manual check, §3.6): a step closed by the
+reconciliation (§4) records no streak activity, because the cron runs on a day the student may not
+have acted.
 
 | Originating write | Route | Signal |
 |---|---|---|
@@ -610,7 +626,7 @@ with `datetime(v.starts_at)` as the instant for `event_participation`; and
 
 `manual_check` is the route's own action, not a hook: `POST /v1/me/missions/{id}/requirements/{reqId}/check`
 sets `checked_at = now` (if unset) on the step's progress row and runs `evaluateEnrollment` in the
-same request. It answers `409 MISSION_STEP_LOCKED` when a sequential predecessor is incomplete and
+same request; the completed step records streak activity as in §3.2. It answers `409 MISSION_STEP_LOCKED` when a sequential predecessor is incomplete and
 `409 MISSION_CLOSED` outside the window. A check is final — it completes the step and is write-once
 like any completion; the page confirms before sending. Nothing is written to `topic_progress`.
 
@@ -630,9 +646,10 @@ own failure affects neither:
 1. **Scope**: missions with `active = 1`, `predicate_kind = 'requirements'`,
    `datetime(start_at) <= now` and `datetime(end_at) >= now - 48 hours` — a mission whose hook
    failed in its last hours is still closed by the next daily run.
-2. **Materialise implicit enrollments**, one `INSERT OR IGNORE … SELECT` per mission: every active
-   user for `auto`; `mission_audience_user` ∪ members of `mission_audience_group` for `assigned`
-   (`source = 'admin'`). `counts_from = start_at`.
+2. **Materialise implicit enrollments**, one `INSERT OR IGNORE … SELECT` per mission: for `auto`,
+   every active user without the `admin` or `content_creator` role whose effective access set
+   contains every topic target of the mission (§5); for `assigned`, `mission_audience_user` ∪
+   members of `mission_audience_group` (`source = 'admin'`). `counts_from = start_at`.
 3. **Backfill captured evidence** (`source = 'backfill'`) from what the sources still hold:
    `xp_events` (`source_kind = 'video'`, joined to `media` on the target topic) at `earned_at`, and
    `topic_progress` at `created_at`, and at `updated_at` when `status = 'in_progress'` (a completed
@@ -641,7 +658,8 @@ own failure affects neither:
 4. **Recompute** each requirement in position order with the set-based statement of §3.4 for all
    enrollments, then apply completions and partial counts in `db.batch` chunks of 100.
 5. **Monotonic**: the job may close a step or a mission (`completed_by = 'reconcile'`) and grant its
-   rewards; it never clears a `completed_at` or a `completed` flag. Partial counts may go down.
+   rewards and badge; it never clears a `completed_at` or a `completed` flag, and it records no
+   streak activity (§3.2). Partial counts may go down.
 6. Logs counts only (`missions`, `enrollments`, `steps_closed`, `missions_closed`), never user data.
 
 Set-based counting keeps the run within D1's per-invocation query cap: the cost is
@@ -653,9 +671,9 @@ routine, two callers, as billing does.
 
 | `enrollment_mode` | Who sees the mission | How the enrollment row appears | `counts_from` |
 |---|---|---|---|
-| `auto` | Every authenticated user | First hook evaluation for that user, or the daily run after `start_at` (§4) | `start_at` |
+| `auto` | Non-staff users whose effective access set contains **every** topic target of the mission (all non-staff users when the mission has no topic target) | First hook evaluation for that user, or the daily run after `start_at` (§4) | `start_at` |
 | `open` | Every authenticated user | The student clicks **Join** (`source = 'self'`) | `joined_at` |
-| `assigned` | Users in `mission_audience_user` or in a group of `mission_audience_group` | `PUT …/audience` for direct users; first hook or daily run for group members (`source = 'admin'`) | `start_at` |
+| `assigned` | Users in `mission_audience_user` or in a group of `mission_audience_group`; every other student sees it as a **locked teaser** | `PUT …/audience` for direct users; first hook or daily run for group members (`source = 'admin'`) | `start_at` |
 
 - **Leave** (`POST /v1/me/missions/{id}/leave`) exists only for `self` enrollments: it sets
   `left_at`; hooks and the cron skip the row; completed steps and rewards stay. Joining again clears
@@ -664,15 +682,27 @@ routine, two callers, as billing does.
   no longer covered get `left_at = now`; their progress and rewards stay.
 - The dashboard read never writes: an `auto` mission without a row is shown as
   `enrollment: { source: 'auto', implicit: true }` with its steps computed read-only.
-- Whether `auto` should also require access to the requirement targets, and whether staff take part,
-  are Open Questions 3 and 4.
+- **`auto` follows the access gate** (Open Question 3, decided): a student who cannot open one of the
+  topic targets is never enrolled and never sees the mission — an impossible mission is not shown.
+  The gate is checked when the enrollment would be created; an existing enrollment is not removed if
+  access is lost later (its completed steps and rewards stay; open steps simply stop advancing).
+- **Staff are not enrolled in `auto` missions** (`admin`, `content_creator`), so they do not distort
+  the leaderboard (Open Question 4, decided). They may still join `open` missions or be assigned.
+- **Locked teasers** (Open Question 4, decided): an active `assigned` mission the student is not in is
+  listed by `GET /v1/me/missions` with its title and the reason only —
+  `locked: { reason: 'assigned', groups: string[] }`, the names of the mission's audience groups
+  (empty when it is assigned to individual users only). No step, target, reward or description is
+  disclosed, and every other route still answers `404` for it (§8).
 
 ### 6. HTTP surface
 
 All routes are `@hono/zod-openapi` `createRoute` definitions returning `ControllerResult` through
 `respondWith`, under `/v1`, like the rest of the API.
 
-**Admin** — `buildAdminMissionsRouter` gains `router.use('*', requireRole(ROLES.ADMIN))`:
+**Admin** — the `/admin/*` umbrella keeps admitting `admin` and `content_creator` for the three
+`GET` routes (list, detail, participants), so instructors can follow the mission in class
+(Open Question 1, decided); **every write route** carries `requireRole(ROLES.ADMIN)` in its own
+middleware chain, and the router spec asserts `403` for a content creator on each of them:
 
 | Method & path | Purpose | Success / errors |
 |---|---|---|
@@ -684,7 +714,7 @@ All routes are `@hono/zod-openapi` `createRoute` definitions returning `Controll
 | `PATCH /v1/admin/missions/{id}/requirements/{reqId}` | `title` only — the one field editable after start | `200` · `404` |
 | `PUT /v1/admin/missions/{id}/audience` | `{ groupIds, userIds }`, replace-all; only for `assigned` | `200` · `400` · `409 MISSION_NOT_ASSIGNED` |
 | `GET /v1/admin/missions/{id}/participants?cursor=` | Enrollments with per-step progress and `completed_by` | `200 { data, nextCursor }` |
-| `POST /v1/admin/missions/{id}/reconcile` | Run §4 for this mission | `200 ReconcileStats` |
+| `POST /v1/admin/missions/{id}/reconcile` | Run §4 for this mission (admin) | `200 ReconcileStats` |
 | `DELETE /v1/admin/missions/{id}` | Soft delete (`active = 0`), as today | `200` · `404` |
 
 ```ts
@@ -718,7 +748,7 @@ const MissionCreate = z.object({
 
 | Method & path | Purpose | Success / errors |
 |---|---|---|
-| `GET /v1/me/missions` | Active missions the caller is enrolled in or may join, each with steps | `200 { data: DashboardMissionEntry[] \| null }` |
+| `GET /v1/me/missions` | Active missions the caller is enrolled in or may join, each with steps, plus locked teasers of `assigned` missions (§5) | `200 { data: DashboardMissionEntry[] \| null }` |
 | `GET /v1/me/missions/{id}` | One mission with steps (the mission page) | `200` · `404` |
 | `POST /v1/me/missions/{id}/join` | Join an `open` mission inside its window | `201` · `200` (already joined) · `404` · `409 MISSION_NOT_JOINABLE` · `409 MISSION_CLOSED` |
 | `POST /v1/me/missions/{id}/leave` | Leave a `self` enrollment | `204` · `404` · `409 MISSION_NOT_LEAVABLE` |
@@ -731,7 +761,8 @@ export interface DashboardMissionEntry {
   progress: MissionProgress | null;       // aggregate: completed steps / step count
   enrollment: { source: 'auto' | 'self' | 'admin'; joinedAt: string | null; implicit: boolean } | null;
   joinable: boolean;                      // open, inside the window, not enrolled
-  steps: MissionStepView[];               // [] for a legacy mission
+  locked: { reason: 'assigned'; groups: string[] } | null;  // teaser: only `mission.id` and `mission.title` are filled
+  steps: MissionStepView[];               // [] for a legacy mission or a teaser
 }
 export interface MissionStepView {
   id: string; position: number; kind: RequirementKind; title: string; xpReward: number;
@@ -757,10 +788,16 @@ export interface MissionStepView {
   **Mode** (*Parallel — all steps at once* / *Sequential — one after another*), **Enrollment**
   (*Automatic* / *Students join* / *Assigned*), mission XP and badge. With *Assigned*, a users-and-
   groups picker in the shape of the events audience editor.
+- **Badge suggestion**: when the window is **14 days or longer** and no badge is picked, the badge
+  field shows a non-blocking hint — *"Long missions deserve a trophy: pick a badge"* — next to the
+  badge picker. Saving without one stays allowed. The chosen badge is granted on completion (§3.5).
 - **Requirements editor** (`components/missions/RequirementEditor.tsx`): a list of step cards and
   **Add step** with a kind picker. Per kind:
   - *Demonstrations on a topic*: topic, minimum count, "description required", "count: any /
-    shared only", "count moderated demonstrations", XP.
+    shared only", "count moderated demonstrations", XP. **Defaults** (Open Question 2, decided):
+    "count moderated demonstrations" starts **off**, and when the admin adds a `shared_only`
+    requirement next to an `any` one on the same topic, the editor pre-fills the shared step with a
+    higher XP than the private one. Both are editable per requirement.
   - *Visit a topic*: topic, XP — with the hint that a visit is recorded when the student opens a
     media item of the topic (Current State §6), and a warning when the topic has no media.
   - *Watch videos*: topic, minimum count (capped by the topic's video count), XP.
@@ -774,7 +811,8 @@ export interface MissionStepView {
   active switch, with a banner explaining why.
 - **Participants** tab on the same page: per student, a row of step chips (locked / open with
   `current/required` / completed with date and *hook* or *reconcile*), and **Reconcile now**.
-- The admin hub's Missions card (`admin/page.tsx:143`) is shown to `admin` only.
+- The admin hub's Missions card (`admin/page.tsx:143`) stays visible to content creators, and the
+  pages render read-only for them (no create, edit, audience or *Reconcile now* controls).
 
 **Student dashboard** — `MissionsList` becomes two groups:
 
@@ -785,6 +823,8 @@ export interface MissionStepView {
   locked.
 - **Available**: `open` missions the student has not joined, with **Join**. A confirmation states
   that only activity from now on counts.
+- **Locked**: teasers of `assigned` missions the student is not in — title, a lock icon and the
+  reason (*"For the Black Belt group"*), nothing else, no link.
 - Clicking a mission opens **`(protected)/missions/[id]`**: full description, every step with its
   instructions, and the **I did it** button of `manual_check` steps (with a confirmation that it
   cannot be undone). Leave is in the page's menu for `self` enrollments.
@@ -795,15 +835,18 @@ export interface MissionStepView {
 **Phase 0 — make `video_watched` producible.** The live catalog viewer
 (`components/catalog/MediaList/*`, `VideoStage`) calls the existing
 `client.topics.markVideoWatched(topicId, mediaId)` at 90 % played or on `ended`, the rule
-`VideoPlayerWithPlaylist` already implements. No API change, no topic change; side effects are
-Open Question 5.
+`VideoPlayerWithPlaylist` already implements. No API change, no topic change. Accepted as a bug fix
+(Open Question 5, decided): it re-enables video XP, the weekly video quest and the
+`videos_watched_in_period` badge rule, so the release notes must announce that students start
+earning XP for watching videos.
 
 ### 8. Security
 
-- **Admin-only authoring**: `requireRole(ROLES.ADMIN)` on the missions router, same pattern as
-  `/users`, `/billing`, `/storage` and `/levels`. **Role-boundary change**: content creators lose
-  create, edit and delete on missions, which they hold today through the `/admin/*` umbrella. A
-  router spec asserts `403` for a content creator on every admin missions route.
+- **Admin-only authoring**: `requireRole(ROLES.ADMIN)` on every write route of the missions
+  router, the guard `/users`, `/billing`, `/storage` and `/levels` apply router-wide. **Role-boundary
+  change**: content creators lose create, edit, audience, reconcile and delete on missions, which
+  they hold today through the `/admin/*` umbrella; they keep the three reads. A router spec asserts
+  `403` for a content creator on every write route and `200` on every read.
 - **Topic targets reuse the catalog gate.** Evidence can only be produced through gated endpoints
   (visit, watched, submissions all check published + not archived + effective access set), so the
   evaluator adds no new way to touch a topic. The student read resolves each topic target through
@@ -814,7 +857,9 @@ Open Question 5.
   events audience rules (`D1EventRepository`); otherwise `null`s.
 - **404 on misses**, like notes and submissions: an `assigned` mission the caller is not assigned
   to, a requirement id that is not a `manual_check` step of that mission, or a mission outside the
-  caller's visibility all answer `404` — no route is an enumeration oracle.
+  caller's visibility all answer `404` on detail, join, leave and check. The only disclosure of an
+  `assigned` mission to a non-member is the list teaser (title and group names, §5), a deliberate
+  product choice; an `auto` mission the student fails the gate for is not listed at all.
 - **Write-once rewards** bound abuse: uploading and deleting the same demonstration cannot earn a
   step twice (the key is per requirement), and a step needs evidence inside its own interval.
 - Hooks log `missionId` / `requirementId` / `userId` only, never descriptions or file names.
@@ -907,11 +952,13 @@ FEATURES §5 entry; backlog items for (a) the quest seed/evaluator mismatch (`lo
 
 | Risk | Mitigation |
 |---|---|
-| Content creators who author missions today lose that ability | Flagged as a role-boundary change; read-only access is Open Question 1; matches the 2026-06-23 economy decision that reward values are admin-only |
+| Content creators who author missions today lose that ability | Flagged as a role-boundary change; they keep read access to list, detail and participants (Open Question 1, decided); matches the 2026-06-23 economy decision that reward values are admin-only |
+| Locked teasers reveal that an `assigned` mission exists, and its group names | Deliberate (Open Question 4, decided); only title and group names, every other route stays `404` |
+| Students start earning video XP once Phase 0 ships | Accepted as a bug fix (Open Question 5, decided); announced in the release notes |
 | A hook adds latency to uploads, visits and payments | One indexed query when no mission targets the topic/event (the common case); evaluation touches only matching requirements of one user |
 | A hook fails and the student sees no progress | Best-effort by design; the daily reconciliation recomputes from the evidence and closes the step with the same `completed_at` the hook would have written |
 | Prepaid `event_participation` closes up to a day after the event starts | Documented (§2); the admin can run *Reconcile now* |
-| `video_watched` / `topic_visited` depend on the web calling two endpoints | Phase 0 wires the video call; the visit semantics (media interaction, not page open) are surfaced in the editor and are Open Question 6 |
+| `video_watched` / `topic_visited` depend on the web calling two endpoints | Phase 0 wires the video call; the visit semantics (media interaction, not page open) are surfaced in the editor; page-mount visits are a backlog item (Open Question 6, decided) |
 | Backfill from `topic_progress` misses visits whose instant was overwritten | Hooks are primary; backfill only adds instants the source still proves; a missed visit can be repeated by the student inside the window |
 | Comparing ISO and SQLite timestamps as strings misorders same-day values | Every window predicate wraps both sides in `datetime()`; tests cover both formats at the edges |
 | Two hooks complete the same step concurrently | Conditional `UPDATE … WHERE completed_at IS NULL` plus the per-requirement XP idempotency key |
@@ -938,11 +985,21 @@ FEATURES §5 entry; backlog items for (a) the quest seed/evaluator mismatch (`lo
   step `current_count` goes down.
 - (Ph 4) Running `scheduled()` twice in a row changes no row the second time.
 - (Ph 3) A content creator gets `403` on `POST /v1/admin/missions` and every other admin missions
-  route; an admin gets `201`. A request with an unknown `kind`, a `minCount` of 0, an extra param
+  write route, and `200` on list, detail and participants; an admin gets `201`. A request with an unknown `kind`, a `minCount` of 0, an extra param
   key, an archived topic or an unpriced event is a `400` naming the requirement index.
 - (Ph 3) After `start_at`, `PUT …/requirements` answers `409 MISSION_STARTED`.
 - (Ph 4) A student not assigned to an `assigned` mission gets `404` on `GET /v1/me/missions/{id}`,
-  `join` and `check`, and never sees it in `GET /v1/me/missions`.
+  `join` and `check`, and sees it in `GET /v1/me/missions` only as a teaser with `locked.reason =
+  'assigned'`, its title and group names, and no steps.
+- (Ph 4) An `auto` mission targeting a topic outside a student's access set never enrolls that
+  student and is absent from their `GET /v1/me/missions`; an `admin` or `content_creator` is never
+  enrolled in an `auto` mission by a hook or by the daily run.
+- (Ph 4) Completing a step through a hook (or a manual check) on a day with no other activity
+  advances `user_streak`; a step closed by the daily run does not.
+- (Ph 4) Completing a mission with a `badge_id` inserts exactly one `user_badges` row, also when the
+  hook and the daily run both see the completion.
+- (Ph 5) Creating a mission with a window of 14 days or more and no badge shows the badge
+  suggestion; saving without one still succeeds.
 - (Ph 4) Joining an `open` mission mid-window counts only evidence produced after the join.
 - (Ph 4) A paid charge for an event inside the window completes `event_participation` once the
   event has started; voiding the charge before completion takes the count back to 0.
@@ -955,26 +1012,50 @@ FEATURES §5 entry; backlog items for (a) the quest seed/evaluator mismatch (`lo
 
 ## Open Questions
 
+All six questions below were answered by the product owner on 2026-10-02; each keeps its original
+text, with the decision directly under it (Resolved Decision 15).
+
 1. **Read-only missions for content creators?** Today they write; this RFC makes authoring
    admin-only. Should `GET /v1/admin/missions*` stay open to `content_creator` (list, detail,
    participants) so instructors can follow their students? Owner: product owner.
+   **Decision (2026-10-02, product owner):** content creators keep read access on
+   `GET /v1/admin/missions*` (list, detail, participants); writes are admin-only — the instructor
+   animates the mission in class and must see participants and per-step progress (§6, §8).
 2. **XP policy for private vs shared evidence.** The model allows any split (two requirements with
    different `xp_reward`); is there a house default the editor should suggest (e.g. shared evidence
    worth more, moderated evidence never counting)? Owner: product owner.
+   **Decision (2026-10-02, product owner):** editor default — shared evidence is worth more than
+   private, and moderated evidence never counts (`countModerated: false`); the admin may override per
+   requirement — sharing is the social behaviour the platform wants, and rewarding content staff
+   took out of circulation is contradictory (§2, §7).
 3. **Does `auto` enrollment follow the topic access gate of the targets?** Today every user would be
    enrolled, including students who cannot open the target topic and therefore can never finish.
    Option: enroll only users whose effective access set contains every topic target. Owner: product
    owner.
+   **Decision (2026-10-02, product owner):** yes — `auto` enrolls only users whose effective access
+   set contains every topic target, and the others never see the mission — an impossible mission is
+   the classic anti-pattern (§5).
 4. **Visibility outside the enrollment.** Should students see `assigned` missions they are not in
    (as locked teasers), and should staff accounts be enrolled in `auto` missions at all? Owner:
    product owner.
+   **Decision (2026-10-02, product owner):** `assigned` missions the student is not in are shown as
+   locked teasers (title and reason, e.g. the group's name), and staff accounts are not enrolled in
+   `auto` missions — the teaser shows what membership unlocks, and staff participation would distort
+   the leaderboard (§5).
 5. **Re-wiring `markVideoWatched` (Phase 0) re-enables its side effects**: 50 XP per first watch of a
    video (`xp-config.ts:13`), the weekly video quest and the `videos_watched_in_period` badge rule,
    none of which fire from the UI today. Accept as a bug fix, or gate them? Owner: product owner.
+   **Decision (2026-10-02, product owner):** Phase 0 is accepted as a bug fix, re-enabling video XP,
+   the weekly video quest and the video badge; the release notes must announce it — students start
+   earning XP where nothing happened before (§7).
 6. **`topic_visited` semantics.** A visit is recorded when the student expands or plays a media item,
    not on page open, and never on a topic without media. Calling `visit` on page mount would change
    topic progress for every student (a topic-concept change, out of scope here). Keep v1 as is, or
    file the change separately? Owner: product owner.
+   **Decision (2026-10-02, product owner):** keep the current semantics in v1; firing `visit` on page
+   mount becomes a separate backlog item — gamification wants it (visiting is the smallest possible
+   first step of a sequential mission, and text-only topics never produce it today), but it changes
+   topic progress, which this RFC does not touch (Roadmap).
 
 ## Resolved Decisions
 
@@ -1009,7 +1090,7 @@ All decided **2026-10-02** by the **product owner**:
    audiences); hooks evaluate only active missions the user is enrolled in; the dashboard shows
    participation with per-step progress and *Join* (§5, §7).
 9. **Admin-only setup** — `requireRole(ADMIN)` on the missions router; content creators lose write
-   access (role-boundary change); read-only for them is Open Question 1 (§8).
+   access (role-boundary change); they keep read access (Open Question 1, decided, §8).
 10. **Admin UI** — a structured requirements editor replaces `predicateKind` / `predicateParams`:
     kind picker, topic picker reusing `task-topic-picker.tsx`, params per kind, ordering in
     sequential mode (§7).
@@ -1026,6 +1107,16 @@ All decided **2026-10-02** by the **product owner**:
     while `quest-evaluator.ts` knows `daily_login` and reads `.target`: the daily-login quest never
     progresses and every target collapses to 1. Typed requirements fix the class for missions; the
     quest fix is a backlog item (Phase 7).
+15. **The six Open Questions were answered** on 2026-10-02 by the product owner: content creators
+    keep read access; editor XP defaults favour shared evidence and never count moderated evidence;
+    `auto` enrollment follows the access gate; locked teasers for `assigned` missions and no staff in
+    `auto` missions; Phase 0 accepted as a bug fix; `topic_visited` semantics kept for v1. Each
+    decision and its rationale is recorded under its question in *Open Questions*.
+16. **Additions beyond the original brief, ratified**: the `mission_evidence` table (captured
+    evidence for visits and video watches, §1, §3.1); `mission_audience_group` /
+    `mission_audience_user` (§1, §5); the Leave route (§5, §6); rules frozen after `start_at`
+    (`409 MISSION_STARTED`, §6); the admin participants and reconcile endpoints (§4, §6); legacy
+    missions kept on the M7 loop until they end (§3.7).
 
 ## References
 
@@ -1068,3 +1159,19 @@ All decided **2026-10-02** by the **product owner**:
   §2.3 (quests and missions as shipped),
   [M15](../milestones/15-gamification-catalog-administration/milestone.md),
   [M16](../milestones/16-player-progression-administration/milestone.md)
+
+### Roadmap for the sibling concepts
+
+Each item below is a **separate future document**, and **none blocks M27**:
+
+1. **Backlog (no RFC)** — fix the quest seed mismatch (`login` vs `daily_login`, `count` vs
+   `target` in `0019_seed_quests.sql`), the demo seed's mission params
+   (`scripts/demo/dataset/base.json`), and fire `visit` on topic page mount (Open Question 6, decided).
+2. **RFC 0023 — *Challenges as recurring missions*** — a mission template plus a recurrence rule;
+   the cron instantiates the next window; daily and weekly quests converge on the mission engine.
+3. **RFC 0024 — *Tasks as mission templates*** — Task + TaskStage become the reusable mold (steps
+   and targets, no window or reward), and a mission is the assignment of a mold to a group with a
+   window and XP; migrates or retires `task_progress`.
+
+RFC 0023 and RFC 0024 may merge into one if M27 shows that the template and the recurrence want the
+same table.
