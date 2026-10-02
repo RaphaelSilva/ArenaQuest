@@ -1,6 +1,6 @@
 # Task 13 — Frontend: Drop zone on the submission upload form (Phase 6)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md) — §12 web surface
 **Team:** Frontend Web
@@ -50,13 +50,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The *Arquivo* field renders a drop zone with a call to action and the existing type/size hint.
-- [ ] Dropping a valid file selects it, prefills the title and shows its name and size.
-- [ ] Dropping an invalid file shows the same preflight error as picking it; no request is sent.
-- [ ] Clicking or pressing Enter/Space on the zone opens the file picker.
-- [ ] The zone ignores drops and clicks while an upload is in progress.
-- [ ] `make lint` and `make test-web` green; web `tsc --noEmit` adds no new error.
-- [ ] No diff outside the scope guardrail.
+- [x] The *Arquivo* field renders a drop zone with a call to action and the existing type/size hint.
+- [x] Dropping a valid file selects it, prefills the title and shows its name and size.
+- [x] Dropping an invalid file shows the same preflight error as picking it; no request is sent.
+- [x] Clicking or pressing Enter/Space on the zone opens the file picker.
+- [x] The zone ignores drops and clicks while an upload is in progress.
+- [x] `make lint` and `make test-web` green; web `tsc --noEmit` adds no new error.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
