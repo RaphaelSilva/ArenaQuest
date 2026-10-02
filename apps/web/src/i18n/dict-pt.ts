@@ -2516,6 +2516,11 @@ export const dictPt = {
       open: 'Enviar demonstração',
       heading: 'Nova demonstração',
       fileLabel: 'Arquivo',
+      dropzoneCta: 'Arraste um arquivo para cá ou clique para escolher',
+      dropzoneActive: 'Solte o arquivo para selecioná-lo',
+      dropzoneLabel: 'Escolher ou soltar o arquivo da demonstração',
+      dropzoneChange: 'Escolher outro arquivo',
+      dropzoneChosen: (name: string, size: string) => `${name} · ${size}`,
       fileHint: (video: string, image: string, pdf: string) =>
         `Vídeo (MP4 ou MOV) até ${video} · foto até ${image} · PDF até ${pdf}.`,
       titleLabel: 'Título',

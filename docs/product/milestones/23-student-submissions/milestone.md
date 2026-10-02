@@ -129,7 +129,7 @@ Each task is one independent PR with one owner and one review surface. Backend a
 | 10 | [Local seed and documentation closeout](./10-seed-and-docs.task.md) | 5 | Backend | ✅ Done |
 | 11 | [Staff upload and author rights on their own submissions](./11-staff-upload-api.task.md) | 6 | Backend | ✅ Done |
 | 12 | [*Minhas* tab and upload for staff](./12-staff-mine-tab-web.task.md) | 6 | Frontend | ✅ Done |
-| 13 | [Drop zone on the submission upload form](./13-upload-drop-zone-web.task.md) | 6 | Frontend | ☐ Open |
+| 13 | [Drop zone on the submission upload form](./13-upload-drop-zone-web.task.md) | 6 | Frontend | ✅ Done |
 
 Dependency graph:
 

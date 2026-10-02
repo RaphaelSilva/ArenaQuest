@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import { SUBMISSION_DESCRIPTION_MAX, SUBMISSION_TITLE_MAX } from '@arenaquest/shared/domain/submissions/limits';
 import { mediaSizeLimitFor } from '@arenaquest/shared/domain/media/limits';
 import { useApiClient } from '@web/context/auth-context';
@@ -11,6 +11,7 @@ import {
   type SubmissionSummary,
   type SubmissionVisibility,
 } from '@web/lib/submissions-api';
+import { SubmissionDropZone } from './SubmissionDropZone';
 import { SubmissionVisibilitySwitch } from './SubmissionVisibilitySwitch';
 import { submissionErrorMessage } from './submission-errors';
 import { SUBMISSION_ACCEPT, formatBytes, preflightSubmission, titleFromFileName } from './submission-format';
@@ -50,7 +51,7 @@ export function UploadForm({
   const dict = useDict();
   const t = dict.submissions.upload;
   const client = useApiClient();
-  const ids = { file: useId(), title: useId(), description: useId(), counter: useId() };
+  const ids = { file: useId(), fileHint: useId(), title: useId(), description: useId(), counter: useId() };
 
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
@@ -66,8 +67,9 @@ export function UploadForm({
   const imageMax = mediaSizeLimitFor('image/jpeg');
   const pdfMax = mediaSizeLimitFor('application/pdf');
 
-  const onPick = (event: ChangeEvent<HTMLInputElement>) => {
-    const picked = event.target.files?.[0] ?? null;
+  /** The one path for a picked or a dropped file. */
+  const onPick = (picked: File | null) => {
+    if (busy) return;
     setFile(picked);
     setError(null);
     if (!picked) return;
@@ -176,16 +178,15 @@ export function UploadForm({
       <label htmlFor={ids.file} className="mb-1 block text-[13px] font-semibold" style={{ color: 'var(--aq-text)' }}>
         {t.fileLabel}
       </label>
-      <input
-        id={ids.file}
-        type="file"
+      <SubmissionDropZone
+        inputId={ids.file}
         accept={SUBMISSION_ACCEPT}
-        onChange={onPick}
         disabled={busy}
-        className="block w-full text-[13px]"
-        style={{ color: 'var(--aq-text2)' }}
+        file={file}
+        describedBy={ids.fileHint}
+        onSelect={onPick}
       />
-      <p className="mt-1 text-[12px]" style={{ color: 'var(--aq-text3)' }}>
+      <p id={ids.fileHint} className="mt-1 text-[12px]" style={{ color: 'var(--aq-text3)' }}>
         {t.fileHint(
           formatBytes(dict, summary.limits.videoMaxBytes),
           imageMax === null ? '' : formatBytes(dict, imageMax),

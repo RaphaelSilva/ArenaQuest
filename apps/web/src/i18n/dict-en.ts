@@ -2511,6 +2511,11 @@ export const dictEn = {
       open: 'Send a demonstration',
       heading: 'New demonstration',
       fileLabel: 'File',
+      dropzoneCta: 'Drag a file here or click to choose',
+      dropzoneActive: 'Drop the file to select it',
+      dropzoneLabel: 'Choose or drop the demonstration file',
+      dropzoneChange: 'Choose another file',
+      dropzoneChosen: (name: string, size: string) => `${name} · ${size}`,
       fileHint: (video: string, image: string, pdf: string) =>
         `Video (MP4 or MOV) up to ${video} · photo up to ${image} · PDF up to ${pdf}.`,
       titleLabel: 'Title',
