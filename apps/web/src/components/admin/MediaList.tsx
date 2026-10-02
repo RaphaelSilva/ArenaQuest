@@ -5,16 +5,23 @@ import { useApiClient } from '@web/context/auth-context';
 import type { Media } from '@web/lib/admin-media-api';
 import { Spinner } from '@web/components/spinner';
 import { useDict } from '@web/context/dict-context';
+import type { TopicNode } from '@web/lib/admin-topics-api';
+import { MoveMediaDialog } from './MoveMediaDialog';
 
 type MediaListProps = {
   topicId: string;
   media: Media[];
   onMediaDeleted: () => void;
+  /** The topic tree the page already holds, offered as move targets. */
+  topics: TopicNode[];
+  /** Called after a move succeeded, with the destination's title, so the page reloads and confirms. */
+  onMediaMoved: (targetTitle: string) => void;
 };
 
-export function MediaList({ topicId, media, onMediaDeleted }: MediaListProps) {
+export function MediaList({ topicId, media, onMediaDeleted, topics, onMediaMoved }: MediaListProps) {
   const client = useApiClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [movingItem, setMovingItem] = useState<Media | null>(null);
   const dict = useDict();
   const d = dict.admin.topics.media;
 
@@ -44,6 +51,7 @@ export function MediaList({ topicId, media, onMediaDeleted }: MediaListProps) {
   }
 
   return (
+    <>
     <ul className="divide-y divide-zinc-100 rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
       {media.map((item) => {
         const isPdf = item.type === 'application/pdf';
@@ -104,6 +112,19 @@ export function MediaList({ topicId, media, onMediaDeleted }: MediaListProps) {
                   </svg>
                 </a>
               )}
+              {item.status === 'ready' && (
+                <button
+                  type="button"
+                  onClick={() => setMovingItem(item)}
+                  className="rounded-full p-2 text-zinc-400 hover:bg-zinc-100 hover:text-indigo-600 dark:hover:bg-zinc-800 dark:hover:text-indigo-400"
+                  title={d.list.moveTo}
+                  aria-label={d.list.moveTo}
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7zm9 6h5m0 0l-2-2m2 2l-2 2" />
+                  </svg>
+                </button>
+              )}
               <button
                 onClick={() => handleDelete(item.id)}
                 disabled={deletingId === item.id}
@@ -123,5 +144,18 @@ export function MediaList({ topicId, media, onMediaDeleted }: MediaListProps) {
         );
       })}
     </ul>
+    {movingItem && (
+      <MoveMediaDialog
+        topicId={topicId}
+        media={movingItem}
+        topics={topics}
+        onClose={() => setMovingItem(null)}
+        onMoved={(targetTitle) => {
+          setMovingItem(null);
+          onMediaMoved(targetTitle);
+        }}
+      />
+    )}
+    </>
   );
 }
