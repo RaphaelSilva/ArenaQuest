@@ -12891,6 +12891,136 @@
         ]
       }
     },
+    "/v1/admin/topics/{topicId}/media/{mediaId}/move": {
+      "post": {
+        "description": "Reassign a ready media item to another topic (logical transfer). Only the row's topic changes: the storage object is neither copied nor renamed, and its storage key keeps the original topic id. The item's catalog audience becomes the target topic's.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "topicId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "mediaId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "targetTopicId": {
+                    "description": "The topic the media item moves to. Any existing topic other than the current one, archived included.",
+                    "format": "uuid",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "targetTopicId"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "originalName": {
+                      "type": "string"
+                    },
+                    "sizeBytes": {
+                      "type": "integer"
+                    },
+                    "status": {
+                      "enum": [
+                        "pending",
+                        "ready",
+                        "deleted"
+                      ],
+                      "type": "string"
+                    },
+                    "storageKey": {
+                      "type": "string"
+                    },
+                    "topicNodeId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "uploadedById": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "topicNodeId",
+                    "url",
+                    "type",
+                    "storageKey",
+                    "sizeBytes",
+                    "originalName",
+                    "uploadedById",
+                    "status",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Media moved; the updated item with a fresh signed `url`"
+          },
+          "400": {
+            "description": "SameTopic — the target equals the current topic; or Bad Request / Validation Failed"
+          },
+          "404": {
+            "description": "Media not found, deleted or not on `{topicId}`; or target topic not found"
+          },
+          "409": {
+            "description": "MediaNotReady — only ready media can be moved"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Move Media",
+        "tags": [
+          "admin:media"
+        ]
+      }
+    },
     "/v1/admin/users": {
       "get": {
         "description": "Retrieve a paginated list of all users.",

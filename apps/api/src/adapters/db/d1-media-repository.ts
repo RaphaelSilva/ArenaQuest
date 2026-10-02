@@ -88,6 +88,22 @@ export class D1MediaRepository implements IMediaRepository {
     return media;
   }
 
+  async moveToTopic(
+    id: string,
+    fromTopicId: string,
+    toTopicId: string,
+  ): Promise<Entities.Content.Media | null> {
+    const result = await this.db
+      .prepare(
+        "UPDATE media SET topic_node_id = ?, updated_at = datetime('now') WHERE id = ? AND topic_node_id = ? AND status = 'ready'",
+      )
+      .bind(toTopicId, id, fromTopicId)
+      .run();
+
+    if ((result.meta.changes ?? 0) === 0) return null;
+    return this.findById(id);
+  }
+
   async softDelete(id: string): Promise<void> {
     await this.db
       .prepare("UPDATE media SET status = 'deleted', updated_at = datetime('now') WHERE id = ?")

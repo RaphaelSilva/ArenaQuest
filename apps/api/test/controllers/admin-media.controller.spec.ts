@@ -57,6 +57,7 @@ function makeMediaRepo(overrides: Partial<IMediaRepository> = {}): IMediaReposit
     listByTopic: vi.fn(async () => [MEDIA_PENDING]),
     create: vi.fn(async () => MEDIA_PENDING),
     markReady: vi.fn(async () => MEDIA_READY),
+    moveToTopic: vi.fn(async (id, _from, to) => ({ ...MEDIA_READY, id, topicNodeId: to, updatedAt: new Date() })),
     softDelete: vi.fn(async () => {}),
     hardDelete: vi.fn(async () => {}),
     ...overrides,
@@ -267,6 +268,143 @@ describe('AdminMediaController', () => {
       storageAdapter.deleteObject = vi.fn(async () => { throw new Error('storage error'); });
       const result = await controller.deleteMedia('topic-1', 'media-1');
       expect(result.ok).toBe(true);
+    });
+  });
+
+  // ── moveMedia ─────────────────────────────────────────────────────────────
+
+  describe('moveMedia', () => {
+    const TARGET: TopicNodeRecord = { ...TOPIC, id: 'topic-2', title: 'Target' };
+    const MEDIA_DELETED: Entities.Content.Media = { ...MEDIA_PENDING, status: Entities.Config.MediaStatus.DELETED };
+
+    beforeEach(() => {
+      topicsRepo.findById = vi.fn(async (id) => (id === TOPIC.id ? TOPIC : id === TARGET.id ? TARGET : null));
+      mediaRepo.findById = vi.fn(async (id) => (id === MEDIA_READY.id ? MEDIA_READY : null));
+    });
+
+    /** Every storage method other than signing the download URL must stay untouched. */
+    function expectNoStorageWrite() {
+      expect(storageAdapter.putObject).not.toHaveBeenCalled();
+      expect(storageAdapter.getObject).not.toHaveBeenCalled();
+      expect(storageAdapter.deleteObject).not.toHaveBeenCalled();
+      expect(storageAdapter.deleteObjects).not.toHaveBeenCalled();
+      expect(storageAdapter.objectExists).not.toHaveBeenCalled();
+      expect(storageAdapter.headObject).not.toHaveBeenCalled();
+      expect(storageAdapter.getPresignedUploadUrl).not.toHaveBeenCalled();
+      expect(storageAdapter.readHead).not.toHaveBeenCalled();
+    }
+
+    it('moves a READY item and returns it with a fresh signed url', async () => {
+      const result = await controller.moveMedia('topic-1', 'media-1', 'topic-2');
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.topicNodeId).toBe('topic-2');
+      expect(result.data.storageKey).toBe(MEDIA_READY.storageKey);
+      expect(result.data.createdAt).toEqual(MEDIA_READY.createdAt);
+      expect(result.data.url).toBe('https://storage.example.com/download');
+      expect(mediaRepo.moveToTopic).toHaveBeenCalledWith('media-1', 'topic-1', 'topic-2');
+      expect(storageAdapter.getPresignedDownloadUrl).toHaveBeenCalledWith(MEDIA_READY.storageKey, { expiresInSeconds: 3600 });
+      expectNoStorageWrite();
+    });
+
+    it('accepts an archived target topic', async () => {
+      topicsRepo.findById = vi.fn(async (id) =>
+        id === TARGET.id ? { ...TARGET, archived: true, status: Entities.Config.TopicNodeStatus.ARCHIVED } : TOPIC,
+      );
+      const result = await controller.moveMedia('topic-1', 'media-1', 'topic-2');
+      expect(result.ok).toBe(true);
+    });
+
+    it('returns 400 SameTopic when the target equals the source, without touching the repository', async () => {
+      const result = await controller.moveMedia('topic-1', 'media-1', 'topic-1');
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(400);
+      expect(result.error).toBe('SameTopic');
+      expect(mediaRepo.moveToTopic).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 for an unknown media id', async () => {
+      const result = await controller.moveMedia('topic-1', 'nonexistent', 'topic-2');
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(404);
+      expect(result.error).toBe('NotFound');
+      expect(mediaRepo.moveToTopic).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 for a deleted media item', async () => {
+      mediaRepo.findById = vi.fn(async () => MEDIA_DELETED);
+      const result = await controller.moveMedia('topic-1', 'media-1', 'topic-2');
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(404);
+      expect(mediaRepo.moveToTopic).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the media belongs to a different topic', async () => {
+      const result = await controller.moveMedia('topic-3', 'media-1', 'topic-2');
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(404);
+      expect(mediaRepo.moveToTopic).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 MediaNotReady for a pending media item', async () => {
+      mediaRepo.findById = vi.fn(async () => MEDIA_PENDING);
+      const result = await controller.moveMedia('topic-1', 'media-1', 'topic-2');
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(409);
+      expect(result.error).toBe('MediaNotReady');
+      expect(mediaRepo.moveToTopic).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 with detail when the target topic does not exist', async () => {
+      const result = await controller.moveMedia('topic-1', 'media-1', 'missing-topic');
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(404);
+      expect(result.error).toBe('NotFound');
+      expect(result.meta?.detail).toBe('target topic not found');
+      expect(mediaRepo.moveToTopic).not.toHaveBeenCalled();
+    });
+
+    it('re-reads and answers 404 when the conditional write loses to a concurrent delete', async () => {
+      mediaRepo.findById = vi.fn()
+        .mockResolvedValueOnce(MEDIA_READY)
+        .mockResolvedValueOnce(MEDIA_DELETED);
+      mediaRepo.moveToTopic = vi.fn(async () => null);
+      const result = await controller.moveMedia('topic-1', 'media-1', 'topic-2');
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(404);
+      expect(mediaRepo.findById).toHaveBeenCalledTimes(2);
+      expectNoStorageWrite();
+      expect(storageAdapter.getPresignedDownloadUrl).not.toHaveBeenCalled();
+    });
+
+    it('re-reads and answers 404 when the conditional write loses to a concurrent move', async () => {
+      mediaRepo.findById = vi.fn()
+        .mockResolvedValueOnce(MEDIA_READY)
+        .mockResolvedValueOnce({ ...MEDIA_READY, topicNodeId: 'topic-3' });
+      mediaRepo.moveToTopic = vi.fn(async () => null);
+      const result = await controller.moveMedia('topic-1', 'media-1', 'topic-2');
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(404);
+    });
+
+    it('re-reads and answers 409 when the row is no longer ready at write time', async () => {
+      mediaRepo.findById = vi.fn()
+        .mockResolvedValueOnce(MEDIA_READY)
+        .mockResolvedValueOnce(MEDIA_PENDING);
+      mediaRepo.moveToTopic = vi.fn(async () => null);
+      const result = await controller.moveMedia('topic-1', 'media-1', 'topic-2');
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(409);
+      expect(result.error).toBe('MediaNotReady');
     });
   });
 });
