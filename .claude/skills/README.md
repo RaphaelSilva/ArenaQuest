@@ -60,7 +60,7 @@ flowchart TD
     PR_BL --> M_BL[(merged into main)]
 
     M_RFC --> WT_FEAT["make worktree-open KIND=milestone MILESTONE=N<br/>branch feature/mN/candidate"]
-    M_BL --> WT_TASK["make worktree-open KIND=backlog<br/>branch feature/backlog/&lt;topic&gt;/&lt;NN-slug&gt;.task"]
+    M_BL --> WT_TASK["make worktree-open KIND=backlog<br/>one task: SLUG=&lt;NN-slug&gt; → feature/backlog/&lt;topic&gt;/&lt;NN-slug&gt;.task<br/>tasks shipped together: FEATURE=&lt;f&gt; → feature/backlog/&lt;topic&gt;/&lt;f&gt;/candidate"]
 
     subgraph EXEC["Feature worktree · .worktrees/&lt;name&gt;"]
         WT_FEAT --> DEV["developer (orchestrator)<br/>per-task loop"]

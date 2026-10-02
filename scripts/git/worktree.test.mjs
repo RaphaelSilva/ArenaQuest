@@ -34,6 +34,34 @@ test('deriveTarget rejects missing or malformed input', () => {
   assert.throws(() => deriveTarget({ kind: 'epic', epic: true }), /--epic is required/);
 });
 
+test('deriveTarget derives a backlog candidate with a task prefix', () => {
+  assert.deepEqual(deriveTarget({ kind: 'backlog', topic: 'user-experience', feature: 'move-topic-media' }), {
+    kind: 'backlog',
+    branch: 'feature/backlog/user-experience/move-topic-media/candidate',
+    name: 'backlog-user-experience-move-topic-media-candidate',
+    taskPrefix: 'feature/backlog/user-experience/move-topic-media/',
+  });
+});
+
+test('deriveTarget accepts the --backend/--frontend suffix in single-task backlog mode', () => {
+  assert.deepEqual(deriveTarget({ kind: 'backlog', topic: 'ux', slug: '08-move-topic-media-to-another-topic--backend' }),
+    { kind: 'backlog', branch: 'feature/backlog/ux/08-move-topic-media-to-another-topic--backend.task', name: 'backlog-ux-08-move-topic-media-to-another-topic--backend' });
+  assert.equal(deriveTarget({ kind: 'backlog', topic: 'ux', slug: '09-x--frontend' }).kind, 'backlog');
+});
+
+test('deriveTarget rejects --feature with --slug, or neither, for backlog', () => {
+  assert.throws(() => deriveTarget({ kind: 'backlog', topic: 'ux', feature: 'f', slug: 's' }), /mutually exclusive/);
+  assert.throws(() => deriveTarget({ kind: 'backlog', topic: 'ux' }), /--slug or --feature is required/);
+});
+
+test('deriveTarget rejects malformed backlog slugs and keeps --feature strict', () => {
+  assert.throws(() => deriveTarget({ kind: 'backlog', topic: 'ux', slug: 'a---b' }), /kebab-case/);
+  assert.throws(() => deriveTarget({ kind: 'backlog', topic: 'ux', slug: 'a-b-' }), /kebab-case/);
+  assert.throws(() => deriveTarget({ kind: 'backlog', topic: 'ux', slug: '-a' }), /kebab-case/);
+  assert.throws(() => deriveTarget({ kind: 'backlog', topic: 'ux', feature: 'a--b' }), /kebab-case/);
+  assert.throws(() => deriveTarget({ kind: 'chained', milestone: '8', slug: 'a--b' }), /kebab-case/);
+});
+
 test('parseWorktreeList reads porcelain records', () => {
   const text = [
     'worktree /repo', 'HEAD aaa', 'branch refs/heads/main', '',

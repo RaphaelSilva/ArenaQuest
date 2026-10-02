@@ -45,6 +45,7 @@ cd apps/api && pnpm test --grep "test name"
 ```bash
 make worktree-open KIND=rfc NUMBER=16 SLUG=x      # planning: docs/rfc-0016-x → .worktrees/rfc-0016-x
 make worktree-open KIND=milestone MILESTONE=21    # execution: feature/m21/candidate → .worktrees/m21-candidate
+make worktree-open KIND=backlog TOPIC=ux FEATURE=x # backlog pair: feature/backlog/ux/x/candidate → .worktrees/backlog-ux-x-candidate
 make worktree-sweep DRY_RUN=1                     # preview removing worktrees whose PR merged
 ```
 

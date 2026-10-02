@@ -271,7 +271,7 @@ convert-skipped: ## Convert the files an import skipped, locally (REPORT=path SO
 # ==============================================================================
 ##@ 🌳 LOCAL — git worktrees (one per feature, see CONTRIBUTING.md)
 # ==============================================================================
-worktree-open: ## Open (or reuse) a feature worktree from origin/main (KIND=rfc|docs|milestone|chained|epic|backlog; NUMBER, SLUG, MILESTONE, EPIC, TOPIC; ADOPT=1)
+worktree-open: ## Open (or reuse) a feature worktree from origin/main (KIND=rfc|docs|milestone|chained|epic|backlog; NUMBER, SLUG, MILESTONE, EPIC, TOPIC, FEATURE; ADOPT=1)
 	@test -n "$(KIND)" || { printf "$(RED)  ✖  KIND is required — e.g. make worktree-open KIND=milestone MILESTONE=21$(RESET)\n"; exit 1; }
 	node scripts/git/worktree.mjs open --kind $(KIND) \
 		$(if $(NUMBER),--number $(NUMBER),) \
@@ -279,6 +279,7 @@ worktree-open: ## Open (or reuse) a feature worktree from origin/main (KIND=rfc|
 		$(if $(MILESTONE),--milestone $(MILESTONE),) \
 		$(if $(EPIC),--epic $(EPIC),) \
 		$(if $(TOPIC),--topic $(TOPIC),) \
+		$(if $(FEATURE),--feature $(FEATURE),) \
 		$(if $(filter 1,$(ADOPT)),--adopt,)
 
 worktree-sweep: ## Remove managed worktrees whose PR is merged into main (DRY_RUN=1 to preview; needs gh auth)

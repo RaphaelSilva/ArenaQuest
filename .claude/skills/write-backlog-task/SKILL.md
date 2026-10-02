@@ -151,9 +151,21 @@ make worktree-open KIND=docs SLUG=backlog-<topic>-<slug>
 Commit there with `docs(backlog): …` and open the PR to `main` only after the user
 confirms. Several related backlog tasks can share one planning PR.
 
-After the planning PR merges, execution goes through the `developer` skill. It
-runs `make worktree-open KIND=backlog TOPIC=<topic> SLUG=<NN-slug>`, and its branch
-is `feature/backlog/<topic>/<NN-slug>.task`.
+After the planning PR merges, execution goes through the `developer` skill:
+
+- **A single standalone task** runs in
+  `make worktree-open KIND=backlog TOPIC=<topic> SLUG=<NN-slug>`, on branch
+  `feature/backlog/<topic>/<NN-slug>.task`, and becomes its own PR.
+- **Tasks that ship together** — a `--team both` pair, or any task whose
+  `Depends On` names another task of the same delivery — run through one
+  **backlog candidate**: `make worktree-open KIND=backlog TOPIC=<topic> FEATURE=<feature>`
+  opens `feature/backlog/<topic>/<feature>/candidate`; each task branch is
+  `feature/backlog/<topic>/<feature>/<NN-slug>.task`, cut from and merged back into
+  the candidate, and the candidate is the one PR to `main`. `<feature>` is the
+  shared stem (for `NN-x--backend` / `NN+1-x--frontend` it is `x`, or a shorter
+  name the owner picks). Name it in your reply to the user when you scaffold a pair.
+
+`worktree-open` accepts the `--backend` / `--frontend` suffix in a backlog `SLUG`.
 
 ## Gotchas
 
