@@ -14,6 +14,7 @@ source of truth; this page only summarises how they hand work to one another.
 | [`backend-developer`](./backend-developer/SKILL.md) | Implement `apps/api` / `packages/shared` work (usually as a subagent) |
 | [`frontend-developer`](./frontend-developer/SKILL.md) | Implement `apps/web` work (usually as a subagent) |
 | [`verify-doc-status`](./verify-doc-status/SKILL.md) | Reconcile doc statuses with the implementation (`driver.mjs`); never edits code |
+| [`preview-candidate`](./preview-candidate/SKILL.md) | Deploy, smoke-test and report a candidate preview on staging (`deploy.mjs --preview`); teardown after the merge |
 
 ## 1. End to end: from a request to delivery
 
@@ -112,6 +113,27 @@ flowchart TD
     FE -. "BLOCKED:" .-> STOP
 ```
 
+## 3. `preview-candidate`: from a candidate to a reviewable preview
+
+```mermaid
+flowchart TD
+    W["Feature worktree<br/>feature/mN/candidate · clean · pushed"] --> AUTH{"wrangler whoami"}
+    AUTH -- "no" --> STOPA(["STOP · wrangler login / CF_API_TOKEN"])
+    AUTH -- "yes" --> LBL{"Labels with a staging D1<br/>(wrangler d1 list)"}
+    LBL -- "none" --> STOPL(["STOP · make set-new-label"])
+    LBL -- "one / chosen" --> SEC["Check AQ_PREVIEW_* by name<br/>missing R2 → uploads off (ask if media)"]
+    SEC --> DRY["make deploy-preview-staging DRY_RUN=1"]
+    DRY --> DEP["make deploy-preview-staging<br/>guard → bookmark → migrate → API preview → web → Pages branch"]
+    DEP --> SMOKE{"Smoke test<br/>health 200 · web 200 · CORS 204<br/>feature route 401 (404 = wrong backend)"}
+    SMOKE --> ACC["Demo accounts from the staging D1<br/>(emails + roles, never a password)"]
+    ACC --> REP["Fixed report<br/>URLs · accounts · password tip · limitations<br/>bookmark + restore · teardown command"]
+    REP --> PR["Replace the PR's ## Preview section"]
+    PR -. "after the merge" .-> ASK{"AskUserQuestion<br/>remove the preview?"}
+    ASK -- "Yes" --> DEL["make preview-delete-staging"]
+    ASK -- "Dry run first" --> DRYDEL["preview-delete-staging DRY_RUN=1"] --> ASK
+    ASK -- "Keep / no answer" --> KEEP(["Preview stays"])
+```
+
 ## Rules the diagrams encode
 
 - **The parent owns every observable step.** `developer` runs branches,
@@ -124,5 +146,8 @@ flowchart TD
   worktree is opened.
 - **Step 0 decides the route.** A request that fails any backlog criterion becomes
   an RFC; the gate names the failed criterion instead of deciding silently.
+- **`preview-candidate` never reaches production or a secret value.** It previews on
+  staging only, checks secrets by name, and always reports the D1 bookmark that undoes
+  its migrations. Teardown runs only after an explicit `AskUserQuestion` "Yes".
 - **`verify-doc-status` is report-only on code.** It points at what is missing;
   it never changes implementation to make a criterion pass.
