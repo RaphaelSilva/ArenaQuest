@@ -7,6 +7,7 @@ import { buildPublicRouter } from '@api/routes/public';
 import { buildMeRouter } from '@api/routes/me';
 import { buildCommentsRouter } from '@api/routes/comments.router';
 import { buildNotesRouter } from '@api/routes/notes.router';
+import { buildSubmissionsRouter } from '@api/routes/submissions.router';
 import { buildEventsRouter } from '@api/routes/events.router';
 import { buildHealthRouter } from '@api/routes/public/health';
 
@@ -79,6 +80,7 @@ export class AppRouter {
     v1.route('/', buildPublicRouter(container));
     v1.route('/', buildCommentsRouter({ engagement, progress, gamification }));
     v1.route('/', buildNotesRouter({ engagement, content, progress }));
+    v1.route('/', buildSubmissionsRouter({ engagement, content, progress }));
     v1.route('/auth', buildAuthRouter({ identity, infra, controllers, gamification }));
     v1.route('/admin', buildAdminRouter(container));
     v1.route('/me', buildMeRouter(container));

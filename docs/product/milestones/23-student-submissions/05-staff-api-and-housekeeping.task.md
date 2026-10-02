@@ -1,6 +1,6 @@
 # Task 05 — Backend: Staff submissions API, tombstone and housekeeping (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md)
 **Team:** Backend API
@@ -67,20 +67,20 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `admin` and `content_creator` receive every ready and removed submission with
+- [x] `admin` and `content_creator` receive every ready and removed submission with
       `scope=all`, on topics outside their own access set too.
-- [ ] Force-unshare by either staff role hides the submission from classmates and makes the
+- [x] Force-unshare by either staff role hides the submission from classmates and makes the
       author's next share `409 SUBMISSION_MODERATED` until moderation is cleared.
-- [ ] Only `admin` can remove; afterwards R2 has no object, the author's `scope=mine` shows a
+- [x] Only `admin` can remove; afterwards R2 has no object, the author's `scope=mine` shows a
       `removed` row with title and date, classmates cannot see it, and the author's usage no
       longer counts it; a `content_creator` gets `403`.
-- [ ] With R2 failing, remove answers `502` and the row is unchanged.
-- [ ] Students and tutors get `403` on every `/v1/admin/submissions*` route and on the
+- [x] With R2 failing, remove answers `502` and the row is unchanged.
+- [x] Students and tutors get `403` on every `/v1/admin/submissions*` route and on the
       per-student list.
-- [ ] After `scheduled()` runs, a pending row created 25 h ago and its object are gone; a 1 h
+- [x] After `scheduled()` runs, a pending row created 25 h ago and its object are gone; a 1 h
       old one remains; billing's daily run is unaffected.
-- [ ] Changed files lint clean; `make test-api` green; `pnpm dump-openapi` leaves no diff.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green; `pnpm dump-openapi` leaves no diff.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

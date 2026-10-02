@@ -1,6 +1,6 @@
 # Task 01 — Backend: Submission contracts — entity, media types, limits and ports (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md)
 **Team:** Backend API
@@ -69,17 +69,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `SUBMISSION_MEDIA_TYPES` equals `ALLOWED_MEDIA_TYPES` plus `video/quicktime`, asserted
+- [x] `SUBMISSION_MEDIA_TYPES` equals `ALLOWED_MEDIA_TYPES` plus `video/quicktime`, asserted
       by a test; `ALLOWED_MEDIA_TYPES` and `MEDIA_SIZE_LIMIT_BYTES` are unchanged in the diff.
-- [ ] `domain/submissions/limits.ts` exports the defaults 10, 1 073 741 824, 262 144 000 and
+- [x] `domain/submissions/limits.ts` exports the defaults 10, 1 073 741 824, 262 144 000 and
       `true`, plus the title (120) and description (2 000) limits.
-- [ ] `ISubmissionRepository` declares every operation of RFC 0020 §11 and compiles with no
+- [x] `ISubmissionRepository` declares every operation of RFC 0020 §11 and compiles with no
       import from `@cloudflare/*`.
-- [ ] `sanitizeFileName` returns identical output for the existing admin-media test inputs
+- [x] `sanitizeFileName` returns identical output for the existing admin-media test inputs
       after the move; `admin-media.controller.ts` changes by its import line only.
-- [ ] `packages/shared` and `apps/api` typecheck; changed files lint clean; `make test-api`
+- [x] `packages/shared` and `apps/api` typecheck; changed files lint clean; `make test-api`
       green.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

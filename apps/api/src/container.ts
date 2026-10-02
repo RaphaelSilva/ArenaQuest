@@ -19,6 +19,7 @@ import { D1GamificationRepository } from '@api/adapters/db/d1-gamification-repos
 import { D1MissionRepository } from '@api/adapters/db/d1-mission-repository';
 import { D1CommentRepository } from '@api/adapters/db/d1-comment-repository';
 import { D1NoteRepository } from '@api/adapters/db/d1-note-repository';
+import { D1SubmissionRepository } from '@api/adapters/db/d1-submission-repository';
 import { D1BillingRepository } from '@api/adapters/db/d1-billing-repository';
 import { D1EventChargeRepository } from '@api/adapters/db/d1-event-charge-repository';
 import { D1EventRepository } from '@api/adapters/db/d1-event-repository';
@@ -31,6 +32,11 @@ import { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engi
 import { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
 import { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
 import { AuthService } from '@api/core/auth/auth-service';
+import {
+  parseSubmissionConfig,
+  type SubmissionConfigResult,
+  type SubmissionEnv,
+} from '@api/core/submissions/config';
 import { BillingService } from '@api/core/billing/billing-service';
 import { AccountingService } from '@api/core/billing/accounting-service';
 import { EventChargeService } from '@api/core/billing/event-charge-service';
@@ -61,6 +67,7 @@ import type {
   IGamificationRepository,
   ICommentRepository,
   INoteRepository,
+  ISubmissionRepository,
   IMissionRepository,
   IActivationTokenRepository,
   IPasswordResetTokenRepository,
@@ -99,6 +106,16 @@ export interface EngagementContext {
   commentRepo: ICommentRepository;
   /** Student notes (RFC 0016). */
   noteRepo: INoteRepository;
+  /** Student submissions (RFC 0020). */
+  submissionRepo: ISubmissionRepository;
+  /**
+   * The parsed `SUBMISSIONS_*` vars — the parse *result*, not a config, so a
+   * malformed var surfaces as `500 SUBMISSION_CONFIG_INVALID` on the submission
+   * routes instead of failing every request at container build time.
+   */
+  submissionConfig: SubmissionConfigResult;
+  /** Per-user presign budget (`rl:submissions:`, 30 per hour). */
+  submissionRateLimiter: IRateLimiter;
 }
 
 export interface ProgressContext {
@@ -239,6 +256,10 @@ export function buildContainer(env: Env): AppContainer {
   const taskLinks = new D1TaskLinkingRepository(env.DB);
   const commentRepo = new D1CommentRepository(env.DB);
   const noteRepo = new D1NoteRepository(env.DB);
+  const submissionRepo = new D1SubmissionRepository(env.DB);
+  // The vars are optional per environment, so the generated `Env` may not
+  // declare them; read them structurally, as GAMIFICATION_ENABLED is below.
+  const submissionConfig = parseSubmissionConfig(env as unknown as SubmissionEnv);
 
   // Identity: user groups
   const userGroups = new D1UserGroupRepository(env.DB);
@@ -322,6 +343,15 @@ export function buildContainer(env: Env): AppContainer {
     prefix: 'rl:events:',
   });
 
+  // Student submissions (RFC 0020 §10): keyed by user id, presign only. It
+  // bounds upload/delete churn, which a quota — a level, not a rate — does not.
+  const submissionRateLimiter = new KvRateLimiter(env.RATE_LIMIT_KV, {
+    windowMs: 60 * 60_000,
+    maxAttempts: 30,
+    lockoutMs: 60 * 60_000,
+    prefix: 'rl:submissions:',
+  });
+
   // Controllers
   const registrationEmitter = buildRegistrationMailHandler({
     users,
@@ -358,7 +388,16 @@ export function buildContainer(env: Env): AppContainer {
   return {
     identity: { users, tokens, activationTokens, passwordResetTokens, oauthAccounts, authService, userGroups },
     content: { topics, tags, media, storage },
-    engagement: { taskRepo, taskStages, taskLinks, commentRepo, noteRepo },
+    engagement: {
+      taskRepo,
+      taskStages,
+      taskLinks,
+      commentRepo,
+      noteRepo,
+      submissionRepo,
+      submissionConfig,
+      submissionRateLimiter,
+    },
     progress: { progressRepo, enrollmentRepo },
     gamification: { questRepo, badgeRepo, gamificationRepo, missionRepo, xpEngine, streakEngine, questEvaluator, badgeEngine },
     billing: { billingRepo, billingService, accountingService, eventChargeRepo, eventChargeService },

@@ -1,6 +1,6 @@
 # Task 08 — Frontend: Move dialog and My demonstrations page (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md)
 **Team:** Frontend Web
@@ -57,18 +57,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Moving one card to another readable topic removes it from this topic's *Minhas*, shows
+- [x] Moving one card to another readable topic removes it from this topic's *Minhas*, shows
       it on the target as private, and updates both counts.
-- [ ] Selecting 3 cards for a target with 2 free slots reports 2 moved and 1 refused with the
+- [x] Selecting 3 cards for a target with 2 free slots reports 2 moved and 1 refused with the
       "no room" reason (component test with a mocked response).
-- [ ] The selection cannot exceed 10 items; the picker never lists the current topic or an
+- [x] The selection cannot exceed 10 items; the picker never lists the current topic or an
       unreadable one.
-- [ ] `/submissions` lists all the student's submissions grouped by topic; a row on a topic
+- [x] `/submissions` lists all the student's submissions grouped by topic; a row on a topic
       they lost shows the read-only explanation and still offers delete and move.
-- [ ] The nav shows "Minhas demonstrações" for students.
-- [ ] `check-i18n-coverage.js` passes; `pt` and `en` builds both render.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] The nav shows "Minhas demonstrações" for students.
+- [x] `check-i18n-coverage.js` passes; `pt` and `en` builds both render.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

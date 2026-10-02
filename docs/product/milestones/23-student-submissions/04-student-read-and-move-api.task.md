@@ -1,6 +1,6 @@
 # Task 04 — Backend: Student read and move API (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md)
 **Team:** Backend API
@@ -71,22 +71,22 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `scope=mine` returns the caller's pending, ready and removed submissions; `scope=class`
+- [x] `scope=mine` returns the caller's pending, ready and removed submissions; `scope=class`
       returns only shared ready ones with author names and `isMine` on the caller's own.
-- [ ] Another student gets `404` on a direct read of a private, pending or removed
+- [x] Another student gets `404` on a direct read of a private, pending or removed
       submission, and `scope=class` never contains them — asserted with a cursor taken from
       the author's `scope=mine`.
-- [ ] A student requesting `scope=all` gets `403`.
-- [ ] With the switch off, `scope=class` is empty and a shared submission is `404` to other
+- [x] A student requesting `scope=all` gets `403`.
+- [x] With the switch off, `scope=class` is empty and a shared submission is `404` to other
       students; turned back on, the same rows are listed unchanged.
-- [ ] `GET /v1/me/submissions` returns all of the caller's submissions with `topicAccessible`;
+- [x] `GET /v1/me/submissions` returns all of the caller's submissions with `topicAccessible`;
       on an inaccessible topic `PATCH` is refused while `DELETE` and move succeed.
-- [ ] Moving 3 submissions into a topic with 2 free slots returns 2 `moved` and 1
+- [x] Moving 3 submissions into a topic with 2 free slots returns 2 `moved` and 1
       `refused: quota`; moved ones are private, keep `moderated`, and their object key is
       unchanged; an unreadable target is `404`.
-- [ ] Responses carrying URLs set `Cache-Control: private, no-store`.
-- [ ] Changed files lint clean; `make test-api` green; `pnpm dump-openapi` leaves no diff.
-- [ ] No diff outside the scope guardrail.
+- [x] Responses carrying URLs set `Cache-Control: private, no-store`.
+- [x] Changed files lint clean; `make test-api` green; `pnpm dump-openapi` leaves no diff.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

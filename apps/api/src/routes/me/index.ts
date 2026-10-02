@@ -6,6 +6,7 @@ import { buildMeGamificationRouter } from '@api/routes/me/gamification';
 import { buildMeCommentsRouter } from '@api/routes/me/comments';
 import { buildMeBillingRouter } from '@api/routes/me/billing';
 import { buildMeNotesRouter } from '@api/routes/me/notes';
+import { buildMeSubmissionsRouter } from '@api/routes/me/submissions';
 import type {
   BillingContext,
   IdentityContext,
@@ -52,6 +53,9 @@ export function buildMeRouter(slice: {
 
   // 6. The caller's own notes across topics (RFC 0016 §5).
   meRouter.route('/', buildMeNotesRouter(slice));
+
+  // 7. The caller's own submissions across topics, and moving them (RFC 0020 §6, §10).
+  meRouter.route('/', buildMeSubmissionsRouter(slice));
 
   return meRouter;
 }

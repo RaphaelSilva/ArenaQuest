@@ -1,6 +1,6 @@
 # Task 09 — Frontend: Staff submission surfaces (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [23 — Student submissions](./milestone.md)
 **RFC:** [RFC 0020](../../RFCs/0020-student-submissions.md)
 **Team:** Frontend Web
@@ -59,18 +59,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A staff user sees **Demonstrações dos alunos** with the total and a single *Todos* tab
+- [x] A staff user sees **Demonstrações dos alunos** with the total and a single *Todos* tab
       grouped by student.
-- [ ] **Remover compartilhamento** makes a shared submission private and moderated;
+- [x] **Remover compartilhamento** makes a shared submission private and moderated;
       **Permitir compartilhar de novo** clears it.
-- [ ] **Remover** appears for `admin` only, asks for confirmation, and turns the card into a
+- [x] **Remover** appears for `admin` only, asks for confirmation, and turns the card into a
       removed item showing who and when.
-- [ ] No upload, edit or move control renders for staff on a student's submission.
-- [ ] The user backoffice shows the student's submissions grouped by topic with the same
+- [x] No upload, edit or move control renders for staff on a student's submission.
+- [x] The user backoffice shows the student's submissions grouped by topic with the same
       actions.
-- [ ] `check-i18n-coverage.js` passes; `pt` and `en` builds both render.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `check-i18n-coverage.js` passes; `pt` and `en` builds both render.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

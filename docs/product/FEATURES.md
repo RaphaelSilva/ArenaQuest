@@ -197,6 +197,39 @@ _Peer rating of shared notes and XP for notes are deferred (RFC 0016). The user
 backoffice is admin-only in the web, so a `content_creator` reaches the
 per-student notes API but has no page for it yet._
 
+### Student submissions (Demonstrations)
+Students upload **demonstration files** — a video straight from the phone
+(iPhone `.mov` included), an image or a PDF — with a title and a Markdown
+description, several per topic, from a **Demonstrations** button on the topic
+page. The dedicated page has a *Mine* tab (quota line, upload with client-side
+preflight, progress and **Cancel**, edit, delete, a **Select** mode and **Move
+to another topic**), a *Class* tab listing the shared demonstrations of the
+topic's readers in a full-screen viewer with previous/next and a direct link per
+submission, and — for staff — an *All* tab grouped by student. *My
+demonstrations* (`/submissions`) lists every submission across topics, and the
+user backoffice gains a *Demonstrations* section. A video the browser cannot
+decode shows a **Download** fallback instead of a broken player.
+
+Submissions live in their own table and under their own `submissions/` key
+prefix, never in course `media`. Uploads go `presign → PUT → finalize`, and
+finalize accepts the file only when its stored length and leading signature
+bytes match what was announced. Quotas (10 per topic, 1 GiB per student, 250 MB
+per video) and a per-label **sharing switch** are environment variables, enforced
+atomically in SQL. Submissions are private by default; a shared one is readable
+by the topic's readers, and access follows the catalog gate with `404` on a
+miss. Moving is author-only and metadata-only, resets the submission to private
+and keeps its moderation flag. Staff (`admin`, `content_creator`) read everything
+and force-unshare; only `admin` removes, leaving a *"Removed by staff"*
+tombstone for the author outside every quota. A daily sweep deletes abandoned
+uploads older than 24 h.
+
+**Code:** `apps/api/src/controllers/submissions.controller.ts`, `apps/api/src/adapters/db/d1-submission-repository.ts`, `apps/api/src/routes/{submissions.router.ts,me/submissions.ts,admin/submissions.ts}`, `apps/api/src/core/submissions/config.ts`, `apps/api/src/jobs/sweep-pending-submissions.ts`, `apps/web/src/components/catalog/submissions/`, `apps/web/src/app/(protected)/{catalog/[id]/submissions,submissions}/`
+→ [M23 Student submissions](./milestones/23-student-submissions/milestone.md) · [RFC 0020](./RFCs/0020-student-submissions.md) · ✅
+_Staff review (corrections, scores), server-side transcoding and thumbnails, and
+several files per submission are deferred (RFC 0020). The user-backoffice
+section is reachable only by `admin` (the page's existing gate), so a
+`content_creator` moderates from the topic page. Not yet walked on staging._
+
 ---
 
 ## 5. Gamification
