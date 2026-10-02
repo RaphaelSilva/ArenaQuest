@@ -3,7 +3,7 @@
 **Status:** 📝 Draft
 **Scope:** `apps/api` (mission requirements, enrollment, evidence counting, inline hooks at the existing write sites, admin-only authoring, daily reconciliation), `packages/shared` (requirement kinds and params, mission evaluator, ports, entity and dashboard types), `apps/web` (admin mission editor and participants view, dashboard missions panel, mission page, live video-watched wiring), `scripts/demo` (demo mission as typed requirements). Derived from [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md).
 
-> **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: the new migration `apps/api/migrations/0031_create_mission_requirements.sql` (two `ADD COLUMN` on `missions`, six new tables — renumbered if another migration lands first); the mission files `apps/api/src/{adapters/db/d1-mission-repository.ts,adapters/db/d1-mission-participation-repository.ts,adapters/db/d1-mission-evidence-repository.ts,controllers/admin-missions.controller.ts,controllers/me-missions.controller.ts,routes/admin/missions.ts,routes/me/missions.ts,core/missions/**,jobs/reconcile-missions.ts}`; the `GET /missions` handler in `apps/api/src/routes/me/gamification.ts` and the mission part of `controllers/me-dashboard.controller.ts`; **one `runMissionHook(…)` call, after the existing write and inside its own `try/catch`**, in each of `apps/api/src/routes/{submissions.router.ts,me/submissions.ts,admin/submissions.ts,me/progress.ts,topics.router.ts,admin/billing.ts}` (no other line of those handlers changes); the reconcile call added to `scheduled()` in `apps/api/src/index.ts` (billing and the submission sweep untouched); wiring in `apps/api/src/container.ts` (the `gamification` group gains `missionEvaluator` and the two new repositories) and `routes/me/index.ts`; the regenerated `apps/api/openapi.json` and `apps/api/src/openapi/components/entities.ts`; `apps/api/test/**`; the shared files `packages/shared/{domain/missions/requirements.ts,domain/mission.ts,domain/gamification/mission-evaluator.ts,types/dashboard.ts,ports/i-mission-repository.ts,ports/i-mission-participation-repository.ts,ports/i-mission-evidence-repository.ts,ports/index.ts}`, the `Entities.Gamification` mission types in `packages/shared/types/entities.ts`, one `XpAction` appended to `domain/gamification/xp-config.ts`, and the mission loop of `domain/gamification/quest-evaluator.ts` (narrowed to legacy missions — the quest loop is not edited); on the web, `apps/web/src/app/(protected)/admin/missions/**`, the Missions card in `apps/web/src/app/(protected)/admin/page.tsx`, the new `apps/web/src/app/(protected)/missions/**`, `apps/web/src/components/missions/**`, `apps/web/src/components/dashboard/MissionsList.tsx` (and its mount in `DashboardContent.tsx`), the `markVideoWatched` call in `apps/web/src/components/catalog/MediaList/**`, `apps/web/src/lib/{admin-gamification-api.ts,dashboard-api.ts,missions-api.ts,api-types.gen.ts}`, and both i18n dictionaries (+ `types.ts`); `scripts/demo/{dataset/base.json,dataset.mjs,sql.mjs,ci-check.mjs}` and their tests; and, for the closeout only, `CLAUDE.md`, `docs/product/FEATURES.md`, new files under `docs/product/backlog/`, RFC 0022's `Status:` header and its `docs/product/RFCs/README.md` row. It is explicitly **not** an opportunity to: add **any column to `topic_nodes`, `topic_progress` or `topic_submissions`**, or change a visit, complete, upload, share, move or moderation rule (`progress-service.ts`, `submissions.controller.ts`, `d1-progress-repository.ts`, `d1-submission-repository.ts` stay as they are); add a **`topic_completed` kind** or a "mark as complete" button; fire `visit` on **topic page mount** (a backlog item); add **door check-in or attendance** for events, or touch `event-charge-service.ts` / `d1-event-charge-repository.ts`; change **Task / TaskStage** — `tasks`, `task_stages`, `task_progress`, `task_stage_progress` and their controllers are neither changed nor migrated; **redesign daily/weekly quests**, edit `quest_definitions`, `0019_seed_quests.sql` or the quest half of `quest-evaluator.ts` (the seed mismatch is a backlog item); **revoke XP** — no code path deletes or negates an `xp_events` or `user_badges` row; build **recurring missions or mission templates** (RFC 0023/0024 roadmap); add **staff review of submissions** (RFC 0020's deferred item) or RFC 0008's **recommendations and manual badge approval**; or change `getEffectiveAccessTopicIds`, `D1EventRepository`'s audience rules or `routes/admin/index.ts`'s umbrella guard. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
+> **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: the new migration `apps/api/migrations/0031_create_mission_requirements.sql` (two `ADD COLUMN` on `missions`, six new tables — renumbered if another migration lands first); the mission files `apps/api/src/{adapters/db/d1-mission-repository.ts,adapters/db/d1-mission-participation-repository.ts,adapters/db/d1-mission-evidence-repository.ts,controllers/admin-missions.controller.ts,controllers/me-missions.controller.ts,routes/admin/missions.ts,routes/me/missions.ts,core/missions/**,jobs/reconcile-missions.ts}`; the `GET /missions` handler in `apps/api/src/routes/me/gamification.ts` and the mission part of `controllers/me-dashboard.controller.ts`; **one `runMissionHook(…)` call, after the existing write and inside its own `try/catch`**, in each of `apps/api/src/routes/{submissions.router.ts,me/submissions.ts,admin/submissions.ts,me/progress.ts,topics.router.ts,admin/billing.ts}` (no other line of those handlers changes); the reconcile call added to `scheduled()` in `apps/api/src/index.ts` (billing and the submission sweep untouched); wiring in `apps/api/src/container.ts` (the `gamification` group gains `missionEvaluator` and the two new repositories) and `routes/me/index.ts`; the regenerated `apps/api/openapi.json` and `apps/api/src/openapi/components/entities.ts`; `apps/api/test/**`; the shared files `packages/shared/{domain/missions/** (requirements and its spec),domain/mission.ts,domain/gamification/mission-evaluator.ts,types/dashboard.ts,ports/i-mission-repository.ts,ports/i-mission-participation-repository.ts,ports/i-mission-evidence-repository.ts,ports/index.ts}`, the `Entities.Gamification` mission types in `packages/shared/types/entities.ts`, one `XpAction` appended to `domain/gamification/xp-config.ts`, and the mission loop of `domain/gamification/quest-evaluator.ts` (narrowed to legacy missions — the quest loop is not edited); on the web, `apps/web/src/app/(protected)/admin/missions/**`, the Missions card in `apps/web/src/app/(protected)/admin/page.tsx`, the new `apps/web/src/app/(protected)/missions/**`, `apps/web/src/components/missions/**`, `apps/web/src/components/dashboard/MissionsList.tsx` (and its mount in `DashboardContent.tsx`), the `markVideoWatched` call in `apps/web/src/components/catalog/MediaList/**` (plus passing the topic id to it from `apps/web/src/app/(protected)/catalog/[id]/page.tsx`, nothing else on that page), `apps/web/src/lib/{admin-gamification-api.ts,dashboard-api.ts,missions-api.ts,api-client.ts (registering the missions client),api-types.gen.ts}`, and both i18n dictionaries (+ `types.ts`); `scripts/demo/{dataset/base.json,dataset.mjs,sql.mjs,ci-check.mjs}` and their tests; and, for the closeout only, `CLAUDE.md`, `docs/product/FEATURES.md`, `docs/ReleaseNotes.md`, new files under `docs/product/backlog/`, this folder's `closeout-analysis.md`, RFC 0022's `Status:` header and its `docs/product/RFCs/README.md` row. It is explicitly **not** an opportunity to: add **any column to `topic_nodes`, `topic_progress` or `topic_submissions`**, or change a visit, complete, upload, share, move or moderation rule (`progress-service.ts`, `submissions.controller.ts`, `d1-progress-repository.ts`, `d1-submission-repository.ts` stay as they are); add a **`topic_completed` kind** or a "mark as complete" button; fire `visit` on **topic page mount** (a backlog item); add **door check-in or attendance** for events, or touch `event-charge-service.ts` / `d1-event-charge-repository.ts`; change **Task / TaskStage** — `tasks`, `task_stages`, `task_progress`, `task_stage_progress` and their controllers are neither changed nor migrated; **redesign daily/weekly quests**, edit `quest_definitions`, `0019_seed_quests.sql` or the quest half of `quest-evaluator.ts` (the seed mismatch is a backlog item); **revoke XP** — no code path deletes or negates an `xp_events` or `user_badges` row; build **recurring missions or mission templates** (RFC 0023/0024 roadmap); add **staff review of submissions** (RFC 0020's deferred item) or RFC 0008's **recommendations and manual badge approval**; or change `getEffectiveAccessTopicIds`, `D1EventRepository`'s audience rules or `routes/admin/index.ts`'s umbrella guard. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
 
 ---
 
@@ -115,27 +115,27 @@ Out of scope (explicit, from RFC 0022 Non-Goals):
 
 ## 5. Task Breakdown
 
-> **Proposed rows — to be materialised by `write-tasks`.** The `.task.md` files below do not exist
-> yet; file names are shown in code font rather than as links so no link is broken. `write-tasks`
-> creates each file, turns the name into a link and keeps this table, the graph and the order in
-> sync. Backend and frontend never share a task.
+Each task is one independent PR with one owner and one review surface. Backend and frontend never
+share a file: the web work lands as five Frontend tasks (`01`, `09`–`12`), and the demo seed (`13`)
+and the closeout (`14`) use the Backend template, as earlier milestones did for script and docs
+tasks.
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | Live catalog viewer reports watched videos — `01-video-watched-wiring-frontend.task.md` | 0 | Frontend | ☐ Open |
-| 02 | Mission contracts — requirement kinds, params, entities, ports — `02-mission-contracts.task.md` | 1 | Backend | ☐ Open |
-| 03 | Mission evaluator — windowing, sequential unlock, write-once rewards, streak — `03-mission-evaluator-domain.task.md` | 1 | Backend | ☐ Open |
-| 04 | Migration 0031 and D1 adapters with per-kind counting SQL — `04-schema-and-d1-adapters.task.md` | 2 | Backend | ☐ Open |
-| 05 | Admin missions API — admin-only writes, typed requirements, start lock, audience, participants — `05-admin-missions-api.task.md` | 3 | Backend | ☐ Open |
-| 06 | Mission hooks at the evidence write sites — `06-mission-hooks.task.md` | 4 | Backend | ☐ Open |
-| 07 | Student missions API — steps, teasers, join, leave, manual check — `07-student-missions-api.task.md` | 4 | Backend | ☐ Open |
-| 08 | Daily reconciliation, admin reconcile endpoint, legacy loop narrowing — `08-reconciliation-job.task.md` | 4 | Backend | ☐ Open |
-| 09 | Admin mission editor — requirements editor, pickers, audience, badge suggestion — `09-admin-mission-editor-frontend.task.md` | 5 | Frontend | ☐ Open |
-| 10 | Admin participants tab and *Reconcile now* — `10-admin-participants-frontend.task.md` | 5 | Frontend | ☐ Open |
-| 11 | Dashboard missions panel — *My missions*, *Available*, *Locked*, *Join* — `11-dashboard-missions-panel-frontend.task.md` | 6 | Frontend | ☐ Open |
-| 12 | Mission page — steps, manual check, leave — `12-mission-page-frontend.task.md` | 6 | Frontend | ☐ Open |
-| 13 | Demo seed mission as typed requirements — `13-demo-seed-requirements.task.md` | 7 | Backend | ☐ Open |
-| 14 | Documentation closeout, backlog items and release note — `14-docs-and-closeout.task.md` | 7 | Backend | ☐ Open |
+| 01 | [Live catalog viewer reports watched videos](./01-video-watched-wiring-frontend.task.md) | 0 | Frontend | ☐ Open |
+| 02 | [Mission contracts — requirement kinds, params, entities, ports](./02-mission-contracts.task.md) | 1 | Backend | ☐ Open |
+| 03 | [Mission evaluator — windowing, sequential unlock, write-once rewards, streak](./03-mission-evaluator-domain.task.md) | 1 | Backend | ☐ Open |
+| 04 | [Migration 0031 and D1 adapters with per-kind counting](./04-schema-and-d1-adapters.task.md) | 2 | Backend | ☐ Open |
+| 05 | [Admin missions API — admin-only writes, typed requirements, start lock, audience, participants](./05-admin-missions-api.task.md) | 3 | Backend | ☐ Open |
+| 06 | [Mission hooks at the evidence write sites](./06-mission-hooks.task.md) | 4 | Backend | ☐ Open |
+| 07 | [Student missions API — steps, teasers, join, leave, manual check](./07-student-missions-api.task.md) | 4 | Backend | ☐ Open |
+| 08 | [Daily reconciliation, admin reconcile endpoint and legacy loop narrowing](./08-reconciliation-job.task.md) | 4 | Backend | ☐ Open |
+| 09 | [Admin mission editor — requirements editor, pickers, audience, badge suggestion](./09-admin-mission-editor-frontend.task.md) | 5 | Frontend | ☐ Open |
+| 10 | [Admin participants tab and Reconcile now](./10-admin-participants-frontend.task.md) | 5 | Frontend | ☐ Open |
+| 11 | [Dashboard missions panel — My missions, Available, Locked, Join](./11-dashboard-missions-panel-frontend.task.md) | 6 | Frontend | ☐ Open |
+| 12 | [Mission page — steps, manual check, leave](./12-mission-page-frontend.task.md) | 6 | Frontend | ☐ Open |
+| 13 | [Demo seed mission as typed requirements](./13-demo-seed-requirements.task.md) | 7 | Backend | ☐ Open |
+| 14 | [Documentation closeout, backlog items and release note](./14-docs-and-closeout.task.md) | 7 | Backend | ☐ Open |
 
 Dependency graph:
 
@@ -151,17 +151,18 @@ Dependency graph:
                                     (all) ──► 14
 ```
 
-(`03` and `04` both need `02`; `06`, `07` and `08` need both `03` and `04`; `08` also needs `05`
-for the admin reconcile route; `10` needs `08` and `09`; `13` needs `04`; `14` needs every other
-task.)
+(`03` and `04` depend on `02`; `05` depends on `04`; `06` and `07` depend on `03` and `04`; `08`
+depends on `03`, `04` and `05`; `09` depends on `05`; `10` depends on `08` and `09`; `11` depends
+on `07`; `12` depends on `07` and `11`; `13` depends on `04`; `14` depends on every other task.)
 
 **Recommended execution order:** `01` → `02` → `03` → `04` → `05` → `06` → `07` → `08` → `09` →
 `10` → `11` → `12` → `13` → `14`. `01` touches only the catalog viewer and can merge at any time —
 first is best, since the release note for video XP rides with it. The backend (`02`–`08`) ships
 behind routes no page calls yet; `03` (pure domain) and `04` (SQL) can run in parallel once `02` is
-in. `09` can start as soon as `05` lands, in parallel with `06`–`08`; `11` and `12` need only `07`;
-`13` needs only the schema (`04`). `14` is written last, because its closeout note and the RFC status
-change assert the milestone is complete.
+in. `09` can start as soon as `05` lands, in parallel with `06`–`08`; `11` needs only `07`, and `12`
+follows `11` because it reuses its step components and client; `13` needs only the schema (`04`).
+`14` is written last, because its closeout note and the RFC status change assert the milestone is
+complete.
 
 Each task is intended to land as an independent PR with `make lint`,
 `make test-api`, and `make test-web` passing.
