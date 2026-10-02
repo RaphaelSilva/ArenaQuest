@@ -44,7 +44,9 @@ Never invent topology. Compute it from the task's source folder.
   approval, so this skill always stops at the PR.
 - **Branch naming** (slashes literal; `<task_slug>` = filename minus `.task.md`):
   - **Milestone:** candidate `feature/m<N>/candidate` (one per milestone, cut from `main`); task `feature/m<N>/<task_slug>.task` (cut from candidate).
-  - **Backlog:** task `feature/backlog/<topic>/<task_slug>.task` (cut from `main`, no candidate).
+  - **Backlog (single task):** task `feature/backlog/<topic>/<task_slug>.task` (cut from `main`, no candidate).
+  - **Backlog candidate:** candidate `feature/backlog/<topic>/<feature>/candidate` (cut from `main`); task `feature/backlog/<topic>/<feature>/<task_slug>.task` (cut from the candidate). `<feature>` is the shared stem of the tasks (for a `--team both` pair, the slug without `NN-` and without `--backend`/`--frontend`, shortened if the owner names it).
+  - **When a backlog run needs a candidate:** whenever it executes **two or more backlog tasks that ship together** — a `--team both` pair, or any task whose `Depends On` names another task of the same run. Never stack one backlog task branch on another, and never deliver dependent backlog tasks as separate PRs: they go through one candidate and one PR. A single standalone backlog task keeps the no-candidate mode.
   - **Epic:** candidate `feature/epic/<epic_name>/candidate` (cut from `main`); task `feature/epic/<epic_name>/<task_slug>.task` (cut from epic candidate).
 - **Chained mode** (`chained`/`stacked`, milestone/epic only — backlog unsupported):
   subject branch `feature/m<N>/<subject_slug>` cut from `main` (`<subject_slug>` =
@@ -74,7 +76,8 @@ task → back to candidate) happen **inside that feature's worktree**.
   | Milestone | `feature/m<N>/candidate` | `.worktrees/m<N>-candidate` |
   | Epic | `feature/epic/<epic_name>/candidate` | `.worktrees/epic-<epic_name>-candidate` |
   | Chained | `feature/m<N>/<subject_slug>` | `.worktrees/m<N>-<subject_slug>` |
-  | Backlog | `feature/backlog/<topic>/<task_slug>.task` | `.worktrees/backlog-<topic>-<task_slug>` |
+  | Backlog (single task) | `feature/backlog/<topic>/<task_slug>.task` | `.worktrees/backlog-<topic>-<task_slug>` |
+  | Backlog candidate | `feature/backlog/<topic>/<feature>/candidate` | `.worktrees/backlog-<topic>-<feature>-candidate` |
 
 - **Foreign worktrees are off-limits.** `git worktree list` may show worktrees owned
   by another process (e.g. `.worktrees/t_*`, or a candidate someone else is driving).
@@ -94,6 +97,14 @@ task files chain is written in a planning worktree and merged into `main` throug
 own PR (see `write-rfc` §*Where to work*). This skill starts from that merged plan:
 its feature worktree is always opened from `origin/main` *after* the planning PR landed.
 
+**Exception — the owner authorizes execution before the planning PR merges.** Then
+the task files exist only on the planning branch. In a candidate mode (milestone,
+epic, backlog candidate), merge the planning branch into the freshly opened
+candidate **first** (`git merge --no-ff origin/<planning_branch>`), so the task files
+live on the candidate, status close-out (§4.5) works there, and the single candidate
+PR carries planning and code together. In the single-task backlog mode, read the task
+file from the planning worktree and leave its status to the planning branch.
+
 ### Open the worktree (from the root checkout)
 
 1. In the root checkout: `git worktree list` and `git status` — the root must be on
@@ -107,10 +118,15 @@ its feature worktree is always opened from `origin/main` *after* the planning PR
    make worktree-open KIND=epic EPIC=<epic_name>
    make worktree-open KIND=chained MILESTONE=<N> SLUG=<subject_slug>
    make worktree-open KIND=backlog TOPIC=<topic> SLUG=<task_slug>
+   make worktree-open KIND=backlog TOPIC=<topic> FEATURE=<feature>   # backlog candidate
    ```
    It refuses a path that holds a worktree it did not open. New branches are always
    based on `origin/main` — `main` is checked out in the root and git refuses to check
    it out twice.
+   **Never open a worktree by hand.** If `make worktree-open` refuses the input (a
+   slug it does not accept, a kind it does not know), STOP and report it: the fix
+   is to the script (`scripts/git/worktree.mjs` + its tests), not a hand-made
+   `git worktree add` with a copied marker.
 4. **Route the session into the worktree** (`cd .worktrees/<name>`) and run every
    subsequent command — plan, delegation, verification, commits, merges, pushes —
    from there. Pass the worktree path to every subagent as its working directory.
@@ -125,7 +141,8 @@ its feature worktree is always opened from `origin/main` *after* the planning PR
    git pull --ff-only origin <candidate_branch>   # when it exists on origin
    git checkout -b <target_task_branch>
    ```
-   Backlog has no candidate: the worktree already sits on the task branch.
+   Backlog (single task) has no candidate: the worktree already sits on the task branch.
+   Backlog candidate: hop exactly as for a milestone, from `feature/backlog/<topic>/<feature>/candidate`.
    Chained: cut the first task from the subject, each later one from the previous task branch.
 
 ## 3. Loop control
@@ -162,7 +179,8 @@ Every step below runs **inside the feature worktree**:
      verified API/shared contracts.
    Write a self-contained `.plan.md` and commit it locally:
    - location: `docs/product/{milestones/<N>|backlog/<topic>|epics/<epic_name>}/planing/<task_slug>.plan.md` (folder literally `planing/`).
-   - `git add <plan> && git commit -m "docs(planning): plan for <task_slug>"`.
+   - `planing/` is **gitignored** (`docs/product/**/planing/`): the plan stays a local
+     file in the worktree. Do not force-add it.
    For a data-layer task, check the highest migration in `apps/api/migrations/` to derive the next number.
 2. **Delegate (§1).** Spawn the persona subagent(s) — backend first, then frontend
    for "both" tasks. Pass the plan path, task path, and the delegated contract. The
@@ -182,8 +200,10 @@ Every step below runs **inside the feature worktree**:
    in sync if present.
 6. **Push & merge (parent).** Single `git push -u origin <task_branch>`. Then per mode:
    - **Milestone/Epic:** `git checkout <candidate>` → `git merge --no-ff <task_branch>` → `git push origin <candidate>`. (Loop: auto-merge; single-task: confirm first.)
-   - **Backlog:** there is no local merge target — the pushed task branch *is* the unit
-     of review. Stop there and offer the PR to `main` (§2).
+   - **Backlog (single task):** there is no local merge target — the pushed task branch
+     *is* the unit of review. Stop there and offer the PR to `main` (§2).
+   - **Backlog candidate:** same as milestone — merge `--no-ff` into the backlog candidate,
+     push it, and offer **one** PR from the candidate to `main`.
    - **Chained:** no per-task merge — only the final fast-forward (§3).
    Offer to delete the local task branch after merge. **`main` is never a merge target
    here:** the candidate/subject/backlog branch reaches it only through a confirmed PR.

@@ -90,8 +90,10 @@ main ◄──────────────────── PR from the
 
 The worktree is named after the feature's candidate branch:
 `feature/m<N>/candidate` → `.worktrees/m<N>-candidate`,
-`feature/epic/<name>/candidate` → `.worktrees/epic-<name>-candidate`. A backlog
-change without a candidate uses `.worktrees/backlog-<topic>-<slug>`.
+`feature/epic/<name>/candidate` → `.worktrees/epic-<name>-candidate`,
+`feature/backlog/<topic>/<feature>/candidate` → `.worktrees/backlog-<topic>-<feature>-candidate`
+(backlog tasks that ship together, e.g. a backend + frontend pair). A single
+standalone backlog task has no candidate and uses `.worktrees/backlog-<topic>-<slug>`.
 
 The Claude Code skills that drive this workflow (planning → per-task loop → PR)
 are diagrammed in [`.claude/skills/README.md`](./.claude/skills/README.md).
@@ -105,7 +107,8 @@ are diagrammed in [`.claude/skills/README.md`](./.claude/skills/README.md).
    It fetches `origin`, attaches to `feature/m19/candidate` if it already exists or
    creates it from `origin/main`, and marks the worktree as managed so the sweep
    can remove it later. Other kinds: `KIND=epic EPIC=<name>`,
-   `KIND=backlog TOPIC=<topic> SLUG=<slug>`, `KIND=chained MILESTONE=<N> SLUG=<subject>`.
+   `KIND=backlog TOPIC=<topic> SLUG=<slug>`, `KIND=backlog TOPIC=<topic> FEATURE=<feature>`
+   (backlog candidate), `KIND=chained MILESTONE=<N> SLUG=<subject>`.
 
 2. **Move into it and bootstrap its local state**
    ```bash

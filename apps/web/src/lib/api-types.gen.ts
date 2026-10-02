@@ -6426,6 +6426,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/topics/{topicId}/media/{mediaId}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Media
+         * @description Reassign a ready media item to another topic (logical transfer). Only the row's topic changes: the storage object is neither copied nor renamed, and its storage key keeps the original topic id. The item's catalog audience becomes the target topic's.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    topicId: string;
+                    mediaId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: uuid
+                         * @description The topic the media item moves to. Any existing topic other than the current one, archived included.
+                         */
+                        targetTopicId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Media moved; the updated item with a fresh signed `url` */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            createdAt: string;
+                            /** Format: uuid */
+                            id: string;
+                            originalName: string;
+                            sizeBytes: number;
+                            /** @enum {string} */
+                            status: "pending" | "ready" | "deleted";
+                            storageKey: string;
+                            /** Format: uuid */
+                            topicNodeId: string;
+                            type: string;
+                            updatedAt: string;
+                            /** Format: uuid */
+                            uploadedById: string;
+                            url: string;
+                        };
+                    };
+                };
+                /** @description SameTopic — the target equals the current topic; or Bad Request / Validation Failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Media not found, deleted or not on `{topicId}`; or target topic not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description MediaNotReady — only ready media can be moved */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/users": {
         parameters: {
             query?: never;

@@ -17,6 +17,9 @@
  *   chained    --milestone <n> --slug <s>→ feature/m<n>/<s>              .worktrees/m<n>-<s>
  *   epic       --epic <e>                → feature/epic/<e>/candidate    .worktrees/epic-<e>-candidate
  *   backlog    --topic <t> --slug <s>    → feature/backlog/<t>/<s>.task  .worktrees/backlog-<t>-<s>
+ *              (<s> may end in --backend / --frontend)
+ *   backlog    --topic <t> --feature <f> → feature/backlog/<t>/<f>/candidate  .worktrees/backlog-<t>-<f>-candidate
+ *              (task branches: feature/backlog/<t>/<f>/<task_slug>.task; --feature and --slug are exclusive)
  *
  * Ownership: `open` writes a marker file (aq-worktree.json) into the worktree's
  * private git dir. `sweep` only ever considers worktrees carrying that marker, so
@@ -41,12 +44,15 @@ export const WORKTREES_DIR = '.worktrees';
 export const TRUNK = 'main';
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+// Backlog task slugs may carry the `--backend` / `--frontend` suffix written by
+// write-backlog-task: one or two hyphens between words, never leading/trailing/triple.
+const TASK_SLUG = /^[a-z0-9]+(?:--?[a-z0-9]+)*$/;
 const INT = /^[0-9]+$/;
 
 // ── Pure logic ────────────────────────────────────────────────────────────────
 
 /** Derive the branch and worktree folder name for one feature. Throws on bad input. */
-export function deriveTarget({ kind, number, slug, milestone, epic, topic } = {}) {
+export function deriveTarget({ kind, number, slug, milestone, epic, topic, feature } = {}) {
   const need = (value, flag, pattern = SLUG) => {
     if (value === undefined || value === '' || value === true) throw new Error(`--${flag} is required for --kind ${kind}`);
     const text = String(value);
@@ -78,7 +84,14 @@ export function deriveTarget({ kind, number, slug, milestone, epic, topic } = {}
     }
     case 'backlog': {
       const t = need(topic, 'topic');
-      const s = need(slug, 'slug');
+      const given = (v) => v !== undefined && v !== '' && v !== false;
+      if (given(feature) && given(slug)) throw new Error('--feature and --slug are mutually exclusive for --kind backlog');
+      if (!given(feature) && !given(slug)) throw new Error('--slug or --feature is required for --kind backlog');
+      if (given(feature)) {
+        const f = need(feature, 'feature');
+        return { kind, branch: `feature/backlog/${t}/${f}/candidate`, name: `backlog-${t}-${f}-candidate`, taskPrefix: `feature/backlog/${t}/${f}/` };
+      }
+      const s = need(slug, 'slug', TASK_SLUG);
       return { kind, branch: `feature/backlog/${t}/${s}.task`, name: `backlog-${t}-${s}` };
     }
     default:

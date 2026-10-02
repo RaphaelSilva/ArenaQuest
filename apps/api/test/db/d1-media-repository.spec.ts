@@ -114,4 +114,72 @@ describe('D1MediaRepository', () => {
 
     expect(await repo.findById(m.id)).toBeNull();
   });
+
+  describe('moveToTopic', () => {
+    let targetTopicId: string;
+
+    beforeAll(async () => {
+      targetTopicId = crypto.randomUUID();
+      await env.DB
+        .prepare("INSERT INTO topic_nodes (id, title) VALUES (?, 'Target Topic')")
+        .bind(targetTopicId)
+        .run();
+    });
+
+    /** Backdates a row so an `updated_at` bump is observable within one second. */
+    const backdate = (id: string) =>
+      env.DB
+        .prepare("UPDATE media SET created_at = '2020-01-01 00:00:00', updated_at = '2020-01-01 00:00:00' WHERE id = ?")
+        .bind(id)
+        .run();
+
+    it('moves a READY row, keeping storage_key and created_at and advancing updated_at', async () => {
+      const m = await repo.create(makeInput({ storageKey: 'topics/src/move-ready.mp4' }));
+      await repo.markReady(m.id);
+      await backdate(m.id);
+      const before = (await repo.findById(m.id))!;
+
+      const moved = await repo.moveToTopic(m.id, topicNodeId, targetTopicId);
+
+      expect(moved).not.toBeNull();
+      expect(moved!.topicNodeId).toBe(targetTopicId);
+      expect(moved!.status).toBe(Entities.Config.MediaStatus.READY);
+      expect(moved!.storageKey).toBe(before.storageKey);
+      expect(moved!.createdAt.getTime()).toBe(before.createdAt.getTime());
+      expect(moved!.updatedAt.getTime()).toBeGreaterThan(before.updatedAt.getTime());
+
+      expect((await repo.listByTopic(targetTopicId)).map(r => r.id)).toContain(m.id);
+      expect((await repo.listByTopic(topicNodeId)).map(r => r.id)).not.toContain(m.id);
+    });
+
+    it('leaves a PENDING row untouched and returns null', async () => {
+      const m = await repo.create(makeInput({ storageKey: 'topics/src/move-pending.mp4' }));
+
+      expect(await repo.moveToTopic(m.id, topicNodeId, targetTopicId)).toBeNull();
+      expect((await repo.findById(m.id))!.topicNodeId).toBe(topicNodeId);
+    });
+
+    it('leaves a DELETED row untouched and returns null', async () => {
+      const m = await repo.create(makeInput({ storageKey: 'topics/src/move-deleted.mp4' }));
+      await repo.markReady(m.id);
+      await repo.softDelete(m.id);
+
+      expect(await repo.moveToTopic(m.id, topicNodeId, targetTopicId)).toBeNull();
+      const fetched = (await repo.findById(m.id))!;
+      expect(fetched.topicNodeId).toBe(topicNodeId);
+      expect(fetched.status).toBe(Entities.Config.MediaStatus.DELETED);
+    });
+
+    it('leaves a row that is not on the given source topic untouched and returns null', async () => {
+      const m = await repo.create(makeInput({ storageKey: 'topics/src/move-wrong-source.mp4' }));
+      await repo.markReady(m.id);
+
+      expect(await repo.moveToTopic(m.id, targetTopicId, targetTopicId)).toBeNull();
+      expect((await repo.findById(m.id))!.topicNodeId).toBe(topicNodeId);
+    });
+
+    it('returns null for an unknown id', async () => {
+      expect(await repo.moveToTopic('00000000-0000-0000-0000-000000000000', topicNodeId, targetTopicId)).toBeNull();
+    });
+  });
 });
