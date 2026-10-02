@@ -1,6 +1,6 @@
 # Task 02 — Backend: Storage reference port and D1 resolver (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [25 — Admin storage browser and orphan audit](./milestone.md)
 **RFC:** [RFC 0018](../../RFCs/0018-admin-storage-browser-and-orphan-audit.md)
 **Team:** Backend API
@@ -66,20 +66,20 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `resolveKeys` over 91 keys returns the correct references for all of them and issues one
+- [x] `resolveKeys` over 91 keys returns the correct references for all of them and issues one
       `db.batch` per 90-key chunk (two batches).
-- [ ] A media key resolves with its topic title and uploader name; a key whose topic row is gone
+- [x] A media key resolves with its topic title and uploader name; a key whose topic row is gone
       resolves with `topic: null`; a key whose media row is gone is absent from the result.
-- [ ] A key stored in `events.flyer_key` resolves as `event-flyer` with the event's title, slug
+- [x] A key stored in `events.flyer_key` resolves as `event-flyer` with the event's title, slug
       and flyer status; a key stored only in `flyer_replaced_key` resolves as
       `event-flyer-displaced`.
-- [ ] A key referenced by a `deleted` and a `ready` media row returns both references.
-- [ ] `existingOwners` returns only the ids that exist, with their titles.
-- [ ] `listReferencedKeys` walks every `ready`/`pending` media key and every non-null flyer key
+- [x] A key referenced by a `deleted` and a `ready` media row returns both references.
+- [x] `existingOwners` returns only the ids that exist, with their titles.
+- [x] `listReferencedKeys` walks every `ready`/`pending` media key and every non-null flyer key
       exactly once across pages, and omits `deleted` media.
-- [ ] No D1 import leaks into the port or into any controller.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] No D1 import leaks into the port or into any controller.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

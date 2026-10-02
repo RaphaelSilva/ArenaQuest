@@ -1,6 +1,6 @@
 # Milestone 25 — Admin storage browser and orphan audit
 
-**Status:** 📝 Draft
+**Status:** 🚧 In Progress — tasks 01–07 and 09–10 landed, plus the Task 08 docs; only the staging `/audit` latency check (§3) is open
 **Scope:** `packages/shared` (storage port folder listing, new storage-reference port, key-owner registry), `apps/api` (read-only D1 resolution adapter, admin-only `/v1/admin/storage/*` router and controller, guarded orphan delete), `apps/web` (admin-only `/admin/storage` page, sidebar item, i18n). Derived from [RFC 0018](../../RFCs/0018-admin-storage-browser-and-orphan-audit.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: `packages/shared/ports/i-storage-adapter.ts` (the `listObjects` options object, `prefixes`, `StorageObject.contentType`) and the matching `apps/api/src/adapters/storage/r2-storage-adapter.ts`; the two existing `listObjects` test doubles in `apps/api/test/controllers/{topics,admin-media}.controller.spec.ts`; the new files `packages/shared/ports/i-storage-reference-repository.ts` (plus its re-export in `ports/index.ts`), `packages/shared/domain/storage/key-owners.ts`, `apps/api/src/adapters/db/d1-storage-reference-repository.ts`, `apps/api/src/controllers/admin-storage.controller.ts`, `apps/api/src/routes/admin/storage.ts`, `apps/api/test/storage/**`; the wiring lines in `apps/api/src/routes/admin/index.ts` and `apps/api/src/container.ts`; new schemas in `apps/api/src/openapi/components/entities.ts` and the regenerated `apps/api/openapi.json`; the new `apps/web/src/lib/admin-storage-api.ts`, `apps/web/src/app/(protected)/admin/storage/**`, `apps/web/src/components/admin/storage/**`, one item in `apps/web/src/components/layout/admin-sidebar.tsx`, the regenerated `apps/web/src/lib/api-types.gen.ts` and both i18n dictionaries; and, for the closeout only, `docs/product/FEATURES.md`, RFC 0018's `Status:` header and its README row, and — only if the §3 latency criterion fails — one backlog task file under `docs/product/backlog/` for the `media.storage_key` index. It is explicitly **not** an opportunity to: **upload, rename or move objects** from this page (the topic media uploader and the RFC 0014 flyer flow keep owning writes); **open the page to `content_creator`** in any form; add a **scheduled garbage collector** or any Cron Trigger; **fix the root causes** of drift (`deleteMedia`'s swallowed `.catch`, the displaced-flyer delete, `ON DELETE CASCADE` on `media`, the repositories' hard `delete`) — they are made visible here and fixed in separate backlog items; write to **any DB row** (no status change, no hard-delete of `pending` or `deleted` media rows); add a **migration** (no `storage_objects` inventory, no audit table, no index on `media.storage_key` unless the §3 latency criterion fails and it is filed as its own task); or build a **cross-tenant** view. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
@@ -63,19 +63,19 @@ Out of scope (explicit, from RFC 0018 Non-Goals):
 
 ## 3. Acceptance Criteria
 
-- [ ] `listObjects('topics/', { delimiter: '/' })` against a miniflare R2 with two topic folders returns two `prefixes` and zero `objects`; without `delimiter`, `prefixes` is `[]`.
-- [ ] `key-owners-coverage.spec.ts` passes on the current migrations and fails on a fixture migration that adds an unregistered `thumbnail_key` column.
-- [ ] `D1StorageReferenceRepository.resolveKeys` returns correct references for 91 keys (crossing the 90-key chunk boundary) using one `db.batch` per chunk.
-- [ ] With one fixture object per status (`linked` media, `linked` flyer, `pending`, stale `pending`, `displaced`, `deleted-row`, orphan with each hint), `/browse` and `/audit` classify every object as specified in §2; `/audit` omits the `linked` ones.
-- [ ] `/audit/missing` reports exactly the fixture `ready` row whose object was never put, and nothing else.
-- [ ] A `content_creator` token gets `403` and a `student` token gets `403` on each of `/browse`, `/object`, `/audit`, `/audit/missing` and `DELETE /object`; no token gets `401`.
-- [ ] `DELETE /object` returns `409` for a `linked`, `pending`, `displaced` and a 1-hour-old orphan, and leaves each object in the bucket; on a 25-hour-old orphan it returns `200`, the object is gone, no D1 row changed, and one `storage.orphan.deleted` line is logged.
+- [x] `listObjects('topics/', { delimiter: '/' })` against a miniflare R2 with two topic folders returns two `prefixes` and zero `objects`; without `delimiter`, `prefixes` is `[]`.
+- [x] `key-owners-coverage.spec.ts` passes on the current migrations and fails on a fixture migration that adds an unregistered `thumbnail_key` column.
+- [x] `D1StorageReferenceRepository.resolveKeys` returns correct references for 91 keys (crossing the 90-key chunk boundary) using one `db.batch` per chunk.
+- [x] With one fixture object per status (`linked` media, `linked` flyer, `pending`, stale `pending`, `displaced`, `deleted-row`, orphan with each hint), `/browse` and `/audit` classify every object as specified in §2; `/audit` omits the `linked` ones.
+- [x] `/audit/missing` reports exactly the fixture `ready` row whose object was never put, and nothing else.
+- [x] A `content_creator` token gets `403` and a `student` token gets `403` on each of `/browse`, `/object`, `/audit`, `/audit/missing` and `DELETE /object`; no token gets `401`.
+- [x] `DELETE /object` returns `409` for a `linked`, `pending`, `displaced` and a 1-hour-old orphan, and leaves each object in the bucket; on a 25-hour-old orphan it returns `200`, the object is gone, no D1 row changed, and one `storage.orphan.deleted` line is logged.
 - [ ] An `/audit` page of 1000 keys completes in under 2 s on staging (if not, an index task is filed — not bundled).
-- [ ] In the web app, an admin navigates root → `topics/` → a topic folder and sees the topic title and each file's original name; the sidebar item is absent for a `content_creator` session (RTL test).
-- [ ] The scan panel accumulates pages until `nextCursor` is absent, shows the `scanned` count, stops on demand, and totals reclaimable bytes by status (RTL test with a mocked client).
-- [ ] `check-i18n-coverage.js` passes; `dict-en.ts` and `dict-pt.ts` have identical `adminStorage` keys.
-- [ ] `make lint`, `make test-api` and `make test-web` pass green.
-- [ ] No diff outside the files listed in the guardrail; no new file under `apps/api/migrations/`.
+- [x] In the web app, an admin navigates root → `topics/` → a topic folder and sees the topic title and each file's original name; the sidebar item is absent for a `content_creator` session (RTL test).
+- [x] The scan panel accumulates pages until `nextCursor` is absent, shows the `scanned` count, stops on demand, and totals reclaimable bytes by status (RTL test with a mocked client).
+- [x] `check-i18n-coverage.js` passes; `dict-en.ts` and `dict-pt.ts` have identical `adminStorage` keys.
+- [x] `make lint`, `make test-api` and `make test-web` pass green.
+- [x] No diff outside the files listed in the guardrail; no new file under `apps/api/migrations/`. *(Three minimal out-of-list edits were needed; see the closeout.)*
 
 ---
 
@@ -92,14 +92,16 @@ Out of scope (explicit, from RFC 0018 Non-Goals):
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [Storage port folder listing and key-owner registry](./01-storage-port-folder-listing-and-key-owner-registry.task.md) | 0 | Backend | ☐ Open |
-| 02 | [Storage reference port and D1 resolver](./02-storage-reference-port-and-d1-resolver.task.md) | 1 | Backend | ☐ Open |
-| 03 | [Admin storage API: browse, object and audit](./03-admin-storage-api-browse-object-audit.task.md) | 1 | Backend | ☐ Open |
-| 04 | [Admin storage browser page](./04-admin-storage-browser-page.task.md) | 1 | Frontend | ☐ Open |
-| 05 | [Orphan and missing-file scan panel](./05-orphan-and-missing-file-scan-panel.task.md) | 1 | Frontend | ☐ Open |
-| 06 | [Guarded orphan delete API](./06-guarded-orphan-delete-api.task.md) | 2 | Backend | ☐ Open |
-| 07 | [Delete orphan action in the browser](./07-delete-orphan-action.task.md) | 2 | Frontend | ☐ Open |
-| 08 | [Docs and rollout closeout](./08-docs-and-rollout-closeout.task.md) | 3 | Backend | ☐ Open |
+| 01 | [Storage port folder listing and key-owner registry](./01-storage-port-folder-listing-and-key-owner-registry.task.md) | 0 | Backend | ✅ Done |
+| 02 | [Storage reference port and D1 resolver](./02-storage-reference-port-and-d1-resolver.task.md) | 1 | Backend | ✅ Done |
+| 03 | [Admin storage API: browse, object and audit](./03-admin-storage-api-browse-object-audit.task.md) | 1 | Backend | ✅ Done |
+| 04 | [Admin storage browser page](./04-admin-storage-browser-page.task.md) | 1 | Frontend | ✅ Done |
+| 05 | [Orphan and missing-file scan panel](./05-orphan-and-missing-file-scan-panel.task.md) | 1 | Frontend | ✅ Done |
+| 06 | [Guarded orphan delete API](./06-guarded-orphan-delete-api.task.md) | 2 | Backend | ✅ Done |
+| 07 | [Delete orphan action in the browser](./07-delete-orphan-action.task.md) | 2 | Frontend | ✅ Done |
+| 08 | [Docs and rollout closeout](./08-docs-and-rollout-closeout.task.md) | 3 | Backend | 🚧 In Progress |
+| 09 | [Register student submissions as a storage key owner](./09-submission-storage-owner-api.task.md) | 2 | Backend | ✅ Done |
+| 10 | [Show student submissions as storage owners](./10-submission-storage-owner-web.task.md) | 2 | Frontend | ✅ Done |
 
 Dependency graph:
 
@@ -133,10 +135,10 @@ Each task is intended to land as an independent PR into the `feature/m25/candida
 
 ## 7. Definition of Done (milestone level)
 
-- [ ] All tasks marked Done with every acceptance box checked.
+- [ ] All tasks marked Done with every acceptance box checked. *(Task 08 is open until the staging latency check runs.)*
 - [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] Closeout note written at `./closeout-analysis.md`.
-- [ ] RFC 0018 status set to `Implemented` in its header and
+- [x] `make lint`, `make test-api`, and `make test-web` pass green.
+- [x] Closeout note written at `./closeout-analysis.md`.
+- [x] RFC 0018 status set to `Implemented` in its header and
       `docs/product/RFCs/README.md`; deferred items remain backlog.
-- [ ] No diff outside the scope declared in the guardrail.
+- [x] No diff outside the scope declared in the guardrail. *(Small, necessary exceptions are recorded in the closeout.)*

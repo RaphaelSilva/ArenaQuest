@@ -1,6 +1,6 @@
 # Task 05 — Frontend: Orphan and missing-file scan panel (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [25 — Admin storage browser and orphan audit](./milestone.md)
 **RFC:** [RFC 0018](../../RFCs/0018-admin-storage-browser-and-orphan-audit.md)
 **Team:** Frontend Web
@@ -62,20 +62,20 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Starting "Scan for orphans" calls `/audit` without a cursor, then with each returned
+- [x] Starting "Scan for orphans" calls `/audit` without a cursor, then with each returned
       cursor, and stops calling when `nextCursor` is absent; the scanned counter equals the sum
       of `scanned` across pages.
-- [ ] Pressing stop mid-run aborts the in-flight request and issues no further request.
-- [ ] A failed page shows an error; "Retry" re-requests with the last good cursor and keeps
+- [x] Pressing stop mid-run aborts the in-flight request and issues no further request.
+- [x] A failed page shows an error; "Retry" re-requests with the last good cursor and keeps
       earlier results.
-- [ ] Results are grouped by status with the correct count and total bytes per group;
+- [x] Results are grouped by status with the correct count and total bytes per group;
       "Check for missing files" lists missing-object rows with owner links.
-- [ ] Selecting a result opens the Task 04 detail drawer for that key.
-- [ ] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and `dict-pt.ts`;
+- [x] Selecting a result opens the Task 04 detail drawer for that key.
+- [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and `dict-pt.ts`;
       `check-i18n-coverage.js` passes.
-- [ ] The surface is responsive and keyboard-usable while a run is active.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] The surface is responsive and keyboard-usable while a run is active.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

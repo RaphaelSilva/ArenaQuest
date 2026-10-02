@@ -1,7 +1,7 @@
 # RFC 0018: Admin storage browser and orphan audit
 
 **Date:** 2026-09-29
-**Status:** Proposed
+**Status:** Implemented
 **Revised:** 2026-09-29
 **Author:** raphaelsilva
 **Affected:**

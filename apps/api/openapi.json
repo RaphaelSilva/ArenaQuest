@@ -2173,6 +2173,80 @@
         ],
         "type": "object"
       },
+      "ClassifiedObject": {
+        "properties": {
+          "contentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hint": {
+            "description": "Set only when `status` is `orphan`.",
+            "enum": [
+              "owner-topic-gone",
+              "owner-event-gone",
+              "row-gone",
+              "unknown-shape"
+            ],
+            "example": "row-gone",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "key": {
+            "example": "topics/3f2c…/9a1b…-lesson.pdf",
+            "type": "string"
+          },
+          "name": {
+            "description": "Last path segment of the key.",
+            "example": "9a1b…-lesson.pdf",
+            "type": "string"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/StorageReference"
+            },
+            "type": "array"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "stale": {
+            "description": "Only ever true for `pending`: older than the 24 h grace window.",
+            "type": "boolean"
+          },
+          "status": {
+            "description": "Server-side classification of a stored object.",
+            "enum": [
+              "linked",
+              "pending",
+              "displaced",
+              "deleted-row",
+              "orphan"
+            ],
+            "example": "linked",
+            "type": "string"
+          },
+          "uploadedAt": {
+            "example": "2026-09-29T12:00:00.000Z",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "size",
+          "uploadedAt",
+          "contentType",
+          "status",
+          "stale",
+          "hint",
+          "references"
+        ],
+        "type": "object"
+      },
       "Comment": {
         "properties": {
           "body": {
@@ -2476,6 +2550,53 @@
         ],
         "type": "object"
       },
+      "EventFlyerStorageReference": {
+        "properties": {
+          "eventId": {
+            "type": "string"
+          },
+          "flyerName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "flyerStatus": {
+            "enum": [
+              "none",
+              "pending",
+              "ready"
+            ],
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "event-flyer",
+              "event-flyer-displaced"
+            ],
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "eventId",
+          "title",
+          "slug",
+          "flyerStatus",
+          "flyerName"
+        ],
+        "type": "object"
+      },
       "ForgotPasswordRequest": {
         "properties": {
           "email": {
@@ -2720,6 +2841,115 @@
           "status",
           "createdAt",
           "updatedAt"
+        ],
+        "type": "object"
+      },
+      "MediaStorageReference": {
+        "properties": {
+          "createdAt": {
+            "example": "2026-09-29T12:00:00.000Z",
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "media"
+            ],
+            "type": "string"
+          },
+          "mediaId": {
+            "type": "string"
+          },
+          "originalName": {
+            "example": "Lesson One.pdf",
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "status": {
+            "description": "The status of the media.",
+            "enum": [
+              "pending",
+              "ready",
+              "deleted"
+            ],
+            "example": "ready",
+            "type": "string"
+          },
+          "topic": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "description": "The status of the topic node.",
+                "enum": [
+                  "draft",
+                  "published",
+                  "archived"
+                ],
+                "example": "published",
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "status"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "topicId": {
+            "type": "string"
+          },
+          "type": {
+            "example": "application/pdf",
+            "type": "string"
+          },
+          "uploader": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "uploaderId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "mediaId",
+          "status",
+          "originalName",
+          "type",
+          "sizeBytes",
+          "uploaderId",
+          "uploader",
+          "topicId",
+          "topic",
+          "createdAt"
         ],
         "type": "object"
       },
@@ -3569,6 +3799,253 @@
           }
         ]
       },
+      "StorageAuditMissingResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StorageMissingObject"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "scanned": {
+            "description": "Number of references checked for this page.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "scanned"
+        ],
+        "type": "object"
+      },
+      "StorageAuditResponse": {
+        "properties": {
+          "nextCursor": {
+            "type": "string"
+          },
+          "objects": {
+            "description": "Only the non-`linked` objects of the page.",
+            "items": {
+              "$ref": "#/components/schemas/ClassifiedObject"
+            },
+            "type": "array"
+          },
+          "scanned": {
+            "description": "Number of keys walked for this page.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "objects",
+          "scanned"
+        ],
+        "type": "object"
+      },
+      "StorageBrowseResponse": {
+        "properties": {
+          "folders": {
+            "items": {
+              "$ref": "#/components/schemas/StorageFolder"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": "string"
+          },
+          "objects": {
+            "items": {
+              "$ref": "#/components/schemas/ClassifiedObject"
+            },
+            "type": "array"
+          },
+          "prefix": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "prefix",
+          "folders",
+          "objects"
+        ],
+        "type": "object"
+      },
+      "StorageDeleteConflict": {
+        "properties": {
+          "error": {
+            "enum": [
+              "StorageObjectNotDeletable"
+            ],
+            "type": "string"
+          },
+          "object": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassifiedObject"
+              },
+              {
+                "description": "The classification read during this request."
+              }
+            ]
+          },
+          "reason": {
+            "description": "`not-deletable-status`: not `orphan` / `deleted-row`. `within-grace-window`: uploaded less than 24 h ago.",
+            "enum": [
+              "not-deletable-status",
+              "within-grace-window"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "error",
+          "reason",
+          "object"
+        ],
+        "type": "object"
+      },
+      "StorageDeleteResponse": {
+        "properties": {
+          "deleted": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "status": {
+            "description": "Classification the object had when it was removed.",
+            "enum": [
+              "orphan",
+              "deleted-row"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "deleted",
+          "key",
+          "size",
+          "status"
+        ],
+        "type": "object"
+      },
+      "StorageFolder": {
+        "properties": {
+          "name": {
+            "description": "Last segment of the prefix, without the delimiter.",
+            "type": "string"
+          },
+          "owner": {
+            "description": "The topic / event a `topics/<id>/` or `events/<id>/` folder belongs to, when it exists.",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "topic",
+                  "event"
+                ],
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "title"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "ownerGone": {
+            "description": "True for an owner-shaped folder whose topic / event no longer exists.",
+            "type": "boolean"
+          },
+          "prefix": {
+            "example": "topics/3f2c…/",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prefix",
+          "name",
+          "owner",
+          "ownerGone"
+        ],
+        "type": "object"
+      },
+      "StorageMissingObject": {
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "reference": {
+            "$ref": "#/components/schemas/StorageReference"
+          },
+          "status": {
+            "enum": [
+              "missing-object"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "status",
+          "reference"
+        ],
+        "type": "object"
+      },
+      "StorageObjectDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ClassifiedObject"
+          },
+          {
+            "properties": {
+              "downloadUrl": {
+                "description": "Presigned GET URL, valid for 5 minutes.",
+                "type": "string"
+              },
+              "downloadUrlExpiresAt": {
+                "example": "2026-09-29T12:05:00.000Z",
+                "type": "string"
+              }
+            },
+            "required": [
+              "downloadUrl",
+              "downloadUrlExpiresAt"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "StorageReference": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/MediaStorageReference"
+          },
+          {
+            "$ref": "#/components/schemas/EventFlyerStorageReference"
+          },
+          {
+            "$ref": "#/components/schemas/SubmissionStorageReference"
+          }
+        ]
+      },
       "Submission": {
         "properties": {
           "authorId": {
@@ -3740,6 +4217,121 @@
           "reason",
           "used",
           "limit"
+        ],
+        "type": "object"
+      },
+      "SubmissionStorageReference": {
+        "properties": {
+          "author": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "contentType": {
+            "example": "video/quicktime",
+            "type": "string"
+          },
+          "createdAt": {
+            "example": "2026-09-29T12:00:00.000Z",
+            "type": "string"
+          },
+          "key": {
+            "example": "submissions/student-a/9a1b…-kata.mp4",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "submission"
+            ],
+            "type": "string"
+          },
+          "originalName": {
+            "example": "IMG_0042.MOV",
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "status": {
+            "description": "A `removed` tombstone has no key, so only `pending` / `ready` resolve in practice.",
+            "enum": [
+              "pending",
+              "ready",
+              "removed"
+            ],
+            "example": "ready",
+            "type": "string"
+          },
+          "submissionId": {
+            "type": "string"
+          },
+          "title": {
+            "example": "Kata, 2nd attempt",
+            "type": "string"
+          },
+          "topic": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "description": "The status of the topic node.",
+                "enum": [
+                  "draft",
+                  "published",
+                  "archived"
+                ],
+                "example": "published",
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "status"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "topicId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "submissionId",
+          "status",
+          "title",
+          "originalName",
+          "contentType",
+          "sizeBytes",
+          "authorId",
+          "author",
+          "topicId",
+          "topic",
+          "createdAt"
         ],
         "type": "object"
       },
@@ -9112,6 +9704,308 @@
         "summary": "Update Quest",
         "tags": [
           "admin:quests"
+        ]
+      }
+    },
+    "/v1/admin/storage/audit": {
+      "get": {
+        "description": "Walks up to `limit` keys flat and returns only the non-`linked` ones. Stateless: follow `nextCursor`.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Opaque `nextCursor` from the previous page.",
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 1000,
+              "example": 1000,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageAuditResponse"
+                }
+              }
+            },
+            "description": "Audit page"
+          },
+          "400": {
+            "description": "Validation failed or invalid cursor"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Audit one page of the bucket",
+        "tags": [
+          "admin:storage"
+        ]
+      }
+    },
+    "/v1/admin/storage/audit/missing": {
+      "get": {
+        "description": "Checks up to `limit` live references and returns those whose object does not exist.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Opaque `nextCursor` from the previous page.",
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "example": 50,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageAuditMissingResponse"
+                }
+              }
+            },
+            "description": "Missing-object page"
+          },
+          "400": {
+            "description": "Validation failed or invalid cursor"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Find references whose object is gone",
+        "tags": [
+          "admin:storage"
+        ]
+      }
+    },
+    "/v1/admin/storage/browse": {
+      "get": {
+        "description": "Delimited sub-folders (labelled with their topic / event) and the classified objects directly under `prefix`.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "prefix",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "Folder to list: '' for the bucket root, otherwise ending with '/'.",
+              "example": "topics/",
+              "maxLength": 1024,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Opaque `nextCursor` from the previous page.",
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "example": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageBrowseResponse"
+                }
+              }
+            },
+            "description": "One folder page"
+          },
+          "400": {
+            "description": "Validation failed or invalid cursor"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Browse one storage folder",
+        "tags": [
+          "admin:storage"
+        ]
+      }
+    },
+    "/v1/admin/storage/object": {
+      "delete": {
+        "description": "Re-classifies the key at request time and removes the object only when it is `orphan` or `deleted-row` and was uploaded more than 24 h ago. Anything else answers `409` with the current classification and leaves the object in place. Storage only: no database row is changed.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "example": "topics/3f2c…/9a1b…-lesson.pdf",
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageDeleteResponse"
+                }
+              }
+            },
+            "description": "Object removed"
+          },
+          "400": {
+            "description": "Validation failed or invalid cursor"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "No object under that key"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageDeleteConflict"
+                }
+              }
+            },
+            "description": "Not safe to delete right now"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete an orphaned object",
+        "tags": [
+          "admin:storage"
+        ]
+      },
+      "get": {
+        "description": "Head, references, classification and a presigned download URL valid for 5 minutes.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "example": "topics/3f2c…/9a1b…-lesson.pdf",
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageObjectDetail"
+                }
+              }
+            },
+            "description": "Object detail"
+          },
+          "400": {
+            "description": "Validation failed or invalid cursor"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "description": "No object under that key"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Inspect one stored object",
+        "tags": [
+          "admin:storage"
         ]
       }
     },

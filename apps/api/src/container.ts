@@ -23,6 +23,7 @@ import { D1SubmissionRepository } from '@api/adapters/db/d1-submission-repositor
 import { D1BillingRepository } from '@api/adapters/db/d1-billing-repository';
 import { D1EventChargeRepository } from '@api/adapters/db/d1-event-charge-repository';
 import { D1EventRepository } from '@api/adapters/db/d1-event-repository';
+import { D1StorageReferenceRepository } from '@api/adapters/db/d1-storage-reference-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
 import { KvRateLimiter } from '@api/adapters/rate-limit/kv-rate-limiter';
 import { ConsoleMailAdapter } from '@api/adapters/mail/console-mail-adapter';
@@ -56,6 +57,7 @@ import type {
   ITagRepository,
   IMediaRepository,
   IStorageAdapter,
+  IStorageReferenceRepository,
   ITaskRepository,
   ITaskStageRepository,
   ITaskLinkingRepository,
@@ -97,6 +99,11 @@ export interface ContentContext {
   tags: ITagRepository;
   media: IMediaRepository;
   storage: IStorageAdapter;
+  /**
+   * Read-only resolution of bucket keys to their owning rows (RFC 0018 §3),
+   * read by the admin storage browser.
+   */
+  storageReferences: IStorageReferenceRepository;
 }
 
 export interface EngagementContext {
@@ -249,6 +256,7 @@ export function buildContainer(env: Env): AppContainer {
     secretAccessKey: env.R2_SECRET_ACCESS_KEY,
     publicBase: env.R2_PUBLIC_BASE || undefined,
   });
+  const storageReferences = new D1StorageReferenceRepository(env.DB);
 
   // Engagement repos
   const taskRepo = new D1TaskRepository(env.DB);
@@ -387,7 +395,7 @@ export function buildContainer(env: Env): AppContainer {
 
   return {
     identity: { users, tokens, activationTokens, passwordResetTokens, oauthAccounts, authService, userGroups },
-    content: { topics, tags, media, storage },
+    content: { topics, tags, media, storage, storageReferences },
     engagement: {
       taskRepo,
       taskStages,

@@ -1,6 +1,6 @@
 # Task 08 — Backend: Docs and rollout closeout (Phase 3)
 
-**Status:** 📝 Open
+**Status:** 🚧 In Progress — docs closed; staging `/audit` latency check blocked (no deployable staging environment)
 **Milestone:** [25 — Admin storage browser and orphan audit](./milestone.md)
 **RFC:** [RFC 0018](../../RFCs/0018-admin-storage-browser-and-orphan-audit.md)
 **Team:** Backend API
@@ -56,16 +56,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `docs/product/FEATURES.md` lists the admin storage browser and orphan audit.
-- [ ] RFC 0018's header and README row read `Implemented`; `check-rfc.mjs` passes on it.
+- [x] `docs/product/FEATURES.md` lists the admin storage browser and orphan audit.
+- [x] RFC 0018's header and README row read `Implemented`; `check-rfc.mjs` passes on it.
 - [ ] Every task in the milestone and the milestone itself are marked done; `check-feature.mjs`
       and `check-task.mjs --milestone 25` pass.
 - [ ] The closeout records the staging `/audit` page time and the per-status counts, with no key
       or file name.
 - [ ] If the page time was ≥ 2 s, a backlog task for the `media.storage_key` index exists and is
       linked from the closeout; otherwise none was created.
-- [ ] `make test-api` and `make test-web` still green on the candidate branch.
-- [ ] No diff outside the scope guardrail.
+- [x] `make test-api` and `make test-web` still green on the candidate branch.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

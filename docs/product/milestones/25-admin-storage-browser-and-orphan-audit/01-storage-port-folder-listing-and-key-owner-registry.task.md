@@ -1,6 +1,6 @@
 # Task 01 — Backend: Storage port folder listing and key-owner registry (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [25 — Admin storage browser and orphan audit](./milestone.md)
 **RFC:** [RFC 0018](../../RFCs/0018-admin-storage-browser-and-orphan-audit.md)
 **Team:** Backend API
@@ -68,19 +68,19 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `listObjects('topics/', { delimiter: '/' })` over two topic folders returns two
+- [x] `listObjects('topics/', { delimiter: '/' })` over two topic folders returns two
       `prefixes` and zero `objects`; the same call without `delimiter` returns every object and
       `prefixes: []`.
-- [ ] A listing over more objects than `limit` reaches every key by following `nextCursor`
+- [x] A listing over more objects than `limit` reaches every key by following `nextCursor`
       until it is absent.
-- [ ] Each returned object carries the `contentType` it was put with.
-- [ ] `parseStorageKey` returns `topic-media` with topic id, media id and file name for a media
+- [x] Each returned object carries the `contentType` it was put with.
+- [x] `parseStorageKey` returns `topic-media` with topic id, media id and file name for a media
       key, `event-flyer` with the event id for a flyer key, and `unknown` for anything else.
-- [ ] The coverage spec passes on the current migrations and fails, naming the column, when fed
+- [x] The coverage spec passes on the current migrations and fails, naming the column, when fed
       a fixture migration that adds an unregistered `thumbnail_key` column.
-- [ ] No provider-specific (R2) import leaks into `packages/shared`.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] No provider-specific (R2) import leaks into `packages/shared`.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

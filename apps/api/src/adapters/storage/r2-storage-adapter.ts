@@ -17,8 +17,18 @@ import type {
   PresignedUrlOptions,
   StorageObject,
   StorageObjectMetadata,
+  ListObjectsOptions,
   ListObjectsResult,
 } from '@arenaquest/shared/ports';
+
+/** R2's own per-call ceiling for `list`. */
+const MAX_LIST_LIMIT = 1000;
+const DEFAULT_LIST_LIMIT = 100;
+
+function clampListLimit(limit: number | undefined): number {
+  if (limit === undefined || !Number.isFinite(limit)) return DEFAULT_LIST_LIMIT;
+  return Math.min(MAX_LIST_LIMIT, Math.max(1, Math.floor(limit)));
+}
 
 export interface R2StorageAdapterConfig {
   bucket: R2Bucket;
@@ -174,16 +184,23 @@ export class R2StorageAdapter implements IStorageAdapter {
     return `${base}/${key}`;
   }
 
-  async listObjects(prefix: string, cursor?: string, limit = 100): Promise<ListObjectsResult> {
+  async listObjects(prefix: string, options?: ListObjectsOptions): Promise<ListObjectsResult> {
+    const limit = clampListLimit(options?.limit);
+    // With `include` set, R2 may return fewer than `limit` objects while
+    // `truncated` is still true (the metadata counts against the response
+    // size). A short page is therefore NOT the end: callers continue on
+    // `nextCursor` only, and stop only once it is absent.
     const result = await this.bucket.list({
       prefix,
-      cursor,
+      cursor: options?.cursor,
       limit,
+      ...(options?.delimiter ? { delimiter: options.delimiter } : {}),
       include: ['customMetadata', 'httpMetadata'],
     });
 
     return {
       objects: result.objects.map(obj => this.toStorageObject(obj)),
+      prefixes: options?.delimiter ? (result.delimitedPrefixes ?? []) : [],
       nextCursor: result.truncated ? result.cursor : undefined,
     };
   }
@@ -195,6 +212,7 @@ export class R2StorageAdapter implements IStorageAdapter {
       key: obj.key,
       size: obj.size,
       lastModified: obj.uploaded,
+      ...(obj.httpMetadata?.contentType ? { contentType: obj.httpMetadata.contentType } : {}),
       metadata: obj.customMetadata
         ? (obj.customMetadata as StorageObjectMetadata)
         : undefined,

@@ -17,6 +17,7 @@ import { buildAdminBillingRouter } from './billing';
 import { buildAdminEventsRouter } from './events';
 import { buildAdminNotesRouter } from './notes';
 import { buildAdminSubmissionsRouter } from './submissions';
+import { buildAdminStorageRouter } from './storage';
 import type { AppContainer } from '@api/container';
 
 export function buildAdminRouter(container: AppContainer) {
@@ -49,6 +50,8 @@ export function buildAdminRouter(container: AppContainer) {
   app.route('/groups', buildAdminGroupsRouter(container));
   // Carries its own requireRole(ROLES.ADMIN) — the umbrella above admits CONTENT_CREATOR.
   app.route('/billing', buildAdminBillingRouter(container));
+  // Carries its own requireRole(ROLES.ADMIN) — the bucket view is admin only (RFC 0018).
+  app.route('/storage', buildAdminStorageRouter(container));
   // Carries its own requireRole(ROLES.ADMIN) on the publish transition only —
   // a content creator writes drafts here, but does not put them on the internet.
   app.route('/events', buildAdminEventsRouter(container));

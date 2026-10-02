@@ -4425,6 +4425,327 @@ export interface paths {
         };
         trace?: never;
     };
+    "/v1/admin/storage/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit one page of the bucket
+         * @description Walks up to `limit` keys flat and returns only the non-`linked` ones. Stateless: follow `nextCursor`.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Audit page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageAuditResponse"];
+                    };
+                };
+                /** @description Validation failed or invalid cursor */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/audit/missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find references whose object is gone
+         * @description Checks up to `limit` live references and returns those whose object does not exist.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Missing-object page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageAuditMissingResponse"];
+                    };
+                };
+                /** @description Validation failed or invalid cursor */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/browse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Browse one storage folder
+         * @description Delimited sub-folders (labelled with their topic / event) and the classified objects directly under `prefix`.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    prefix?: string;
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One folder page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageBrowseResponse"];
+                    };
+                };
+                /** @description Validation failed or invalid cursor */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/storage/object": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inspect one stored object
+         * @description Head, references, classification and a presigned download URL valid for 5 minutes.
+         */
+        get: {
+            parameters: {
+                query: {
+                    key: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Object detail */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageObjectDetail"];
+                    };
+                };
+                /** @description Validation failed or invalid cursor */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No object under that key */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /**
+         * Delete an orphaned object
+         * @description Re-classifies the key at request time and removes the object only when it is `orphan` or `deleted-row` and was uploaded more than 24 h ago. Anything else answers `409` with the current classification and leaves the object in place. Storage only: no database row is changed.
+         */
+        delete: {
+            parameters: {
+                query: {
+                    key: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Object removed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageDeleteResponse"];
+                    };
+                };
+                /** @description Validation failed or invalid cursor */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No object under that key */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not safe to delete right now */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StorageDeleteConflict"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/submissions/{id}": {
         parameters: {
             query?: never;
@@ -8331,7 +8652,7 @@ export interface paths {
         put?: never;
         /**
          * Move my submissions to another topic
-         * @description Moves up to 10 of the caller's ready submissions, in order, each guarded by the target's per-topic count. Partial success is normal. Moved submissions become private, keep their moderation flag, and their file is not touched. The source topic need not be readable.
+         * @description Moves up to 10 of the caller's ready submissions, in order, each guarded by the target's per-topic count. Partial success is normal. Moved submissions become private, keep their moderation flag, and their file is not touched. The source topic need not be readable. Staff (`admin`, `content_creator`) move their own submissions under the same rules.
          */
         post: {
             parameters: {
@@ -8366,7 +8687,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Staff do not move submissions */
+                /** @description A staff caller named a submission another user authored; nothing is moved */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -9269,7 +9590,7 @@ export interface paths {
         put?: never;
         /**
          * Start a submission upload
-         * @description Creates a `pending` submission and returns a presigned PUT under a server-built key. Rate limited to 30 per hour per user.
+         * @description Creates a `pending` submission and returns a presigned PUT under a server-built key. Rate limited to 30 per hour per user. Staff (`admin`, `content_creator`) upload too, under the same type, size, quota and sharing rules, on any published, non-archived topic.
          */
         post: {
             parameters: {
@@ -9297,17 +9618,6 @@ export interface paths {
                 };
                 /** @description Malformed body, or `SUBMISSION_TITLE_INVALID` / `SUBMISSION_DESCRIPTION_TOO_LONG` */
                 400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorBody"] & {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-                /** @description Staff do not upload submissions */
-                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -9524,7 +9834,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Staff acting on someone else's submission (they read and moderate only) */
+                /** @description Staff acting on a submission someone else authored (they read and moderate it, they do not change it) */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -9612,7 +9922,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Staff acting on someone else's submission (they read and moderate only) */
+                /** @description Staff acting on a submission someone else authored (they read and moderate it, they do not change it) */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -9694,7 +10004,7 @@ export interface paths {
                         "application/json": components["schemas"]["Submission"];
                     };
                 };
-                /** @description Staff acting on someone else's submission (they read and moderate only) */
+                /** @description Staff acting on a submission someone else authored (they read and moderate it, they do not change it) */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -10387,6 +10697,34 @@ export interface components {
              */
             nextCursor: string | null;
         };
+        ClassifiedObject: {
+            contentType: string | null;
+            /**
+             * @description Set only when `status` is `orphan`.
+             * @example row-gone
+             * @enum {string|null}
+             */
+            hint: "owner-topic-gone" | "owner-event-gone" | "row-gone" | "unknown-shape" | null;
+            /** @example topics/3f2c…/9a1b…-lesson.pdf */
+            key: string;
+            /**
+             * @description Last path segment of the key.
+             * @example 9a1b…-lesson.pdf
+             */
+            name: string;
+            references: components["schemas"]["StorageReference"][];
+            size: number;
+            /** @description Only ever true for `pending`: older than the 24 h grace window. */
+            stale: boolean;
+            /**
+             * @description Server-side classification of a stored object.
+             * @example linked
+             * @enum {string}
+             */
+            status: "linked" | "pending" | "displaced" | "deleted-row" | "orphan";
+            /** @example 2026-09-29T12:00:00.000Z */
+            uploadedAt: string;
+        };
         Comment: {
             /** @example This topic was very helpful! */
             body: string | null;
@@ -10495,6 +10833,17 @@ export interface components {
             maxBytes: number;
             uploadUrl: string;
         };
+        EventFlyerStorageReference: {
+            eventId: string;
+            flyerName: string | null;
+            /** @enum {string} */
+            flyerStatus: "none" | "pending" | "ready";
+            key: string;
+            /** @enum {string} */
+            kind: "event-flyer" | "event-flyer-displaced";
+            slug: string;
+            title: string;
+        };
         ForgotPasswordRequest: {
             /**
              * Format: email
@@ -10600,6 +10949,41 @@ export interface components {
              * @example https://example.com/media/123.jpg
              */
             url: string;
+        };
+        MediaStorageReference: {
+            /** @example 2026-09-29T12:00:00.000Z */
+            createdAt: string;
+            key: string;
+            /** @enum {string} */
+            kind: "media";
+            mediaId: string;
+            /** @example Lesson One.pdf */
+            originalName: string;
+            sizeBytes: number;
+            /**
+             * @description The status of the media.
+             * @example ready
+             * @enum {string}
+             */
+            status: "pending" | "ready" | "deleted";
+            topic: {
+                id: string;
+                /**
+                 * @description The status of the topic node.
+                 * @example published
+                 * @enum {string}
+                 */
+                status: "draft" | "published" | "archived";
+                title: string;
+            } | null;
+            topicId: string;
+            /** @example application/pdf */
+            type: string;
+            uploader: {
+                id: string;
+                name: string;
+            } | null;
+            uploaderId: string;
         };
         MoveSubmissionsBody: {
             /**
@@ -10917,6 +11301,74 @@ export interface components {
              */
             removedByName: string | null;
         };
+        StorageAuditMissingResponse: {
+            items: components["schemas"]["StorageMissingObject"][];
+            nextCursor?: string;
+            /** @description Number of references checked for this page. */
+            scanned: number;
+        };
+        StorageAuditResponse: {
+            nextCursor?: string;
+            /** @description Only the non-`linked` objects of the page. */
+            objects: components["schemas"]["ClassifiedObject"][];
+            /** @description Number of keys walked for this page. */
+            scanned: number;
+        };
+        StorageBrowseResponse: {
+            folders: components["schemas"]["StorageFolder"][];
+            nextCursor?: string;
+            objects: components["schemas"]["ClassifiedObject"][];
+            prefix: string;
+        };
+        StorageDeleteConflict: {
+            /** @enum {string} */
+            error: "StorageObjectNotDeletable";
+            object: components["schemas"]["ClassifiedObject"] & unknown;
+            /**
+             * @description `not-deletable-status`: not `orphan` / `deleted-row`. `within-grace-window`: uploaded less than 24 h ago.
+             * @enum {string}
+             */
+            reason: "not-deletable-status" | "within-grace-window";
+        };
+        StorageDeleteResponse: {
+            /** @enum {boolean} */
+            deleted: true;
+            key: string;
+            size: number;
+            /**
+             * @description Classification the object had when it was removed.
+             * @enum {string}
+             */
+            status: "orphan" | "deleted-row";
+        };
+        StorageFolder: {
+            /** @description Last segment of the prefix, without the delimiter. */
+            name: string;
+            /** @description The topic / event a `topics/<id>/` or `events/<id>/` folder belongs to, when it exists. */
+            owner: {
+                id: string;
+                /** @enum {string} */
+                kind: "topic" | "event";
+                title: string;
+            } | null;
+            /** @description True for an owner-shaped folder whose topic / event no longer exists. */
+            ownerGone: boolean;
+            /** @example topics/3f2c…/ */
+            prefix: string;
+        };
+        StorageMissingObject: {
+            key: string;
+            reference: components["schemas"]["StorageReference"];
+            /** @enum {string} */
+            status: "missing-object";
+        };
+        StorageObjectDetail: components["schemas"]["ClassifiedObject"] & {
+            /** @description Presigned GET URL, valid for 5 minutes. */
+            downloadUrl: string;
+            /** @example 2026-09-29T12:05:00.000Z */
+            downloadUrlExpiresAt: string;
+        };
+        StorageReference: components["schemas"]["MediaStorageReference"] | components["schemas"]["EventFlyerStorageReference"] | components["schemas"]["SubmissionStorageReference"];
         Submission: {
             /** @example student-a */
             authorId: string;
@@ -11001,6 +11453,44 @@ export interface components {
             reason: "count" | "storage";
             /** @example 10 */
             used: number;
+        };
+        SubmissionStorageReference: {
+            author: {
+                id: string;
+                name: string;
+            } | null;
+            authorId: string;
+            /** @example video/quicktime */
+            contentType: string;
+            /** @example 2026-09-29T12:00:00.000Z */
+            createdAt: string;
+            /** @example submissions/student-a/9a1b…-kata.mp4 */
+            key: string;
+            /** @enum {string} */
+            kind: "submission";
+            /** @example IMG_0042.MOV */
+            originalName: string;
+            sizeBytes: number;
+            /**
+             * @description A `removed` tombstone has no key, so only `pending` / `ready` resolve in practice.
+             * @example ready
+             * @enum {string}
+             */
+            status: "pending" | "ready" | "removed";
+            submissionId: string;
+            /** @example Kata, 2nd attempt */
+            title: string;
+            topic: {
+                id: string;
+                /**
+                 * @description The status of the topic node.
+                 * @example published
+                 * @enum {string}
+                 */
+                status: "draft" | "published" | "archived";
+                title: string;
+            } | null;
+            topicId: string;
         };
         SubmissionSummary: {
             /**
