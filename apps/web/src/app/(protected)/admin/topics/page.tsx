@@ -1014,6 +1014,11 @@ export default function AdminTopicsPage() {
                     topicId={selectedId}
                     media={detailMedia}
                     onMediaDeleted={reloadMedia}
+                    topics={nodes}
+                    onMediaMoved={(targetTitle) => {
+                      showToast(d.media.move.moved(targetTitle), 'success');
+                      void reloadMedia();
+                    }}
                   />
                 )
               )}

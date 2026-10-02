@@ -6105,6 +6105,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/topics/{topicId}/media/{mediaId}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Media
+         * @description Reassign a ready media item to another topic (logical transfer). Only the row's topic changes: the storage object is neither copied nor renamed, and its storage key keeps the original topic id. The item's catalog audience becomes the target topic's.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    topicId: string;
+                    mediaId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: uuid
+                         * @description The topic the media item moves to. Any existing topic other than the current one, archived included.
+                         */
+                        targetTopicId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Media moved; the updated item with a fresh signed `url` */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            createdAt: string;
+                            /** Format: uuid */
+                            id: string;
+                            originalName: string;
+                            sizeBytes: number;
+                            /** @enum {string} */
+                            status: "pending" | "ready" | "deleted";
+                            storageKey: string;
+                            /** Format: uuid */
+                            topicNodeId: string;
+                            type: string;
+                            updatedAt: string;
+                            /** Format: uuid */
+                            uploadedById: string;
+                            url: string;
+                        };
+                    };
+                };
+                /** @description SameTopic — the target equals the current topic; or Bad Request / Validation Failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Media not found, deleted or not on `{topicId}`; or target topic not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description MediaNotReady — only ready media can be moved */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/users": {
         parameters: {
             query?: never;
@@ -8331,7 +8420,7 @@ export interface paths {
         put?: never;
         /**
          * Move my submissions to another topic
-         * @description Moves up to 10 of the caller's ready submissions, in order, each guarded by the target's per-topic count. Partial success is normal. Moved submissions become private, keep their moderation flag, and their file is not touched. The source topic need not be readable.
+         * @description Moves up to 10 of the caller's ready submissions, in order, each guarded by the target's per-topic count. Partial success is normal. Moved submissions become private, keep their moderation flag, and their file is not touched. The source topic need not be readable. Staff (`admin`, `content_creator`) move their own submissions under the same rules.
          */
         post: {
             parameters: {
@@ -8366,7 +8455,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Staff do not move submissions */
+                /** @description A staff caller named a submission another user authored; nothing is moved */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -9269,7 +9358,7 @@ export interface paths {
         put?: never;
         /**
          * Start a submission upload
-         * @description Creates a `pending` submission and returns a presigned PUT under a server-built key. Rate limited to 30 per hour per user.
+         * @description Creates a `pending` submission and returns a presigned PUT under a server-built key. Rate limited to 30 per hour per user. Staff (`admin`, `content_creator`) upload too, under the same type, size, quota and sharing rules, on any published, non-archived topic.
          */
         post: {
             parameters: {
@@ -9297,17 +9386,6 @@ export interface paths {
                 };
                 /** @description Malformed body, or `SUBMISSION_TITLE_INVALID` / `SUBMISSION_DESCRIPTION_TOO_LONG` */
                 400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorBody"] & {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-                /** @description Staff do not upload submissions */
-                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -9524,7 +9602,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Staff acting on someone else's submission (they read and moderate only) */
+                /** @description Staff acting on a submission someone else authored (they read and moderate it, they do not change it) */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -9612,7 +9690,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Staff acting on someone else's submission (they read and moderate only) */
+                /** @description Staff acting on a submission someone else authored (they read and moderate it, they do not change it) */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -9694,7 +9772,7 @@ export interface paths {
                         "application/json": components["schemas"]["Submission"];
                     };
                 };
-                /** @description Staff acting on someone else's submission (they read and moderate only) */
+                /** @description Staff acting on a submission someone else authored (they read and moderate it, they do not change it) */
                 403: {
                     headers: {
                         [name: string]: unknown;
