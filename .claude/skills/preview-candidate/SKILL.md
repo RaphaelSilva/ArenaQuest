@@ -1,6 +1,6 @@
 ---
 name: preview-candidate
-description: Deploy, verify and report an ArenaQuest candidate preview on staging (API Workers Preview + Pages branch), and tear it down after the merge. Use when asked to "deploy the candidate preview", "preview m<N>", "redeploy the preview", "which user do I log in with on the preview", "update the PR with the preview" or "remove the preview". Picks a label whose staging is actually provisioned, runs the deploy CLI, smoke-tests both URLs, lists the demo accounts from the staging D1, and always ends with the same report — URLs, accounts, password tip, limitations, rollback bookmark and teardown command.
+description: Deploy, verify and report an ArenaQuest candidate preview on staging (API Workers Preview + Pages branch), and tear it down after the merge. Use when asked to "deploy the candidate preview", "preview m<N>", "redeploy the preview", "which user do I log in with on the preview", "update the PR with the preview" or "remove the preview". Picks a label whose staging is actually provisioned, runs the deploy CLI, smoke-tests both URLs, lists the demo accounts from the staging D1, asks (AskUserQuestion) before any teardown, and always ends with the same report — URLs, accounts, password tip, limitations, rollback bookmark and teardown command.
 Triggers: preview candidate, deploy preview, candidate preview, redeploy preview, preview url, preview users, preview login, staging preview, delete preview, remove preview, preview-delete-staging, deploy-preview-staging
 ---
 
@@ -136,8 +136,11 @@ Migrations aplicadas até <NNNN> no D1 compartilhado do staging <label>. Para de
 pnpm --filter api exec wrangler d1 time-travel restore <db> --bookmark=<bookmark> --env <label>-staging
 
 Por que <label>: <o único label com D1 de staging | escolhido por você>.
-Depois do merge: make preview-delete-staging LABEL=<label> CANDIDATE=<c>
+Depois do merge, a remoção (make preview-delete-staging LABEL=<label> CANDIDATE=<c>)
+será perguntada antes de rodar.
 ```
+
+The report only *names* the teardown command; it never runs it (§7).
 
 **PR.** When the candidate has an open PR, put the same URLs, accounts table and
 limitations under a `## Preview` section of its body. **Replace** that section on every
@@ -145,7 +148,19 @@ redeploy — never append a second one — and leave the rest of the body untouc
 
 ## 7. Teardown
 
-On "remove the preview", or once the PR is merged:
+**Teardown is never automatic — always ask first.** Whenever teardown becomes relevant
+(the owner mentions removing the preview, the PR is merged, the worktree was swept, or a
+report is about to suggest it), stop and ask with the **`AskUserQuestion`** tool — an
+open question, not a line buried in the report — before running anything:
+
+- **question:** *"Remove the preview `<c>` from `<label>` staging (Worker preview + Pages
+  branch `<c>`)?"*, stating whether the PR is merged;
+- **options:** *"Yes, delete it"* · *"Dry run first"* · *"Keep it"*.
+
+Only an explicit *"Yes"* (or *"Dry run first"*, then a second confirmation) runs it; no
+answer, an ambiguous answer, or an earlier approval for another candidate means **keep**.
+A request phrased as "remove the preview" still gets the question, because it deletes
+what reviewers may have open.
 
 ```bash
 make preview-delete-staging LABEL=<l> CANDIDATE=<c> DRY_RUN=1   # plan
@@ -163,6 +178,8 @@ command only if the owner wants the D1 rolled back. Report what was deleted, and
   production too, but this skill never asks it to.
 - **Secrets by name only.** Never write, print, log or pass a secret value on argv —
   `AQ_DEMO_PASSWORD` and `AQ_PREVIEW_*` included.
+- **`preview-delete-staging` only after an `AskUserQuestion` "Yes".** Never run it on
+  inference — not after a merge, a sweep, or a "remove the preview" request (§7).
 - **Every deploy reports its bookmark.** A deploy whose bookmark is missing is a failure.
 - **Never kill a process this session did not start.** Another worktree's `wrangler dev`
   may hold `:8787`; local smoke tests use a free port.

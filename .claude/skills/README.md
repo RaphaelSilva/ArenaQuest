@@ -128,7 +128,10 @@ flowchart TD
     SMOKE --> ACC["Demo accounts from the staging D1<br/>(emails + roles, never a password)"]
     ACC --> REP["Fixed report<br/>URLs · accounts · password tip · limitations<br/>bookmark + restore · teardown command"]
     REP --> PR["Replace the PR's ## Preview section"]
-    PR -. "after the merge" .-> DEL["make preview-delete-staging"]
+    PR -. "after the merge" .-> ASK{"AskUserQuestion<br/>remove the preview?"}
+    ASK -- "Yes" --> DEL["make preview-delete-staging"]
+    ASK -- "Dry run first" --> DRYDEL["preview-delete-staging DRY_RUN=1"] --> ASK
+    ASK -- "Keep / no answer" --> KEEP(["Preview stays"])
 ```
 
 ## Rules the diagrams encode
@@ -145,6 +148,6 @@ flowchart TD
   an RFC; the gate names the failed criterion instead of deciding silently.
 - **`preview-candidate` never reaches production or a secret value.** It previews on
   staging only, checks secrets by name, and always reports the D1 bookmark that undoes
-  its migrations.
+  its migrations. Teardown runs only after an explicit `AskUserQuestion` "Yes".
 - **`verify-doc-status` is report-only on code.** It points at what is missing;
   it never changes implementation to make a criterion pass.
