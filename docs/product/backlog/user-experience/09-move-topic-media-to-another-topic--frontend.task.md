@@ -1,0 +1,81 @@
+# Task 09 — Frontend: Move topic media to another topic
+
+**Status:** 📝 Open
+**Kind:** Feature
+**Team:** Frontend Web
+**Priority:** Medium
+**Found in:** M25 preview review (admin storage browser), 2026-10-02
+**Depends On:** [Task 08](./08-move-topic-media-to-another-topic--backend.task.md)
+
+## Summary
+
+Adds a **"Move to…"** action to each `ready` media item in the backoffice topic media list
+(`/admin/topics`). It is visible to `admin` and `content_creator`, the same roles that upload
+and delete there. The action opens a dialog with a topic picker built from the existing topic
+tree. The current topic is excluded. The dialog shows the item's name and the destination, and
+requires an explicit confirm before it calls Task 08's `POST
+/v1/admin/topics/{topicId}/media/{mediaId}/move`. On success the item disappears from the open
+topic's list and a confirmation names the destination. On an error the dialog stays open and
+shows the reason from the server: not ready, topic gone, or no permission.
+
+## Motivation
+
+- Raised while reviewing the M25 storage-browser preview (PR #78): a file uploaded to the wrong
+  module can today only be deleted and uploaded again.
+- Task 08 adds the endpoint, and this task puts it where content is managed, next to upload and
+  delete.
+
+## Scope
+
+In:
+- `move(topicId, mediaId, targetTopicId)` in `admin-media-api.ts`, over the centralized `api-client`.
+- The "Move to…" action on `ready` items in the admin `MediaList`. A `pending` item does not
+  get the action.
+- A move dialog:
+  - the topic picker comes from the topic tree the page already loads;
+  - it is modal, keeps focus inside, closes on Escape, and starts on *Cancel*;
+  - it announces the outcome.
+- List refresh after a success, and an error state that keeps the dialog open.
+- The regenerated `api-types.gen.ts`, and new keys in both dictionaries.
+- RTL tests for every behaviour above.
+
+Out:
+- The endpoint itself. That is Task 08.
+- A "Move" shortcut in the M25 storage browser drawer. It can link to the topic later; not
+  part of this task.
+- Drag-and-drop between topics, and bulk moves.
+
+## Technical Constraints
+
+- **Scope guardrail:** changes restricted to:
+  - `apps/web/src/lib/admin-media-api.ts`
+  - `apps/web/src/lib/api-types.gen.ts`: regenerated with `pnpm gen:api-types`.
+  - `apps/web/src/components/admin/MediaList.tsx` and a new `apps/web/src/components/admin/MoveMediaDialog.tsx`
+  - `apps/web/src/components/admin/__tests__/**`
+  - `apps/web/src/app/(protected)/admin/topics/page.tsx`: only if the topic tree must be passed down.
+  - `apps/web/src/i18n/dict-en.ts`, `apps/web/src/i18n/dict-pt.ts`
+- Reuse the topic tree data the topics page already holds; no new fetch for the picker.
+- **i18n.** No hardcoded user-facing string; identical keys in both dictionaries;
+  `check-i18n-coverage.js` passes.
+- The server decides: the client hides the action for non-`ready` items, but always shows a
+  `409` / `404` / `403` answer.
+
+## Acceptance Criteria
+
+- [ ] A `ready` item shows "Move to…"; a `pending` item does not.
+- [ ] The picker lists every topic except the current one; confirming sends the move request
+      with the chosen target, and cancelling sends nothing.
+- [ ] On success the item leaves the current topic's list and the confirmation names the destination.
+- [ ] On `409`, `404` or `403` the dialog stays open and shows the matching message.
+- [ ] The dialog is keyboard-usable, keeps focus inside and closes on Escape.
+- [ ] No hardcoded user-facing string; the new keys exist in both dictionaries; `check-i18n-coverage.js` passes.
+- [ ] Changed files lint clean; `make test-web` green.
+- [ ] No diff outside the scope guardrail.
+
+## Verification Plan
+
+1. `make test-web` and `check-i18n-coverage.js`: the new component tests pass.
+2. `make dev-api` + `make dev-web`, sign in as the seeded admin: move a video from one topic to
+   another, open the destination and see it there. Try a `pending` item and a deleted
+   destination topic.
+3. `git diff --stat` confirms only scope-guardrail files changed.
