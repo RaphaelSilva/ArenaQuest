@@ -123,16 +123,61 @@
 				"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 				"R2_PUBLIC_BASE": "",
 				"R2_BUCKET_NAME": "budo-media-staging",
-				"MAIL_DRIVER": "resend",
+				"MAIL_DRIVER": "console",
 				"MAIL_FROM": "Budo Staging <noreply@budo.app>",
 				"WEB_BASE_URL": "https://budo-web-staging.pages.dev",
 				// "GOOGLE_CLIENT_ID": it was setted manually in Cloudflare dashboard, because we don't want to expose it in the repo.
-				"GOOGLE_REDIRECT_URI": "https://api-budo-staging.spaziord.com.br/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api-budo-staging.spaziord.com.br/auth/google/callback",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,
 				"logs": {
 					"enabled": true
+				}
+			},
+			"previews": {
+				"d1_databases": [
+					{
+						"binding": "DB",
+						"database_name": "budo-db-staging",
+						"database_id": "c4884534-9070-42c6-bdb2-9bc2c843f41c"
+					}
+				],
+				"kv_namespaces": [
+					{
+						"binding": "RATE_LIMIT_KV",
+						"id": "c75ab14e35164e22b7c6eb3581969295"
+					}
+				],
+				"r2_buckets": [
+					{
+						"binding": "R2",
+						"bucket_name": "budo-media-staging"
+					}
+				],
+				"vars": {
+					"ALLOWED_ORIGINS": "https://budo-web-staging.pages.dev,https://*.budo-web-staging.pages.dev,http://localhost:3000",
+					"COOKIE_SAMESITE": "None",
+					"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+					"R2_PUBLIC_BASE": "",
+					"R2_BUCKET_NAME": "budo-media-staging",
+					"MAIL_DRIVER": "console",
+					"MAIL_FROM": "Budo Staging <noreply@budo.app>",
+					"WEB_BASE_URL": "https://budo-web-staging.pages.dev",
+					"GOOGLE_REDIRECT_URI": "https://api-budo-staging.spaziord.com.br/auth/google/callback",
+					"APP_PREVIEW": "1"
+				},
+				"observability": {
+					"enabled": true,
+					"logs": {
+						"enabled": true
+					}
 				}
 			}
 		},
@@ -174,7 +219,13 @@
 				// `wrangler deploy`, which replaces the whole vars set, cannot silently drop it.
 				// The matching GOOGLE_CLIENT_SECRET stays a Worker secret.
 				"GOOGLE_CLIENT_ID": "63847537881-4fudig0vngk2ll8u2pt4lkoijnppuv79.apps.googleusercontent.com",
-				"GOOGLE_REDIRECT_URI": "https://api.taibudo.com/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api.taibudo.com/auth/google/callback",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,
@@ -213,16 +264,61 @@
 				"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 				"R2_PUBLIC_BASE": "",
 				"R2_BUCKET_NAME": "spaziord-media-staging",
-				"MAIL_DRIVER": "resend",
+				"MAIL_DRIVER": "console",
 				"MAIL_FROM": "SpazioRD Staging <noreply@spaziord.app>",
 				"WEB_BASE_URL": "https://spaziord-web-staging.pages.dev",
 				"GOOGLE_REDIRECT_URI": "https://api-staging.spaziord.com.br/auth/google/callback",
-				"GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
+				"GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,
 				"logs": {
 					"enabled": true
+				}
+			},
+			"previews": {
+				"d1_databases": [
+					{
+						"binding": "DB",
+						"database_name": "spaziord-db-staging",
+						"database_id": "fc1fe1ce-df8f-4579-b9f8-3b3c1abc206f"
+					}
+				],
+				"kv_namespaces": [
+					{
+						"binding": "RATE_LIMIT_KV",
+						"id": "fec26f8faa614796bac63f9f529f7616"
+					}
+				],
+				"r2_buckets": [
+					{
+						"binding": "R2",
+						"bucket_name": "spaziord-media-staging"
+					}
+				],
+				"vars": {
+					"ALLOWED_ORIGINS": "https://spaziord-web-staging.pages.dev,https://*.spaziord-web-staging.pages.dev,http://localhost:3000",
+					"COOKIE_SAMESITE": "None",
+					"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+					"R2_PUBLIC_BASE": "",
+					"R2_BUCKET_NAME": "spaziord-media-staging",
+					"MAIL_DRIVER": "console",
+					"MAIL_FROM": "SpazioRD Staging <noreply@spaziord.app>",
+					"WEB_BASE_URL": "https://spaziord-web-staging.pages.dev",
+					"GOOGLE_REDIRECT_URI": "https://api-staging.spaziord.com.br/auth/google/callback",
+					"APP_PREVIEW": "1"
+				},
+				"observability": {
+					"enabled": true,
+					"logs": {
+						"enabled": true
+					}
 				}
 			}
 		},
@@ -262,7 +358,13 @@
 				// `wrangler deploy`, which replaces the whole vars set, cannot silently drop it.
 				// The matching GOOGLE_CLIENT_SECRET stays a Worker secret.
 				"GOOGLE_CLIENT_ID": "63847537881-4fudig0vngk2ll8u2pt4lkoijnppuv79.apps.googleusercontent.com",
-				"GOOGLE_REDIRECT_URI": "https://api.spaziord.app/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api.spaziord.app/auth/google/callback",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,
@@ -301,18 +403,63 @@
 				"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 				"R2_PUBLIC_BASE": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 				"R2_BUCKET_NAME": "arenaquest-media-staging",
-				"MAIL_DRIVER": "resend",
+				"MAIL_DRIVER": "console",
 				"MAIL_FROM": "ArenaQuest Staging <noreply@arenaquest.app>",
 				"WEB_BASE_URL": "https://arenaquest-web-staging.pages.dev",
 				// Google OAuth — replace with your staging OAuth client values.
 				// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET --env staging`
 				// "GOOGLE_CLIENT_ID": "<fill: Google OAuth client id (not a secret)>"
-				"GOOGLE_REDIRECT_URI": "https://api-staging.raphael-1d2.workers.dev/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api-staging.raphael-1d2.workers.dev/auth/google/callback",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,
 				"logs": {
 					"enabled": true
+				}
+			},
+			"previews": {
+				"d1_databases": [
+					{
+						"binding": "DB",
+						"database_name": "arenaquest-db-staging",
+						"database_id": "6a2f5784-c57e-46ae-a858-27ca876f1dfe"
+					}
+				],
+				"kv_namespaces": [
+					{
+						"binding": "RATE_LIMIT_KV",
+						"id": "c697147935024190ada81e743c3479d9"
+					}
+				],
+				"r2_buckets": [
+					{
+						"binding": "R2",
+						"bucket_name": "arenaquest-media-staging"
+					}
+				],
+				"vars": {
+					"ALLOWED_ORIGINS": "https://arenaquest-web-staging.pages.dev,https://*.arenaquest-web-staging.pages.dev,http://localhost:3000",
+					"COOKIE_SAMESITE": "None",
+					"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+					"R2_PUBLIC_BASE": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
+					"R2_BUCKET_NAME": "arenaquest-media-staging",
+					"MAIL_DRIVER": "console",
+					"MAIL_FROM": "ArenaQuest Staging <noreply@arenaquest.app>",
+					"WEB_BASE_URL": "https://arenaquest-web-staging.pages.dev",
+					"GOOGLE_REDIRECT_URI": "https://api-staging.raphael-1d2.workers.dev/auth/google/callback",
+					"APP_PREVIEW": "1"
+				},
+				"observability": {
+					"enabled": true,
+					"logs": {
+						"enabled": true
+					}
 				}
 			}
 		},
@@ -350,7 +497,13 @@
 				// Google OAuth — replace with your staging OAuth client values.
 				// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET --env staging`
 				// "GOOGLE_CLIENT_ID": it was setted manually in Cloudflare dashboard, because we don't want to expose it in the repo.
-				"GOOGLE_REDIRECT_URI": "https://api.arenaquest.app/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api.arenaquest.app/auth/google/callback",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,
@@ -396,7 +549,13 @@
 				// Google OAuth — replace with your staging OAuth client values.
 				// GOOGLE_CLIENT_SECRET is a secret: `wrangler secret put GOOGLE_CLIENT_SECRET --env staging`
 				//"GOOGLE_CLIENT_ID": "",
-				"GOOGLE_REDIRECT_URI": "https://api-staging.raphael-1d2.workers.dev/auth/google/callback"
+				"GOOGLE_REDIRECT_URI": "https://api-staging.raphael-1d2.workers.dev/auth/google/callback",
+				// Student submissions (RFC 0020 section 3). Absent = default; present but
+				// invalid = 500 SUBMISSION_CONFIG_INVALID. Tune per label and environment.
+				"SUBMISSIONS_PER_TOPIC_MAX": "10",
+				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
+				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
+				"SUBMISSIONS_SHARING_ENABLED": "true"
 			},
 			"observability": {
 				"enabled": true,

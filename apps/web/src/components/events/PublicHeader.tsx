@@ -39,9 +39,7 @@ function MinimalHeader() {
       className="flex h-14 items-center justify-between px-6"
       style={{ background: 'var(--aq-bg2)', borderBottom: '1px solid var(--aq-border)' }}
     >
-      <Link href="/" aria-label={dict.events.header.home}>
-        <Logo size="sm" />
-      </Link>
+      <Logo />
 
       <nav className="flex items-center gap-3" aria-label={dict.events.header.navLabel}>
         <ThemeToggle />

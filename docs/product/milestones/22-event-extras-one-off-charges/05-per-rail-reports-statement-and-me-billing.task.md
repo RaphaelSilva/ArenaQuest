@@ -1,6 +1,6 @@
 # Task 05 — Backend: Per-rail reports, statement and `/v1/me/billing` (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [22 — Event extras: one-off charges on a separate billing rail](./milestone.md)
 **RFC:** [RFC 0015](../../RFCs/0015-event-extras-one-off-charges-for-events.md)
 **Team:** Backend API
@@ -61,19 +61,19 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] For a month with 30000 fees and 15000 extras received, movement returns
+- [x] For a month with 30000 fees and 15000 extras received, movement returns
       `receivedMinor = 30000`, `extras.receivedMinor = 15000`, `cashReceivedMinor = 45000`.
-- [ ] Every pre-existing movement field returns the same value as before this task when the
+- [x] Every pre-existing movement field returns the same value as before this task when the
       charge tables hold data (contracts-only meaning preserved).
-- [ ] `aging` with no parameter equals `?rail=contract` and equals the pre-task output;
+- [x] `aging` with no parameter equals `?rail=contract` and equals the pre-task output;
       `?rail=extras` buckets only charges.
-- [ ] A voided charge contributes to no report total and no bucket.
-- [ ] `/v1/me/billing` for a student with a paid-up contract and one overdue charge returns
+- [x] A voided charge contributes to no report total and no bucket.
+- [x] `/v1/me/billing` for a student with a paid-up contract and one overdue charge returns
       contract `standing = good` and `extras.standing = delinquent`, with the charge's event title.
-- [ ] `/v1/me/billing` never returns a charge belonging to another user (test with two users).
-- [ ] A report spanning two currencies returns `409`, as today.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] `/v1/me/billing` never returns a charge belonging to another user (test with two users).
+- [x] A report spanning two currencies returns `409`, as today.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

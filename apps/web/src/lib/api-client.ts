@@ -8,6 +8,7 @@ import * as topicsApiModule from './topics-api';
 import * as tasksApiModule from './tasks-api';
 import * as accountApiModule from './account-api';
 import * as adminTopicsApiModule from './admin-topics-api';
+import * as adminTagsApiModule from './admin-tags-api';
 import * as adminTasksApiModule from './admin-tasks-api';
 import * as adminUsersApiModule from './admin-users-api';
 import * as adminMediaApiModule from './admin-media-api';
@@ -21,6 +22,8 @@ import * as meBillingApiModule from './me-billing-api';
 import * as progressApiModule from './progress-api';
 import * as dashboardApiModule from './dashboard-api';
 import * as commentsApiModule from './comments-api';
+import * as notesApiModule from './notes-api';
+import * as submissionsApiModule from './submissions-api';
 
 // HTTP transport interface — injectable for testing
 export interface HttpTransport {
@@ -84,6 +87,10 @@ export class ApiClient {
     return adminTopicsApiModule.createAdminTopicsApi(this.http);
   }
 
+  get adminTags() {
+    return adminTagsApiModule.createAdminTagsApi(this.http);
+  }
+
   get adminTasks() {
     return adminTasksApiModule.createAdminTasksApi(this.http);
   }
@@ -134,5 +141,13 @@ export class ApiClient {
 
   get comments() {
     return commentsApiModule.createCommentsApi(this.http);
+  }
+
+  get notes() {
+    return notesApiModule.createNotesApi(this.http);
+  }
+
+  get submissions() {
+    return submissionsApiModule.createSubmissionsApi(this.http);
   }
 }

@@ -68,7 +68,12 @@ describe('events schema constraints (migration 0027)', () => {
   it('creates the listing and reverse-lookup indexes', async () => {
     const { results } = await env.DB
       .prepare(
-        `SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_event%' ORDER BY name`,
+        // Scoped to 0027's own tables: later migrations (0028's event_charges
+        // family) add indexes that share the `idx_event` prefix.
+        `SELECT name FROM sqlite_master
+          WHERE type = 'index' AND name LIKE 'idx_event%'
+            AND tbl_name IN ('events', 'event_audience_group', 'event_audience_user')
+          ORDER BY name`,
       )
       .all<{ name: string }>();
 

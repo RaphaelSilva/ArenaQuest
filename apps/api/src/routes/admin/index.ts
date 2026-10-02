@@ -4,6 +4,7 @@ import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { buildAdminUsersRouter } from './users';
 import { buildAdminTopicsRouter } from './topics';
+import { buildAdminTagsRouter } from './tags';
 import { buildAdminTasksRouter } from './tasks';
 import { buildAdminBadgesRouter } from './badges';
 import { buildAdminMissionsRouter } from './missions';
@@ -14,6 +15,8 @@ import { buildAdminEnrollmentsRouter } from './enrollments';
 import { buildAdminGroupsRouter } from './groups';
 import { buildAdminBillingRouter } from './billing';
 import { buildAdminEventsRouter } from './events';
+import { buildAdminNotesRouter } from './notes';
+import { buildAdminSubmissionsRouter } from './submissions';
 import { buildAdminStorageRouter } from './storage';
 import type { AppContainer } from '@api/container';
 
@@ -23,8 +26,21 @@ export function buildAdminRouter(container: AppContainer) {
   // Apply root level authentication and role checks once for the entire sub-app
   app.use('*', authGuard, requireRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR));
 
+  // Staff notes (RFC 0016). MUST stay registered before '/users': the users
+  // router applies `requireRole(ROLES.ADMIN)` to '/users/*', which would also
+  // catch 'GET /users/{userId}/notes' and 403 a content creator. Hono runs
+  // handlers in registration order and this one responds, so the later
+  // '/users/*' middleware never runs for that path. Guarded by a spec asserting
+  // a content creator gets 200 there (test/routes/admin-notes.router.spec.ts).
+  app.route('/', buildAdminNotesRouter(container));
+  // Staff submissions (RFC 0020): same constraint as notes — before '/users',
+  // or 'GET /users/{userId}/submissions' would 403 a content creator. Guarded
+  // by test/routes/admin-submissions.router.spec.ts.
+  app.route('/', buildAdminSubmissionsRouter(container));
   app.route('/users', buildAdminUsersRouter(container));
   app.route('/topics', buildAdminTopicsRouter(container));
+  // No stricter guard: tag lookup serves every role that may author a topic.
+  app.route('/tags', buildAdminTagsRouter(container));
   app.route('/tasks', buildAdminTasksRouter(container));
   app.route('/badges', buildAdminBadgesRouter(container));
   app.route('/missions', buildAdminMissionsRouter(container));

@@ -1,6 +1,6 @@
 # Task 08 — Frontend: Two-rail roster, reports and statement panel (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [22 — Event extras: one-off charges on a separate billing rail](./milestone.md)
 **RFC:** [RFC 0015](../../RFCs/0015-event-extras-one-off-charges-for-events.md)
 **Team:** Frontend Web
@@ -58,21 +58,21 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A roster row for contract paid-up + overdue charge shows *Monthly fee: good* and
+- [x] A roster row for contract paid-up + overdue charge shows *Monthly fee: good* and
       *Extras: delinquent*.
-- [ ] An extras-only buyer's row shows "no contract" for the monthly fee and a resolved extras badge.
-- [ ] Filtering by monthly fee and by extras are independent; each issues the matching query
+- [x] An extras-only buyer's row shows "no contract" for the monthly fee and a resolved extras badge.
+- [x] Filtering by monthly fee and by extras are independent; each issues the matching query
       parameter.
-- [ ] The aging view opens on the contract rail; switching to extras refetches with
+- [x] The aging view opens on the contract rail; switching to extras refetches with
       `rail=extras`.
-- [ ] Movement shows the three groups and no single combined "received" other than the
+- [x] Movement shows the three groups and no single combined "received" other than the
       cash-received line.
-- [ ] The statement panel shows contract and extras sections separately, each with its own badge.
-- [ ] The existing billing nav badge (if any) keeps reflecting the contract rail only.
-- [ ] No hardcoded user-facing string; keys exist in both dictionaries;
+- [x] The statement panel shows contract and extras sections separately, each with its own badge.
+- [x] The existing billing nav badge (if any) keeps reflecting the contract rail only.
+- [x] No hardcoded user-facing string; keys exist in both dictionaries;
       `check-i18n-coverage.js` passes.
-- [ ] Changed files lint clean; `make test-web` green for the affected component tests.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-web` green for the affected component tests.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

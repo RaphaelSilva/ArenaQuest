@@ -18,8 +18,11 @@ let client: {
   };
 };
 
+let search = '';
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace }),
+  useSearchParams: () => new URLSearchParams(search),
 }));
 
 vi.mock('@web/hooks/use-auth', () => ({
@@ -59,6 +62,7 @@ describe('AdminBillingPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     isAdmin = true;
+    search = '';
     http = makeTransport((_method, path) => {
       if (path.includes('/reports/aging')) return agingReport;
       return [];
@@ -105,6 +109,37 @@ describe('AdminBillingPage', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('tab', { name: d.tabs.plans }));
     expect(await screen.findByText(d.plans.recurringNote)).toBeInTheDocument();
+  });
+
+  it('opens the Extras tab from the plans tab link', async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole('tab', { name: d.tabs.plans }));
+    fireEvent.click(await screen.findByRole('link', { name: d.plans.extrasLink }));
+    expect(screen.getByRole('tab', { name: d.tabs.extras })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  it('opens on the Extras tab, on the event, from the event page link', async () => {
+    search = 'tab=extras&eventId=ev-1';
+    renderPage();
+    expect(await screen.findByRole('tab', { name: d.tabs.extras })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await waitFor(() =>
+      expect(http).toHaveBeenCalledWith('GET', '/admin/billing/events/ev-1/summary'),
+    );
+  });
+
+  it('ignores an unknown tab in the query', async () => {
+    search = 'tab=nope';
+    renderPage();
+    expect(await screen.findByRole('tab', { name: d.tabs.students })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   });
 
   it('switches tabs on click', async () => {

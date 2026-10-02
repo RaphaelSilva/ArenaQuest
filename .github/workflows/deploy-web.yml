@@ -33,7 +33,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
 
       - name: Install Dependencies
@@ -49,7 +49,7 @@ jobs:
         run: make test-web
 
   # ────────────────────────────────────────────────────────────────────────────
-  # 2. Deploy Staging — builds and deploys with staging API URL
+  # 2. Deploy Staging — the deploy CLI, arenaquest label, staging environment
   # ────────────────────────────────────────────────────────────────────────────
   deploy-staging:
     name: Deploy to Staging
@@ -67,7 +67,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
 
       - name: Install Dependencies
@@ -76,26 +76,13 @@ jobs:
       - name: Build shared
         run: pnpm turbo build --filter @arenaquest/shared
 
-      - name: Build for Cloudflare Pages (Staging)
-        run: pnpm --filter web pages:build
+      # Same release path as the production matrix: the deploy CLI resolves the
+      # arenaquest profile and bakes NEXT_PUBLIC_API_URL / brand vars from it.
+      - name: Deploy Web (Staging)
         env:
-          NEXT_PUBLIC_API_URL: https://api-staging.raphael-1d2.workers.dev
-          # White-label branding — sourced from the staging GitHub Environment
-          # vars; unset → empty → ArenaQuest defaults in brand.ts/next.config.ts.
-          NEXT_PUBLIC_BRAND_SIGLA: ${{ vars.NEXT_PUBLIC_BRAND_SIGLA }}
-          NEXT_PUBLIC_BRAND_NAME_PREFIX: ${{ vars.NEXT_PUBLIC_BRAND_NAME_PREFIX }}
-          NEXT_PUBLIC_BRAND_NAME_ACCENT: ${{ vars.NEXT_PUBLIC_BRAND_NAME_ACCENT }}
-          NEXT_PUBLIC_BRAND_POWERED_BY: ${{ vars.NEXT_PUBLIC_BRAND_POWERED_BY }}
-          NEXT_PUBLIC_BRAND_ACCENT: ${{ vars.NEXT_PUBLIC_BRAND_ACCENT }}
-          NEXT_PUBLIC_BRAND_WHATSAPP: ${{ vars.NEXT_PUBLIC_BRAND_WHATSAPP }}
-
-      - name: Deploy to Cloudflare Pages (Staging)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: apps/web
-          command: pages deploy .vercel/output/static --project-name=arenaquest-web-staging
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: node scripts/cloudflare/deploy.mjs --label arenaquest -e staging --yes --scope web
 
   # ────────────────────────────────────────────────────────────────────────────
   # 3. Deploy Production — one matrixed job over every label; runs only on main.
@@ -129,7 +116,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
 
       - name: Install Dependencies

@@ -52,7 +52,15 @@
     "R2_BUCKET_NAME":      { "required": true,  "from": "r2" },
     "R2_PUBLIC_BASE":      { "required": false, "from": "r2" },
     "MAIL_DRIVER":         { "required": true,  "enum": ["resend", "console", ""] },
-    "MAIL_FROM":           { "required": true }
+    "MAIL_FROM":           { "required": true },
+    // Student submissions (RFC 0020 section 3). Optional: absent takes the
+    // default from packages/shared/domain/submissions/limits.ts. The schema has
+    // no integer rule, so the three numeric vars are guarded at runtime by
+    // apps/api/src/core/submissions/config.ts (present but invalid = 500).
+    "SUBMISSIONS_PER_TOPIC_MAX":             { "required": false },
+    "SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": { "required": false },
+    "SUBMISSIONS_VIDEO_MAX_BYTES":           { "required": false },
+    "SUBMISSIONS_SHARING_ENABLED":           { "required": false, "enum": ["true", "false"] }
   },
   "api-secrets": {
     "JWT_SECRET":           { "required": true },

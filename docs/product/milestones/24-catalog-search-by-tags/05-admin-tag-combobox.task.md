@@ -1,6 +1,6 @@
 # Task 05 — Frontend: Admin tag combobox (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [24 — Catalog search by tags](./milestone.md)
 **RFC:** [RFC 0017](../../RFCs/0017-catalog-search-by-tags.md)
 **Team:** Frontend Web
@@ -65,17 +65,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Typing `chu` shows `Chūdan` from a mocked `GET /v1/admin/tags?q=chu`; selecting it
+- [x] Typing `chu` shows `Chūdan` from a mocked `GET /v1/admin/tags?q=chu`; selecting it
       adds a chip.
-- [ ] Enter on `Kihon novo` (no suggestion) adds a chip marked as new.
-- [ ] Adding `CHUDAN` while a `Chūdan` chip is present adds nothing.
-- [ ] Removing a chip and saving sends a `tags` array without it; the request body never
+- [x] Enter on `Kihon novo` (no suggestion) adds a chip marked as new.
+- [x] Adding `CHUDAN` while a `Chūdan` chip is present adds nothing.
+- [x] Removing a chip and saving sends a `tags` array without it; the request body never
       contains `tagIds` or any tag ID.
-- [ ] Opening an existing topic shows its current tags as chips.
-- [ ] `check-i18n-coverage.js` passes; `dict-en` / `dict-pt` keys identical, with the
+- [x] Opening an existing topic shows its current tags as chips.
+- [x] `check-i18n-coverage.js` passes; `dict-en` / `dict-pt` keys identical, with the
       `tagIds*` keys gone from both.
-- [ ] Components lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] Components lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

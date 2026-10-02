@@ -7,9 +7,9 @@ import { useDict } from '@web/context/dict-context';
 import type {
   AdjustmentKind,
   ApplyAdjustmentInput,
-  BillingInvoiceWithBalance,
   BillingReportCurrency,
 } from '@web/lib/admin-billing-api';
+import type { LedgerTarget, LedgerTargetKind } from './ledger-target';
 import { useMoneyFormatter } from './money';
 import { explain } from './explain-error';
 import { toMinorUnits } from './minor-units';
@@ -51,11 +51,14 @@ type FieldErrors = { amount?: string; reason?: string };
  */
 export function AdjustmentForm({
   invoice,
+  kind: target = 'invoice',
   currency,
   onClose,
   onApplied,
 }: {
-  invoice: BillingInvoiceWithBalance;
+  /** The invoice — or, with `kind="charge"`, the event charge — adjusted. */
+  invoice: LedgerTarget;
+  kind?: LedgerTargetKind;
   currency: BillingReportCurrency | null;
   onClose: () => void;
   /** Called after the server accepted the adjustment. */
@@ -63,6 +66,8 @@ export function AdjustmentForm({
 }) {
   const dict = useDict();
   const d = dict.admin.billing.ledger.adjustment;
+  const extras = dict.admin.billing.extras;
+  const isCharge = target === 'charge';
   const kindLabels = dict.admin.billing.ledger.adjustmentKind;
   const planValidation = dict.admin.billing.plans.validation;
   const client = useApiClient();
@@ -137,7 +142,11 @@ export function AdjustmentForm({
 
     setBusy(true);
     try {
-      await client.adminBilling.invoices.addAdjustment(invoice.id, payload);
+      if (isCharge) {
+        await client.adminBilling.extras.addAdjustment(invoice.id, payload);
+      } else {
+        await client.adminBilling.invoices.addAdjustment(invoice.id, payload);
+      }
       onApplied();
     } catch (thrown) {
       setSubmitError(explain(thrown, d.error));
@@ -161,7 +170,9 @@ export function AdjustmentForm({
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             {d.dialogTitle}
           </h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{d.explainer}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {isCharge ? extras.adjustmentExplainer : d.explainer}
+          </p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">{d.manualOnlyNote}</p>
         </div>
 
@@ -229,7 +240,7 @@ export function AdjustmentForm({
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             rows={3}
-            placeholder={d.reasonPlaceholder}
+            placeholder={isCharge ? extras.adjustmentReasonPlaceholder : d.reasonPlaceholder}
             aria-describedby={fieldErrors.reason ? reasonErrorId : undefined}
             className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
           />

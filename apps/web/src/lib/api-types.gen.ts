@@ -332,6 +332,810 @@ export interface paths {
         };
         trace?: never;
     };
+    "/v1/admin/billing/charge-payments/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reverse an Event Charge Payment
+         * @description Appends the mirror-image row. A reversal cannot be reversed, and a payment is reversed at most once.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ReversePaymentBody"];
+                };
+            };
+            responses: {
+                /** @description Reversal recorded */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingEventChargePayment"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/charges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Event Charges */
+        get: {
+            parameters: {
+                query?: {
+                    eventId?: string;
+                    userId?: string;
+                    status?: "open" | "paid" | "void";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Charges with their balances */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingEventChargeWithBalance"][];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Charge Users for an Event
+         * @description Issues one charge per user (1–200) for one published event (`409` for draft or archived). Idempotent: a pair with a live charge is reported under `absorbed`. Without `amountMinor` the price is snapshot as standard; any other amount is negotiated and needs a `termsNote`. For a restricted event, `outsideAudience` lists the users who cannot see it — the charge is still issued and no audience row is written.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["IssueEventChargesBody"];
+                };
+            };
+            responses: {
+                /** @description Nothing created; every pair was absorbed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingIssueEventChargesResult"];
+                    };
+                };
+                /** @description At least one charge created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingIssueEventChargesResult"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/charges/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An Event Charge with its Ledger */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Charge with its ledger */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingEventChargeDetail"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/charges/{id}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply an Event Charge Adjustment
+         * @description Append-only, signed, non-zero and reasoned. Negative reduces what is owed.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ApplyAdjustmentBody"];
+                };
+            };
+            responses: {
+                /** @description Adjustment applied */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingEventChargeAdjustment"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/charges/{id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record an Event Charge Payment */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RecordPaymentBody"];
+                };
+            };
+            responses: {
+                /** @description Payment recorded */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingEventChargePayment"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/charges/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Void an Event Charge
+         * @description The reason is mandatory. Refused with `409` while the charge has net payments — reverse them first.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["VoidEventChargeBody"];
+                };
+            };
+            responses: {
+                /** @description Charge voided */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingEventCharge"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/event-prices/{eventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * An Event's Price
+         * @description The list price of an event, or `404` when the event is not for sale.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Event price */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingEventPrice"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Set an Event's Price
+         * @description Creates or replaces the event's price in the tenant's active currency. Charges already issued keep their own snapshot.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SetEventPriceBody"];
+                };
+            };
+            responses: {
+                /** @description Event price set */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingEventPrice"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Clear an Event's Price
+         * @description Stops offering the event. Existing charges are untouched.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Price cleared */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/events/{eventId}/audience-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check Buyers Against an Event Audience
+         * @description Read-only: lists the given users a restricted event is not addressed to. Always empty for public and members events.
+         */
+        get: {
+            parameters: {
+                query: {
+                    userIds: string;
+                };
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Audience check */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingEventAudienceCheck"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/events/{eventId}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * An Event's Charge Summary
+         * @description Charged, signed adjustments, received and outstanding over the non-void charges (`chargedMinor + adjustmentsMinor - receivedMinor = outstandingMinor`), plus counts by status.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Event charge summary */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingEventChargeSummary"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/billing/holds/{userId}": {
         parameters: {
             query?: never;
@@ -1145,12 +1949,13 @@ export interface paths {
         };
         /**
          * Receivables Aging
-         * @description Open balances bucketed 0-30 / 31-60 / 61-90 / 90+ by days past each invoice's own due date. Boundaries are exclusive: 30 days past due and 31 days past due land in different buckets.
+         * @description Open balances bucketed 0-30 / 31-60 / 61-90 / 90+ by days past each item's own due date. Boundaries are exclusive: 30 days past due and 31 days past due land in different buckets. `rail` picks the one rail aged — `contract` (invoices, the default, unchanged) or `extras` (event charges); the two are never bucketed together.
          */
         get: {
             parameters: {
                 query?: {
                     asOf?: string;
+                    rail?: "contract" | "extras";
                 };
                 header?: never;
                 path?: never;
@@ -1207,7 +2012,7 @@ export interface paths {
         };
         /**
          * Monthly Movement
-         * @description Billed, received and outstanding for one month, recomputed from the ledger rows. Billed is keyed off the invoice's issue date and the adjustment's applied date; received is keyed off the payment's paid date — a payment in September against an August invoice is September's received and August's billed.
+         * @description Billed, received and outstanding for one month, recomputed from the ledger rows. Billed is keyed off the invoice's issue date and the adjustment's applied date; received is keyed off the payment's paid date — a payment in September against an August invoice is September's received and August's billed. Every top-level field is the contract rail only; `extras` reports event charges on the same date rules, and `cashReceivedMinor` is the one cross-rail figure — money that entered the till.
          */
         get: {
             parameters: {
@@ -1269,11 +2074,13 @@ export interface paths {
         };
         /**
          * The Student Billing Roster
-         * @description Every student with a contract, with their standing resolved from their invoices rather than read from a column: outstanding balance, oldest overdue date, next due date and whether the terms were negotiated. `standing=exempt` is the held filter — a hold is the only way to reach it. Reporting only: nothing here gates a student's access.
+         * @description Every user with a contract or any event charge, with two standings resolved side by side and never merged: `contract` (from contract invoices only — outstanding balance, oldest overdue date, next due date, negotiated terms; null when there is no contract) and `extras` (from event charges only — outstanding balance, oldest overdue date, open and overdue charge counts; null when never charged). There is no top-level standing or total. `contractStanding` and `extrasStanding` filter independently; `standing` is kept as an alias of `contractStanding`. `contractStanding=exempt` is the held filter — a hold applies to the contract rail only. Reporting only: nothing here gates a student's access.
          */
         get: {
             parameters: {
                 query?: {
+                    contractStanding?: "good" | "due" | "delinquent" | "exempt";
+                    extrasStanding?: "good" | "due" | "delinquent" | "exempt";
                     standing?: "good" | "due" | "delinquent" | "exempt";
                     asOf?: string;
                 };
@@ -1339,7 +2146,7 @@ export interface paths {
         };
         /**
          * A Student's Statement
-         * @description The student's contracts with their chains, invoices with their adjustments and payments, the outstanding total, and the two derived membership dates: "student since" spans every contract group, "current membership since" is the root of the group now active.
+         * @description The student's contracts with their chains, invoices with their adjustments and payments, the outstanding total, and the two derived membership dates: "student since" spans every contract group, "current membership since" is the root of the group now active. `outstandingMinor` is the contract rail only; the sibling `extras` object carries the extras rail — its own standing, outstanding and each event charge with its event title, date and ledger.
          */
         get: {
             parameters: {
@@ -2992,6 +3799,108 @@ export interface paths {
         };
         trace?: never;
     };
+    "/v1/admin/notes/{id}/moderation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Clear a note's moderation flag (staff)
+         * @description Lets the author share the note again. It does not re-share it.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Moderation cleared */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No note with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/notes/{id}/unshare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Force-unshare a note (staff)
+         * @description Sets the note private and flags it moderated, recording who and when, and increments `revision` so an open editor gets `NOTE_STALE`. The body is never changed. On a private note it is idempotent in effect (stays private, becomes flagged).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The moderated note */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffNote"];
+                    };
+                };
+                /** @description No note with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/players/{userId}/badges/{badgeId}": {
         parameters: {
             query?: never;
@@ -3837,6 +4746,231 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/submissions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a submission (admin)
+         * @description Deletes the stored object, then turns the row into a tombstone: status `removed`, removal stamp and author, description cleared, private. The author sees "Removed by the staff" and the quota is freed. Idempotent on a removed submission.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Submission removed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Only `admin` removes; a content creator force-unshares instead */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description No ready or removed submission with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `StorageUnavailable` — the object could not be deleted; nothing changed, retry */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/submissions/{id}/moderation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Clear a submission's moderation flag (staff)
+         * @description Lets the author share the submission again. It does not re-share it.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Moderation cleared */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No ready or removed submission with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/submissions/{id}/unshare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Force-unshare a submission (staff)
+         * @description Sets the submission private and flags it moderated, recording who and when. The author cannot share it again (`409 SUBMISSION_MODERATED`) until the flag is cleared; a move keeps the flag. Title, description and file are never changed.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The moderated submission */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffSubmissionView"];
+                    };
+                };
+                /** @description No ready or removed submission with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tags
+         * @description Tags whose slug starts with `slugify(q)`, ordered by slug. Backs the admin tag combobox. Readable by `admin` and `content_creator`.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    q?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Matching tags */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Tag"][];
+                        };
+                    };
+                };
+                /** @description Bad Request / Validation Failed (e.g. `limit` outside 1–100) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/tasks": {
         parameters: {
             query?: never;
@@ -4618,7 +5752,16 @@ export interface paths {
                         prerequisiteIds?: string[];
                         /** @enum {string} */
                         status?: "draft" | "published" | "archived";
+                        /** @description Tag IDs to link. Mutually exclusive with `tags`; an unknown ID returns 422 UNKNOWN_TAG. */
                         tagIds?: string[];
+                        /**
+                         * @description Tag names (1–40 characters each after trim, at most 20). Each name is slugified; an existing slug is reused with its stored name, a new one is created. Mutually exclusive with `tagIds`. On PATCH, `[]` removes every tag and omitting the field leaves them unchanged.
+                         * @example [
+                         *       "Chūdan",
+                         *       "Kata"
+                         *     ]
+                         */
+                        tags?: string[];
                         title: string;
                         /** @enum {string} */
                         visibility?: "public" | "restricted" | "private";
@@ -4672,8 +5815,22 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Bad Request / Validation Failed */
+                /** @description Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters) */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Parent topic not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description UNKNOWN_TAG or UNKNOWN_PREREQ — a referenced ID does not exist; nothing is written */
+                422: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -4820,7 +5977,16 @@ export interface paths {
                         prerequisiteIds?: string[];
                         /** @enum {string} */
                         status?: "draft" | "published" | "archived";
+                        /** @description Tag IDs to link. Mutually exclusive with `tags`; an unknown ID returns 422 UNKNOWN_TAG. */
                         tagIds?: string[];
+                        /**
+                         * @description Tag names (1–40 characters each after trim, at most 20). Each name is slugified; an existing slug is reused with its stored name, a new one is created. Mutually exclusive with `tagIds`. On PATCH, `[]` removes every tag and omitting the field leaves them unchanged.
+                         * @example [
+                         *       "Chūdan",
+                         *       "Kata"
+                         *     ]
+                         */
+                        tags?: string[];
                         title?: string;
                         /** @enum {string} */
                         visibility?: "public" | "restricted" | "private";
@@ -4874,7 +6040,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Bad Request / Validation Failed */
+                /** @description Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters) */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -4883,6 +6049,13 @@ export interface paths {
                 };
                 /** @description Topic not found */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description UNKNOWN_TAG or UNKNOWN_PREREQ — a referenced ID does not exist; nothing is written */
+                422: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -5864,6 +7037,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/users/{userId}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a user's notes (staff)
+         * @description Every note the user wrote, private included, newest `updatedAt` first, with the topic title and moderation provenance. An unknown user yields an empty page. Pages of 20.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of the user's notes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffAuthoredNotePage"];
+                    };
+                };
+                /** @description Malformed cursor (`InvalidCursor`) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{userId}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a user's submissions (staff)
+         * @description Every ready or removed submission by the user, across topics, newest first, with the topic title and moderation / removal provenance. Ready ones carry a signed GET `url` (TTL 1 h). An unknown user yields an empty page. Pages of 20.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of the user's submissions */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffAuthoredSubmissionPage"];
+                    };
+                };
+                /** @description Malformed cursor (`InvalidCursor`) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/activate": {
         parameters: {
             query?: never;
@@ -6703,7 +7995,7 @@ export interface paths {
         };
         /**
          * My Billing Statement
-         * @description The caller's own standing, contracts, invoices with their payments, and outstanding total. It takes no parameters: the subject is the authenticated caller and there is no request that names another student. A member with no contract gets an empty statement with standing `good`, not a 404.
+         * @description The caller's own standing, contracts, invoices with their payments, and outstanding total. It takes no parameters: the subject is the authenticated caller and there is no request that names another student. A member with no contract gets an empty statement with standing `good`, not a 404. `standing` and `outstandingMinor` are the contract rail only; the sibling `extras` object carries the caller's own event charges with their own standing — the two are never summed.
          */
         get: {
             parameters: {
@@ -6988,6 +8280,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List my notes
+         * @description Every note the caller wrote, across topics, newest `updatedAt` first, with the topic title and `topicAccessible`. A note whose topic is no longer accessible is read-only (delete allowed). Pages of 20.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of the caller's notes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthoredNotePage"];
+                    };
+                };
+                /** @description Malformed cursor (`InvalidCursor`) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/progress/summary": {
         parameters: {
             query?: never;
@@ -7228,6 +8572,156 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List my submissions
+         * @description Every submission the caller owns, across topics, newest first, with the topic title and `topicAccessible`. On an inaccessible topic a submission is read-only except delete and move. Ready ones carry a signed GET `url` (TTL 1 h). Pages of 20.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of the caller's submissions */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuthoredSubmissionPage"];
+                    };
+                };
+                /** @description Malformed cursor (`InvalidCursor`) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/submissions/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move my submissions to another topic
+         * @description Moves up to 10 of the caller's ready submissions, in order, each guarded by the target's per-topic count. Partial success is normal. Moved submissions become private, keep their moderation flag, and their file is not touched. The source topic need not be readable. Staff (`admin`, `content_creator`) move their own submissions under the same rules.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MoveSubmissionsBody"];
+                };
+            };
+            responses: {
+                /** @description Moved and refused items, with a reason per refusal */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MoveSubmissionsResult"];
+                    };
+                };
+                /** @description Malformed body (no ids, more than 10, or no target) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description A staff caller named a submission another user authored; nothing is moved */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Target topic missing, draft, archived or outside the caller's access */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -7775,6 +9269,815 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/topics/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the notes on a topic
+         * @description Students and tutors: shared notes only, newest share first, own flagged `isMine`. Admins and content creators: every note. Pages of 20.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of notes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ClassNotePage"];
+                    };
+                };
+                /** @description Malformed cursor (`InvalidCursor`) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Topic missing, draft, archived or outside the caller's access */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/topics/{id}/notes/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get my note on a topic
+         * @description Returns the caller's note on the topic, or `null` when there is none.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The caller's note, or null */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Note"];
+                        };
+                    };
+                };
+                /** @description Topic missing, draft, archived or outside the caller's access */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        /**
+         * Create or update my note on a topic
+         * @description Conditional upsert keyed on `baseRevision` (0 = create). The body is sanitised and trimmed, then must be 1..NOTE_BODY_MAX characters.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SaveNoteBody"];
+                };
+            };
+            responses: {
+                /** @description Note updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Note"] & Record<string, never>;
+                    };
+                };
+                /** @description Note created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Note"] & Record<string, never>;
+                    };
+                };
+                /** @description Malformed body, or `NOTE_BODY_EMPTY` / `NOTE_BODY_TOO_LONG` after sanitisation */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Topic missing, draft, archived or outside the caller's access */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `NOTE_STALE`: `baseRevision` is not the stored revision; `current` carries the stored note (or null). `NOTE_MODERATED`: sharing a note the staff made private. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NoteConflictBody"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Delete my note on a topic
+         * @description Hard-deletes the caller's note. Allowed even when the topic is no longer readable.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Note deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The caller has no note on this topic */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/topics/{id}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List submissions on a topic
+         * @description Newest first, pages of 20. Ready submissions carry a signed GET `url` (TTL 1 h). `scope` only narrows what the caller may see; it never widens it. With `scope=all`, staff get every ready and removed submission on any published topic (the access set is bypassed), each with its moderation and removal provenance.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    scope?: "mine" | "class" | "all";
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of submissions (`StaffSubmissionPage` for `scope=all`) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SubmissionPage"] | components["schemas"]["StaffSubmissionPage"];
+                    };
+                };
+                /** @description Malformed query, or `InvalidCursor` */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `scope=all` requested by a non-staff caller */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Topic missing, draft, archived or outside the caller's access */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/topics/{id}/submissions/presign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a submission upload
+         * @description Creates a `pending` submission and returns a presigned PUT under a server-built key. Rate limited to 30 per hour per user. Staff (`admin`, `content_creator`) upload too, under the same type, size, quota and sharing rules, on any published, non-archived topic.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PresignSubmissionBody"];
+                };
+            };
+            responses: {
+                /** @description Pending submission and its upload URL */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PresignSubmissionResponse"];
+                    };
+                };
+                /** @description Malformed body, or `SUBMISSION_TITLE_INVALID` / `SUBMISSION_DESCRIPTION_TOO_LONG` */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Topic missing, draft, archived or outside the caller's access */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_QUOTA` (with `reason`, `used`, `limit`), or `SUBMISSION_SHARING_DISABLED` when asking for `shared` on a label with sharing off */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SubmissionQuotaError"] | (components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        });
+                    };
+                };
+                /** @description `FileTooLarge` — over the per-type limit (`maxBytes`) */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `TooManyRequests` — over 30 presigns in an hour */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/topics/{id}/submissions/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Submission limits and counts for a topic
+         * @description Effective limits, `sharingEnabled`, the caller's usage and the class count; admins and content creators also get `totalCount`.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Summary */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SubmissionSummary"];
+                    };
+                };
+                /** @description Topic missing, draft, archived or outside the caller's access */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/topics/{id}/submissions/{sid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one submission
+         * @description The author reads their own in every status; anyone else only a shared, ready submission while sharing is enabled. Staff (`admin`, `content_creator`) read any ready or removed submission, read-only, with its provenance (`StaffSubmissionView`). Everything else is `404`.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    sid: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The submission (`StaffSubmissionView` for staff) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SubmissionView"] | components["schemas"]["StaffSubmissionView"];
+                    };
+                };
+                /** @description Topic not readable, or the submission is missing, on another topic or not visible to the caller */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /**
+         * Delete a submission
+         * @description Deletes the stored object, then the row — a pending or ready submission, or a tombstone being dismissed. Allowed even when the topic is no longer readable.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    sid: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Submission deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Staff acting on a submission someone else authored (they read and moderate it, they do not change it) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description The submission is missing, on another topic or another student's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `StorageUnavailable` — the object could not be deleted; the row is kept, retry */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Edit a submission
+         * @description Last-write-wins edit of title, description (sanitised Markdown) and visibility.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    sid: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["EditSubmissionBody"];
+                };
+            };
+            responses: {
+                /** @description Submission updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Submission"];
+                    };
+                };
+                /** @description Malformed body, or `SUBMISSION_TITLE_INVALID` / `SUBMISSION_DESCRIPTION_TOO_LONG` */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Staff acting on a submission someone else authored (they read and moderate it, they do not change it) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Topic not readable, or the submission is missing, on another topic or another student's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_MODERATED` (sharing a force-unshared submission), `SUBMISSION_SHARING_DISABLED` or `SUBMISSION_REMOVED` */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/topics/{id}/submissions/{sid}/finalize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish a submission upload
+         * @description Verifies the stored object — length, content type and leading signature bytes — and marks the submission `ready`. On a mismatch the object and the row are deleted. Idempotent on a `ready` submission.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    sid: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Submission ready */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Submission"];
+                    };
+                };
+                /** @description Staff acting on a submission someone else authored (they read and moderate it, they do not change it) */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Topic not readable, or the submission is missing, on another topic or another student's */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_REMOVED` — the submission was removed by the staff */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `NotUploaded` — no object stored yet; `UPLOAD_MISMATCH` — the stored file differs from what was declared */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `SUBMISSION_CONFIG_INVALID`: a `SUBMISSIONS_*` var is present but malformed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `StorageUnavailable` — the mismatched object could not be deleted; retry */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7840,6 +10143,45 @@ export interface components {
             kind: "discount" | "credit" | "waiver" | "surcharge";
             reason: string;
         };
+        AuthoredNote: components["schemas"]["Note"] & {
+            /**
+             * @description False when the caller can no longer read the topic; the note is then read-only (delete allowed)
+             * @example true
+             */
+            topicAccessible: boolean;
+            /** @example Intro to Algebra */
+            topicTitle: string;
+        };
+        AuthoredNotePage: {
+            data: components["schemas"]["AuthoredNote"][];
+            /**
+             * @description Opaque cursor of the next page; null on the last page
+             * @example null
+             */
+            nextCursor: string | null;
+        };
+        AuthoredSubmission: components["schemas"]["Submission"] & {
+            /**
+             * @description False when the topic is no longer readable: read-only except delete and move
+             * @example true
+             */
+            topicAccessible: boolean;
+            /** @example Kihon */
+            topicTitle: string;
+            /**
+             * Format: uri
+             * @description Signed GET URL (TTL 1 h) on a ready submission; null while pending or once removed
+             */
+            url: string | null;
+        };
+        AuthoredSubmissionPage: {
+            data: components["schemas"]["AuthoredSubmission"][];
+            /**
+             * @description Opaque cursor of the next page; null on the last page
+             * @example null
+             */
+            nextCursor: string | null;
+        };
         BillingAgingBucket: {
             /** @enum {string} */
             bucket: "0-30" | "31-60" | "61-90" | "90+";
@@ -7856,9 +10198,107 @@ export interface components {
             buckets: components["schemas"]["BillingAgingBucket"][];
             currency: components["schemas"]["BillingReportCurrency"];
             invoiceCount: number;
+            /**
+             * @example contract
+             * @enum {string}
+             */
+            rail: "contract" | "extras";
             studentCount: number;
             /** @example 15000 */
             totalMinor: number;
+        };
+        BillingEventAudienceCheck: {
+            /** @enum {string} */
+            audience: "public" | "members" | "restricted";
+            eventId: string;
+            outsideAudience: string[];
+        };
+        BillingEventCharge: {
+            /** @example 15000 */
+            amountMinor: number;
+            currency: string;
+            description: string;
+            /** @example 2026-01-01 */
+            dueDate: string;
+            eventId: string;
+            graceDays: number;
+            id: string;
+            issuedAt: string;
+            issuedBy: string;
+            /** @enum {string} */
+            status: "open" | "paid" | "void";
+            termsNote: string;
+            /**
+             * @example standard
+             * @enum {string}
+             */
+            termsSource: "standard" | "negotiated";
+            userId: string;
+            voidReason: string | null;
+            voidedAt: string | null;
+        };
+        BillingEventChargeAdjustment: {
+            /** @example 15000 */
+            amountMinor: number;
+            appliedAt: string;
+            appliedBy: string;
+            chargeId: string;
+            id: string;
+            /** @enum {string} */
+            kind: "discount" | "credit" | "waiver" | "surcharge";
+            reason: string;
+        };
+        BillingEventChargeDetail: components["schemas"]["BillingEventChargeWithBalance"] & {
+            adjustments: components["schemas"]["BillingEventChargeAdjustment"][];
+            payments: components["schemas"]["BillingEventChargePayment"][];
+        };
+        BillingEventChargePayment: {
+            /** @example 15000 */
+            amountMinor: number;
+            chargeId: string;
+            currency: string;
+            externalReference: string | null;
+            id: string;
+            /** @enum {string} */
+            method: "cash" | "pix" | "bank_transfer" | "card" | "gateway" | "other";
+            note: string;
+            paidAt: string;
+            recordedAt: string;
+            recordedBy: string;
+            reversesId: string | null;
+        };
+        BillingEventChargeSummary: {
+            /** @example 15000 */
+            adjustmentsMinor: number;
+            chargeCount: number;
+            /** @example 15000 */
+            chargedMinor: number;
+            counts: {
+                open: number;
+                paid: number;
+                void: number;
+            };
+            currency: string;
+            eventId: string;
+            /** @example 15000 */
+            outstandingMinor: number;
+            /** @example 15000 */
+            receivedMinor: number;
+        };
+        BillingEventChargeWithBalance: components["schemas"]["BillingEventCharge"] & {
+            /** @example 15000 */
+            balanceMinor: number;
+        };
+        BillingEventPrice: {
+            /** @example 15000 */
+            amountMinor: number;
+            /** @example BRL */
+            currency: string;
+            dueInDays: number;
+            eventId: string;
+            graceDays: number;
+            updatedAt: string;
+            updatedBy: string;
         };
         BillingInvoice: {
             /** @example 15000 */
@@ -7895,13 +10335,35 @@ export interface components {
             /** @example 15000 */
             balanceMinor: number;
         };
+        BillingIssueEventChargesResult: {
+            absorbed: {
+                eventId: string;
+                userId: string;
+            }[];
+            created: components["schemas"]["BillingEventCharge"][];
+            outsideAudience: string[];
+        };
+        BillingMovementExtras: {
+            /** @example 15000 */
+            adjustmentsMinor: number;
+            /** @example 15000 */
+            chargedMinor: number;
+            chargesIssued: number;
+            /** @example 15000 */
+            receivableAtCloseMinor: number;
+            /** @example 15000 */
+            receivedMinor: number;
+        };
         BillingMovementReport: {
             activeStudents: number;
             /** @example 15000 */
             adjustmentsMinor: number;
             /** @example 15000 */
             billedMinor: number;
+            /** @example 15000 */
+            cashReceivedMinor: number;
             currency: components["schemas"]["BillingReportCurrency"];
+            extras: components["schemas"]["BillingMovementExtras"];
             /** @example 15000 */
             invoicedMinor: number;
             invoicesIssued: number;
@@ -7958,16 +10420,9 @@ export interface components {
             /** @example R$ */
             symbol: string;
         };
-        BillingRosterEntry: {
-            /** @example 2026-01-01 */
-            asOf: string;
-            contractGroupId: string;
-            contractId: string;
-            /** @enum {string} */
-            contractStatus: "active" | "paused" | "cancelled" | "superseded";
-            /** @example BRL */
-            currency: string;
-            hold: components["schemas"]["BillingStandingHold"];
+        BillingRosterContract: {
+            groupId: string;
+            id: string;
             negotiatedTerms: boolean;
             /** @example 2026-01-01 */
             nextDueDate: string | null;
@@ -7980,8 +10435,32 @@ export interface components {
              * @enum {string}
              */
             standing: "good" | "due" | "delinquent" | "exempt";
+            /** @enum {string} */
+            status: "active" | "paused" | "cancelled" | "superseded";
+        } | null;
+        BillingRosterEntry: {
+            /** @example 2026-01-01 */
+            asOf: string;
+            contract: components["schemas"]["BillingRosterContract"];
+            /** @example BRL */
+            currency: string;
+            extras: components["schemas"]["BillingRosterExtras"];
+            hold: components["schemas"]["BillingStandingHold"];
             userId: string;
         };
+        BillingRosterExtras: {
+            /** @example 2026-01-01 */
+            oldestOverdueDate: string | null;
+            openCharges: number;
+            /** @example 15000 */
+            outstandingMinor: number;
+            overdueCharges: number;
+            /**
+             * @example delinquent
+             * @enum {string}
+             */
+            standing: "good" | "due" | "delinquent" | "exempt";
+        } | null;
         BillingRunReport: {
             absorbed: number;
             adminsNotified: number;
@@ -8016,6 +10495,40 @@ export interface components {
                 userId: string;
             }[];
             eligibleContracts: number;
+            extrasCrossings: {
+                currency: string;
+                /**
+                 * @example delinquent
+                 * @enum {string}
+                 */
+                from: "good" | "due" | "delinquent" | "exempt";
+                /** @example 2026-01-01 */
+                oldestOverdueDate: string | null;
+                /** @example 15000 */
+                outstandingMinor: number;
+                /**
+                 * @example delinquent
+                 * @enum {string}
+                 */
+                to: "good" | "due" | "delinquent" | "exempt";
+                userId: string;
+            }[];
+            extrasReminders: {
+                /** @example 15000 */
+                balanceMinor: number;
+                chargeId: string;
+                currency: string;
+                description: string;
+                /** @example 2026-01-01 */
+                dueDate: string;
+                eventId: string;
+                /** @enum {string} */
+                kind: "extras_due_date" | "extras_grace_lapsed";
+                sent: boolean;
+                /** @example 2026-01-01 */
+                triggerOn: string;
+                userId: string;
+            }[];
             issued: {
                 /** @example 15000 */
                 amountMinor: number;
@@ -8031,6 +10544,18 @@ export interface components {
                 userId: string;
             }[];
             mailsSent: number;
+            reminderCounts: {
+                contract: {
+                    sent: number;
+                    suppressed: number;
+                    undeliverable: number;
+                };
+                extras: {
+                    sent: number;
+                    suppressed: number;
+                    undeliverable: number;
+                };
+            };
             reminders: {
                 /** @example 15000 */
                 balanceMinor: number;
@@ -8062,6 +10587,12 @@ export interface components {
             setBy: string;
             userId: string;
         } | null;
+        BillingStatementCharge: components["schemas"]["BillingEventChargeDetail"] & {
+            /** @example 2026-07-18T13:00:00.000Z */
+            eventStartsAt: string | null;
+            /** @example Seminário de Inverno */
+            eventTitle: string;
+        };
         BillingStatementContractGroup: {
             contractGroupId: string;
             /** @example 2026-01-01 */
@@ -8072,6 +10603,18 @@ export interface components {
             status: "active" | "paused" | "cancelled" | "superseded";
             versions: components["schemas"]["BillingSubscription"][];
         };
+        BillingStatementExtras: {
+            charges: components["schemas"]["BillingStatementCharge"][];
+            /** @example 2026-01-01 */
+            oldestOverdueDate: string | null;
+            /** @example 15000 */
+            outstandingMinor: number;
+            /**
+             * @example delinquent
+             * @enum {string}
+             */
+            standing: "good" | "due" | "delinquent" | "exempt";
+        };
         BillingStatementInvoice: components["schemas"]["BillingInvoiceWithBalance"] & {
             adjustments: components["schemas"]["BillingInvoiceAdjustment"][];
             payments: components["schemas"]["BillingPayment"][];
@@ -8081,6 +10624,7 @@ export interface components {
             currency: components["schemas"]["BillingReportCurrency"];
             /** @example 2026-01-01 */
             currentMembershipSince: string | null;
+            extras: components["schemas"]["BillingStatementExtras"];
             invoices: components["schemas"]["BillingStatementInvoice"][];
             /** @example 15000 */
             outstandingMinor: number;
@@ -8137,6 +10681,21 @@ export interface components {
             /** @example 2026-01-01 */
             endDate?: string;
             graceDays?: number;
+        };
+        ClassNote: components["schemas"]["Note"] & {
+            /**
+             * @description True when the caller wrote this note
+             * @example false
+             */
+            isMine: boolean;
+        };
+        ClassNotePage: {
+            data: components["schemas"]["ClassNote"][];
+            /**
+             * @description Opaque cursor of the next page; null on the last page
+             * @example null
+             */
+            nextCursor: string | null;
         };
         ClassifiedObject: {
             contentType: string | null;
@@ -8237,6 +10796,17 @@ export interface components {
             name: string;
             scopeTopicId?: string | null;
         };
+        EditSubmissionBody: {
+            /** @description Markdown; sanitised, then must be ≤ SUBMISSION_DESCRIPTION_MAX characters */
+            description?: string;
+            /** @example Kata, final */
+            title?: string;
+            /**
+             * @example shared
+             * @enum {string}
+             */
+            visibility?: "private" | "shared";
+        };
         /** @description Standard error response body with optional metadata fields */
         ErrorBody: {
             /** @description Error code or message */
@@ -8288,6 +10858,17 @@ export interface components {
             status: string;
             timestamp: string;
             version: string;
+        };
+        IssueEventChargesBody: {
+            /** @example 15000 */
+            amountMinor?: number;
+            currency?: string;
+            /** @example 2026-01-01 */
+            dueDate?: string;
+            eventId: string;
+            graceDays?: number;
+            termsNote?: string;
+            userIds: string[];
         };
         IssueInvoiceBody: {
             /** @example 15000 */
@@ -8404,6 +10985,29 @@ export interface components {
             } | null;
             uploaderId: string;
         };
+        MoveSubmissionsBody: {
+            /**
+             * @description 1..10 ids of the caller's own ready submissions, moved in this order
+             * @example [
+             *       "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+             *     ]
+             */
+            ids: string[];
+            /** @example topic-2 */
+            targetTopicId: string;
+        };
+        MoveSubmissionsResult: {
+            /** @description Moved submissions, now private; moderation kept */
+            moved: components["schemas"]["Submission"][];
+            refused: {
+                id: string;
+                /**
+                 * @description `quota`: the target is full; `not_found`: missing or not the caller's; `not_ready`: pending or removed; `same_topic`: already there
+                 * @enum {string}
+                 */
+                reason: "quota" | "not_found" | "not_ready" | "same_topic";
+            }[];
+        };
         MyBillingStatement: components["schemas"]["BillingStudentStatement"] & {
             /** @example 2026-03-01 */
             asOf: string;
@@ -8414,6 +11018,56 @@ export interface components {
              * @enum {string}
              */
             standing: "good" | "due" | "delinquent" | "exempt";
+        };
+        Note: {
+            /** @example student-a */
+            authorId: string;
+            /** @example Student A */
+            authorName: string;
+            /**
+             * @description Sanitised Markdown, 1..NOTE_BODY_MAX characters
+             * @example The **key idea** is...
+             */
+            body: string;
+            /** @example 2026-09-28 12:00:00 */
+            createdAt: string;
+            /**
+             * Format: uuid
+             * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
+             */
+            id: string;
+            /**
+             * @description True while a staff force-unshare blocks re-sharing
+             * @example false
+             */
+            moderated: boolean;
+            /**
+             * @description Concurrency token; send it back as `baseRevision`
+             * @example 1
+             */
+            revision: number;
+            /**
+             * @description Last time the note became shared; null if it never was
+             * @example null
+             */
+            sharedAt: string | null;
+            /** @example topic-1 */
+            topicNodeId: string;
+            /** @example 2026-09-28 12:00:00 */
+            updatedAt: string;
+            /**
+             * @example private
+             * @enum {string}
+             */
+            visibility: "private" | "shared";
+        } | null;
+        NoteConflictBody: {
+            current?: components["schemas"]["Note"] & unknown;
+            /**
+             * @example NOTE_STALE
+             * @enum {string}
+             */
+            error: "NOTE_STALE" | "NOTE_MODERATED";
         };
         PlayerProgression: {
             badges: {
@@ -8434,6 +11088,46 @@ export interface components {
                 rankTitle: string;
                 totalXp: number;
             };
+        };
+        PresignSubmissionBody: {
+            /**
+             * @example video/quicktime
+             * @enum {string}
+             */
+            contentType: "application/pdf" | "video/mp4" | "image/jpeg" | "image/png" | "image/webp" | "video/quicktime";
+            /**
+             * @description Markdown; sanitised, then must be ≤ SUBMISSION_DESCRIPTION_MAX characters
+             * @example Left side
+             */
+            description?: string;
+            /** @example IMG_0042.MOV */
+            fileName: string;
+            /**
+             * @description Exact byte length of the file; the presigned PUT signs it
+             * @example 52428800
+             */
+            sizeBytes: number;
+            /** @example Kata, 2nd attempt */
+            title: string;
+            /**
+             * @description Defaults to private
+             * @example private
+             * @enum {string}
+             */
+            visibility?: "private" | "shared";
+        };
+        PresignSubmissionResponse: {
+            /**
+             * @description ISO-8601 instant the upload URL expires
+             * @example 2026-09-29T13:00:00.000Z
+             */
+            expiresAt: string;
+            submission: components["schemas"]["Submission"];
+            /**
+             * Format: uri
+             * @description Presigned PUT; send the declared Content-Type and length
+             */
+            uploadUrl: string;
         };
         RecordPaymentBody: {
             /** @example 15000 */
@@ -8485,11 +11179,39 @@ export interface components {
             /** @example 2026-01-01 */
             since?: string;
         };
+        SaveNoteBody: {
+            /**
+             * @description The revision last received; 0 when no note exists yet
+             * @example 0
+             */
+            baseRevision: number;
+            /**
+             * @description Markdown; sanitised and trimmed, then must be 1..NOTE_BODY_MAX characters
+             * @example My note
+             */
+            body: string;
+            /**
+             * @description Omitted: keep the current visibility (private on create)
+             * @example private
+             * @enum {string}
+             */
+            visibility?: "private" | "shared";
+        };
         SetBillingHoldBody: {
             /** @example 2026-01-01 */
             expiresAt?: string | null;
             /** @example Injured; agreed to pause chasing until March. */
             reason: string;
+        };
+        SetEventPriceBody: {
+            /** @example 15000 */
+            amountMinor: number;
+            /** @example BRL */
+            currency?: string;
+            /** @example 7 */
+            dueInDays?: number;
+            /** @example 5 */
+            graceDays?: number;
         };
         SignContractBody: {
             /** @example 15000 */
@@ -8512,6 +11234,72 @@ export interface components {
              */
             termsSource?: "standard" | "negotiated";
             userId: string;
+        };
+        StaffAuthoredNote: components["schemas"]["StaffNote"] & {
+            /** @example Intro to Algebra */
+            topicTitle: string;
+        };
+        StaffAuthoredNotePage: {
+            data: components["schemas"]["StaffAuthoredNote"][];
+            /**
+             * @description Opaque cursor of the next page; null on the last page
+             * @example null
+             */
+            nextCursor: string | null;
+        };
+        StaffAuthoredSubmission: components["schemas"]["StaffSubmissionView"] & {
+            /** @example Kihon */
+            topicTitle: string;
+        };
+        StaffAuthoredSubmissionPage: {
+            data: components["schemas"]["StaffAuthoredSubmission"][];
+            /**
+             * @description Opaque cursor of the next page; null on the last page
+             * @example null
+             */
+            nextCursor: string | null;
+        };
+        StaffNote: components["schemas"]["Note"] & {
+            /**
+             * @description When staff force-unshared the note; null when not moderated
+             * @example null
+             */
+            moderatedAt: string | null;
+            /**
+             * @description The staff member who force-unshared the note; null when not moderated
+             * @example null
+             */
+            moderatedBy: string | null;
+        };
+        StaffSubmissionPage: {
+            data: components["schemas"]["StaffSubmissionView"][];
+            /**
+             * @description Opaque cursor of the next page; null on the last page
+             * @example null
+             */
+            nextCursor: string | null;
+        };
+        StaffSubmissionView: components["schemas"]["SubmissionView"] & {
+            /**
+             * @description When staff force-unshared the submission; null when not moderated
+             * @example null
+             */
+            moderatedAt: string | null;
+            /**
+             * @description The staff member who force-unshared it; null when not moderated
+             * @example null
+             */
+            moderatedBy: string | null;
+            /**
+             * @description The admin who removed it; null unless removed (or the account is gone)
+             * @example null
+             */
+            removedBy: string | null;
+            /**
+             * @description Display name of `removedBy`; null when unknown
+             * @example null
+             */
+            removedByName: string | null;
         };
         StorageAuditMissingResponse: {
             items: components["schemas"]["StorageMissingObject"][];
@@ -8581,6 +11369,137 @@ export interface components {
             downloadUrlExpiresAt: string;
         };
         StorageReference: components["schemas"]["MediaStorageReference"] | components["schemas"]["EventFlyerStorageReference"];
+        Submission: {
+            /** @example student-a */
+            authorId: string;
+            /** @example Student A */
+            authorName: string;
+            /**
+             * @example video/quicktime
+             * @enum {string}
+             */
+            contentType: "application/pdf" | "video/mp4" | "image/jpeg" | "image/png" | "image/webp" | "video/quicktime";
+            /** @example 2026-09-29 12:00:00 */
+            createdAt: string;
+            /**
+             * @description Sanitised Markdown, ≤ SUBMISSION_DESCRIPTION_MAX; '' when empty or removed
+             * @example
+             */
+            description: string;
+            /**
+             * Format: uuid
+             * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
+             */
+            id: string;
+            /**
+             * @description True while a staff force-unshare blocks re-sharing
+             * @example false
+             */
+            moderated: boolean;
+            /** @example IMG_0042.MOV */
+            originalName: string;
+            /**
+             * @description Null unless status is `removed`
+             * @example null
+             */
+            removedAt: string | null;
+            /**
+             * @description Null while private
+             * @example null
+             */
+            sharedAt: string | null;
+            /**
+             * @description Declared at presign, verified at finalize
+             * @example 52428800
+             */
+            sizeBytes: number;
+            /**
+             * @example ready
+             * @enum {string}
+             */
+            status: "pending" | "ready" | "removed";
+            /**
+             * @description 1..SUBMISSION_TITLE_MAX characters
+             * @example Kata, 2nd attempt
+             */
+            title: string;
+            /** @example topic-1 */
+            topicNodeId: string;
+            /** @example 2026-09-29 12:00:00 */
+            updatedAt: string;
+            /**
+             * @example private
+             * @enum {string}
+             */
+            visibility: "private" | "shared";
+        };
+        SubmissionPage: {
+            data: components["schemas"]["SubmissionView"][];
+            /**
+             * @description Opaque cursor of the next page; null on the last page
+             * @example null
+             */
+            nextCursor: string | null;
+        };
+        SubmissionQuotaError: {
+            /** @enum {string} */
+            error: "SUBMISSION_QUOTA";
+            /** @example 10 */
+            limit: number;
+            /**
+             * @description `count`: per-topic limit; `storage`: per-student bytes
+             * @enum {string}
+             */
+            reason: "count" | "storage";
+            /** @example 10 */
+            used: number;
+        };
+        SubmissionSummary: {
+            /**
+             * @description Shared ready submissions on the topic; 0 when sharing is disabled
+             * @example 8
+             */
+            classCount: number;
+            limits: {
+                /** @example 10 */
+                perTopicMax: number;
+                /** @example 1073741824 */
+                storagePerStudentBytes: number;
+                /** @example 262144000 */
+                videoMaxBytes: number;
+            };
+            /** @example true */
+            sharingEnabled: boolean;
+            /**
+             * @description Staff only: every ready + removed submission on the topic
+             * @example 12
+             */
+            totalCount?: number;
+            usage: {
+                /**
+                 * @description Caller's pending + ready bytes across all topics
+                 * @example 104857600
+                 */
+                bytes: number;
+                /**
+                 * @description Caller's pending + ready submissions on this topic
+                 * @example 2
+                 */
+                topicCount: number;
+            };
+        };
+        SubmissionView: components["schemas"]["Submission"] & {
+            /**
+             * @description True on the caller's own submission
+             * @example false
+             */
+            isMine: boolean;
+            /**
+             * Format: uri
+             * @description Signed GET URL (TTL 1 h) on a ready submission; null while pending or once removed
+             */
+            url: string | null;
+        };
         Tag: {
             /**
              * Format: uuid
@@ -8743,6 +11662,10 @@ export interface components {
              *     ]
              */
             issues: unknown[];
+        };
+        VoidEventChargeBody: {
+            /** @example Seminar cancelled for this student. */
+            reason: string;
         };
         VoidInvoiceBody: {
             /** @example Issued to the wrong student. */

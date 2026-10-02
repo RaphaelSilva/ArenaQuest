@@ -1,6 +1,6 @@
 # Task 01 — Backend: Shared text normaliser and tag slugify (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [24 — Catalog search by tags](./milestone.md)
 **RFC:** [RFC 0017](../../RFCs/0017-catalog-search-by-tags.md)
 **Team:** Backend API
@@ -53,17 +53,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `normalizeText('  Chūdan   TSUKI ')` returns `chudan tsuki`; the NFD spelling of
+- [x] `normalizeText('  Chūdan   TSUKI ')` returns `chudan tsuki`; the NFD spelling of
       `Chūdan` normalises identically to the NFC one.
-- [ ] `normalizeText('Ro Ryu – Taki')` returns `ro ryu - taki`.
-- [ ] `tokenize('Kata  básica/2')` returns `['kata', 'basica', '2']`; `tokenize('')`
+- [x] `normalizeText('Ro Ryu – Taki')` returns `ro ryu - taki`.
+- [x] `tokenize('Kata  básica/2')` returns `['kata', 'basica', '2']`; `tokenize('')`
       returns `[]`.
-- [ ] Every row of `slugify.fixtures.json` passes in `slugify.spec.ts`; `slugify('!!!')`
+- [x] Every row of `slugify.fixtures.json` passes in `slugify.spec.ts`; `slugify('!!!')`
       is `""`.
-- [ ] No new entry in `packages/shared/package.json` `dependencies`.
-- [ ] Changed files lint clean; `pnpm --filter @arenaquest/shared test` and `make test-api`
+- [x] No new entry in `packages/shared/package.json` `dependencies`.
+- [x] Changed files lint clean; `pnpm --filter @arenaquest/shared test` and `make test-api`
       are green.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

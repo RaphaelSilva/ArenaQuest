@@ -19,10 +19,25 @@ const TONE: Record<Standing, 'active' | 'archived' | 'inactive' | 'locked'> = {
   exempt: 'locked',
 };
 
-export function StandingBadge({ standing, size = 'sm' }: { standing: Standing; size?: 'sm' | 'md' }) {
+/**
+ * `railLabel` names the rail the standing belongs to (RFC 0015: the monthly fee
+ * and the extras are resolved apart). It is rendered as visually hidden text
+ * inside the badge, so a screen reader announces "Extras: Delinquent" rather
+ * than a bare label whose rail only a column header would give away.
+ */
+export function StandingBadge({
+  standing,
+  size = 'sm',
+  railLabel,
+}: {
+  standing: Standing;
+  size?: 'sm' | 'md';
+  railLabel?: string;
+}) {
   const dict = useDict();
   return (
     <Badge status={TONE[standing]} size={size}>
+      {railLabel && <span className="sr-only">{dict.admin.billing.railPrefix(railLabel)}</span>}
       {dict.admin.billing.standing[standing]}
     </Badge>
   );

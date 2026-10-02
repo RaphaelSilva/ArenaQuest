@@ -1,0 +1,33 @@
+/**
+ * Test fixture: a hand-kept wrangler.jsonc for the `acme` label (see
+ * good-profile.jsonc) with comments the previews writer must preserve.
+ * Pure data — never deployed.
+ */
+{
+	"name": "api",
+	"triggers": { "crons": ["0 6 * * *"] },
+	"env": {
+		"acme-staging": {
+			"name": "api-acme-staging",
+			"d1_databases": [
+				{ "binding": "DB", "database_name": "acme-db-staging", "database_id": "aaaa-staging", "migrations_dir": "migrations" }
+			],
+			"kv_namespaces": [{ "binding": "RATE_LIMIT_KV", "id": "kv-staging" }],
+			"r2_buckets": [{ "binding": "R2", "bucket_name": "acme-media-staging" }],
+			"vars": {
+				"WEB_BASE_URL": "https://acme-web-staging.pages.dev",
+				// "GOOGLE_CLIENT_ID": set in the dashboard — this comment must survive.
+				"GOOGLE_REDIRECT_URI": "https://api-acme-staging.acme.workers.dev/auth/google/callback"
+			},
+			"observability": { "enabled": true } // trailing comment on the last member
+		},
+		"acme": {
+			"name": "api-acme",
+			"vars": { "WEB_BASE_URL": "https://app.acme.app" }
+		},
+		// legacy hand-written block: never gets a previews member
+		"staging": {
+			"name": "api-staging"
+		}
+	}
+}

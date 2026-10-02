@@ -133,7 +133,8 @@ media: its markdown becomes that topic's `content` (the API sanitises it with
 
 ````
 ```arenaquest
-{ "order": 9, "status": "draft", "estimatedMinutes": 90, "title": "9th Kyu" }
+{ "order": 9, "status": "draft", "estimatedMinutes": 90, "title": "9th Kyu",
+  "tags": ["Soco", "Kihon"] }
 ```
 ````
 
@@ -145,6 +146,14 @@ order — that is what fixes a tree whose folder names sort against their real
 sequence. On a re-run a reused topic is `PATCH`ed only when its README actually
 drifted, and a sibling group already in place is not moved, so a no-op re-run
 performs no writes at all.
+
+`tags` is a list of tag *names*, sent by name on create: the API slugifies each,
+reuses an existing tag with the same slug (keeping its first spelling) and creates
+the rest. `"tags": []` clears the topic's tags, while omitting the key leaves them
+untouched. A name with no usable characters (nothing survives slugifying) is dropped
+with a warning, and a `tags` that is not an array of strings is ignored with a
+warning. On a re-run drift is compared as **slug sets**, so re-casing or
+re-accenting a name is not drift and an unchanged tree still performs no writes.
 
 **Google Drive source.** `scripts/content/drive-source.mjs` lists a folder
 recursively (following `nextPageToken`, covering Shared Drives), downloads
@@ -255,6 +264,64 @@ rows). Type and size are re-checked against the bytes **on disk** through
 `validateMediaFile`, the single preflight both plan builders share — a manifest
 is another route to the upload, not a way around a limit.
 
+**Demo seed (RFC 0021):**
+```bash
+make db-seed-demo-local LABEL=budo          # local replica (DRY_RUN=1: SQL + plan only)
+make db-seed-demo-staging LABEL=budo        # remote staging (prompts; CONFIRM=1 skips)
+node scripts/demo/ci-check.mjs                                  # the CI check, offline
+```
+Both targets forward to `scripts/demo/seed-demo.mjs` (`LABEL` defaults to
+`arenaquest`); the dataset is `scripts/demo/dataset/base.json` plus an optional
+`config/labels/<label>/demo.json`. **There is no production variant**: the CLI
+refuses `-e production` (and any production-named D1/bucket) before writing
+anything, and the production deploy guard rejects a database holding a
+`*.demo.invalid` account. The demo accounts' password is `AQ_DEMO_PASSWORD` from the
+environment, or — when unset on a TTY — asked for (hidden, twice, ≥ 8 chars); never a flag.
+The run is idempotent (deterministic ids; a re-run changes no row count). The
+local bucket is written in-process through wrangler's `getPlatformProxy`
+(`--persist-to <dir>` retargets a local run, D1 and R2 alike). Labels share
+group names and tag slugs, so one local replica holds one label's demo.
+The CI job *Demo seed check* (`.github/workflows/ci.yml`, Node 22 for wrangler)
+applies every migration to a throwaway D1, seeds each label twice and asserts
+RFC 0021's counts, the media objects' SHA-256, the student XP/badges and
+`user_xp` = ledger — offline, with media from `scripts/demo/fixtures/` and a
+generated password — so a migration that breaks the demo fails its PR.
+
+**Recovering staging (disposable staging, RFC 0021 §4):**
+```bash
+make db-reset-staging LABEL=budo     # asks for the demo password if AQ_DEMO_PASSWORD is unset; prompts (types the DB name); CONFIRM=1 skips, DRY_RUN=1 plans only
+```
+`scripts/db/reset-remote.mjs` runs, in a fixed order: a D1 Time Travel bookmark
+(the printed `wrangler d1 time-travel restore <db> --bookmark=… --env <label>-staging`
+undoes the reset; no bookmark → nothing is dropped) → drop every table/view except
+`sqlite_*`/`_cf_*`, `d1_migrations` included, with `PRAGMA defer_foreign_keys = on`
+→ `d1 migrations apply --remote` from the checkout → the demo seed CLI with `--yes`.
+The D1 is emptied in place (same `database_id`); the bucket is not emptied. It
+refuses `-e production`, `-e local` and any production-named D1/bucket through the
+seed's own `resolveTarget`, before any wrangler call; there is no `-prod` target.
+
+**Previewing a candidate (RFC 0021 §1):**
+```bash
+make deploy-preview-staging LABEL=budo CANDIDATE=m21 [DRY_RUN=1]   # API Workers Preview + Pages branch on staging data
+make preview-delete-staging LABEL=budo CANDIDATE=m21              # remove both after the merge
+```
+Both forward to `deploy.mjs --label <l> -e staging --preview <name> [--delete]`
+(`CANDIDATE` empty → `m<N>` from `feature/m<N>/candidate`; name `[a-z0-9-]{1,20}`;
+`-e production` refused). Plan: guard → `check-migrations` against `origin/main` →
+D1 Time Travel bookmark → migrate the staging D1 → `wrangler preview --json --secrets-file`
+(URL from `preview.urls[0]`, parsed in one helper, `parsePreviewUrl`; the file carries a
+per-deploy generated `JWT_SECRET` plus any `AQ_PREVIEW_<NAME>` from the shell — a preview
+deployment gets no secret from the staging Worker *nor* the Preview base config, so the
+preflight skips the Worker's secrets for a preview) → web build with that
+`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SITE_URL=https://<name>.<pagesProject>.pages.dev`,
+`NEXT_PUBLIC_PREVIEW_NAME`/`_SHA` → `pages deploy --branch <name>` → report (both URLs,
+bookmark, restore command). The live staging Worker and the Pages production branch are
+never touched, and the web preview origin must pass the staging `ALLOWED_ORIGINS`
+(`originAllowed`, the API's matching) or the CLI refuses. `--scope web` needs `--api-url`.
+`.github/workflows/preview-candidate.yml` runs the same CLI on `workflow_dispatch`
+only (`label`: one or `all`), writing the URLs to the job summary. See
+`docs/onboarding.md` → "Previewing a candidate".
+
 Renamed targets (`db-migrations-dev` → `db-migrate-local`, `db-seed-dev` →
 `db-seed-local`, `create-db` → `create-db-prod`, ...) still work as deprecated
 aliases that print a pointer. Use the new names.
@@ -286,6 +353,8 @@ Cloudflare Workers serverless backend (Hono). Patterns to follow:
   - Production is locked to exact origins; do not introduce wildcards without a security review (see `docs/product/backlog/cors/`). Staging includes the PR-preview wildcard (`https://*.arenaquest-web-staging.pages.dev`). Local development uses `ALLOWED_ORIGINS=http://localhost:3000` (or `*`) in `.dev.vars` — see `.dev.vars.example`.
 - **User Management** — Includes admin lockout guards to prevent deleting the last active admin or self-lockout.
 - **Events board (the only anonymous data surface)** — `GET /v1/events`, `/{slug}` and `/{slug}/flyer` answer **without a token** and answer *more* when one is present. They are mounted at `/v1/events`, deliberately **not** under `routes/public/` — that directory means "non-admin, authenticated" and reusing it would blur a security boundary. `middleware/optional-auth.ts` is the one middleware that does not reject: an invalid token degrades to anonymous instead of `401`. Audience (`public` · `members` · `restricted`) is resolved server-side in `D1EventRepository`, whose anonymous listing is a **separate statement** with a literal `audience = 'public'` filter rather than the authenticated query with a null user. Out-of-audience detail reads return **404, not 403**, so the open surface is not an enumeration oracle. "Past" is a computed predicate (`COALESCE(ends_at, starts_at + 1 day) < now`), never a column. Anonymous routes carry an IP-keyed `KvRateLimiter` (60 rpm).
+- **Student notes** — `topic_notes` (migration 0028) holds **one note per student per topic** (`UNIQUE (topic_node_id, author_id)`), Markdown sanitised on write, hard-deleted by its author. A note is **private among students only**: no student route reads another student's private note, and `GET /v1/topics/{id}/notes` gives a student only `shared` rows through a statement with a literal `visibility = 'shared'` filter, so no cursor can widen it. `admin` and `content_creator` read every note, private included, **read-only** — no route lets staff edit or delete someone else's note — and `tutor` sees exactly what a student sees. Student-facing routes use the **catalog's** gate (published, not archived, in the effective access set) and answer `404` on any miss, unlike comments' `403`; `DELETE …/notes/me` alone skips the gate, so a note on a lost topic can still be deleted. Moderation is **force-unshare**: `POST /v1/admin/notes/{id}/unshare` makes the note private and flags it, sticky until `DELETE /v1/admin/notes/{id}/moderation`, both callable by either staff role; the admin notes router is mounted **before** `/users` in `routes/admin/index.ts`, because the `/users/*` ADMIN-only middleware would otherwise 403 a content creator on `/users/{userId}/notes`. Concurrency is an integer **`revision`**: an author write is one conditional statement on `baseRevision` — `UPDATE … WHERE revision = ?`, or `INSERT … ON CONFLICT DO NOTHING` for `baseRevision: 0` — decided by `meta.changes` (a force-unshare also bumps it, so an open editor goes stale; clearing moderation does not), and a miss is `409 NOTE_STALE` with the stored note (or `null`) as `current` at the **top level** of the body; sharing a moderated note is `409 NOTE_MODERATED`. Listings are the API's first **cursor-paginated** ones: `routes/_shared/cursor.ts` encodes an opaque `base64url(sortKey|id)` keyset cursor and a malformed one is `400 InvalidCursor`.
+- **Student submissions** — `topic_submissions` (migration 0030) holds a student's demonstration files (one file + title + description per row, many per topic), in **its own table and under the `submissions/{authorId}/` key prefix — never `media`, never `topics/`**, so no course-media reader can surface a student upload. Four vars in every `env.*` block of `wrangler.jsonc` tune it per label and environment: `SUBMISSIONS_PER_TOPIC_MAX` (10), `SUBMISSIONS_STORAGE_PER_STUDENT_BYTES` (1 GiB), `SUBMISSIONS_VIDEO_MAX_BYTES` (250 MB) and `SUBMISSIONS_SHARING_ENABLED` (`true`); an absent var takes its default (`packages/shared/domain/submissions/limits.ts`), a present-but-invalid one makes every submission route `500 SUBMISSION_CONFIG_INVALID` (`src/core/submissions/config.ts`) — never a silent fallback. Upload is `presign → PUT → finalize`; the quota (per-topic count, per-student bytes, pending rows included, removed excluded) is checked in the **same SQL statement** as the insert (`409 SUBMISSION_QUOTA`), presign is rate-limited per user (`rl:submissions:`, 30/h), and **finalize** marks a row `ready` only when the stored object's length (and its type, when the storage reports one) matches and its first 32 bytes carry the file signature (`readHead`); otherwise object and row are deleted (`422 UPLOAD_MISMATCH`). Access follows the catalog gate with `404` on any miss, like notes; staff (`admin`, `content_creator`) read everything but get `403` on presign and on someone else's PATCH/DELETE, and an author's `DELETE` skips the topic gate so a submission on a lost topic can still be removed. **Move** (`POST /v1/me/submissions/move`, ≤ 10 ids, author-only) is metadata-only — the key has no topic id, so the object is untouched — quota-checked on the target per item, resets visibility to `private` and keeps the moderation flag. Staff force-unshare (`/v1/admin/submissions/{id}/unshare`, cleared by `DELETE …/moderation`); `admin` alone removes, which deletes the object and leaves a **tombstone** (`status = 'removed'`, `storage_key = NULL`, description cleared) visible only to its author and staff and outside every quota. The daily `scheduled()` run (next to billing) sweeps `pending` rows older than 24 h with their objects, in batches of 100, logging only counts (`src/jobs/sweep-pending-submissions.ts`). Signed GET URLs (TTL 1 h) are served with `Cache-Control: private, no-store`.
 - **Tests** — Vitest with `@cloudflare/vitest-pool-workers`. Config: `vitest.config.mts`.
 
 ### `apps/web`

@@ -5,7 +5,17 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import type { TopicNode } from '@web/lib/topics-api';
 import type { TopicProgressStatus } from '@web/lib/topics-api';
 import { useDict } from '@web/context/dict-context';
+import { slugify } from '@arenaquest/shared/domain/tags/slugify';
+import {
+  buildHaystack,
+  isEmptyQuery,
+  matchHaystack,
+  parseQuery,
+  type MatchResult,
+  type TagLike,
+} from '@web/lib/catalog-search';
 import { TopicTreeNode, type TopicTreeData } from './TopicTreeNode';
+import { TagChip } from './TagChip';
 
 function buildTree(nodes: TopicNode[]): TopicTreeData[] {
   const byId = new Map<string, TopicTreeData>(nodes.map((n) => [n.id, { ...n, children: [] }]));
@@ -78,16 +88,48 @@ export function CatalogSidebar({ topics, progressMap, globalProgress }: Props) {
     return new Set(ids);
   })();
 
-  const q = qParam.toLowerCase();
+  const tagParam = searchParams.get('tag') ?? '';
+  const parsed = useMemo(() => parseQuery(qParam, tagParam), [qParam, tagParam]);
+  const hasQuery = !isEmptyQuery(parsed);
+
+  // Normalised title + tag names, computed once per topic list (not per keystroke).
+  const haystacks = useMemo(() => new Map(topics.map((t) => [t.id, buildHaystack(t)])), [topics]);
+
+  const matches = useMemo(() => {
+    const out = new Map<string, MatchResult>();
+    if (isEmptyQuery(parsed)) return out;
+    for (const [id, h] of haystacks) out.set(id, matchHaystack(h, parsed));
+    return out;
+  }, [haystacks, parsed]);
+
+  const isMatch = (id: string) => matches.get(id)?.matched ?? false;
+
+  // Tags explaining a match, only for nodes that needed a tag to match.
+  const matchChips = useMemo(() => {
+    const out = new Map<string, TagLike[]>();
+    for (const [id, r] of matches) if (r.matched && r.viaTags.length > 0) out.set(id, r.viaTags);
+    return out;
+  }, [matches]);
+
+  // Display name of the active `?tag=` filter: the tag's own spelling when known.
+  const activeTagName = useMemo(() => {
+    if (!tagParam) return '';
+    const slug = slugify(tagParam);
+    for (const t of topics) {
+      const found = (t.tags ?? []).find((tag) => tag.slug === slug);
+      if (found) return found.name;
+    }
+    return tagParam;
+  }, [tagParam, topics]);
 
   function nodeOrDescendantMatches(node: TopicTreeData): boolean {
-    if (!q) return true;
-    if (node.title.toLowerCase().includes(q)) return true;
+    if (!hasQuery) return true;
+    if (isMatch(node.id)) return true;
     return node.children.some(nodeOrDescendantMatches);
   }
 
   function collectMatchAncestors(node: TopicTreeData, parents: readonly string[]): string[] {
-    const here: string[] = node.title.toLowerCase().includes(q) ? [...parents] : [];
+    const here: string[] = isMatch(node.id) ? [...parents] : [];
     const nextParents = [...parents, node.id];
     for (const child of node.children) {
       here.push(...collectMatchAncestors(child, nextParents));
@@ -96,7 +138,7 @@ export function CatalogSidebar({ topics, progressMap, globalProgress }: Props) {
   }
 
   // Ancestors of any node whose title matches the query — kept open so matches surface.
-  const matchAncestorIds: ReadonlySet<string> = q
+  const matchAncestorIds: ReadonlySet<string> = hasQuery
     ? new Set(tree.flatMap((root) => collectMatchAncestors(root, [])))
     : new Set();
 
@@ -129,6 +171,12 @@ export function CatalogSidebar({ topics, progressMap, globalProgress }: Props) {
     [userExpandedIds, qParam, updateUrl],
   );
 
+  function handleClearTag() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('tag');
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
   function handleSearch(value: string) {
     setSearchValue(value);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -157,6 +205,8 @@ export function CatalogSidebar({ topics, progressMap, globalProgress }: Props) {
         onToggle={handleToggle}
         expandLabel={dict.catalog.sidebar.expandTopic}
         collapseLabel={dict.catalog.sidebar.collapseTopic}
+        matchChips={matchChips}
+        moreLabel={dict.catalog.sidebar.moreTags}
       />
     ));
   }
@@ -214,6 +264,15 @@ export function CatalogSidebar({ topics, progressMap, globalProgress }: Props) {
             aria-label={dict.catalog.sidebar.searchAriaLabel}
           />
         </div>
+        {tagParam && (
+          <div className="mt-2 flex">
+            <TagChip
+              label={dict.catalog.sidebar.activeTag(activeTagName)}
+              onDismiss={handleClearTag}
+              dismissLabel={dict.catalog.sidebar.clearTag}
+            />
+          </div>
+        )}
       </div>
 
       {/* Tree */}

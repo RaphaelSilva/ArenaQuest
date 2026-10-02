@@ -15,3 +15,9 @@ interface ImportMetaGlobOptions {
 interface ImportMeta {
   glob(pattern: string, options?: ImportMetaGlobOptions): Record<string, unknown>;
 }
+
+// Vite's `?inline` asset query (binary test fixtures) resolves to a base64 data URL.
+declare module '*?inline' {
+  const dataUrl: string;
+  export default dataUrl;
+}

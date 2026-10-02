@@ -1,7 +1,10 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
-import { AdminBillingController } from '@api/controllers/admin-billing.controller';
+import {
+  AdminBillingController,
+  AdminEventChargeController,
+} from '@api/controllers/admin-billing.controller';
 import { billingRunDeps } from '@api/core/billing/billing-service';
 import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
 import type { AppContainer } from '@api/container';
@@ -154,6 +157,18 @@ const MovementReportSchema = z
     outstandingMinor: MinorUnits,
     invoicesIssued: z.number().int(),
     activeStudents: z.number().int(),
+    /** The extras rail of the month, from event charges only. */
+    extras: z
+      .object({
+        chargedMinor: MinorUnits,
+        adjustmentsMinor: MinorUnits,
+        receivedMinor: MinorUnits,
+        chargesIssued: z.number().int(),
+        receivableAtCloseMinor: MinorUnits,
+      })
+      .openapi('BillingMovementExtras'),
+    /** Cash that entered the till in the month, both rails. Not a standing, not a receivable. */
+    cashReceivedMinor: MinorUnits,
   })
   .openapi('BillingMovementReport');
 
@@ -168,9 +183,13 @@ const AgingBucketSchema = z
   })
   .openapi('BillingAgingBucket');
 
+const RailSchema = z.enum(['contract', 'extras']).openapi({ example: 'contract' });
+
 const AgingReportSchema = z
   .object({
     asOf: IsoDate,
+    /** The one rail bucketed; on `extras` the counts count event charges. */
+    rail: RailSchema,
     currency: ReportCurrencySchema,
     buckets: z.array(AgingBucketSchema),
     totalMinor: MinorUnits,
@@ -194,6 +213,91 @@ const StatementContractGroupSchema = z
   })
   .openapi('BillingStatementContractGroup');
 
+// The extras rail's record schemas (RFC 0015 §3), declared before the statement
+// because the statement's `extras` block lists charges with their ledger.
+const ChargeStatusSchema = z.enum(['open', 'paid', 'void']);
+
+const EventChargeSchema = z
+  .object({
+    id: z.string(),
+    eventId: z.string(),
+    userId: z.string(),
+    description: z.string(),
+    amountMinor: MinorUnits,
+    currency: z.string(),
+    termsSource: TermsSourceSchema,
+    termsNote: z.string(),
+    dueDate: IsoDate,
+    graceDays: z.number().int(),
+    status: ChargeStatusSchema,
+    issuedBy: z.string(),
+    issuedAt: z.string(),
+    voidedAt: z.string().nullable(),
+    voidReason: z.string().nullable(),
+  })
+  .openapi('BillingEventCharge');
+
+const EventChargeWithBalanceSchema = EventChargeSchema.extend({
+  balanceMinor: MinorUnits,
+}).openapi('BillingEventChargeWithBalance');
+
+const ChargeAdjustmentSchema = z
+  .object({
+    id: z.string(),
+    chargeId: z.string(),
+    kind: AdjustmentKindSchema,
+    amountMinor: MinorUnits,
+    reason: z.string(),
+    appliedBy: z.string(),
+    appliedAt: z.string(),
+  })
+  .openapi('BillingEventChargeAdjustment');
+
+const ChargePaymentSchema = z
+  .object({
+    id: z.string(),
+    chargeId: z.string(),
+    amountMinor: MinorUnits,
+    currency: z.string(),
+    method: PaymentMethodSchema,
+    paidAt: z.string(),
+    externalReference: z.string().nullable(),
+    note: z.string(),
+    reversesId: z.string().nullable(),
+    recordedBy: z.string(),
+    recordedAt: z.string(),
+  })
+  .openapi('BillingEventChargePayment');
+
+const EventChargeDetailSchema = EventChargeWithBalanceSchema.extend({
+  adjustments: z.array(ChargeAdjustmentSchema),
+  payments: z.array(ChargePaymentSchema),
+}).openapi('BillingEventChargeDetail');
+
+/** One event charge on a statement: the charge, its event, and its whole ledger. */
+const StatementChargeSchema = EventChargeDetailSchema.extend({
+  eventTitle: z.string().openapi({ example: 'Seminário de Inverno' }),
+  /** When the event starts; null when the event no longer exists. */
+  eventStartsAt: z.string().nullable().openapi({ example: '2026-07-18T13:00:00.000Z' }),
+}).openapi('BillingStatementCharge');
+
+export const StandingSchema = z
+  .enum(['good', 'due', 'delinquent', 'exempt'])
+  .openapi({ example: 'delinquent' });
+
+/**
+ * The extras rail of a statement (RFC 0015 §7): its own standing and its own
+ * outstanding, beside — never summed into — the contract `outstandingMinor`.
+ */
+const StatementExtrasSchema = z
+  .object({
+    standing: StandingSchema,
+    oldestOverdueDate: IsoDate.nullable(),
+    outstandingMinor: MinorUnits,
+    charges: z.array(StatementChargeSchema),
+  })
+  .openapi('BillingStatementExtras');
+
 /**
  * Exported so `/v1/me/billing` returns the **same** shape rather than a second
  * declaration of it. Reusing the instance also keeps the OpenAPI registry
@@ -208,12 +312,9 @@ export const StudentStatementSchema = z
     outstandingMinor: MinorUnits,
     contractGroups: z.array(StatementContractGroupSchema),
     invoices: z.array(StatementInvoiceSchema),
+    extras: StatementExtrasSchema,
   })
   .openapi('BillingStudentStatement');
-
-export const StandingSchema = z
-  .enum(['good', 'due', 'delinquent', 'exempt'])
-  .openapi({ example: 'delinquent' });
 
 const HoldSchema = z
   .object({
@@ -226,27 +327,73 @@ const HoldSchema = z
   .openapi('BillingStandingHold');
 
 /**
- * One roster line. `standing` is resolved on every read from the invoices, the
- * hold and `asOf` — there is no standing column behind it, and nothing here
- * gates anything: a `delinquent` row changes no permission.
+ * The contract rail of one roster line: RFC 0013's standing, resolved on every
+ * read from the contract's invoices, the hold and `asOf`.
+ */
+const RosterContractSchema = z
+  .object({
+    id: z.string(),
+    groupId: z.string(),
+    status: ContractStatusSchema,
+    nextDueDate: IsoDate.nullable(),
+    negotiatedTerms: z.boolean(),
+    standing: StandingSchema,
+    oldestOverdueDate: IsoDate.nullable(),
+    outstandingMinor: MinorUnits,
+  })
+  .openapi('BillingRosterContract');
+
+/**
+ * The extras rail of one roster line: resolved from event charges only, never
+ * held — a contract hold does not reach it.
+ */
+const RosterExtrasSchema = z
+  .object({
+    standing: StandingSchema,
+    oldestOverdueDate: IsoDate.nullable(),
+    outstandingMinor: MinorUnits,
+    /** Live charges with a positive balance. */
+    openCharges: z.number().int(),
+    /** Of those, the ones whose due date has arrived. */
+    overdueCharges: z.number().int(),
+  })
+  .openapi('BillingRosterExtras');
+
+/**
+ * One roster line (RFC 0015 §4). Two rails side by side and **no top-level
+ * standing or total**, so nothing can read one number as both. `contract` is
+ * null for a buyer with no contract; `extras` is null for someone never
+ * charged for an extra. Nothing here gates anything: a `delinquent` rail
+ * changes no permission.
  */
 const RosterEntrySchema = z
   .object({
     userId: z.string(),
     asOf: IsoDate,
-    standing: StandingSchema,
-    oldestOverdueDate: IsoDate.nullable(),
-    outstandingMinor: MinorUnits,
-    contractId: z.string(),
-    contractGroupId: z.string(),
-    contractStatus: ContractStatusSchema,
     currency: z.string().openapi({ example: 'BRL' }),
-    nextDueDate: IsoDate.nullable(),
-    negotiatedTerms: z.boolean(),
-    /** The stored row, expired or not; `standing === 'exempt'` says whether it bites. */
+    contract: RosterContractSchema.nullable(),
+    extras: RosterExtrasSchema.nullable(),
+    /** The stored row, expired or not; `contract.standing === 'exempt'` says whether it bites. */
     hold: HoldSchema.nullable(),
   })
   .openapi('BillingRosterEntry');
+
+/** One student who moved into `due` or `delinquent` on one rail since the previous run. */
+const RunCrossingSchema = z.object({
+  userId: z.string(),
+  from: StandingSchema,
+  to: StandingSchema,
+  oldestOverdueDate: IsoDate.nullable(),
+  outstandingMinor: MinorUnits,
+  currency: z.string(),
+});
+
+/** What happened to one rail's reminders on one run. */
+const ReminderCountsSchema = z.object({
+  sent: z.number().int(),
+  suppressed: z.number().int(),
+  undeliverable: z.number().int(),
+});
 
 /**
  * What one daily run did (RFC 0013 §6).
@@ -288,16 +435,8 @@ const BillingRunReportSchema = z
         suppressedByHold: z.boolean(),
       }),
     ),
-    crossings: z.array(
-      z.object({
-        userId: z.string(),
-        from: StandingSchema,
-        to: StandingSchema,
-        oldestOverdueDate: IsoDate.nullable(),
-        outstandingMinor: MinorUnits,
-        currency: z.string(),
-      }),
-    ),
+    /** "Crossed on the monthly fee" — contract invoices only. */
+    crossings: z.array(RunCrossingSchema),
     suppressedByHold: z.array(
       z.object({ userId: z.string(), outstandingMinor: MinorUnits }),
     ),
@@ -312,6 +451,33 @@ const BillingRunReportSchema = z
     ),
     mailsSent: z.number().int(),
     adminsNotified: z.number().int(),
+    /**
+     * Extras notices (RFC 0015 §5), kept apart from the contract `reminders`.
+     * No `suppressedByHold`: a contract hold never reaches the extras rail.
+     */
+    extrasReminders: z.array(
+      z.object({
+        chargeId: z.string(),
+        eventId: z.string(),
+        /** The event title snapshot the message names. */
+        description: z.string(),
+        userId: z.string(),
+        kind: z.enum(['extras_due_date', 'extras_grace_lapsed']),
+        dueDate: IsoDate,
+        triggerOn: IsoDate,
+        balanceMinor: MinorUnits,
+        currency: z.string(),
+        sent: z.boolean(),
+      }),
+    ),
+    /** "Crossed on extras" — resolved from charges alone, with no hold. */
+    extrasCrossings: z.array(RunCrossingSchema),
+    /** Per-rail reminder tallies, never summed across rails. */
+    reminderCounts: z.object({
+      contract: ReminderCountsSchema,
+      /** `suppressed` is always 0: the extras rail has no hold. */
+      extras: ReminderCountsSchema,
+    }),
   })
   .openapi('BillingRunReport');
 
@@ -659,7 +825,7 @@ export const movementReportRoute = createRoute({
   path: '/reports/movement',
   summary: 'Monthly Movement',
   description:
-    "Billed, received and outstanding for one month, recomputed from the ledger rows. Billed is keyed off the invoice's issue date and the adjustment's applied date; received is keyed off the payment's paid date — a payment in September against an August invoice is September's received and August's billed.",
+    "Billed, received and outstanding for one month, recomputed from the ledger rows. Billed is keyed off the invoice's issue date and the adjustment's applied date; received is keyed off the payment's paid date — a payment in September against an August invoice is September's received and August's billed. Every top-level field is the contract rail only; `extras` reports event charges on the same date rules, and `cashReceivedMinor` is the one cross-rail figure — money that entered the till.",
   request: {
     query: z.object({
       month: z
@@ -677,10 +843,11 @@ export const agingReportRoute = createRoute({
   path: '/reports/aging',
   summary: 'Receivables Aging',
   description:
-    "Open balances bucketed 0-30 / 31-60 / 61-90 / 90+ by days past each invoice's own due date. Boundaries are exclusive: 30 days past due and 31 days past due land in different buckets.",
+    "Open balances bucketed 0-30 / 31-60 / 61-90 / 90+ by days past each item's own due date. Boundaries are exclusive: 30 days past due and 31 days past due land in different buckets. `rail` picks the one rail aged — `contract` (invoices, the default, unchanged) or `extras` (event charges); the two are never bucketed together.",
   request: {
     query: z.object({
       asOf: IsoDate.optional().openapi({ param: { name: 'asOf', in: 'query' } }),
+      rail: RailSchema.optional().openapi({ param: { name: 'rail', in: 'query' } }),
     }),
   },
   responses: { 200: json('Receivables aging', AgingReportSchema), ...REPORT_RESPONSES },
@@ -692,7 +859,7 @@ export const studentStatementRoute = createRoute({
   path: '/students/{userId}/statement',
   summary: "A Student's Statement",
   description:
-    'The student\'s contracts with their chains, invoices with their adjustments and payments, the outstanding total, and the two derived membership dates: "student since" spans every contract group, "current membership since" is the root of the group now active.',
+    'The student\'s contracts with their chains, invoices with their adjustments and payments, the outstanding total, and the two derived membership dates: "student since" spans every contract group, "current membership since" is the root of the group now active. `outstandingMinor` is the contract rail only; the sibling `extras` object carries the extras rail — its own standing, outstanding and each event charge with its event title, date and ledger.',
   request: { params: UserIdParamSchema },
   responses: {
     200: json('Student statement', StudentStatementSchema),
@@ -715,10 +882,19 @@ export const studentRosterRoute = createRoute({
   path: '/students',
   summary: 'The Student Billing Roster',
   description:
-    "Every student with a contract, with their standing resolved from their invoices rather than read from a column: outstanding balance, oldest overdue date, next due date and whether the terms were negotiated. `standing=exempt` is the held filter — a hold is the only way to reach it. Reporting only: nothing here gates a student's access.",
+    "Every user with a contract or any event charge, with two standings resolved side by side and never merged: `contract` (from contract invoices only — outstanding balance, oldest overdue date, next due date, negotiated terms; null when there is no contract) and `extras` (from event charges only — outstanding balance, oldest overdue date, open and overdue charge counts; null when never charged). There is no top-level standing or total. `contractStanding` and `extrasStanding` filter independently; `standing` is kept as an alias of `contractStanding`. `contractStanding=exempt` is the held filter — a hold applies to the contract rail only. Reporting only: nothing here gates a student's access.",
   request: {
     query: z.object({
-      standing: StandingSchema.optional().openapi({ param: { name: 'standing', in: 'query' } }),
+      contractStanding: StandingSchema.optional().openapi({
+        param: { name: 'contractStanding', in: 'query' },
+      }),
+      extrasStanding: StandingSchema.optional().openapi({
+        param: { name: 'extrasStanding', in: 'query' },
+      }),
+      standing: StandingSchema.optional().openapi({
+        param: { name: 'standing', in: 'query' },
+        description: 'Deprecated alias of `contractStanding`.',
+      }),
       asOf: IsoDate.optional().openapi({ param: { name: 'asOf', in: 'query' } }),
     }),
   },
@@ -747,6 +923,236 @@ export const clearHoldRoute = createRoute({
 });
 
 // ---------------------------------------------------------------------------
+// Extras rail (RFC 0015 §7)
+//
+// One-off charges for an event, on a ledger of their own. Every route below
+// sits behind this router's `requireRole(ROLES.ADMIN)`, and none of them reads
+// or writes an enrollment or an audience grant: a charge grants nothing, and
+// `outsideAudience` is a warning, never a write. Money stays out of
+// `routes/admin/events.ts`.
+// ---------------------------------------------------------------------------
+
+const EventIdParamSchema = z.object({
+  eventId: z.string().openapi({ param: { name: 'eventId', in: 'path' }, example: 'event-id' }),
+});
+
+const EventPriceSchema = z
+  .object({
+    eventId: z.string(),
+    amountMinor: MinorUnits,
+    currency: z.string().openapi({ example: 'BRL' }),
+    dueInDays: z.number().int(),
+    graceDays: z.number().int(),
+    updatedBy: z.string(),
+    updatedAt: z.string(),
+  })
+  .openapi('BillingEventPrice');
+
+const IssueChargesResultSchema = z
+  .object({
+    created: z.array(EventChargeSchema),
+    /** Pairs that already had a live charge; a retry creates nothing. */
+    absorbed: z.array(z.object({ eventId: z.string(), userId: z.string() })),
+    /** Charged users who cannot see a restricted event. A warning only. */
+    outsideAudience: z.array(z.string()),
+  })
+  .openapi('BillingIssueEventChargesResult');
+
+const EventChargeSummarySchema = z
+  .object({
+    eventId: z.string(),
+    currency: z.string(),
+    chargedMinor: MinorUnits,
+    adjustmentsMinor: MinorUnits,
+    receivedMinor: MinorUnits,
+    outstandingMinor: MinorUnits,
+    chargeCount: z.number().int(),
+    counts: z.object({
+      open: z.number().int(),
+      paid: z.number().int(),
+      void: z.number().int(),
+    }),
+  })
+  .openapi('BillingEventChargeSummary');
+
+const AudienceCheckSchema = z
+  .object({
+    eventId: z.string(),
+    audience: z.enum(['public', 'members', 'restricted']),
+    outsideAudience: z.array(z.string()),
+  })
+  .openapi('BillingEventAudienceCheck');
+
+const SetEventPriceBodySchema = z
+  .object({
+    amountMinor: MinorUnits.min(0),
+    /** Optional; must be the tenant's active currency. */
+    currency: z.string().optional().openapi({ example: 'BRL' }),
+    dueInDays: z.number().int().min(0).optional().openapi({ example: 7 }),
+    graceDays: z.number().int().min(0).optional().openapi({ example: 5 }),
+  })
+  .openapi('SetEventPriceBody');
+
+const IssueEventChargesBodySchema = z
+  .object({
+    eventId: z.string().min(1),
+    userIds: z.array(z.string().min(1)).min(1).max(200),
+    amountMinor: MinorUnits.min(0).optional(),
+    currency: z.string().optional(),
+    dueDate: IsoDate.optional(),
+    graceDays: z.number().int().min(0).optional(),
+    termsNote: z.string().optional(),
+  })
+  .openapi('IssueEventChargesBody');
+
+const VoidChargeBodySchema = z
+  .object({ reason: z.string().openapi({ example: 'Seminar cancelled for this student.' }) })
+  .openapi('VoidEventChargeBody');
+
+export const getEventPriceRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/event-prices/{eventId}',
+  summary: "An Event's Price",
+  description: 'The list price of an event, or `404` when the event is not for sale.',
+  request: { params: EventIdParamSchema },
+  responses: { 200: json('Event price', EventPriceSchema), ...ERROR_RESPONSES },
+});
+
+export const setEventPriceRoute = createRoute({
+  ...common,
+  method: 'put',
+  path: '/event-prices/{eventId}',
+  summary: "Set an Event's Price",
+  description:
+    "Creates or replaces the event's price in the tenant's active currency. Charges already issued keep their own snapshot.",
+  request: { params: EventIdParamSchema, ...body(SetEventPriceBodySchema) },
+  responses: { 200: json('Event price set', EventPriceSchema), ...ERROR_RESPONSES },
+});
+
+export const clearEventPriceRoute = createRoute({
+  ...common,
+  method: 'delete',
+  path: '/event-prices/{eventId}',
+  summary: "Clear an Event's Price",
+  description: 'Stops offering the event. Existing charges are untouched.',
+  request: { params: EventIdParamSchema },
+  responses: { 204: { description: 'Price cleared' }, ...ERROR_RESPONSES },
+});
+
+export const listEventChargesRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/charges',
+  summary: 'List Event Charges',
+  request: {
+    query: z.object({
+      eventId: z.string().optional(),
+      userId: z.string().optional(),
+      status: ChargeStatusSchema.optional(),
+    }),
+  },
+  responses: {
+    200: json('Charges with their balances', z.array(EventChargeWithBalanceSchema)),
+    ...ERROR_RESPONSES,
+  },
+});
+
+export const issueEventChargesRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/charges',
+  summary: 'Charge Users for an Event',
+  description:
+    'Issues one charge per user (1–200) for one published event (`409` for draft or archived). Idempotent: a pair with a live charge is reported under `absorbed`. Without `amountMinor` the price is snapshot as standard; any other amount is negotiated and needs a `termsNote`. For a restricted event, `outsideAudience` lists the users who cannot see it — the charge is still issued and no audience row is written.',
+  request: body(IssueEventChargesBodySchema),
+  responses: {
+    201: json('At least one charge created', IssueChargesResultSchema),
+    200: json('Nothing created; every pair was absorbed', IssueChargesResultSchema),
+    ...ERROR_RESPONSES,
+  },
+});
+
+export const getEventChargeRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/charges/{id}',
+  summary: 'An Event Charge with its Ledger',
+  request: { params: IdParamSchema },
+  responses: { 200: json('Charge with its ledger', EventChargeDetailSchema), ...ERROR_RESPONSES },
+});
+
+export const voidEventChargeRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/charges/{id}/void',
+  summary: 'Void an Event Charge',
+  description:
+    'The reason is mandatory. Refused with `409` while the charge has net payments — reverse them first.',
+  request: { params: IdParamSchema, ...body(VoidChargeBodySchema) },
+  responses: { 200: json('Charge voided', EventChargeSchema), ...ERROR_RESPONSES },
+});
+
+export const applyChargeAdjustmentRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/charges/{id}/adjustments',
+  summary: 'Apply an Event Charge Adjustment',
+  description: 'Append-only, signed, non-zero and reasoned. Negative reduces what is owed.',
+  request: { params: IdParamSchema, ...body(ApplyAdjustmentBodySchema) },
+  responses: { 201: json('Adjustment applied', ChargeAdjustmentSchema), ...ERROR_RESPONSES },
+});
+
+export const recordChargePaymentRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/charges/{id}/payments',
+  summary: 'Record an Event Charge Payment',
+  request: { params: IdParamSchema, ...body(RecordPaymentBodySchema) },
+  responses: { 201: json('Payment recorded', ChargePaymentSchema), ...ERROR_RESPONSES },
+});
+
+export const reverseChargePaymentRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/charge-payments/{id}/reverse',
+  summary: 'Reverse an Event Charge Payment',
+  description:
+    'Appends the mirror-image row. A reversal cannot be reversed, and a payment is reversed at most once.',
+  request: { params: IdParamSchema, ...body(ReversePaymentBodySchema) },
+  responses: { 201: json('Reversal recorded', ChargePaymentSchema), ...ERROR_RESPONSES },
+});
+
+export const eventChargeSummaryRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/events/{eventId}/summary',
+  summary: "An Event's Charge Summary",
+  description:
+    'Charged, signed adjustments, received and outstanding over the non-void charges (`chargedMinor + adjustmentsMinor - receivedMinor = outstandingMinor`), plus counts by status.',
+  request: { params: EventIdParamSchema },
+  responses: { 200: json('Event charge summary', EventChargeSummarySchema), ...ERROR_RESPONSES },
+});
+
+export const eventAudienceCheckRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/events/{eventId}/audience-check',
+  summary: 'Check Buyers Against an Event Audience',
+  description:
+    'Read-only: lists the given users a restricted event is not addressed to. Always empty for public and members events.',
+  request: {
+    params: EventIdParamSchema,
+    query: z.object({
+      userIds: z
+        .string()
+        .openapi({ param: { name: 'userIds', in: 'query' }, example: 'user-a,user-b' }),
+    }),
+  },
+  responses: { 200: json('Audience check', AudienceCheckSchema), ...ERROR_RESPONSES },
+});
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -758,6 +1164,7 @@ export function buildAdminBillingRouter(container: AppContainer) {
     // same way, so the manual twin and the cron mail through one code path.
     billingRunDeps(container.infra.mailer, container.identity.users),
   );
+  const extras = new AdminEventChargeController(container.billing.eventChargeService);
 
   const router = new OpenAPIHono({
     defaultHook: (result, c) => {
@@ -885,7 +1292,7 @@ export function buildAdminBillingRouter(container: AppContainer) {
     return c.json(result.data, 200);
   });
 
-  // Roster and holds. Read-and-label: the roster issues three aggregate reads
+  // Roster and holds. Read-and-label: the roster issues four aggregate reads
   // and resolves in memory, and a hold writes one row that no guard ever reads.
 
   router.openapi(studentRosterRoute, async (c) => {
@@ -904,6 +1311,88 @@ export function buildAdminBillingRouter(container: AppContainer) {
     const { userId } = c.req.valid('param');
     const result = await controller.clearHold(userId, c.get('user').sub);
     return respondNoContent(c, result);
+  });
+
+  // Extras rail (RFC 0015 §7). Same guard as everything above; none of these
+  // handlers touches an enrollment or an audience grant.
+
+  router.openapi(getEventPriceRoute, async (c) => {
+    const { eventId } = c.req.valid('param');
+    const result = await extras.getPrice(eventId);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(setEventPriceRoute, async (c) => {
+    const { eventId } = c.req.valid('param');
+    const result = await extras.setPrice(eventId, c.req.valid('json'), c.get('user').sub);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(clearEventPriceRoute, async (c) => {
+    const { eventId } = c.req.valid('param');
+    const result = await extras.clearPrice(eventId, c.get('user').sub);
+    return respondNoContent(c, result);
+  });
+
+  router.openapi(listEventChargesRoute, async (c) => {
+    const result = await extras.listCharges(c.req.valid('query'));
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(issueEventChargesRoute, async (c) => {
+    const result = await extras.issueCharges(c.req.valid('json'), c.get('user').sub);
+    if (!result.ok) return respondWith(c, result);
+    // A retry that created nothing is a success, not a creation.
+    return result.data.created.length > 0 ? c.json(result.data, 201) : c.json(result.data, 200);
+  });
+
+  router.openapi(getEventChargeRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await extras.getCharge(id);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(voidEventChargeRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await extras.voidCharge(id, c.req.valid('json'), c.get('user').sub);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(applyChargeAdjustmentRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await extras.applyAdjustment(id, c.req.valid('json'), c.get('user').sub);
+    return respondCreated(c, result);
+  });
+
+  router.openapi(recordChargePaymentRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await extras.recordPayment(id, c.req.valid('json'), c.get('user').sub);
+    return respondCreated(c, result);
+  });
+
+  router.openapi(reverseChargePaymentRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await extras.reversePayment(id, c.req.valid('json'), c.get('user').sub);
+    return respondCreated(c, result);
+  });
+
+  router.openapi(eventChargeSummaryRoute, async (c) => {
+    const { eventId } = c.req.valid('param');
+    const result = await extras.getEventSummary(eventId);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(eventAudienceCheckRoute, async (c) => {
+    const { eventId } = c.req.valid('param');
+    const result = await extras.checkAudience(eventId, c.req.valid('query'));
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
   });
 
   return router;

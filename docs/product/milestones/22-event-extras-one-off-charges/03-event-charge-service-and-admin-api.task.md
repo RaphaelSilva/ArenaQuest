@@ -1,6 +1,6 @@
 # Task 03 — Backend: Event-charge service and admin API (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [22 — Event extras: one-off charges on a separate billing rail](./milestone.md)
 **RFC:** [RFC 0015](../../RFCs/0015-event-extras-one-off-charges-for-events.md)
 **Team:** Backend API
@@ -73,25 +73,25 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `POST /v1/admin/billing/charges` twice with the same body returns every pair in
+- [x] `POST /v1/admin/billing/charges` twice with the same body returns every pair in
       `created`, then every pair in `absorbed`.
-- [ ] Issuing on a `draft` or `archived` event returns `409` and writes nothing.
-- [ ] An amount differing from the event price without `termsNote` returns `400`; with it,
+- [x] Issuing on a `draft` or `archived` event returns `409` and writes nothing.
+- [x] An amount differing from the event price without `termsNote` returns `400`; with it,
       the charge is stored as `negotiated`.
-- [ ] A price or charge in a non-active currency returns `400`/`409` per the existing billing
+- [x] A price or charge in a non-active currency returns `400`/`409` per the existing billing
       convention.
-- [ ] Recording a payment, reversing it, and reversing the reversal return `201`, `201`, `409`.
-- [ ] A payment on a void charge returns `409`; voiding a charge with positive net payments
+- [x] Recording a payment, reversing it, and reversing the reversal return `201`, `201`, `409`.
+- [x] A payment on a void charge returns `409`; voiding a charge with positive net payments
       returns `409`; voiding without a reason returns `400`.
-- [ ] Charging users outside a `restricted` event's audience lists them in `outsideAudience`;
+- [x] Charging users outside a `restricted` event's audience lists them in `outsideAudience`;
       audience row counts are unchanged; for `public`/`members` events the list is empty.
-- [ ] The per-event summary's charged − adjustments − received equals the sum of the
+- [x] The per-event summary's charged − adjustments − received equals the sum of the
       charges' balances.
-- [ ] A `content_creator` token receives `403` on every new route.
-- [ ] Validation, auth, not-found and conflict branches each return the correct status and
+- [x] A `content_creator` token receives `403` on every new route.
+- [x] Validation, auth, not-found and conflict branches each return the correct status and
       are covered by a test.
-- [ ] Changed files lint clean; `make test-api` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

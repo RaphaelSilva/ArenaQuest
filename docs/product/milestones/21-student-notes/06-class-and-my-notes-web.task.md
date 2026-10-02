@@ -1,6 +1,6 @@
 # Task 06 — Frontend: Class notes list and My notes page (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [21 — Student notes — private and shared topic notes with staff moderation](./milestone.md)
 **RFC:** [RFC 0016](../../RFCs/0016-student-notes.md)
 **Team:** Frontend Web
@@ -59,16 +59,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The *Class notes* tab shows the topic's shared notes newest first with author and
+- [x] The *Class notes* tab shows the topic's shared notes newest first with author and
       date, marks the caller's own, and loads the next page from `nextCursor`.
-- [ ] `/notes` lists every note of the caller grouped by topic with visibility, moderation
+- [x] `/notes` lists every note of the caller grouped by topic with visibility, moderation
       badge, last edit and a working link to the topic.
-- [ ] A note on an inaccessible topic is displayed read-only with the explanation.
-- [ ] A note body containing a `<script>` renders inert.
-- [ ] The navigation shows "My notes" for authenticated users.
-- [ ] `check-i18n-coverage.js` passes; `pt` and `en` builds both render.
-- [ ] Changed files lint clean; `make test-web` green for the affected specs.
-- [ ] No diff outside the scope guardrail.
+- [x] A note on an inaccessible topic is displayed read-only with the explanation.
+- [x] A note body containing a `<script>` renders inert.
+- [x] The navigation shows "My notes" for authenticated users.
+- [x] `check-i18n-coverage.js` passes; `pt` and `en` builds both render.
+- [x] Changed files lint clean; `make test-web` green for the affected specs.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

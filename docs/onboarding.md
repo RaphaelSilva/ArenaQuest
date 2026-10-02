@@ -11,7 +11,7 @@ Google sign-in, and anything targeting staging or production.
 
 ## 1. The 10-minute path
 
-**Prerequisites:** Node ≥ 20 and pnpm ≥ 9 (`corepack enable` gives you pnpm).
+**Prerequisites:** Node ≥ 22 and pnpm ≥ 9 (`corepack enable` gives you pnpm).
 
 ```bash
 git clone <repo-url> ArenaQuest
@@ -83,6 +83,99 @@ idempotent — running it twice produces no duplicates.
 To create a *real* admin (on any environment, including remote), use the
 interactive `make bootstrap-admin` instead — but see Known Issues below first.
 
+### Demo seed (RFC 0021)
+
+A richer, label-aware dataset for demos and release-candidate previews: 6 demo
+users (admin, creator, tutor, three students), a 21-topic tree (3 roots × 3
+levels) with 27 `ready` media, a group, two enrollments and gamification state
+(student-1 at 350 XP, student-2 at 950, student-3 at 0).
+
+```bash
+make db-seed-demo-local LABEL=budo                 # the local replica (default LABEL=arenaquest); asks for the password
+export AQ_DEMO_PASSWORD='…'                        # … or set it up front (CI / scripts); never a flag
+make db-seed-demo-local LABEL=budo DRY_RUN=1       # write .arenaquest/demo-budo-local.sql + print the plan only
+make db-seed-demo-staging LABEL=budo               # remote staging D1 — asks you to type its name
+make db-seed-demo-staging LABEL=budo CONFIRM=1     # … without the prompt (CI / scripts)
+node scripts/demo/ci-check.mjs                     # what CI runs (below)
+```
+
+- **No production.** There is no `db-seed-demo-prod`; `seed-demo.mjs` refuses
+  `-e production` and any staging block naming a production D1 or bucket before
+  it writes anything, and the production deploy guard rejects a database holding
+  a demo account (`demo.<user>@<label>.demo.invalid`). Staging tolerates them.
+- **Password.** Every demo account shares one password: `AQ_DEMO_PASSWORD` when
+  exported, otherwise asked for on the terminal (hidden, typed twice, at least 8
+  characters). With neither — no variable and no TTY, as in CI — a real run
+  refuses before writing anything; a dry run needs no password.
+- **Idempotent.** Ids are deterministic per label; a re-run changes no row
+  count, uploads nothing and rotates the password hash to the current
+  password.
+- **Dataset.** `scripts/demo/dataset/base.json`, optionally overridden per label
+  by `config/labels/<label>/demo.json`. Media are three public-domain files
+  pinned by SHA-256, cached in `.arenaquest/demo-media/` after the first
+  download (behind a proxy, set `NODE_USE_ENV_PROXY=1`). The local bucket is
+  written in-process through wrangler's `getPlatformProxy`, so a converged local
+  re-run takes seconds.
+- **One label per local replica.** Labels share demo group names and tag slugs,
+  so seeding a second label into the same local replica fails on a `UNIQUE`
+  constraint; `make db-reset-local` before switching labels.
+- **CI.** The *Demo seed check* job runs `scripts/demo/ci-check.mjs`: it applies
+  every migration to a fresh throwaway D1, seeds each label twice (each label in
+  its own copy of the store), and asserts the RFC counts, that every media object
+  exists with its pinned SHA-256, the student XP and badges, `user_xp` = the
+  `xp_events` ledger, and that the second run changed no row count. Media come
+  from `scripts/demo/fixtures/` and any network request fails the check; the
+  password is generated inside the script. It needs Node ≥ 22 (wrangler's floor).
+  A migration that breaks the demo therefore fails the PR that adds it.
+
+### Recovering staging (RFC 0021 §4)
+
+Staging is disposable: when a candidate left it in a state nobody wants (an
+abandoned migration, test rows, a half-applied schema), wipe it and reload the
+demo instead of repairing it by hand.
+
+```bash
+# the seed step's password: AQ_DEMO_PASSWORD, or asked for before anything runs
+make db-reset-staging LABEL=budo DRY_RUN=1         # print the plan — no wrangler call, no credentials
+make db-reset-staging LABEL=budo                   # asks you to type the database name (budo-db-staging)
+make db-reset-staging LABEL=budo CONFIRM=1         # … without the prompt (CI / scripts)
+```
+
+`scripts/db/reset-remote.mjs --label <l> -e staging` runs four steps, in this
+order, each only if the previous one succeeded:
+
+1. **Bookmark.** `wrangler d1 time-travel info <db> --json` records the current
+   Time Travel bookmark and prints the exact undo command. If no bookmark can be
+   read, the reset aborts before dropping anything.
+2. **Drop.** Every table and view in `sqlite_master` except `sqlite_*` and
+   `_cf_*` — `d1_migrations` included — is dropped in one batch that starts
+   with `PRAGMA defer_foreign_keys = on` (D1 does not allow turning foreign keys
+   off). A migration applied on staging but absent from your checkout is
+   therefore forgotten along with its tables.
+3. **Migrate.** `wrangler d1 migrations apply <db> --remote` from the current
+   checkout.
+4. **Seed.** `seed-demo.mjs --label <l> -e staging --yes` (the demo seed's own CLI).
+
+The database is emptied **in place**, so its `database_id` never changes and
+neither the label profile nor `wrangler.jsonc` needs an edit. The bucket is
+**not** emptied: the demo re-uses its own objects, and anything else left there
+becomes an orphan for the RFC 0018 storage audit.
+
+**Undoing a reset.** Run the command the reset printed (it is also repeated in
+the error if a later step fails), from the repo root:
+
+```bash
+pnpm --filter api exec wrangler d1 time-travel restore budo-db-staging \
+     --bookmark=<bookmark> --env budo-staging
+```
+
+Time Travel keeps 30 days of history, so the bookmark is good for that long.
+
+There is **no production variant and no flag that skips the refusals**: the
+script rejects `-e production`, `-e local` (use `make db-reset-local`) and any
+staging block naming a production D1 or bucket — the same target resolution the
+demo seed uses — before any wrangler call.
+
 ---
 
 ## 4. The naming rule
@@ -114,6 +207,12 @@ Three corollaries:
 3. **`make deploy`, `make deploy-api` and `make deploy-web` no longer exist.**
    They used to mean production, silently. They now fail with a message
    pointing at `-staging` / `-prod`.
+
+Before adding a migration, run `make check-migrations` (local, read-only; set
+`BASE=<ref>` to compare with something other than `origin/main`): migrations on
+`main` are frozen and new ones must be additive unless they carry a
+`-- @contract: <reason>` header — see *Migrations: expand now, contract later* in
+`CONTRIBUTING.md`.
 
 ### Renamed targets
 
@@ -180,9 +279,89 @@ never prompted for:
   (JWT_SECRET, R2_*, …) are never read — they persist on the Worker across
   deploys.
 
+The staging CI jobs use the same path: `deploy-api.yml` / `deploy-web.yml` run
+`deploy.mjs --label arenaquest -e staging --yes --scope api|web`, guard included.
+
 Adding a brand is one line in each workflow's `strategy.matrix.include` plus a
 new `config/labels/<label>.jsonc` — no copied job stanza and no new deploy
 config store.
+
+**Staging sends no real e-mail.** Every label's staging profile uses `mail.driver: "console"`
+(RFC 0021 §2.5): activation, password-reset and notification mails are written to the Worker log
+instead of an inbox. Read them — and their links — with
+`pnpm --filter api exec wrangler tail --env <label>-staging`. Production keeps `resend`.
+
+### Previewing a candidate (RFC 0021 §1)
+
+A candidate branch is tried on real URLs **as a preview of staging**, before it
+merges: the API as a Workers Preview of the label's staging Worker, the web as a
+Pages branch deployment of the staging Pages project. Both run on the label's
+staging D1, KV and R2; the live staging Worker and the Pages production branch
+are never touched.
+
+```bash
+make deploy-preview-staging LABEL=budo CANDIDATE=m21 DRY_RUN=1   # print the plan — no credentials
+make deploy-preview-staging LABEL=budo CANDIDATE=m21             # deploy it
+make deploy-preview-staging LABEL=budo                           # on feature/m21/candidate: CANDIDATE defaults to m21
+make preview-delete-staging LABEL=budo CANDIDATE=m21             # after the candidate merges
+# ≡ node scripts/cloudflare/deploy.mjs --label budo -e staging --preview m21 [--scope api|web|all] [--dry-run]
+```
+
+The run, in order (each step only if the previous one succeeded):
+
+1. **Guard** (staging mode) — no dev-seed accounts in the staging D1.
+2. **Migration lint** — `scripts/db/check-migrations.mjs --base origin/main`
+   (fetch `main` first). A destructive migration without `-- @contract:` stops
+   here, before anything touches the shared staging D1.
+3. **Bookmark** — `wrangler d1 time-travel info <db> --json`; the restore
+   command is printed right away and again in the report.
+4. **Migrate** the staging D1 from the checkout.
+5. **API preview** — `wrangler preview --env <label>-staging --name <name> --json
+   --secrets-file <tmp>`; the Preview URL (`preview.urls[0]`) is captured from
+   the JSON. The secrets file (0600, deleted as soon as wrangler exits) holds a
+   `JWT_SECRET` generated for this deployment plus any `AQ_PREVIEW_<NAME>` you
+   exported (see below).
+6. **Web build** with `NEXT_PUBLIC_API_URL` = that URL,
+   `NEXT_PUBLIC_SITE_URL=https://<name>.<pagesProject>.pages.dev`,
+   `NEXT_PUBLIC_PREVIEW_NAME=<name>` and `NEXT_PUBLIC_PREVIEW_SHA=<short sha>`.
+7. **Pages branch** — `wrangler pages deploy … --branch <name>`.
+8. **Report** — web URL, API URL, bookmark and restore command.
+
+Rules the CLI enforces before any step runs: `--preview` only with `-e staging`;
+the name matches `[a-z0-9-]{1,20}`; and the web preview origin
+`https://<name>.<pagesProject>.pages.dev` must be admitted by the staging
+`ALLOWED_ORIGINS` (true when the staging `webOrigin` is the Pages host) — a label
+on a custom staging domain is refused rather than shipped with a broken CORS.
+`--scope web` rebuilds only the web and needs `--api-url <API preview URL>`
+(`API_URL=` in Make). A preview has its own `JWT_SECRET`, regenerated on every
+deploy, so log in again on each preview (and after each redeploy); activation and
+reset links still point at the staging web.
+
+**Preview secrets.** A Workers Preview deployment holds only the bindings uploaded
+with it — none of the staging Worker's secrets and, as of wrangler 4.144, none of
+the *Preview base config*'s either (verified live: a base config holding all four
+secrets produced a deployment with zero). That is why the CLI ships the secrets
+with every `wrangler preview`, and why the preflight does not check the staging
+Worker's secrets for a preview. Email/password login needs nothing but the
+generated `JWT_SECRET`. The external ones are optional and taken from your shell:
+
+```bash
+AQ_PREVIEW_R2_ACCESS_KEY_ID=… AQ_PREVIEW_R2_SECRET_ACCESS_KEY=… \
+  make deploy-preview-staging LABEL=budo      # media presign on the preview
+```
+
+Unset, the run warns and the preview still boots: without the R2 keys only presigned
+media uploads/downloads fail (the S3 client is built on first use), without
+`AQ_PREVIEW_GOOGLE_CLIENT_SECRET` only Google sign-in is off.
+
+**Cleanup.** `--preview <name> --delete` runs `wrangler preview delete` and then
+deletes every *preview* deployment of that Pages branch (listed with
+`wrangler pages deployment list --json`, deleted with `--force`).
+
+**CI.** `.github/workflows/preview-candidate.yml` is `workflow_dispatch` only:
+run it from the candidate branch with `label` (one label or `all`) and an
+optional `candidate`; each leg runs the same CLI and writes both URLs and the
+bookmark to the job summary (`--summary-file "$GITHUB_STEP_SUMMARY"`).
 
 ### Bringing up a new tenant
 

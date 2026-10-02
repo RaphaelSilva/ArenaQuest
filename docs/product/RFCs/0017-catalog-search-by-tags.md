@@ -1,7 +1,7 @@
 # RFC 0017: Catalog search by tags
 
 **Date:** 2026-09-29
-**Status:** Draft
+**Status:** Implemented
 **Revised:** 2026-09-29
 **Author:** raphaelsilva
 **Affected:**
