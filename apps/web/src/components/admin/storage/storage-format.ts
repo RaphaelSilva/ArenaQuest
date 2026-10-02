@@ -34,3 +34,6 @@ export const HINT_KEY = {
   'row-gone': 'rowGone',
   'unknown-shape': 'unknownShape',
 } as const satisfies Record<OrphanHint, string>;
+
+/** The root folder of student submissions (RFC 0020), keyed `submissions/<authorId>/…`. */
+export const SUBMISSIONS_ROOT = 'submissions/';

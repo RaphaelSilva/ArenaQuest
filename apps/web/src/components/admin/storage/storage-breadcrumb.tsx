@@ -1,16 +1,22 @@
 'use client';
 
 import { useDict } from '@web/context/dict-context';
+import { SUBMISSIONS_ROOT } from './storage-format';
 
 type Crumb = { prefix: string; label: string };
 
 /** `topics/abc/` → `['', 'topics/', 'topics/abc/']` with their display labels. */
-function crumbsOf(prefix: string, rootLabel: string, titles: ReadonlyMap<string, string>): Crumb[] {
+function crumbsOf(
+  prefix: string,
+  rootLabel: string,
+  titles: ReadonlyMap<string, string>,
+  submissionsLabel: string,
+): Crumb[] {
   const crumbs: Crumb[] = [{ prefix: '', label: rootLabel }];
   let acc = '';
   for (const segment of prefix.split('/').filter(Boolean)) {
     acc += `${segment}/`;
-    crumbs.push({ prefix: acc, label: titles.get(acc) ?? segment });
+    crumbs.push({ prefix: acc, label: titles.get(acc) ?? (acc === SUBMISSIONS_ROOT ? submissionsLabel : segment) });
   }
   return crumbs;
 }
@@ -31,7 +37,7 @@ export function StorageBreadcrumb({
   onNavigate: (prefix: string) => void;
 }) {
   const d = useDict().adminStorage;
-  const crumbs = crumbsOf(prefix, d.root, titles);
+  const crumbs = crumbsOf(prefix, d.root, titles, d.folder.submissionsRoot);
 
   return (
     <nav aria-label={d.breadcrumbLabel} className="mb-4">

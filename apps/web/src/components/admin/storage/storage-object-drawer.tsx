@@ -256,6 +256,26 @@ function ReferenceDetail({ reference }: { reference: StorageReference }) {
     );
   }
 
+  if (reference.kind === 'submission') {
+    return (
+      <>
+      <p className="mb-1 font-semibold text-zinc-900 dark:text-zinc-50">{r.kind.submission}</p>
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1">
+        <dt className={label}>{r.submissionTitle}</dt>
+        <dd className={value}>{reference.title}</dd>
+        <dt className={label}>{r.topic}</dt>
+        <dd className={value}>{reference.topic?.title ?? reference.topicId}</dd>
+        <dt className={label}>{r.originalName}</dt>
+        <dd className={value}>{reference.originalName}</dd>
+        <dt className={label}>{r.author}</dt>
+        <dd className={value}>{reference.author?.name ?? r.unknownUploader}</dd>
+        <dt className={label}>{r.recordStatus}</dt>
+        <dd className={value}>{r.submissionStatus[reference.status]}</dd>
+      </dl>
+      </>
+    );
+  }
+
   return (
     <>
     <p className="mb-1 font-semibold text-zinc-900 dark:text-zinc-50">

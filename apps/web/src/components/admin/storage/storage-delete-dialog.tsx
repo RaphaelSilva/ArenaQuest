@@ -213,6 +213,7 @@ function RefusalReason({ conflict }: { conflict: StorageDeleteConflict }) {
   } else {
     const reference = object.references[0];
     if (reference?.kind === 'media') text = r.linkedToTopic(reference.topic?.title ?? reference.topicId);
+    else if (reference?.kind === 'submission') text = r.linkedToSubmission(reference.title);
     else if (reference) text = r.linkedToEvent(reference.title);
     else text = r.nowStatus(dict.status[STATUS_KEY[object.status]]);
   }
