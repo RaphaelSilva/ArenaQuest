@@ -148,6 +148,9 @@ importers:
       marked:
         specifier: ^18.0.2
         version: 18.0.2
+      zod:
+        specifier: ^3
+        version: 3.23.8
     devDependencies:
       eslint:
         specifier: ^9.0.0
