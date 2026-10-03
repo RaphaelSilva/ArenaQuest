@@ -1,10 +1,10 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { MeGamificationController } from '@api/controllers/me-gamification.controller';
 import { MeQuestsController } from '@api/controllers/me-quests.controller';
-import { MeMissionsController } from '@api/controllers/me-missions.controller';
 import { MeDashboardController } from '@api/controllers/me-dashboard.controller';
 import { respondWith } from '@api/routes/_shared/envelope';
-import type { GamificationContext } from '@api/container';
+import { DashboardMissionEntrySchema } from '@api/openapi/components/entities';
+import { buildMeMissionsController, missionCaller, type MeMissionsSlice } from '@api/routes/me/missions';
 
 const CACHE_CONTROL = 'private, max-age=15';
 
@@ -115,7 +115,8 @@ export const missionsRoute = createRoute({
   method: 'get',
   path: '/missions',
   summary: 'Get Missions',
-  description: 'Retrieves the active missions and current progress for the authenticated user.',
+  description:
+    "Active missions for the authenticated user: those they are enrolled in (an `auto` mission whose gate they pass shows an implicit enrollment, computed read-only), joinable `open` missions, and locked teasers of `assigned` missions they are not in (title and audience group names only, `steps: []`). An `auto` mission targeting a topic outside the caller's access is absent, and staff are never implicitly enrolled. Never writes.",
   tags: ['me:gamification'],
   security: [{ bearerAuth: [] }],
   responses: {
@@ -123,7 +124,7 @@ export const missionsRoute = createRoute({
       description: 'Successfully retrieved missions (or null if empty)',
       content: {
         'application/json': {
-          schema: z.array(z.any()).nullable(),
+          schema: z.array(DashboardMissionEntrySchema).nullable(),
         },
       },
     },
@@ -147,7 +148,7 @@ export const dashboardRoute = createRoute({
             streak: z.any().nullable(),
             questsDaily: z.array(z.any()),
             questsWeekly: z.array(z.any()),
-            missions: z.any().nullable(),
+            missions: z.array(DashboardMissionEntrySchema).nullable(),
             badges: z.any().nullable(),
           }),
         },
@@ -156,14 +157,12 @@ export const dashboardRoute = createRoute({
   },
 });
 
-export function buildMeGamificationRouter(slice: {
-  gamification: GamificationContext;
-}) {
-  const { gamificationRepo, questRepo, badgeRepo, missionRepo } = slice.gamification;
+export function buildMeGamificationRouter(slice: MeMissionsSlice) {
+  const { gamificationRepo, questRepo, badgeRepo } = slice.gamification;
 
   const gamificationCtrl = new MeGamificationController(gamificationRepo, badgeRepo);
   const questsCtrl = new MeQuestsController(questRepo);
-  const missionsCtrl = new MeMissionsController(missionRepo);
+  const missionsCtrl = buildMeMissionsController(slice);
   const dashboardCtrl = new MeDashboardController(gamificationCtrl, questsCtrl, missionsCtrl);
 
   const router = new OpenAPIHono();
@@ -209,16 +208,14 @@ export function buildMeGamificationRouter(slice: {
   });
 
   router.openapi(missionsRoute, async (c) => {
-    const userId = c.get('user').sub;
-    const result = await missionsCtrl.getMissions(userId, new Date());
+    const result = await missionsCtrl.getMissions(missionCaller(c), new Date());
     if (!result.ok) return respondWith(c, result) as any;
     c.header('Cache-Control', CACHE_CONTROL);
     return respondWith(c, result) as any;
   });
 
   router.openapi(dashboardRoute, async (c) => {
-    const userId = c.get('user').sub;
-    const result = await dashboardCtrl.getDashboard(userId, new Date());
+    const result = await dashboardCtrl.getDashboard(missionCaller(c), new Date());
     if (!result.ok) return respondWith(c, result) as any;
     c.header('Cache-Control', CACHE_CONTROL);
     return respondWith(c, result) as any;

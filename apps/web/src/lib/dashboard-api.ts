@@ -1,4 +1,5 @@
 import type { HttpTransport } from './api-client';
+import type { DashboardMissionEntry } from './missions-api';
 
 // ---------------------------------------------------------------------------
 // Types — frontend shape (consumed by components)
@@ -35,16 +36,11 @@ export type WeeklyChallenge = {
   targetValue: number;
 };
 
-export type DashboardMission = {
-  id: string;
-  name: string;
-  icon: string;
-  description: string;
-  progressPct: number;
-  deadlineAt: string | null;
-  rewardXp: number;
-  rewardBadge: string | null;
-};
+/**
+ * A dashboard mission is the API entry as is (RFC 0022 §6): which group it
+ * lands in, its steps and their states are all decided by the server.
+ */
+export type DashboardMission = DashboardMissionEntry;
 
 export type DashboardBadge = {
   id: string;
@@ -106,24 +102,46 @@ export const DASHBOARD_FIXTURE: DashboardPayload = {
   ],
   missions: [
     {
-      id: 'm1',
-      name: 'Semana do Movimento',
-      icon: '🏃',
-      description: 'Complete all movement challenges this week.',
-      progressPct: 65,
-      deadlineAt: '2026-05-18T23:59:59Z',
-      rewardXp: 500,
-      rewardBadge: '🏅',
-    },
-    {
-      id: 'm2',
-      name: 'Maratona de Força',
-      icon: '💪',
-      description: 'Upcoming strength challenge.',
-      progressPct: 0,
-      deadlineAt: '2026-05-25T23:59:59Z',
-      rewardXp: 800,
-      rewardBadge: null,
+      mission: {
+        id: 'm1',
+        title: 'Semana do Movimento',
+        description: 'Complete all movement challenges this week.',
+        startAt: '2026-05-11T00:00:00Z',
+        endAt: '2026-05-18T23:59:59Z',
+        predicateKind: 'requirements',
+        predicateParams: '{}',
+        xpReward: 500,
+        badgeId: null,
+        active: true,
+        mode: 'sequential',
+        enrollmentMode: 'auto',
+        createdAt: '2026-05-01T00:00:00Z',
+        updatedAt: '2026-05-01T00:00:00Z',
+      },
+      progress: {
+        userId: 'me',
+        missionId: 'm1',
+        currentValue: 1,
+        targetValue: 2,
+        completed: false,
+        completedAt: null,
+        updatedAt: '2026-05-12T00:00:00Z',
+      },
+      enrollment: { source: 'auto', joinedAt: null, implicit: true },
+      joinable: false,
+      locked: null,
+      steps: [
+        {
+          id: 's1', position: 1, kind: 'manual_check', title: 'Warm up', xpReward: 20,
+          target: null, instructions: 'Ten minutes of mobility.', current: 1, required: 1,
+          state: 'completed', completedAt: '2026-05-12T00:00:00Z',
+        },
+        {
+          id: 's2', position: 2, kind: 'topic_visited', title: 'Read the fundamentals', xpReward: 30,
+          target: { type: 'topic', topicId: 'r2', title: 'Movement & Strength', accessible: true },
+          instructions: null, current: 0, required: 1, state: 'open', completedAt: null,
+        },
+      ],
     },
   ],
   badges: {
@@ -210,13 +228,12 @@ type ApiXp = { totalXp: number; level: number; rankTitle: string; xpInLevel: num
 type ApiStreak = { currentStreak: number; longestStreak: number; lastActivityDate: string | null };
 type ApiBadgeEntry = { badge: { id: string; name: string; iconEmoji: string; xpReward: number }; earnedAt: string };
 type ApiQuestEntry = { id: string; title: string; xpReward: number; progress: { currentValue: number; targetValue: number; completed: boolean } | null };
-type ApiMissionEntry = { mission: { id: string; title: string; description: string; xpReward: number; endAt: string | null; badgeId: string | null }; progress: { currentValue: number; targetValue: number } | null };
 type ApiDashboardShape = {
   xp: ApiXp | null;
   streak: ApiStreak | null;
   questsDaily: ApiQuestEntry[];
   questsWeekly: ApiQuestEntry[];
-  missions: ApiMissionEntry[] | null;
+  missions: DashboardMissionEntry[] | null;
   badges: ApiBadgeEntry[] | null;
 };
 
@@ -281,25 +298,11 @@ function adaptWeekly(raw: ApiQuestEntry[] | null): WeeklyChallenge[] {
   }));
 }
 
-function adaptMissions(raw: ApiMissionEntry[] | null): DashboardMission[] | null {
-  if (!raw || raw.length === 0) return null;
-  return raw.map((entry) => {
-    const { mission, progress } = entry;
-    const progressPct =
-      progress && progress.targetValue > 0
-        ? Math.min(100, Math.round((progress.currentValue / progress.targetValue) * 100))
-        : 0;
-    return {
-      id: mission.id,
-      name: mission.title,
-      icon: '🎯',
-      description: mission.description,
-      progressPct,
-      deadlineAt: mission.endAt,
-      rewardXp: mission.xpReward,
-      rewardBadge: mission.badgeId ?? null,
-    };
-  });
+// The entries pass through untouched: the panel renders what the server
+// returned and never infers access or step state. `null` (the missions part
+// failed server-side) hides the panel; `[]` shows its empty state.
+function adaptMissions(raw: DashboardMissionEntry[] | null): DashboardMission[] | null {
+  return raw ?? null;
 }
 
 function adaptBadges(raw: ApiBadgeEntry[] | null): { earned: DashboardBadge[]; locked: DashboardBadge[] } {

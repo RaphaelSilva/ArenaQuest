@@ -13,7 +13,8 @@
  *
  * Label override: `config/labels/<label>/demo.json` (optional). It may set
  * `language`, rename entries (`title` / `name` / `description` of an existing
- * user, group, tag, topic or mission, matched by `key`) and ADD media: new
+ * user, group, tag, topic or mission, and the `title` of a mission's
+ * requirement, each matched by `key`) and ADD media: new
  * manifest entries (by `key`, replacing a same-key entry) and extra
  * `media.assign` keys (appended to a topic's list). It can never add a user or
  * a topic — so the baseline user keys are the complete list for every label,
@@ -27,7 +28,9 @@
  *   quest slugs        apps/api/migrations/0019_seed_quests.sql
  *   badge slugs + XP   apps/api/migrations/0021_seed_badges.sql
  *   media types/limits packages/shared/domain/media/limits.ts
- *   mission predicates packages/shared/domain/gamification/quest-evaluator.ts
+ *   mission modes,
+ *   requirement kinds,
+ *   step limits        packages/shared/domain/missions/requirements.ts
  *   topic XP           packages/shared/domain/gamification/xp-config.ts
  *   active currency,
  *   payment methods    apps/api/migrations/0026_create_billing_tables.sql
@@ -56,6 +59,8 @@ export const MEDIA_LICENSES = ['CC0', 'public-domain'];
 
 /** Fields an override may change on an existing entry. */
 const RENAMEABLE_FIELDS = ['title', 'name', 'description'];
+/** Fields an override may change on an existing mission requirement (matched by `key`). */
+const RENAMEABLE_REQUIREMENT_FIELDS = ['title'];
 /** Array sections an override may rename entries in (matched by `key`). */
 const RENAMEABLE_SECTIONS = ['users', 'groups', 'tags', 'topics'];
 /** Key names that must never appear anywhere in a dataset file. */
@@ -102,10 +107,7 @@ export function readReference(repoRoot = ROOT) {
     mediaLimits[type] = expression.split('*').reduce((product, factor) => product * Number(factor.trim()), 1);
   }
 
-  const predicateBlock = read(repoRoot, 'packages/shared/domain/gamification/quest-evaluator.ts').match(
-    /PREDICATE_TO_SOURCE[^=]*=\s*\{([\s\S]*?)\};/,
-  );
-  const missionPredicates = [...(predicateBlock?.[1] ?? '').matchAll(/^\s*([a-z_]+):/gm)].map((m) => m[1]);
+  const missions = readMissionVocabulary(read(repoRoot, 'packages/shared/domain/missions/requirements.ts'));
 
   const topicCompleteXp = Number(
     read(repoRoot, 'packages/shared/domain/gamification/xp-config.ts').match(/topic_complete:\s*(\d+)/)?.[1],
@@ -124,7 +126,7 @@ export function readReference(repoRoot = ROOT) {
     quests,
     badges,
     mediaLimits,
-    missionPredicates,
+    ...missions,
     topicCompleteXp,
     activeCurrency: activeCurrency.length === 1 ? activeCurrency[0] : Number.NaN,
     paymentMethods,
@@ -141,7 +143,41 @@ export function readReference(repoRoot = ROOT) {
           : !Number.isFinite(value);
     if (empty) throw new Error(`demo dataset: could not read the "${name}" vocabulary from the checkout`);
   }
+  for (const [name, value] of Object.entries(reference.requirementLimits)) {
+    if (!Number.isInteger(value)) throw new Error(`demo dataset: could not read the "requirementLimits.${name}" limit from the checkout`);
+  }
   return reference;
+}
+
+/**
+ * The mission vocabulary of `requirements.ts` (its source text): the modes, the
+ * enrollment modes, the requirement kinds (and which of them target a topic)
+ * and the step limits. The per-kind params rules are mirrored in
+ * {@link normalizeRequirementParams}; dataset.test.mjs checks both against the
+ * schemas themselves, so a change there fails the script tests.
+ */
+export function readMissionVocabulary(source) {
+  const list = (name) =>
+    [...(source.match(new RegExp(`export const ${name}\\b[^=]*=\\s*\\[([^\\]]*)\\]`))?.[1] ?? '').matchAll(/'([a-z_]+)'/g)].map(
+      (m) => m[1],
+    );
+  const enumOf = (name) =>
+    [...(source.match(new RegExp(`export const ${name}\\s*=\\s*z\\.enum\\(\\[([^\\]]*)\\]`))?.[1] ?? '').matchAll(/'([a-z_]+)'/g)].map(
+      (m) => m[1],
+    );
+  const constant = (name) => Number(source.match(new RegExp(`export const ${name}\\s*=\\s*(\\d+);`))?.[1]);
+  return {
+    missionModes: enumOf('MissionMode'),
+    enrollmentModes: enumOf('MissionEnrollmentMode'),
+    requirementKinds: list('REQUIREMENT_KINDS'),
+    topicRequirementKinds: list('TOPIC_REQUIREMENT_KINDS'),
+    requirementLimits: {
+      stepsMax: constant('MISSION_STEPS_MAX'),
+      titleMax: constant('REQUIREMENT_TITLE_MAX'),
+      minCountMax: constant('REQUIREMENT_MIN_COUNT_MAX'),
+      instructionsMax: constant('MANUAL_CHECK_INSTRUCTIONS_MAX'),
+    },
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -168,20 +204,24 @@ export function mergeDataset(base, override) {
 
   if (override.language !== undefined) merged.language = override.language;
 
-  const renameIn = (where, list, entries) => {
+  // `nested`: a field holding a keyed sub-list that is renamed the same way
+  // (a mission's `requirements`), with its own renameable fields.
+  const renameIn = (where, list, entries, { fields = RENAMEABLE_FIELDS, nested = {} } = {}) => {
     if (!Array.isArray(entries)) {
       problems.push(`override.${where}: must be an array`);
       return;
     }
     for (const entry of entries) {
-      const target = list.find((item) => item.key === entry?.key);
+      const target = (Array.isArray(list) ? list : []).find((item) => item.key === entry?.key);
       if (!target) {
         problems.push(`override.${where}: "${entry?.key}" is not in the baseline (an override cannot add entries)`);
         continue;
       }
       for (const [field, value] of Object.entries(entry)) {
         if (field === 'key') continue;
-        if (!RENAMEABLE_FIELDS.includes(field)) {
+        if (Object.hasOwn(nested, field)) {
+          renameIn(`${where}["${entry.key}"].${field}`, target[field], value, nested[field]);
+        } else if (!fields.includes(field)) {
           problems.push(`override.${where}["${entry.key}"]: field "${field}" cannot be overridden`);
         } else {
           target[field] = value;
@@ -194,7 +234,9 @@ export function mergeDataset(base, override) {
     if (override[section] !== undefined) renameIn(section, merged[section], override[section]);
   }
   if (override.missions !== undefined) {
-    renameIn('missions', merged.gamification.missions, override.missions);
+    renameIn('missions', merged.gamification.missions, override.missions, {
+      nested: { requirements: { fields: RENAMEABLE_REQUIREMENT_FIELDS } },
+    });
   }
 
   if (override.media !== undefined) {
@@ -409,24 +451,168 @@ export function validateDataset(dataset, reference) {
     }
   }
 
-  const missions = indexByKey(gamification.missions ?? [], 'gamification.missions', problems);
+  validateMissions(dataset, reference, { topics, manifest }, problems);
+
+  validateExtensions(dataset, reference, { users, groups, topics, children }, problems);
+
+  if (problems.length > 0) throw new DatasetError(problems);
+  return dataset;
+}
+
+// -- missions (M27): typed, windowed missions with ordered requirements ----------
+
+/** Every field a dataset mission may carry. */
+const MISSION_FIELDS = ['key', 'title', 'description', 'mode', 'enrollmentMode', 'activeDays', 'xpReward', 'badge', 'requirements'];
+/** Every field a mission requirement may carry; `topic` / `event` are dataset keys, resolved to ids by the seed. */
+const REQUIREMENT_FIELDS = ['key', 'kind', 'title', 'topic', 'event', 'params', 'xpReward'];
+/** The value sets of `submissions_on_topic.visibility` (requirements.ts). */
+export const SUBMISSION_VISIBILITIES = ['any', 'shared_only'];
+
+const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * `raw` params of a requirement of `kind`, checked and normalised the way
+ * `RequirementParams[kind]` (requirements.ts) parses them: strict keys,
+ * defaults applied in the schema's key order, `instructions` trimmed. Returns
+ * `{ params, problems }` — `params` is null when a problem was found. Absent
+ * params are `{}`, which is valid exactly for the kinds whose schema needs no key.
+ */
+export function normalizeRequirementParams(kind, raw, limits) {
+  const problems = [];
+  const input = raw === undefined ? {} : raw;
+  if (!isPlainObject(input)) return { params: null, problems: ['"params" must be an object'] };
+
+  const minCount = (value) => {
+    if (!Number.isInteger(value) || value < 1 || value > limits.minCountMax) {
+      problems.push(`params "minCount" must be an integer 1..${limits.minCountMax} (got ${JSON.stringify(value)})`);
+    }
+    return value;
+  };
+  const boolean = (name, fallback) => {
+    const value = input[name] ?? fallback;
+    if (typeof value !== 'boolean') problems.push(`params "${name}" must be a boolean`);
+    return value;
+  };
+
+  let allowed;
+  let params;
+  switch (kind) {
+    case 'submissions_on_topic': {
+      allowed = ['minCount', 'requireDescription', 'visibility', 'countModerated'];
+      const visibility = input.visibility ?? 'any';
+      if (!SUBMISSION_VISIBILITIES.includes(visibility)) {
+        problems.push(`params "visibility" must be one of ${SUBMISSION_VISIBILITIES.join(', ')} (got ${JSON.stringify(visibility)})`);
+      }
+      params = {
+        minCount: minCount(input.minCount),
+        requireDescription: boolean('requireDescription', false),
+        visibility,
+        countModerated: boolean('countModerated', false),
+      };
+      break;
+    }
+    case 'video_watched':
+      allowed = ['minCount'];
+      params = { minCount: minCount(input.minCount) };
+      break;
+    case 'manual_check': {
+      allowed = ['instructions'];
+      const instructions = input.instructions ?? '';
+      if (typeof instructions !== 'string') problems.push('params "instructions" must be a string');
+      else if (instructions.trim().length > limits.instructionsMax) {
+        problems.push(`params "instructions" must be at most ${limits.instructionsMax} characters`);
+      }
+      params = { instructions: typeof instructions === 'string' ? instructions.trim() : instructions };
+      break;
+    }
+    case 'topic_visited':
+    case 'event_participation':
+      allowed = [];
+      params = {};
+      break;
+    default:
+      return { params: null, problems: [`no params rule for kind "${kind}"`] };
+  }
+  for (const key of Object.keys(input)) {
+    if (!allowed.includes(key)) problems.push(`params "${key}" is not a parameter of ${kind}`);
+  }
+  return { params: problems.length > 0 ? null : params, problems };
+}
+
+/**
+ * Missions: a mode, an enrollment mode, a window and an ordered list of typed
+ * requirements whose targets are dataset keys. A requirement must be one the
+ * API would accept from an admin (admin-missions.controller.ts): a topic target
+ * exists and is published, a `video_watched` topic carries a video, and an
+ * `event_participation` event is priced — the demo prices no event, so that
+ * kind is refused here rather than failing the seed.
+ */
+function validateMissions(dataset, reference, { topics, manifest }, problems) {
+  const limits = reference.requirementLimits;
+  const assign = dataset.media?.assign ?? {};
+  const events = new Map((Array.isArray(dataset.events) ? dataset.events : []).map((event) => [event?.key, event]));
+  const missions = indexByKey(dataset.gamification?.missions ?? [], 'gamification.missions', problems);
+
   for (const [key, mission] of missions) {
     const where = `gamification.missions["${key}"]`;
+    for (const field of Object.keys(mission)) {
+      if (!MISSION_FIELDS.includes(field)) {
+        problems.push(`${where}: field "${field}" is not a mission field (a mission is defined by its "requirements")`);
+      }
+    }
     if (!isNonEmptyString(mission.title)) problems.push(`${where}: missing "title"`);
-    if (!reference.missionPredicates.includes(mission.predicateKind)) {
-      problems.push(`${where}: unknown predicateKind "${mission.predicateKind}" (known: ${reference.missionPredicates.join(', ')})`);
+    if (mission.description !== undefined && typeof mission.description !== 'string') problems.push(`${where}: "description" must be a string`);
+    if (!reference.missionModes.includes(mission.mode)) {
+      problems.push(`${where}: unknown mode "${mission.mode}" (known: ${reference.missionModes.join(', ')})`);
+    }
+    if (!reference.enrollmentModes.includes(mission.enrollmentMode)) {
+      problems.push(`${where}: unknown enrollmentMode "${mission.enrollmentMode}" (known: ${reference.enrollmentModes.join(', ')})`);
+    } else if (mission.enrollmentMode === 'assigned') {
+      problems.push(`${where}: enrollmentMode "assigned" needs an audience, which the demo does not seed (use auto or open)`);
     }
     if (mission.badge != null && !Object.hasOwn(reference.badges, mission.badge)) {
       problems.push(`${where}: unknown badge slug "${mission.badge}"`);
     }
     if (!Number.isInteger(mission.activeDays) || mission.activeDays <= 0) problems.push(`${where}: "activeDays" must be positive`);
     if (!isNonNegativeInt(mission.xpReward)) problems.push(`${where}: "xpReward" must be a non-negative integer`);
+
+    const requirements = indexByKey(mission.requirements, `${where}.requirements`, problems);
+    if (Array.isArray(mission.requirements) && (mission.requirements.length < 1 || mission.requirements.length > limits.stepsMax)) {
+      problems.push(`${where}: needs 1..${limits.stepsMax} requirements (has ${mission.requirements.length})`);
+    }
+    for (const [stepKey, step] of requirements) {
+      const at = `${where}.requirements["${stepKey}"]`;
+      for (const field of Object.keys(step)) {
+        if (!REQUIREMENT_FIELDS.includes(field)) problems.push(`${at}: field "${field}" is not a requirement field`);
+      }
+      if (typeof step.title !== 'string' || step.title.trim().length === 0 || step.title.trim().length > limits.titleMax) {
+        problems.push(`${at}: "title" must be 1..${limits.titleMax} characters`);
+      }
+      if (step.xpReward !== undefined && !isNonNegativeInt(step.xpReward)) problems.push(`${at}: "xpReward" must be a non-negative integer`);
+      if (!reference.requirementKinds.includes(step.kind)) {
+        problems.push(`${at}: unknown kind "${step.kind}" (known: ${reference.requirementKinds.join(', ')})`);
+        continue;
+      }
+
+      if (reference.topicRequirementKinds.includes(step.kind)) {
+        if (step.event !== undefined) problems.push(`${at}: a ${step.kind} step targets a topic, not an event`);
+        const topic = topics.get(step.topic);
+        if (!topic) problems.push(`${at}: topic "${step.topic}" is not a topic`);
+        else if (topic.status !== 'published') problems.push(`${at}: topic "${step.topic}" is ${topic.status} (the API needs a published topic)`);
+        else if (step.kind === 'video_watched' && !(assign[step.topic] ?? []).some((file) => manifest.get(file)?.type?.startsWith('video/'))) {
+          problems.push(`${at}: topic "${step.topic}" has no video`);
+        }
+      } else if (step.kind === 'event_participation') {
+        if (step.topic !== undefined) problems.push(`${at}: an event_participation step targets an event, not a topic`);
+        if (!events.has(step.event)) problems.push(`${at}: event "${step.event}" is not an event`);
+        else problems.push(`${at}: event "${step.event}" has no price, and the API only accepts a priced event (EVENT_NOT_CHARGEABLE)`);
+      } else if (step.topic !== undefined || step.event !== undefined) {
+        problems.push(`${at}: a ${step.kind} step takes no topic or event`);
+      }
+
+      for (const problem of normalizeRequirementParams(step.kind, step.params, limits).problems) problems.push(`${at}: ${problem}`);
+    }
   }
-
-  validateExtensions(dataset, reference, { users, groups, topics, children }, problems);
-
-  if (problems.length > 0) throw new DatasetError(problems);
-  return dataset;
 }
 
 // -- extensions (Task 14): events, billing, tasks, comments -------------------
@@ -677,6 +863,7 @@ export function datasetCounts(dataset) {
     topicsWithMedia: dataset.topics.filter((topic) => (dataset.media.assign[topic.key] ?? []).length > 0).length,
     enrollments: dataset.enrollments.length,
     missions: dataset.gamification.missions.length,
+    missionRequirements: dataset.gamification.missions.reduce((n, mission) => n + mission.requirements.length, 0),
     events: (dataset.events ?? []).length,
     billingPlans: (dataset.billing?.plans ?? []).length,
     subscriptions: (dataset.billing?.subscriptions ?? []).length,

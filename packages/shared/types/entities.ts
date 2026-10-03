@@ -1,3 +1,5 @@
+import type { RequirementKind } from '../domain/missions/requirements';
+
 export namespace Entities {
 
     export namespace Config {
@@ -586,13 +588,66 @@ export namespace Entities {
             description: string;
             startAt: string;
             endAt: string;
+            /** @deprecated legacy M7 predicate; new missions store 'requirements' / '{}' */
             predicateKind: string;
+            /** @deprecated legacy M7 predicate; new missions store 'requirements' / '{}' */
             predicateParams: string;
             xpReward: number;
             badgeId: string | null;
             active: boolean;
+            /** `parallel`: every step open at once; `sequential`: step N opens when N-1 completes (RFC 0022). */
+            mode: 'parallel' | 'sequential';
+            /** Who takes part: implicit (`auto`), by Join (`open`) or by audience (`assigned`). */
+            enrollmentMode: 'auto' | 'open' | 'assigned';
             createdAt: Date;
             updatedAt: Date;
+        }
+
+        /** One ordered step of a mission (RFC 0022 §1). Instants are ISO/SQLite strings. */
+        export interface MissionRequirement {
+            id: string;
+            missionId: string;
+            /** 1-based order inside the mission. */
+            position: number;
+            kind: RequirementKind;
+            title: string;
+            /** Target topic for the three topic kinds; null otherwise. */
+            topicId: string | null;
+            /** Target event for `event_participation`; null otherwise. */
+            eventId: string | null;
+            /** Params of `kind`, already parsed by `parseRequirementParams` in the adapter. */
+            params: unknown;
+            xpReward: number;
+            createdAt: string;
+            updatedAt: string;
+        }
+
+        /** Who takes part in a mission; `countsFrom` is the user's evidence floor. */
+        export interface MissionEnrollment {
+            missionId: string;
+            userId: string;
+            source: 'auto' | 'self' | 'admin';
+            joinedAt: string;
+            countsFrom: string;
+            /** Set by Leave or by an audience removal; null while active. */
+            leftAt: string | null;
+        }
+
+        /** Per-step progress of one user. `completedAt` is write-once. */
+        export interface MissionRequirementProgress {
+            requirementId: string;
+            userId: string;
+            missionId: string;
+            currentCount: number;
+            targetCount: number;
+            /** `manual_check`: when the student ticked the step. */
+            checkedAt: string | null;
+            /** Evidence instant of the target-th qualifying item, never the evaluation clock. */
+            completedAt: string | null;
+            completedBy: 'hook' | 'reconcile' | null;
+            /** Wall clock at which `completedAt` was written. */
+            recordedAt: string | null;
+            updatedAt: string;
         }
     }
 

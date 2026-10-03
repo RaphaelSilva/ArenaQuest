@@ -76,7 +76,9 @@ export class QuestEvaluator {
       }
     }
 
-    const missions = await this.missionRepo.listActiveMissions(nowUtc.toISOString());
+    // Legacy M7 predicate missions only: requirements missions belong to the
+    // mission evaluator (RFC 0022 §3.7).
+    const missions = await this.missionRepo.listActiveLegacyMissions(nowUtc.toISOString());
     for (const mission of missions) {
       const mappedSource = PREDICATE_TO_SOURCE[mission.predicateKind];
       if (!mappedSource || mappedSource !== sourceKind) continue;

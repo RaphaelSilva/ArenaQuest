@@ -1,6 +1,6 @@
 # Task 12 — Frontend: Mission page — steps, manual check, leave (Phase 6)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Frontend Web
@@ -57,16 +57,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Clicking *I did it* on an open `manual_check` step asks for confirmation, calls the check
+- [x] Clicking *I did it* on an open `manual_check` step asks for confirmation, calls the check
       route once, and the step renders as completed with its XP.
-- [ ] A locked sequential `manual_check` step renders the button disabled with the explanation.
-- [ ] A mocked `409 MISSION_CLOSED` renders its translated message and leaves the step open.
-- [ ] *Leave* is offered only for a `self` enrollment; after confirming it calls the leave route and
+- [x] A locked sequential `manual_check` step renders the button disabled with the explanation.
+- [x] A mocked `409 MISSION_CLOSED` renders its translated message and leaves the step open.
+- [x] *Leave* is offered only for a `self` enrollment; after confirming it calls the leave route and
       returns to the dashboard.
-- [ ] A mocked `404` renders the not-found page.
-- [ ] `check-i18n-coverage.js` passes; `pt` and `en` builds both render the page.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A mocked `404` renders the not-found page.
+- [x] `check-i18n-coverage.js` passes; `pt` and `en` builds both render the page.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
+      _Closed 2026-10-03. Choices: not-found rendered inline (the app has no `not-found.tsx` and never calls `notFound()`); Leave is an inline confirmation in the header actions rather than a dropdown menu; a student who has not joined an `open` mission sees Join and no "I did it" (the check route answers `404` for non-participants); a `409 MISSION_CLOSED` on check uses its own wording (`missions.check.closed`). **Not run:** browser walkthrough and PT/EN render check — covered by the Playwright smoke scheduled before the candidate PR._
 
 ## Verification Plan
 

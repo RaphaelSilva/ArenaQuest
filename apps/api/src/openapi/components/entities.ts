@@ -5,6 +5,14 @@ import {
   SUBMISSION_DESCRIPTION_MAX,
   SUBMISSION_TITLE_MAX,
 } from '@arenaquest/shared/domain/submissions/limits';
+import {
+  MISSION_STEPS_MAX,
+  MissionEnrollmentMode,
+  MissionMode,
+  REQUIREMENT_KINDS,
+  REQUIREMENT_TITLE_MAX,
+  RequirementInput,
+} from '@arenaquest/shared/domain/missions/requirements';
 
 extendZodWithOpenApi(z);
 
@@ -526,3 +534,247 @@ export const MoveSubmissionsResultSchema = z.object({
     }),
   })),
 }).openapi('MoveSubmissionsResult');
+
+// ---------------------------------------------------------------------------
+// Missions (RFC 0022 §6)
+// ---------------------------------------------------------------------------
+
+const MISSION_TITLE_MAX = 120;
+const MISSION_DESCRIPTION_MAX = 2_000;
+
+const uuidExample = 'a1b2c3d4-e5f6-7890-1234-567890abcdef';
+
+export const MissionModeSchema = MissionMode.openapi({
+  description: '`parallel`: every step open at once; `sequential`: step N opens when N-1 completes',
+  example: 'sequential',
+});
+
+export const MissionEnrollmentModeSchema = MissionEnrollmentMode.openapi({
+  description: 'Who takes part: implicit (`auto`), by Join (`open`) or by audience (`assigned`)',
+  example: 'auto',
+});
+
+export const MissionSchema = z.object({
+  id: z.string().uuid().openapi({ example: uuidExample }),
+  title: z.string().openapi({ example: 'Kihon month' }),
+  description: z.string().openapi({ example: 'Three demonstrations, then the seminar.' }),
+  startAt: z.string().openapi({ example: '2026-10-01T12:00:00.000Z' }),
+  endAt: z.string().openapi({ example: '2026-10-31T23:59:59.000Z' }),
+  predicateKind: z.string().openapi({
+    deprecated: true,
+    description: "Legacy M7 predicate; `requirements` for every mission defined by requirements",
+    example: 'requirements',
+  }),
+  predicateParams: z.string().openapi({
+    deprecated: true,
+    description: "Legacy M7 predicate params; `{}` for every mission defined by requirements",
+    example: '{}',
+  }),
+  xpReward: z.number().int().openapi({ example: 500 }),
+  badgeId: z.string().nullable().openapi({ example: null }),
+  active: z.boolean().openapi({ example: true }),
+  mode: MissionModeSchema,
+  enrollmentMode: MissionEnrollmentModeSchema,
+  createdAt: z.string().openapi({ example: '2026-10-01T12:00:00.000Z' }),
+  updatedAt: z.string().openapi({ example: '2026-10-01T13:00:00.000Z' }),
+}).openapi('Mission');
+
+export const MissionListItemSchema = MissionSchema.extend({
+  requirementCount: z.number().int().openapi({ description: 'Steps of the mission (0 for a legacy mission)', example: 2 }),
+  enrolledCount: z.number().int().openapi({ description: 'Active enrollments', example: 12 }),
+  completedCount: z.number().int().openapi({ description: 'Enrolled users whose mission progress is completed', example: 3 }),
+}).openapi('MissionListItem');
+
+export const MissionRequirementSchema = z.object({
+  id: z.string().uuid().openapi({ example: uuidExample }),
+  missionId: z.string().uuid().openapi({ example: uuidExample }),
+  position: z.number().int().openapi({ description: '1-based order inside the mission', example: 1 }),
+  kind: z.enum(REQUIREMENT_KINDS).openapi({ example: 'submissions_on_topic' }),
+  title: z.string().openapi({ example: 'Three demonstrations' }),
+  topicId: z.string().nullable().openapi({ description: 'Target of the three topic kinds; null otherwise', example: uuidExample }),
+  eventId: z.string().nullable().openapi({ description: 'Target of `event_participation`; null otherwise', example: null }),
+  params: z.record(z.unknown()).openapi({
+    description: "The kind's params, defaults applied",
+    example: { minCount: 3, requireDescription: false, visibility: 'any', countModerated: false },
+  }),
+  xpReward: z.number().int().openapi({ example: 50 }),
+  createdAt: z.string().openapi({ example: '2026-10-01 12:00:00' }),
+  updatedAt: z.string().openapi({ example: '2026-10-01 12:00:00' }),
+}).openapi('MissionRequirement');
+
+export const MissionAudienceSchema = z.object({
+  groupIds: z.array(z.string().uuid()).openapi({ example: [uuidExample] }),
+  userIds: z.array(z.string().uuid()).openapi({ example: [] }),
+}).openapi('MissionAudience');
+
+export const MissionDetailSchema = z.object({
+  mission: MissionSchema,
+  requirements: z.array(MissionRequirementSchema).openapi({ description: 'Ordered by position' }),
+  audience: MissionAudienceSchema,
+}).openapi('MissionDetail');
+
+export const MissionRequirementInputSchema = RequirementInput.openapi('MissionRequirementInput', {
+  description: 'One step, discriminated on `kind`; every object is strict (unknown keys are refused)',
+});
+
+const requirementListField = z.array(MissionRequirementInputSchema).min(1).max(MISSION_STEPS_MAX).openapi({
+  description: `1..${MISSION_STEPS_MAX} steps; positions follow the array order`,
+});
+
+export const MissionCreateBodySchema = z.object({
+  title: z.string().trim().min(1).max(MISSION_TITLE_MAX).openapi({ example: 'Kihon month' }),
+  description: z.string().trim().min(1).max(MISSION_DESCRIPTION_MAX).openapi({ example: 'Three demonstrations, then the seminar.' }),
+  startAt: z.string().datetime().openapi({ example: '2026-10-01T12:00:00.000Z' }),
+  endAt: z.string().datetime().openapi({ description: 'Must be after `startAt`', example: '2026-10-31T23:59:59.000Z' }),
+  mode: MissionModeSchema.default('parallel'),
+  enrollmentMode: MissionEnrollmentModeSchema.default('auto'),
+  xpReward: z.number().int().min(0).default(0).openapi({ example: 500 }),
+  badgeId: z.string().uuid().nullable().default(null).openapi({ example: null }),
+  requirements: requirementListField,
+  audience: MissionAudienceSchema.optional().openapi({ description: "Only with `enrollmentMode = 'assigned'`" }),
+}).strict().openapi('MissionCreateBody');
+
+export const MissionPatchBodySchema = z.object({
+  title: z.string().trim().min(1).max(MISSION_TITLE_MAX).optional(),
+  description: z.string().trim().min(1).max(MISSION_DESCRIPTION_MAX).optional(),
+  startAt: z.string().datetime().optional().openapi({ description: 'Locked once the mission started' }),
+  endAt: z.string().datetime().optional().openapi({ description: 'Once started, may only be extended' }),
+  mode: MissionModeSchema.optional().openapi({ description: 'Locked once the mission started' }),
+  enrollmentMode: MissionEnrollmentModeSchema.optional().openapi({ description: 'Locked once the mission started' }),
+  xpReward: z.number().int().min(0).optional().openapi({ description: 'Locked once the mission started' }),
+  badgeId: z.string().uuid().nullable().optional().openapi({ description: 'Locked once the mission started' }),
+  active: z.boolean().optional(),
+}).strict().openapi('MissionPatchBody');
+
+export const ReplaceMissionRequirementsBodySchema = z.object({
+  requirements: requirementListField,
+}).strict().openapi('ReplaceMissionRequirementsBody');
+
+export const MissionRequirementTitleBodySchema = z.object({
+  title: z.string().trim().min(1).max(REQUIREMENT_TITLE_MAX).openapi({ example: 'Three demonstrations' }),
+}).strict().openapi('MissionRequirementTitleBody');
+
+export const MissionRequirementErrorSchema = z.object({
+  error: z.enum(['ValidationError', 'INVALID_REQUIREMENT_TARGET', 'EVENT_NOT_CHARGEABLE', 'REQUIREMENT_SHARING_DISABLED']),
+  index: z.number().int().optional().openapi({ description: 'Index of the offending item in `requirements`' }),
+  reason: z.string().optional().openapi({
+    description: 'TOPIC_NOT_FOUND · TOPIC_NOT_PUBLISHED · TOPIC_ARCHIVED · TOPIC_HAS_NO_VIDEO · EVENT_NOT_FOUND · EVENT_NOT_PUBLISHED · EVENT_NOT_CHARGEABLE · REQUIREMENT_SHARING_DISABLED, or a schema reason (UNKNOWN_KIND, UNRECOGNIZED_KEYS, TOO_SMALL, …)',
+    example: 'TOPIC_ARCHIVED',
+  }),
+  field: z.string().optional().openapi({ description: 'Schema errors: the path inside the item', example: 'params.minCount' }),
+}).passthrough().openapi('MissionRequirementError');
+
+export const MissionStartedErrorSchema = z.object({
+  error: z.literal('MISSION_STARTED'),
+  fields: z.array(z.string()).openapi({ example: ['mode'] }),
+}).openapi('MissionStartedError');
+
+export const MissionParticipantStepSchema = z.object({
+  requirementId: z.string().uuid(),
+  currentCount: z.number().int(),
+  targetCount: z.number().int(),
+  checkedAt: z.string().nullable(),
+  completedAt: z.string().nullable().openapi({ description: 'Evidence instant of the target-th item' }),
+  completedBy: z.enum(['hook', 'reconcile']).nullable(),
+}).openapi('MissionParticipantStep');
+
+export const MissionParticipantSchema = z.object({
+  userId: z.string().openapi({ example: uuidExample }),
+  name: z.string().nullable().openapi({ example: 'Student A' }),
+  email: z.string().nullable().openapi({ example: 'student@example.com' }),
+  source: z.enum(['auto', 'self', 'admin']),
+  joinedAt: z.string().openapi({ example: '2026-10-01 12:00:00' }),
+  countsFrom: z.string().openapi({ example: '2026-10-01T12:00:00.000Z' }),
+  leftAt: z.string().nullable().openapi({ example: null }),
+  progress: z.object({
+    currentValue: z.number().int().openapi({ description: 'Completed steps' }),
+    targetValue: z.number().int().openapi({ description: 'Step count' }),
+    completed: z.boolean(),
+    completedAt: z.string().nullable(),
+  }).nullable(),
+  steps: z.array(MissionParticipantStepSchema).openapi({ description: 'Evaluated steps, in position order' }),
+}).openapi('MissionParticipant');
+
+export const MissionParticipantPageSchema = z.object({
+  data: z.array(MissionParticipantSchema),
+  nextCursor: nextCursorField,
+}).openapi('MissionParticipantPage');
+
+export const MissionReconcileReportSchema = z.object({
+  missions: z.number().int().openapi({ description: 'Missions reconciled (1 for this route)', example: 1 }),
+  enrollmentsCreated: z.number().int().openapi({ description: 'Implicit enrollments materialised', example: 3 }),
+  evidenceBackfilled: z.number().int().openapi({ description: "Evidence rows captured with `source = 'backfill'`", example: 2 }),
+  enrollmentsEvaluated: z.number().int().openapi({ description: 'Active enrollments evaluated', example: 12 }),
+  stepsClosed: z.number().int().openapi({ description: "Steps completed by this run (`completedBy = 'reconcile'`)", example: 4 }),
+  missionsClosed: z.number().int().openapi({ description: 'Mission completions granted by this run', example: 1 }),
+  failed: z.number().int().openapi({ description: 'Missions whose reconciliation failed (0 or 1 here)', example: 0 }),
+}).openapi('MissionReconcileReport');
+
+// ---------------------------------------------------------------------------
+// Student missions (RFC 0022 §5, §6, §8)
+// ---------------------------------------------------------------------------
+
+export const MissionProgressSchema = z.object({
+  userId: z.string(),
+  missionId: z.string(),
+  currentValue: z.number().int().openapi({ description: 'Completed steps (or the legacy single counter)', example: 1 }),
+  targetValue: z.number().int().openapi({ description: 'Step count (or the legacy target)', example: 3 }),
+  completed: z.boolean(),
+  completedAt: z.string().nullable().openapi({ example: null }),
+  updatedAt: z.string().openapi({ example: '2026-10-02T12:00:00.000Z' }),
+}).openapi('MissionProgress');
+
+const MissionTopicTargetSchema = z.object({
+  type: z.literal('topic'),
+  topicId: z.string().nullable().openapi({ description: "null when the topic is outside the caller's access", example: uuidExample }),
+  title: z.string().nullable().openapi({ example: 'Kihon' }),
+  accessible: z.boolean(),
+}).openapi('MissionTopicTarget');
+
+const MissionEventTargetSchema = z.object({
+  type: z.literal('event'),
+  slug: z.string().nullable().openapi({ description: 'null when the event is not visible to the caller', example: 'seminar-2026' }),
+  title: z.string().nullable().openapi({ example: 'Seminar' }),
+  startsAt: z.string().nullable().openapi({ example: '2026-10-20T13:00:00.000Z' }),
+}).openapi('MissionEventTarget');
+
+export const MissionStepViewSchema = z.object({
+  id: z.string().openapi({ description: 'Requirement id', example: uuidExample }),
+  position: z.number().int().openapi({ example: 1 }),
+  kind: z.enum(REQUIREMENT_KINDS).openapi({ example: 'submissions_on_topic' }),
+  title: z.string().openapi({ example: 'Three demonstrations' }),
+  xpReward: z.number().int().openapi({ example: 50 }),
+  target: z.union([MissionTopicTargetSchema, MissionEventTargetSchema]).nullable().openapi({
+    description: 'A topic or event the caller cannot open is redacted (no id, title or slug); null for `manual_check`',
+  }),
+  instructions: z.string().nullable().openapi({ description: '`manual_check` only', example: null }),
+  current: z.number().int().openapi({ example: 1 }),
+  required: z.number().int().openapi({ example: 3 }),
+  state: z.enum(['locked', 'open', 'completed']),
+  completedAt: z.string().nullable().openapi({ description: 'Evidence instant of the target-th item', example: null }),
+}).openapi('MissionStepView');
+
+export const MissionEnrollmentViewSchema = z.object({
+  source: z.enum(['auto', 'self', 'admin']),
+  joinedAt: z.string().nullable().openapi({ description: 'null for an implicit enrollment', example: null }),
+  implicit: z.boolean().openapi({ description: 'Granted by the policy, no row written yet (reads never write)' }),
+}).openapi('MissionEnrollmentView');
+
+export const MissionLockedSchema = z.object({
+  reason: z.literal('assigned'),
+  groups: z.array(z.string()).openapi({ description: "Names of the mission's audience groups", example: ['Black belts'] }),
+}).openapi('MissionLocked');
+
+export const DashboardMissionEntrySchema = z.object({
+  mission: MissionSchema.openapi({ description: 'For a locked teaser only `id` and `title` are meaningful' }),
+  progress: MissionProgressSchema.nullable(),
+  enrollment: MissionEnrollmentViewSchema.nullable(),
+  joinable: z.boolean().openapi({ description: '`open` mission, inside its window, caller not enrolled' }),
+  locked: MissionLockedSchema.nullable().openapi({ description: 'Teaser of an `assigned` mission the caller is not in' }),
+  steps: z.array(MissionStepViewSchema).openapi({ description: 'Ordered steps; `[]` for a legacy mission or a teaser' }),
+}).openapi('DashboardMissionEntry');
+
+export const MissionCheckResultSchema = z.object({
+  step: MissionStepViewSchema,
+  mission: DashboardMissionEntrySchema,
+}).openapi('MissionCheckResult');

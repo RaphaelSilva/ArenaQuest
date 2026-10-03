@@ -7,6 +7,7 @@ import {
 } from '@api/controllers/admin-billing.controller';
 import { billingRunDeps } from '@api/core/billing/billing-service';
 import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
+import { runMissionHook } from '@api/core/missions/hook';
 import type { AppContainer } from '@api/container';
 
 /**
@@ -1360,24 +1361,28 @@ export function buildAdminBillingRouter(container: AppContainer) {
     const { id } = c.req.valid('param');
     const result = await extras.voidCharge(id, c.req.valid('json'), c.get('user').sub);
     if (!result.ok) return respondWith(c, result);
+    await runMissionHook(container, { kind: 'event_charge', userId: result.data.userId, eventId: result.data.eventId });
     return c.json(result.data, 200);
   });
 
   router.openapi(applyChargeAdjustmentRoute, async (c) => {
     const { id } = c.req.valid('param');
     const result = await extras.applyAdjustment(id, c.req.valid('json'), c.get('user').sub);
+    if (result.ok) await runMissionHook(container, { kind: 'event_charge_by_id', chargeId: result.data.chargeId });
     return respondCreated(c, result);
   });
 
   router.openapi(recordChargePaymentRoute, async (c) => {
     const { id } = c.req.valid('param');
     const result = await extras.recordPayment(id, c.req.valid('json'), c.get('user').sub);
+    if (result.ok) await runMissionHook(container, { kind: 'event_charge_by_id', chargeId: result.data.chargeId });
     return respondCreated(c, result);
   });
 
   router.openapi(reverseChargePaymentRoute, async (c) => {
     const { id } = c.req.valid('param');
     const result = await extras.reversePayment(id, c.req.valid('json'), c.get('user').sub);
+    if (result.ok) await runMissionHook(container, { kind: 'event_charge_by_id', chargeId: result.data.chargeId });
     return respondCreated(c, result);
   });
 

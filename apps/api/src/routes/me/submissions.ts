@@ -15,7 +15,8 @@ import { encodeCursor, invalidCursorResponse, parseCursorParam } from '@api/rout
 import { cursorQuerySchema } from '@api/routes/notes.router';
 import { NO_STORE } from '@api/routes/submissions.router';
 import type { Context } from 'hono';
-import type { ContentContext, EngagementContext, ProgressContext } from '@api/container';
+import { runMissionHook } from '@api/core/missions/hook';
+import type { ContentContext, EngagementContext, GamificationContext, ProgressContext } from '@api/container';
 
 const error = (description: string) => ({
   description,
@@ -74,6 +75,7 @@ export function buildMeSubmissionsRouter(slice: {
   engagement: EngagementContext;
   content: ContentContext;
   progress: ProgressContext;
+  gamification: GamificationContext;
 }): OpenAPIHono {
   const controller = new SubmissionsController(
     slice.engagement.submissionRepo,
@@ -107,6 +109,10 @@ export function buildMeSubmissionsRouter(slice: {
 
   router.openapi(moveMySubmissionsRoute, async (c) => {
     const result = await controller.move(submissionCaller(c), c.req.valid('json') as MoveSubmissionsInput);
+    if (result.ok && result.data.moved.length > 0) {
+      const { targetTopicId } = c.req.valid('json') as MoveSubmissionsInput;
+      await runMissionHook(slice, { kind: 'submission_move', userId: c.get('user').sub, targetTopicId });
+    }
     return respondWith(c, result) as any;
   });
 

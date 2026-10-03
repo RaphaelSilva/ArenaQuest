@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import { TopicsController } from '@api/controllers/topics.controller';
+import { runMissionHook } from '@api/core/missions/hook';
 import type { ContentContext, ProgressContext, GamificationContext } from '@api/container';
 
 export function buildTopicsRouter(slice: {
@@ -64,6 +65,9 @@ export function buildTopicsRouter(slice: {
         console.error('[badge] video_watched evaluate failed:', err);
       }
     }
+
+    // The evaluator checks that `videoId` is a ready video of this topic (RFC 0022 §3.1).
+    await runMissionHook(slice, { kind: 'video_watch', userId: user.sub, topicId, mediaId: videoId });
 
     return c.json({ xpAwarded });
   });

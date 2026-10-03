@@ -1,6 +1,6 @@
 # Task 13 — Backend: Demo seed mission as typed requirements (Phase 7)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Backend API
@@ -66,15 +66,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `node scripts/demo/ci-check.mjs` passes: every migration applies, each label seeds twice, and
+- [x] `node scripts/demo/ci-check.mjs` passes: every migration applies, each label seeds twice, and
       the counts include `mission_requirements` with no change on the second run.
-- [ ] The demo mission reads back from the local D1 with `predicate_kind = 'requirements'`, its
+- [x] The demo mission reads back from the local D1 with `predicate_kind = 'requirements'`, its
       `mode`, `enrollment_mode` and its ordered requirement rows pointing at seeded topics.
-- [ ] `dataset.mjs` reports an unknown requirement kind, invalid params and an unknown topic key as
+- [x] `dataset.mjs` reports an unknown requirement kind, invalid params and an unknown topic key as
       dataset problems (unit tests).
-- [ ] The RFC 0021 assertions on student XP, badges and `user_xp` = ledger are unchanged.
-- [ ] `make test-scripts` green; changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] The RFC 0021 assertions on student XP, badges and `user_xp` = ledger are unchanged.
+- [x] `make test-scripts` green; changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
+      _Closed 2026-10-03. Choices: the scripts keep the house pattern of scraping the TypeScript source (`requirements.ts`) for kinds, modes and limits and mirror the per-kind param rules in `dataset.mjs`; a test transpiles the shared module to prove parity (tests only). Requirement ids derive from `mission-requirement` + `<missionKey>#<position>` and upsert on `(mission_id, position)` so a reorder cannot collide with the unique key. `event_participation` and `assigned` are refused by the dataset validation (the demo prices no event and seeds no audience). `node scripts/demo/ci-check.mjs` passed for the three labels, each seeded twice with no row-count change._
 
 ## Verification Plan
 

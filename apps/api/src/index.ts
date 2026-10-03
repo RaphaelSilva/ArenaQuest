@@ -15,6 +15,7 @@ import { Scalar } from '@scalar/hono-api-reference';
 import { buildContainer } from '@api/container';
 import { runScheduledBilling } from '@api/core/billing/billing-service';
 import { sweepPendingSubmissions } from '@api/jobs/sweep-pending-submissions';
+import { reconcileMissions } from '@api/jobs/reconcile-missions';
 import { AppRouter } from '@api/routes';
 import { configureOpenAPIDocument } from '@api/openapi/document';
 import '@api/types/hono-env';
@@ -53,6 +54,10 @@ export default {
    * The abandoned-upload sweep (RFC 0020 §9) runs after billing on the same
    * daily trigger, in a `finally` so a billing failure never skips it; the
    * sweep itself never throws, so it cannot affect billing either.
+   *
+   * The mission reconciliation (RFC 0022 §4) runs last, in its own `finally`
+   * link, so neither a billing nor a sweep failure skips it; it never throws
+   * either, so it cannot affect them.
    */
   async scheduled(
     _controller: ScheduledController,
@@ -63,10 +68,18 @@ export default {
     try {
       await runScheduledBilling(container);
     } finally {
-      await sweepPendingSubmissions({
-        submissions: container.engagement.submissionRepo,
-        storage: container.content.storage,
-      });
+      try {
+        await sweepPendingSubmissions({
+          submissions: container.engagement.submissionRepo,
+          storage: container.content.storage,
+        });
+      } finally {
+        await reconcileMissions({
+          missions: container.gamification.missionRepo,
+          participation: container.gamification.missionParticipationRepo,
+          evaluator: container.gamification.missionEvaluator,
+        });
+      }
     }
   },
 } satisfies ExportedHandler<AppEnv>;

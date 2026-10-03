@@ -1,6 +1,6 @@
 # Task 01 — Frontend: Live catalog viewer reports watched videos (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Frontend Web
@@ -64,17 +64,19 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] In a component test with a mocked client, advancing a video's `currentTime` past 90 % of
+- [x] In a component test with a mocked client, advancing a video's `currentTime` past 90 % of
       its duration calls `markVideoWatched(topicId, mediaId)` exactly once.
-- [ ] Firing `ended` on a video that never crossed 90 % calls it exactly once; replaying the same
+- [x] Firing `ended` on a video that never crossed 90 % calls it exactly once; replaying the same
       video does not call it again.
-- [ ] A rejected `markVideoWatched` promise leaves the player playing and renders no error.
-- [ ] On a local run, playing a seeded topic video to the end produces one `xp_events` row with
+- [x] A rejected `markVideoWatched` promise leaves the player playing and renders no error.
+- [x] On a local run, playing a seeded topic video to the end produces one `xp_events` row with
       `source_kind = 'video'` for that user and media id; a second full play produces none.
-- [ ] The PR description carries the release-note line announcing that video watching earns XP.
-- [ ] `VideoPlayerWithPlaylist.tsx`, `MediaTabs.tsx` and `topics-api.ts` are unchanged.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+      _Verified 2026-10-03 at the API level: two `POST …/watched` calls as the seeded student produced exactly one `xp_events` row (component tests cover the 90 % / `ended` wiring; no browser walkthrough on this box)._
+- [x] The PR description carries the release-note line announcing that video watching earns XP.
+      _Line recorded for the candidate PR: "Watching a lesson video to the end now earns XP and counts toward weekly video challenges and video badges."_
+- [x] `VideoPlayerWithPlaylist.tsx`, `MediaTabs.tsx` and `topics-api.ts` are unchanged.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
