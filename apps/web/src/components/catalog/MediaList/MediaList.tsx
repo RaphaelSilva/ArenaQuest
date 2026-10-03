@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { Media } from '@web/lib/topics-api';
 import { useDict } from '@web/context/dict-context';
@@ -13,6 +13,8 @@ const PdfStage = dynamic(() => import('./PdfStage'), { ssr: false });
 type MediaListProps = {
   media: Media[];
   onVisitTopic?: () => void;
+  /** Called once per video per page view when it is watched (90 % or `ended`). */
+  onVideoWatched?: (mediaId: string) => void;
 };
 
 function getMediaTypeIcon(type: string): string {
@@ -39,9 +41,12 @@ function formatFileSize(bytes: number): string {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 }
 
-export function MediaList({ media, onVisitTopic }: MediaListProps) {
+export function MediaList({ media, onVisitTopic, onVideoWatched }: MediaListProps) {
   const dict = useDict();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Collapsing a row unmounts its VideoStage; this set keeps the report to
+  // once per video for the whole page view, not once per expansion.
+  const watchedIdsRef = useRef<Set<string>>(new Set());
 
   if (!media || media.length === 0) {
     return null;
@@ -62,6 +67,12 @@ export function MediaList({ media, onVisitTopic }: MediaListProps) {
 
   const handleInteraction = () => {
     onVisitTopic?.(); // Trigger progress on audio play / video scrub etc.
+  };
+
+  const handleVideoWatched = (mediaId: string) => {
+    if (watchedIdsRef.current.has(mediaId)) return;
+    watchedIdsRef.current.add(mediaId);
+    onVideoWatched?.(mediaId);
   };
 
   return (
@@ -140,7 +151,13 @@ export function MediaList({ media, onVisitTopic }: MediaListProps) {
               {/* Collapsible Player Stage */}
               {isExpanded && (
                 <div className="border-t p-4" style={{ borderColor: 'var(--aq-border)', background: 'var(--aq-bg3)' }}>
-                  {isVideo && <VideoStage url={m.url} onInteraction={handleInteraction} />}
+                  {isVideo && (
+                    <VideoStage
+                      url={m.url}
+                      onInteraction={handleInteraction}
+                      onWatched={() => handleVideoWatched(m.id)}
+                    />
+                  )}
                   {isAudio && <AudioStage url={m.url} onInteraction={handleInteraction} />}
                   {isPdf && (
                     <PdfStage
