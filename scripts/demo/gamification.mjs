@@ -23,6 +23,20 @@
  * Amounts are never literals here: topic XP from xp-config.ts, badge ids,
  * rewards and rules from migration 0021, quest targets from migration 0019.
  *
+ * Missions (RFC 0022, migration 0031) are written the way the admin API writes
+ * one (admin-missions.controller.ts, d1-mission-repository.ts), never as a
+ * legacy M7 predicate:
+ *   - missions.predicate_kind      `requirements` (REQUIREMENTS_PREDICATE_KIND),
+ *     predicate_params `{}`, mode / enrollment_mode from the dataset;
+ *   - one mission_requirements row per step: position = list order (1-based),
+ *     kind, title (trimmed), topic_node_id / event_id from the dataset keys,
+ *     params = the kind's params with the schema defaults applied
+ *     (normalizeRequirementParams, dataset.mjs), xp_reward (default 0).
+ * A requirement row's id is derived from `<missionKey>#<position>`, the same
+ * key as the table's UNIQUE (mission_id, position), so the id and the conflict
+ * target always agree (see sql.mjs). No enrollment or progress is seeded: the
+ * evaluator creates them when a demo student acts.
+ *
  * Fixed point: the badge engine runs on every login, so a student seeded with
  * a badge still due (e.g. 950 XP without `levantador-bronze`, min 500) would
  * be awarded it — and its XP — the moment they log in. The builder refuses
@@ -46,6 +60,7 @@ import { fileURLToPath } from 'node:url';
 
 // Functions only (hoisted), so the sql.mjs ↔ gamification.mjs import cycle is safe.
 import { sqlValue } from './sql.mjs';
+import { normalizeRequirementParams, readMissionVocabulary } from './dataset.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(dirname(HERE)); // repo root (scripts/demo/..)
@@ -59,6 +74,9 @@ export const SOURCE_KIND = Object.freeze({
   adminAdjustment: 'admin_adjustment',
 });
 
+/** `missions.predicate_kind` of a mission defined by requirements (requirements.ts, verified by the tests). */
+export const REQUIREMENTS_PREDICATE_KIND = 'requirements';
+
 const DAY_MS = 86_400_000;
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -66,8 +84,9 @@ const DAY_MS = 86_400_000;
 // ════════════════════════════════════════════════════════════════════════════
 
 /**
- * `{ topicCompleteXp, badges: { slug: { id, xpReward, ruleKind, ruleParams } }, quests: { id: { kind, target } } }`.
- * A quest's target is its `predicate_params.count`.
+ * `{ topicCompleteXp, badges: { slug: { id, xpReward, ruleKind, ruleParams } }, quests: { id: { kind, target } }, requirementLimits }`.
+ * A quest's target is its `predicate_params.count`; `requirementLimits` are the
+ * mission step limits of requirements.ts.
  */
 export function readGamificationReference(repoRoot = ROOT) {
   const read = (relPath) => readFileSync(join(repoRoot, relPath), 'utf8');
@@ -91,7 +110,8 @@ export function readGamificationReference(repoRoot = ROOT) {
   if (!Number.isFinite(topicCompleteXp)) throw new Error('gamification: could not read topic_complete XP from xp-config.ts');
   if (Object.keys(badges).length === 0) throw new Error('gamification: could not read the badges of migration 0021');
   if (Object.keys(quests).length === 0) throw new Error('gamification: could not read the quests of migration 0019');
-  return { topicCompleteXp, badges, quests };
+  const { requirementLimits } = readMissionVocabulary(read('packages/shared/domain/missions/requirements.ts'));
+  return { topicCompleteXp, badges, quests, requirementLimits };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -216,6 +236,7 @@ export function buildGamification(dataset, ctx) {
     user_streak: [],
     quest_progress: [],
     missions: [],
+    mission_requirements: [],
   };
   const totals = {};
   const adminId = ctx.id('user', 'admin');
@@ -325,17 +346,37 @@ export function buildGamification(dataset, ctx) {
   for (const mission of dataset.gamification.missions) {
     const badge = mission.badge == null ? null : reference.badges[mission.badge];
     if (mission.badge != null && !badge) throw new Error(`gamification: unknown badge "${mission.badge}"`);
+    const missionId = ctx.id('mission', mission.key);
     rows.missions.push({
-      id: ctx.id('mission', mission.key),
+      id: missionId,
       title: mission.title,
       description: mission.description ?? '',
       start_at: now.toISOString(),
       end_at: new Date(now.getTime() + mission.activeDays * DAY_MS).toISOString(),
-      predicate_kind: mission.predicateKind,
-      predicate_params: JSON.stringify(mission.params ?? {}),
+      predicate_kind: REQUIREMENTS_PREDICATE_KIND,
+      predicate_params: '{}',
       xp_reward: mission.xpReward,
       badge_id: badge?.id ?? null,
       active: 1,
+      mode: mission.mode,
+      enrollment_mode: mission.enrollmentMode,
+    });
+
+    (mission.requirements ?? []).forEach((step, index) => {
+      const position = index + 1;
+      const { params, problems } = normalizeRequirementParams(step.kind, step.params, reference.requirementLimits);
+      if (!params) throw new Error(`gamification: mission "${mission.key}" requirement "${step.key}": ${problems.join('; ')}`);
+      rows.mission_requirements.push({
+        id: ctx.id('mission-requirement', `${mission.key}#${position}`),
+        mission_id: missionId,
+        position,
+        kind: step.kind,
+        title: step.title.trim(),
+        topic_node_id: step.topic == null ? null : ctx.id('topic', step.topic),
+        event_id: step.event == null ? null : ctx.id('event', step.event),
+        params: JSON.stringify(params),
+        xp_reward: step.xpReward ?? 0,
+      });
     });
   }
 

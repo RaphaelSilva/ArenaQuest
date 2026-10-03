@@ -468,15 +468,34 @@
     "missions": [
       {
         "key": "first-topic",
-        "title": "Complete your first topic",
-        "description": "Finish any lesson within the next two weeks.",
-        "predicateKind": "complete_topic",
-        "params": {
-          "count": 1
-        },
+        "title": "Get started",
+        "description": "Open your first lesson and share one demonstration within the next two weeks.",
+        "mode": "parallel",
+        "enrollmentMode": "auto",
         "badge": "tecnica-afiada",
         "activeDays": 14,
-        "xpReward": 100
+        "xpReward": 100,
+        "requirements": [
+          {
+            "key": "visit",
+            "kind": "topic_visited",
+            "title": "Open your first lesson",
+            "topic": "root-1/module-1/lesson-1",
+            "params": {},
+            "xpReward": 20
+          },
+          {
+            "key": "demo",
+            "kind": "submissions_on_topic",
+            "title": "Share one demonstration",
+            "topic": "root-1/module-1/lesson-2",
+            "params": {
+              "minCount": 1,
+              "requireDescription": true
+            },
+            "xpReward": 50
+          }
+        ]
       }
     ]
   },

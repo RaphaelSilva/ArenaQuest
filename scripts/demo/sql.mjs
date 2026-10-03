@@ -315,9 +315,16 @@ export const mediaSection = {
 };
 
 /**
- * Progress, XP ledger, badges, streak, quest progress and the mission — see
- * gamification.mjs for the rows and why each table is keyed as it is. Needs
- * `ctx.now` and `ctx.gamification`.
+ * Progress, XP ledger, badges, streak, quest progress and the missions with
+ * their requirements — see gamification.mjs for the rows and why each table is
+ * keyed as it is. Needs `ctx.now` and `ctx.gamification`.
+ *
+ * A requirement is keyed by its UNIQUE (mission_id, position), its id
+ * insert-only: a step list the backoffice replaced on a demo mission (new
+ * random ids at the same positions) is converged in place rather than
+ * colliding with it, and the demo's own id is derived from the same position.
+ * No requirement targets an event here: events are written after this section,
+ * and dataset.mjs refuses an event_participation step (the demo prices no event).
  */
 export const gamificationSection = {
   name: 'gamification',
@@ -343,6 +350,9 @@ export const gamificationSection = {
         }),
       ),
       ...rows.missions.map((row) => upsert('missions', row, { touch: 'updated_at' })),
+      ...rows.mission_requirements.map((row) =>
+        upsert('mission_requirements', row, { key: ['mission_id', 'position'], insertOnly: ['id'], touch: 'updated_at' }),
+      ),
     ];
     const counts = Object.fromEntries(Object.entries(rows).map(([table, list]) => [table, list.length]));
     return { statements, counts };

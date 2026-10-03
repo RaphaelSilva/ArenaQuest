@@ -102,6 +102,7 @@ test('summary counts: 6 users, 6 roles, 1 group, 2 members, 21 topics, 2 tags, 2
     user_streak: 1,
     quest_progress: 1,
     missions: 1,
+    mission_requirements: 2,
     events: 3,
     event_audience_group: 1,
     billing_plans: 2,
