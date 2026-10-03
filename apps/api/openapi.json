@@ -2429,6 +2429,49 @@
         ],
         "type": "object"
       },
+      "DashboardMissionEntry": {
+        "properties": {
+          "enrollment": {
+            "$ref": "#/components/schemas/MissionEnrollmentView"
+          },
+          "joinable": {
+            "description": "`open` mission, inside its window, caller not enrolled",
+            "type": "boolean"
+          },
+          "locked": {
+            "$ref": "#/components/schemas/MissionLocked"
+          },
+          "mission": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Mission"
+              },
+              {
+                "description": "For a locked teaser only `id` and `title` are meaningful"
+              }
+            ]
+          },
+          "progress": {
+            "$ref": "#/components/schemas/MissionProgress"
+          },
+          "steps": {
+            "description": "Ordered steps; `[]` for a legacy mission or a teaser",
+            "items": {
+              "$ref": "#/components/schemas/MissionStepView"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "mission",
+          "progress",
+          "enrollment",
+          "joinable",
+          "locked",
+          "steps"
+        ],
+        "type": "object"
+      },
       "EditSubmissionBody": {
         "properties": {
           "description": {
@@ -3076,6 +3119,21 @@
         ],
         "type": "object"
       },
+      "MissionCheckResult": {
+        "properties": {
+          "mission": {
+            "$ref": "#/components/schemas/DashboardMissionEntry"
+          },
+          "step": {
+            "$ref": "#/components/schemas/MissionStepView"
+          }
+        },
+        "required": [
+          "step",
+          "mission"
+        ],
+        "type": "object"
+      },
       "MissionCreateBody": {
         "additionalProperties": false,
         "properties": {
@@ -3190,6 +3248,78 @@
         ],
         "type": "object"
       },
+      "MissionEnrollmentView": {
+        "properties": {
+          "implicit": {
+            "description": "Granted by the policy, no row written yet (reads never write)",
+            "type": "boolean"
+          },
+          "joinedAt": {
+            "description": "null for an implicit enrollment",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "enum": [
+              "auto",
+              "self",
+              "admin"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "joinedAt",
+          "implicit"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "MissionEventTarget": {
+        "properties": {
+          "slug": {
+            "description": "null when the event is not visible to the caller",
+            "example": "seminar-2026",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startsAt": {
+            "example": "2026-10-20T13:00:00.000Z",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "example": "Seminar",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "enum": [
+              "event"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "slug",
+          "title",
+          "startsAt"
+        ],
+        "type": "object"
+      },
       "MissionListItem": {
         "allOf": [
           {
@@ -3220,6 +3350,35 @@
             ],
             "type": "object"
           }
+        ]
+      },
+      "MissionLocked": {
+        "description": "Teaser of an `assigned` mission the caller is not in",
+        "properties": {
+          "groups": {
+            "description": "Names of the mission's audience groups",
+            "example": [
+              "Black belts"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "enum": [
+              "assigned"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "groups"
+        ],
+        "type": [
+          "object",
+          "null"
         ]
       },
       "MissionParticipant": {
@@ -3446,6 +3605,53 @@
           }
         },
         "type": "object"
+      },
+      "MissionProgress": {
+        "properties": {
+          "completed": {
+            "type": "boolean"
+          },
+          "completedAt": {
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currentValue": {
+            "description": "Completed steps (or the legacy single counter)",
+            "example": 1,
+            "type": "integer"
+          },
+          "missionId": {
+            "type": "string"
+          },
+          "targetValue": {
+            "description": "Step count (or the legacy target)",
+            "example": 3,
+            "type": "integer"
+          },
+          "updatedAt": {
+            "example": "2026-10-02T12:00:00.000Z",
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "missionId",
+          "currentValue",
+          "targetValue",
+          "completed",
+          "completedAt",
+          "updatedAt"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
       },
       "MissionRequirement": {
         "properties": {
@@ -3826,6 +4032,133 @@
         "required": [
           "error",
           "fields"
+        ],
+        "type": "object"
+      },
+      "MissionStepView": {
+        "properties": {
+          "completedAt": {
+            "description": "Evidence instant of the target-th item",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "current": {
+            "example": 1,
+            "type": "integer"
+          },
+          "id": {
+            "description": "Requirement id",
+            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+            "type": "string"
+          },
+          "instructions": {
+            "description": "`manual_check` only",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "submissions_on_topic",
+              "topic_visited",
+              "video_watched",
+              "manual_check",
+              "event_participation"
+            ],
+            "example": "submissions_on_topic",
+            "type": "string"
+          },
+          "position": {
+            "example": 1,
+            "type": "integer"
+          },
+          "required": {
+            "example": 3,
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "locked",
+              "open",
+              "completed"
+            ],
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MissionTopicTarget"
+              },
+              {
+                "$ref": "#/components/schemas/MissionEventTarget"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A topic or event the caller cannot open is redacted (no id, title or slug); null for `manual_check`"
+          },
+          "title": {
+            "example": "Three demonstrations",
+            "type": "string"
+          },
+          "xpReward": {
+            "example": 50,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "kind",
+          "title",
+          "xpReward",
+          "target",
+          "instructions",
+          "current",
+          "required",
+          "state",
+          "completedAt"
+        ],
+        "type": "object"
+      },
+      "MissionTopicTarget": {
+        "properties": {
+          "accessible": {
+            "type": "boolean"
+          },
+          "title": {
+            "example": "Kihon",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "topicId": {
+            "description": "null when the topic is outside the caller's access",
+            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "enum": [
+              "topic"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "topicId",
+          "title",
+          "accessible"
         ],
         "type": "object"
       },
@@ -15951,7 +16284,15 @@
                 "schema": {
                   "properties": {
                     "badges": {},
-                    "missions": {},
+                    "missions": {
+                      "items": {
+                        "$ref": "#/components/schemas/DashboardMissionEntry"
+                      },
+                      "type": [
+                        "array",
+                        "null"
+                      ]
+                    },
                     "questsDaily": {
                       "items": {},
                       "type": "array"
@@ -15965,7 +16306,8 @@
                   },
                   "required": [
                     "questsDaily",
-                    "questsWeekly"
+                    "questsWeekly",
+                    "missions"
                   ],
                   "type": "object"
                 }
@@ -15987,13 +16329,15 @@
     },
     "/v1/me/missions": {
       "get": {
-        "description": "Retrieves the active missions and current progress for the authenticated user.",
+        "description": "Active missions for the authenticated user: those they are enrolled in (an `auto` mission whose gate they pass shows an implicit enrollment, computed read-only), joinable `open` missions, and locked teasers of `assigned` missions they are not in (title and audience group names only, `steps: []`). An `auto` mission targeting a topic outside the caller's access is absent, and staff are never implicitly enrolled. Never writes.",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {},
+                  "items": {
+                    "$ref": "#/components/schemas/DashboardMissionEntry"
+                  },
                   "type": [
                     "array",
                     "null"
@@ -16012,6 +16356,312 @@
         "summary": "Get Missions",
         "tags": [
           "me:gamification"
+        ]
+      }
+    },
+    "/v1/me/missions/{id}": {
+      "get": {
+        "description": "One active mission with its steps (the mission page), as `GET /me/missions` lists it. A locked teaser, a gated-out `auto` mission and a mission outside its window answer `404`. Never writes.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardMissionEntry"
+                }
+              }
+            },
+            "description": "The mission entry"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`NotFound` — no such mission or step, or the caller cannot see it"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get one of my missions",
+        "tags": [
+          "me:missions"
+        ]
+      }
+    },
+    "/v1/me/missions/{id}/join": {
+      "post": {
+        "description": "Enrolls the caller (`source = self`) in an `open` mission inside its window; evidence counts from the join. A rejoin after Leave keeps the first `countsFrom`.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardMissionEntry"
+                }
+              }
+            },
+            "description": "Already joined: the current entry"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardMissionEntry"
+                }
+              }
+            },
+            "description": "Joined: the new entry"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`NotFound` — no such mission or step, or the caller cannot see it"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`MISSION_NOT_JOINABLE` (not an `open` mission) or `MISSION_CLOSED` (outside its window)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Join an open mission",
+        "tags": [
+          "me:missions"
+        ]
+      }
+    },
+    "/v1/me/missions/{id}/leave": {
+      "post": {
+        "description": "Leaves a `self` enrollment: completed steps and rewards stay, and a later Join keeps the original `countsFrom`.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Left"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`NotFound` — no such mission or step, or the caller cannot see it"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`MISSION_NOT_LEAVABLE` — the enrollment is not `self` (implicit or by audience)"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Leave a mission",
+        "tags": [
+          "me:missions"
+        ]
+      }
+    },
+    "/v1/me/missions/{id}/requirements/{reqId}/check": {
+      "post": {
+        "description": "Marks a `manual_check` step as done and evaluates the mission in the same request, so the step completes, earns its XP and records streak activity. A second tick changes nothing and answers the current step.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reqId",
+            "required": true,
+            "schema": {
+              "example": "b1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionCheckResult"
+                }
+              }
+            },
+            "description": "The step and its mission entry"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`NotFound` — no such mission or step, or the caller cannot see it"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`MISSION_STEP_LOCKED` (a sequential predecessor is incomplete) or `MISSION_CLOSED` (outside the window)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`MISSION_EVALUATOR_UNAVAILABLE`"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Tick a manual-check step",
+        "tags": [
+          "me:missions"
         ]
       }
     },

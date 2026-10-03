@@ -699,3 +699,72 @@ export const MissionParticipantPageSchema = z.object({
   data: z.array(MissionParticipantSchema),
   nextCursor: nextCursorField,
 }).openapi('MissionParticipantPage');
+
+// ---------------------------------------------------------------------------
+// Student missions (RFC 0022 §5, §6, §8)
+// ---------------------------------------------------------------------------
+
+export const MissionProgressSchema = z.object({
+  userId: z.string(),
+  missionId: z.string(),
+  currentValue: z.number().int().openapi({ description: 'Completed steps (or the legacy single counter)', example: 1 }),
+  targetValue: z.number().int().openapi({ description: 'Step count (or the legacy target)', example: 3 }),
+  completed: z.boolean(),
+  completedAt: z.string().nullable().openapi({ example: null }),
+  updatedAt: z.string().openapi({ example: '2026-10-02T12:00:00.000Z' }),
+}).openapi('MissionProgress');
+
+const MissionTopicTargetSchema = z.object({
+  type: z.literal('topic'),
+  topicId: z.string().nullable().openapi({ description: "null when the topic is outside the caller's access", example: uuidExample }),
+  title: z.string().nullable().openapi({ example: 'Kihon' }),
+  accessible: z.boolean(),
+}).openapi('MissionTopicTarget');
+
+const MissionEventTargetSchema = z.object({
+  type: z.literal('event'),
+  slug: z.string().nullable().openapi({ description: 'null when the event is not visible to the caller', example: 'seminar-2026' }),
+  title: z.string().nullable().openapi({ example: 'Seminar' }),
+  startsAt: z.string().nullable().openapi({ example: '2026-10-20T13:00:00.000Z' }),
+}).openapi('MissionEventTarget');
+
+export const MissionStepViewSchema = z.object({
+  id: z.string().openapi({ description: 'Requirement id', example: uuidExample }),
+  position: z.number().int().openapi({ example: 1 }),
+  kind: z.enum(REQUIREMENT_KINDS).openapi({ example: 'submissions_on_topic' }),
+  title: z.string().openapi({ example: 'Three demonstrations' }),
+  xpReward: z.number().int().openapi({ example: 50 }),
+  target: z.union([MissionTopicTargetSchema, MissionEventTargetSchema]).nullable().openapi({
+    description: 'A topic or event the caller cannot open is redacted (no id, title or slug); null for `manual_check`',
+  }),
+  instructions: z.string().nullable().openapi({ description: '`manual_check` only', example: null }),
+  current: z.number().int().openapi({ example: 1 }),
+  required: z.number().int().openapi({ example: 3 }),
+  state: z.enum(['locked', 'open', 'completed']),
+  completedAt: z.string().nullable().openapi({ description: 'Evidence instant of the target-th item', example: null }),
+}).openapi('MissionStepView');
+
+export const MissionEnrollmentViewSchema = z.object({
+  source: z.enum(['auto', 'self', 'admin']),
+  joinedAt: z.string().nullable().openapi({ description: 'null for an implicit enrollment', example: null }),
+  implicit: z.boolean().openapi({ description: 'Granted by the policy, no row written yet (reads never write)' }),
+}).openapi('MissionEnrollmentView');
+
+export const MissionLockedSchema = z.object({
+  reason: z.literal('assigned'),
+  groups: z.array(z.string()).openapi({ description: "Names of the mission's audience groups", example: ['Black belts'] }),
+}).openapi('MissionLocked');
+
+export const DashboardMissionEntrySchema = z.object({
+  mission: MissionSchema.openapi({ description: 'For a locked teaser only `id` and `title` are meaningful' }),
+  progress: MissionProgressSchema.nullable(),
+  enrollment: MissionEnrollmentViewSchema.nullable(),
+  joinable: z.boolean().openapi({ description: '`open` mission, inside its window, caller not enrolled' }),
+  locked: MissionLockedSchema.nullable().openapi({ description: 'Teaser of an `assigned` mission the caller is not in' }),
+  steps: z.array(MissionStepViewSchema).openapi({ description: 'Ordered steps; `[]` for a legacy mission or a teaser' }),
+}).openapi('DashboardMissionEntry');
+
+export const MissionCheckResultSchema = z.object({
+  step: MissionStepViewSchema,
+  mission: DashboardMissionEntrySchema,
+}).openapi('MissionCheckResult');
