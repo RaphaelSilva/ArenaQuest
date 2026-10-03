@@ -3,7 +3,7 @@
 **Status:** 📝 Draft
 **Scope:** `scripts/backup/` + `.github/workflows/backup.yml` + the label profile and provisioner (off-database backups of D1 and R2, restore drill, backup status), `apps/api` (`job_runs` recording, admin ops health and job-run routes, admin-only topic publish gate), `apps/web` (topic publish controls follow the gate), `scripts/lib/` + `scripts/mcp/` (shared API client, the local `aq-mcp` MCP server), `.claude/skills/ops-runbook/` and `docs/operations/`. Derived from [RFC 0023](../../RFCs/0023-ai-admin-assistant.md).
 
-> **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: the new `scripts/backup/**`, `scripts/lib/**`, `scripts/mcp/**` and `.github/workflows/backup.yml`; `scripts/content/import-media.mjs` and `scripts/media/convert-skipped.mjs` **only** to import what moves to `scripts/lib/` (behaviour and CLI unchanged, their existing tests green and unedited except for import paths); `scripts/cloudflare/provision-label.mjs` for the backup bucket and a read-only `--check` mode; the `backup` block in `config/labels/*.jsonc` and the profile schema that validates it; one new migration `apps/api/migrations/00NN_create_job_runs.sql` (next free number at implementation time — `0031` is claimed by M27); `apps/api/src/index.ts` (`scheduled()` recording), `apps/api/src/core/billing/billing-service.ts` (return counts only), `apps/api/src/jobs/**`, the new `apps/api/src/routes/admin/ops.ts`, `apps/api/src/controllers/admin-ops.controller.ts`, a `D1JobRunRepository` with its port in `packages/shared/ports/`, the wiring lines in `routes/admin/index.ts` and `container.ts`, the publish gate in `apps/api/src/routes/admin/topics.ts`, `apps/api/test/**`, the regenerated `apps/api/openapi.json` and `apps/web/src/lib/api-types.gen.ts`; the topic publish controls under `apps/web/src/app/(protected)/admin/topics/**` and `apps/web/src/components/admin/topics/**` with both i18n dictionaries; the root `package.json`/lockfile for `@modelcontextprotocol/sdk` only; the new `.claude/skills/ops-runbook/**`, `docs/operations/backup-restore.md`, the `aq-mcp` section of `docs/onboarding.md`, a CLAUDE.md paragraph per new surface; and, for the closeout, RFC 0023's `Status:` header and its README row. It is explicitly **not** an opportunity to: build a **remote MCP server** in the Worker or any OAuth flow (RFC Alternative 1); let the assistant **publish, archive, delete or move** topics; write to D1 through **SQL** from any tool; let any tool **restore, reset or deploy** — tier 3 only prints the command; back up **staging** or **KV**, or store **secret values** anywhere; add **multi-operator** access or a new role; change the public, anonymous **`/health`**; touch **`topic_notes` bodies** or **submission files** from any tool. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
+> **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: the new `scripts/backup/**`, `scripts/lib/**`, `scripts/mcp/**` and `.github/workflows/backup.yml`; `scripts/content/import-media.mjs` and `scripts/media/convert-skipped.mjs` **only** to import what moves to `scripts/lib/` (behaviour and CLI unchanged, their existing tests green and unedited except for import paths); `scripts/cloudflare/provision-label.mjs` for the backup bucket and a read-only `--check` mode; the `backup` block in `config/labels/*.jsonc` and the profile schema that validates it; one new migration `apps/api/migrations/00NN_create_job_runs.sql` (next free number at implementation time — `0031` is claimed by M27); `apps/api/src/index.ts` (`scheduled()` recording), `apps/api/src/core/billing/billing-service.ts` (return counts only), `apps/api/src/jobs/**`, the new `apps/api/src/routes/admin/ops.ts`, `apps/api/src/controllers/admin-ops.controller.ts`, a `D1JobRunRepository` with its port in `packages/shared/ports/`, the wiring lines in `routes/admin/index.ts` and `container.ts`, the publish gate in `apps/api/src/routes/admin/topics.ts`, `apps/api/test/**`, the regenerated `apps/api/openapi.json` and `apps/web/src/lib/api-types.gen.ts`; the topic publish controls under `apps/web/src/app/(protected)/admin/topics/**` and `apps/web/src/components/admin/topics/**` with both i18n dictionaries; the root `package.json`/lockfile for `@modelcontextprotocol/sdk` only; the new `.claude/skills/ops-runbook/**`, `docs/operations/backup-restore.md`, the `aq-mcp` section of `docs/onboarding.md`, a CLAUDE.md paragraph per new surface; the `Makefile` for new `backup-*-prod`, `backup-status-prod` and `infra-check-<env>` targets only; `.gitignore` only for `.arenaquest/` if not yet ignored; and, for the closeout, RFC 0023's `Status:` header and its README row. It is explicitly **not** an opportunity to: build a **remote MCP server** in the Worker or any OAuth flow (RFC Alternative 1); let the assistant **publish, archive, delete or move** topics; write to D1 through **SQL** from any tool; let any tool **restore, reset or deploy** — tier 3 only prints the command; back up **staging** or **KV**, or store **secret values** anywhere; add **multi-operator** access or a new role; change the public, anonymous **`/health`**; touch **`topic_notes` bodies** or **submission files** from any tool. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
 
 ---
 
@@ -97,36 +97,45 @@ Out of scope (explicit, from RFC 0023 Non-Goals):
 
 ## 5. Task Breakdown
 
-The execution plan. Each row is a `.task.md` file authored separately with
-`write-tasks` — split backend and frontend into distinct tasks (frontend gets
-the `--frontend` suffix and depends on its backend task). Fill the table once
-the task files exist; keep the dependency graph and recommended order in sync.
+Each row is one independent PR. Backend and frontend are separate files; every
+script/CI task is filed under **Backend** (the only non-web team).
 
 | # | Task File | Phase | Team | Status |
 |---|-----------|-------|------|--------|
-| 01 | [<title>](./01-<slug>.task.md) | 0 | Backend | ☐ Open |
+| 01 | [Backup bucket in the label profile and provisioner check mode](./01-backup-bucket-and-provision-check.task.md) | 0 | Backend | ☐ Open |
+| 02 | [D1 export and backup manifest](./02-d1-export-and-manifest.task.md) | 0 | Backend | ☐ Open |
+| 03 | [R2 media mirror](./03-r2-media-mirror.task.md) | 0 | Backend | ☐ Open |
+| 04 | [Backup workflow, restore drill and restore runbook](./04-backup-workflow-drill-and-runbook.task.md) | 0 | Backend | ☐ Open |
+| 05 | [Record scheduled and manual job runs](./05-job-runs-recording.task.md) | 1 | Backend | ☐ Open |
+| 06 | [Admin ops health and job-runs API](./06-admin-ops-health-api.task.md) | 1 | Backend | ☐ Open |
+| 07 | [Admin-only topic publish gate](./07-topic-publish-gate.task.md) | 2 | Backend | ☐ Open |
+| 08 | [Topic publish controls follow the role](./08-topic-publish-controls.task.md) | 2 | Frontend | ☐ Open |
+| 09 | [Shared script library for the API client and media conversion](./09-shared-script-library.task.md) | 3 | Backend | ☐ Open |
+| 10 | [aq-mcp server with draft authoring tools](./10-aq-mcp-authoring-tools.task.md) | 3 | Backend | ☐ Open |
+| 11 | [Backup status report](./11-backup-status-report.task.md) | 4 | Backend | ☐ Open |
+| 12 | [aq-mcp ops tools in three tiers](./12-aq-mcp-ops-tools.task.md) | 4 | Backend | ☐ Open |
+| 13 | [ops-runbook skill and read-only token procedure](./13-ops-runbook-skill.task.md) | 4 | Backend | ☐ Open |
 
-Planned slices for `write-tasks` (from RFC 0023 §Implementation Plan):
-
-- **Phase 0 — Backups:** backup bucket in profile + provisioner and `--check`; D1 export + manifest; R2 mirror; `backup.yml` + weekly drill; restore runbook.
-- **Phase 1 — Observability:** `job_runs` migration, port, repository and recording in `scheduled()` and the manual billing route; `/v1/admin/ops/health` and `/job-runs`.
-- **Phase 2 — Publish gate:** API gate (backend); publish controls follow the role (`--frontend`).
-- **Phase 3 — Authoring MCP:** extract `scripts/lib/api-client.mjs` and `scripts/lib/convert.mjs`; `aq-mcp` authoring tools, annotations and audit log; onboarding section.
-- **Phase 4 — Ops tools:** `status.mjs`; tier 1–3 tools in `aq-mcp`; `ops-runbook` skill; read-only token procedure.
-
-Dependency graph (by phase):
+Dependency graph (an arrow means "must land before"):
 
 ```
-Phase 0 (backups) ──────────────► Phase 4 (backup_status, tiers)
-Phase 1 (job_runs, ops health) ─► Phase 4 (system_health, job_runs tools)
-Phase 2 (gate API) ─► Phase 2 (gate web)
-Phase 2 (gate API) ─► Phase 3 (aq-mcp authoring) ─► Phase 4
+Phase 0   01 ──► 02 ──┐
+          01 ──► 03 ──┴──► 04 ──► 11 ──┐
+Phase 1   05 ──► 06 ───────────────────┤
+Phase 2   07 ──► 08                    ├──► 12 ──► 13
+Phase 3   07, 09 ──► 10 ───────────────┤
+          01 (--check) ────────────────┘
+          05 (job_runs) ─────────────────────────► 13
 ```
 
-**Recommended execution order:** Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4. Phases 0, 1 and 2 are independent and may run in parallel.
+**Recommended execution order:** `01` → `02` → `03` → `04` → `05` → `06` → `07` → `08` → `09` →
+`10` → `11` → `12` → `13`. Three independent starts — `01` (backups), `05` (observability),
+`07`/`09` (publish gate, script library) — may run in parallel; `07` waits on the owner's
+confirmation of Decision 6.
 
 Each task is intended to land as an independent PR with `make lint`,
-`make test-api`, and `make test-web` passing.
+`make test-api`, and `make test-web` passing (and `node --test` for the
+script suites it touches).
 
 ---
 
