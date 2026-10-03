@@ -124,7 +124,7 @@ tasks.
 |---|-----------|-------|------|--------|
 | 01 | [Live catalog viewer reports watched videos](./01-video-watched-wiring-frontend.task.md) | 0 | Frontend | ✅ Done |
 | 02 | [Mission contracts — requirement kinds, params, entities, ports](./02-mission-contracts.task.md) | 1 | Backend | ✅ Done |
-| 03 | [Mission evaluator — windowing, sequential unlock, write-once rewards, streak](./03-mission-evaluator-domain.task.md) | 1 | Backend | ☐ Open |
+| 03 | [Mission evaluator — windowing, sequential unlock, write-once rewards, streak](./03-mission-evaluator-domain.task.md) | 1 | Backend | ✅ Done |
 | 04 | [Migration 0031 and D1 adapters with per-kind counting](./04-schema-and-d1-adapters.task.md) | 2 | Backend | ☐ Open |
 | 05 | [Admin missions API — admin-only writes, typed requirements, start lock, audience, participants](./05-admin-missions-api.task.md) | 3 | Backend | ☐ Open |
 | 06 | [Mission hooks at the evidence write sites](./06-mission-hooks.task.md) | 4 | Backend | ☐ Open |
