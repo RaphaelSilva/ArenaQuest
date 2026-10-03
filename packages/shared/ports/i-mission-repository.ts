@@ -43,6 +43,11 @@ export interface IMissionRepository {
   /** Replaces every requirement of the mission atomically; positions follow the array order. */
   replaceRequirements(missionId: string, requirements: RequirementInput[]): Promise<MissionRequirement[]>;
   /**
+   * Renames one requirement in place, keeping its id (and so its progress rows).
+   * Null when `requirementId` is not a requirement of `missionId`.
+   */
+  updateRequirementTitle(missionId: string, requirementId: string, title: string): Promise<MissionRequirement | null>;
+  /**
    * Requirements of `target.kind` on `target.topicId` / `target.eventId`, restricted to
    * active missions whose window contains `nowIso`.
    */

@@ -2953,6 +2953,882 @@
         ],
         "type": "object"
       },
+      "Mission": {
+        "properties": {
+          "active": {
+            "example": true,
+            "type": "boolean"
+          },
+          "badgeId": {
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "example": "2026-10-01T12:00:00.000Z",
+            "type": "string"
+          },
+          "description": {
+            "example": "Three demonstrations, then the seminar.",
+            "type": "string"
+          },
+          "endAt": {
+            "example": "2026-10-31T23:59:59.000Z",
+            "type": "string"
+          },
+          "enrollmentMode": {
+            "description": "Who takes part: implicit (`auto`), by Join (`open`) or by audience (`assigned`)",
+            "enum": [
+              "auto",
+              "open",
+              "assigned"
+            ],
+            "example": "auto",
+            "type": "string"
+          },
+          "id": {
+            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+            "format": "uuid",
+            "type": "string"
+          },
+          "mode": {
+            "description": "`parallel`: every step open at once; `sequential`: step N opens when N-1 completes",
+            "enum": [
+              "parallel",
+              "sequential"
+            ],
+            "example": "sequential",
+            "type": "string"
+          },
+          "predicateKind": {
+            "deprecated": true,
+            "description": "Legacy M7 predicate; `requirements` for every mission defined by requirements",
+            "example": "requirements",
+            "type": "string"
+          },
+          "predicateParams": {
+            "deprecated": true,
+            "description": "Legacy M7 predicate params; `{}` for every mission defined by requirements",
+            "example": "{}",
+            "type": "string"
+          },
+          "startAt": {
+            "example": "2026-10-01T12:00:00.000Z",
+            "type": "string"
+          },
+          "title": {
+            "example": "Kihon month",
+            "type": "string"
+          },
+          "updatedAt": {
+            "example": "2026-10-01T13:00:00.000Z",
+            "type": "string"
+          },
+          "xpReward": {
+            "example": 500,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "startAt",
+          "endAt",
+          "predicateKind",
+          "predicateParams",
+          "xpReward",
+          "badgeId",
+          "active",
+          "mode",
+          "enrollmentMode",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "MissionAudience": {
+        "properties": {
+          "groupIds": {
+            "example": [
+              "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+            ],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "userIds": {
+            "example": [],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "groupIds",
+          "userIds"
+        ],
+        "type": "object"
+      },
+      "MissionCreateBody": {
+        "additionalProperties": false,
+        "properties": {
+          "audience": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MissionAudience"
+              },
+              {
+                "description": "Only with `enrollmentMode = 'assigned'`"
+              }
+            ]
+          },
+          "badgeId": {
+            "default": null,
+            "example": null,
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "example": "Three demonstrations, then the seminar.",
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "endAt": {
+            "description": "Must be after `startAt`",
+            "example": "2026-10-31T23:59:59.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "enrollmentMode": {
+            "default": "auto",
+            "description": "Who takes part: implicit (`auto`), by Join (`open`) or by audience (`assigned`)",
+            "enum": [
+              "auto",
+              "open",
+              "assigned"
+            ],
+            "example": "auto",
+            "type": "string"
+          },
+          "mode": {
+            "default": "parallel",
+            "description": "`parallel`: every step open at once; `sequential`: step N opens when N-1 completes",
+            "enum": [
+              "parallel",
+              "sequential"
+            ],
+            "example": "sequential",
+            "type": "string"
+          },
+          "requirements": {
+            "description": "1..20 steps; positions follow the array order",
+            "items": {
+              "$ref": "#/components/schemas/MissionRequirementInput"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": "array"
+          },
+          "startAt": {
+            "example": "2026-10-01T12:00:00.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "title": {
+            "example": "Kihon month",
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "xpReward": {
+            "default": 0,
+            "example": 500,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "startAt",
+          "endAt",
+          "requirements"
+        ],
+        "type": "object"
+      },
+      "MissionDetail": {
+        "properties": {
+          "audience": {
+            "$ref": "#/components/schemas/MissionAudience"
+          },
+          "mission": {
+            "$ref": "#/components/schemas/Mission"
+          },
+          "requirements": {
+            "description": "Ordered by position",
+            "items": {
+              "$ref": "#/components/schemas/MissionRequirement"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "mission",
+          "requirements",
+          "audience"
+        ],
+        "type": "object"
+      },
+      "MissionListItem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Mission"
+          },
+          {
+            "properties": {
+              "completedCount": {
+                "description": "Enrolled users whose mission progress is completed",
+                "example": 3,
+                "type": "integer"
+              },
+              "enrolledCount": {
+                "description": "Active enrollments",
+                "example": 12,
+                "type": "integer"
+              },
+              "requirementCount": {
+                "description": "Steps of the mission (0 for a legacy mission)",
+                "example": 2,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "requirementCount",
+              "enrolledCount",
+              "completedCount"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "MissionParticipant": {
+        "properties": {
+          "countsFrom": {
+            "example": "2026-10-01T12:00:00.000Z",
+            "type": "string"
+          },
+          "email": {
+            "example": "student@example.com",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "joinedAt": {
+            "example": "2026-10-01 12:00:00",
+            "type": "string"
+          },
+          "leftAt": {
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "example": "Student A",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "progress": {
+            "properties": {
+              "completed": {
+                "type": "boolean"
+              },
+              "completedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "currentValue": {
+                "description": "Completed steps",
+                "type": "integer"
+              },
+              "targetValue": {
+                "description": "Step count",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "currentValue",
+              "targetValue",
+              "completed",
+              "completedAt"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "source": {
+            "enum": [
+              "auto",
+              "self",
+              "admin"
+            ],
+            "type": "string"
+          },
+          "steps": {
+            "description": "Evaluated steps, in position order",
+            "items": {
+              "$ref": "#/components/schemas/MissionParticipantStep"
+            },
+            "type": "array"
+          },
+          "userId": {
+            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "name",
+          "email",
+          "source",
+          "joinedAt",
+          "countsFrom",
+          "leftAt",
+          "progress",
+          "steps"
+        ],
+        "type": "object"
+      },
+      "MissionParticipantPage": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/MissionParticipant"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "description": "Opaque cursor of the next page; null on the last page",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "MissionParticipantStep": {
+        "properties": {
+          "checkedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completedAt": {
+            "description": "Evidence instant of the target-th item",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completedBy": {
+            "enum": [
+              "hook",
+              "reconcile"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currentCount": {
+            "type": "integer"
+          },
+          "requirementId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "targetCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requirementId",
+          "currentCount",
+          "targetCount",
+          "checkedAt",
+          "completedAt",
+          "completedBy"
+        ],
+        "type": "object"
+      },
+      "MissionPatchBody": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "badgeId": {
+            "description": "Locked once the mission started",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "endAt": {
+            "description": "Once started, may only be extended",
+            "format": "date-time",
+            "type": "string"
+          },
+          "enrollmentMode": {
+            "description": "Locked once the mission started",
+            "enum": [
+              "auto",
+              "open",
+              "assigned"
+            ],
+            "example": "auto",
+            "type": "string"
+          },
+          "mode": {
+            "description": "Locked once the mission started",
+            "enum": [
+              "parallel",
+              "sequential"
+            ],
+            "example": "sequential",
+            "type": "string"
+          },
+          "startAt": {
+            "description": "Locked once the mission started",
+            "format": "date-time",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "xpReward": {
+            "description": "Locked once the mission started",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "MissionRequirement": {
+        "properties": {
+          "createdAt": {
+            "example": "2026-10-01 12:00:00",
+            "type": "string"
+          },
+          "eventId": {
+            "description": "Target of `event_participation`; null otherwise",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "submissions_on_topic",
+              "topic_visited",
+              "video_watched",
+              "manual_check",
+              "event_participation"
+            ],
+            "example": "submissions_on_topic",
+            "type": "string"
+          },
+          "missionId": {
+            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+            "format": "uuid",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {},
+            "description": "The kind's params, defaults applied",
+            "example": {
+              "countModerated": false,
+              "minCount": 3,
+              "requireDescription": false,
+              "visibility": "any"
+            },
+            "type": "object"
+          },
+          "position": {
+            "description": "1-based order inside the mission",
+            "example": 1,
+            "type": "integer"
+          },
+          "title": {
+            "example": "Three demonstrations",
+            "type": "string"
+          },
+          "topicId": {
+            "description": "Target of the three topic kinds; null otherwise",
+            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "example": "2026-10-01 12:00:00",
+            "type": "string"
+          },
+          "xpReward": {
+            "example": 50,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "missionId",
+          "position",
+          "kind",
+          "title",
+          "topicId",
+          "eventId",
+          "params",
+          "xpReward",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "MissionRequirementError": {
+        "properties": {
+          "error": {
+            "enum": [
+              "ValidationError",
+              "INVALID_REQUIREMENT_TARGET",
+              "EVENT_NOT_CHARGEABLE",
+              "REQUIREMENT_SHARING_DISABLED"
+            ],
+            "type": "string"
+          },
+          "field": {
+            "description": "Schema errors: the path inside the item",
+            "example": "params.minCount",
+            "type": "string"
+          },
+          "index": {
+            "description": "Index of the offending item in `requirements`",
+            "type": "integer"
+          },
+          "reason": {
+            "description": "TOPIC_NOT_FOUND · TOPIC_NOT_PUBLISHED · TOPIC_ARCHIVED · TOPIC_HAS_NO_VIDEO · EVENT_NOT_FOUND · EVENT_NOT_PUBLISHED · EVENT_NOT_CHARGEABLE · REQUIREMENT_SHARING_DISABLED, or a schema reason (UNKNOWN_KIND, UNRECOGNIZED_KEYS, TOO_SMALL, …)",
+            "example": "TOPIC_ARCHIVED",
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "MissionRequirementInput": {
+        "description": "One step, discriminated on `kind`; every object is strict (unknown keys are refused)",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "submissions_on_topic"
+                ],
+                "type": "string"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "countModerated": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "minCount": {
+                    "maximum": 50,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "requireDescription": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "visibility": {
+                    "default": "any",
+                    "enum": [
+                      "any",
+                      "shared_only"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "minCount"
+                ],
+                "type": "object"
+              },
+              "title": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "topicId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "xpReward": {
+                "default": 0,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "title",
+              "kind",
+              "topicId",
+              "params"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "topic_visited"
+                ],
+                "type": "string"
+              },
+              "params": {
+                "additionalProperties": false,
+                "default": {},
+                "properties": {},
+                "type": "object"
+              },
+              "title": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "topicId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "xpReward": {
+                "default": 0,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "title",
+              "kind",
+              "topicId"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "video_watched"
+                ],
+                "type": "string"
+              },
+              "params": {
+                "additionalProperties": false,
+                "properties": {
+                  "minCount": {
+                    "maximum": 50,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minCount"
+                ],
+                "type": "object"
+              },
+              "title": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "topicId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "xpReward": {
+                "default": 0,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "title",
+              "kind",
+              "topicId",
+              "params"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "manual_check"
+                ],
+                "type": "string"
+              },
+              "params": {
+                "additionalProperties": false,
+                "default": {},
+                "properties": {
+                  "instructions": {
+                    "default": "",
+                    "maxLength": 500,
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "title": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "xpReward": {
+                "default": 0,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "title",
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "eventId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "event_participation"
+                ],
+                "type": "string"
+              },
+              "params": {
+                "additionalProperties": false,
+                "default": {},
+                "properties": {},
+                "type": "object"
+              },
+              "title": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "xpReward": {
+                "default": 0,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "title",
+              "kind",
+              "eventId"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "MissionRequirementTitleBody": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "example": "Three demonstrations",
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
+      "MissionStartedError": {
+        "properties": {
+          "error": {
+            "enum": [
+              "MISSION_STARTED"
+            ],
+            "type": "string"
+          },
+          "fields": {
+            "example": [
+              "mode"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "error",
+          "fields"
+        ],
+        "type": "object"
+      },
       "MoveSubmissionsBody": {
         "properties": {
           "ids": {
@@ -3427,6 +4303,24 @@
           "type": "object"
         },
         "type": "array"
+      },
+      "ReplaceMissionRequirementsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "requirements": {
+            "description": "1..20 steps; positions follow the array order",
+            "items": {
+              "$ref": "#/components/schemas/MissionRequirementInput"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "requirements"
+        ],
+        "type": "object"
       },
       "ResetPasswordRequest": {
         "properties": {
@@ -8372,7 +9266,7 @@
     },
     "/v1/admin/missions": {
       "get": {
-        "description": "Retrieve a list of all gamification missions.",
+        "description": "Every mission, legacy rows included, with requirement, enrolled and completed counts.",
         "responses": {
           "200": {
             "content": {
@@ -8381,76 +9275,7 @@
                   "properties": {
                     "data": {
                       "items": {
-                        "properties": {
-                          "active": {
-                            "example": true,
-                            "type": "boolean"
-                          },
-                          "badgeId": {
-                            "example": null,
-                            "format": "uuid",
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "createdAt": {
-                            "example": "2023-01-01T12:00:00Z",
-                            "type": "string"
-                          },
-                          "description": {
-                            "example": "Complete 3 topics.",
-                            "type": "string"
-                          },
-                          "endAt": {
-                            "example": "2023-01-08T12:00:00Z",
-                            "type": "string"
-                          },
-                          "id": {
-                            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                            "format": "uuid",
-                            "type": "string"
-                          },
-                          "predicateKind": {
-                            "example": "topics_completed",
-                            "type": "string"
-                          },
-                          "predicateParams": {
-                            "example": "3",
-                            "type": "string"
-                          },
-                          "startAt": {
-                            "example": "2023-01-01T12:00:00Z",
-                            "type": "string"
-                          },
-                          "title": {
-                            "example": "Weekly Sprint",
-                            "type": "string"
-                          },
-                          "updatedAt": {
-                            "example": "2023-01-01T13:00:00Z",
-                            "type": "string"
-                          },
-                          "xpReward": {
-                            "example": 500,
-                            "type": "integer"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "title",
-                          "description",
-                          "startAt",
-                          "endAt",
-                          "predicateKind",
-                          "predicateParams",
-                          "xpReward",
-                          "badgeId",
-                          "active",
-                          "createdAt",
-                          "updatedAt"
-                        ],
-                        "type": "object"
+                        "$ref": "#/components/schemas/MissionListItem"
                       },
                       "type": "array"
                     }
@@ -8462,7 +9287,10 @@
                 }
               }
             },
-            "description": "Successfully retrieved missions"
+            "description": "Missions"
+          },
+          "403": {
+            "description": "Not staff"
           }
         },
         "security": [
@@ -8470,76 +9298,18 @@
             "bearerAuth": []
           }
         ],
-        "summary": "List All Missions",
+        "summary": "List missions",
         "tags": [
           "admin:missions"
         ]
       },
       "post": {
-        "description": "Create a new gamification mission.",
+        "description": "Creates a mission and its 1..20 ordered requirements in one batch, stored with `predicateKind = 'requirements'`. An audience is accepted only with `enrollmentMode = 'assigned'`; its users (direct and group members) are enrolled.",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "properties": {
-                  "active": {
-                    "example": true,
-                    "type": "boolean"
-                  },
-                  "badgeId": {
-                    "example": null,
-                    "format": "uuid",
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "description": {
-                    "example": "Complete 3 topics.",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "endAt": {
-                    "example": "2023-01-08T12:00:00Z",
-                    "format": "date-time",
-                    "type": "string"
-                  },
-                  "predicateKind": {
-                    "example": "topics_completed",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "predicateParams": {
-                    "example": "3",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "startAt": {
-                    "example": "2023-01-01T12:00:00Z",
-                    "format": "date-time",
-                    "type": "string"
-                  },
-                  "title": {
-                    "example": "Weekly Sprint",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "xpReward": {
-                    "example": 500,
-                    "minimum": 0,
-                    "type": "integer"
-                  }
-                },
-                "required": [
-                  "title",
-                  "description",
-                  "startAt",
-                  "endAt",
-                  "predicateKind",
-                  "predicateParams",
-                  "xpReward"
-                ],
-                "type": "object"
+                "$ref": "#/components/schemas/MissionCreateBody"
               }
             }
           }
@@ -8551,76 +9321,7 @@
                 "schema": {
                   "properties": {
                     "data": {
-                      "properties": {
-                        "active": {
-                          "example": true,
-                          "type": "boolean"
-                        },
-                        "badgeId": {
-                          "example": null,
-                          "format": "uuid",
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "createdAt": {
-                          "example": "2023-01-01T12:00:00Z",
-                          "type": "string"
-                        },
-                        "description": {
-                          "example": "Complete 3 topics.",
-                          "type": "string"
-                        },
-                        "endAt": {
-                          "example": "2023-01-08T12:00:00Z",
-                          "type": "string"
-                        },
-                        "id": {
-                          "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                          "format": "uuid",
-                          "type": "string"
-                        },
-                        "predicateKind": {
-                          "example": "topics_completed",
-                          "type": "string"
-                        },
-                        "predicateParams": {
-                          "example": "3",
-                          "type": "string"
-                        },
-                        "startAt": {
-                          "example": "2023-01-01T12:00:00Z",
-                          "type": "string"
-                        },
-                        "title": {
-                          "example": "Weekly Sprint",
-                          "type": "string"
-                        },
-                        "updatedAt": {
-                          "example": "2023-01-01T13:00:00Z",
-                          "type": "string"
-                        },
-                        "xpReward": {
-                          "example": 500,
-                          "type": "integer"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "title",
-                        "description",
-                        "startAt",
-                        "endAt",
-                        "predicateKind",
-                        "predicateParams",
-                        "xpReward",
-                        "badgeId",
-                        "active",
-                        "createdAt",
-                        "updatedAt"
-                      ],
-                      "type": "object"
+                      "$ref": "#/components/schemas/MissionDetail"
                     }
                   },
                   "required": [
@@ -8630,10 +9331,20 @@
                 }
               }
             },
-            "description": "Successfully created mission"
+            "description": "Mission created"
           },
           "400": {
-            "description": "Bad Request / Validation Failed"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionRequirementError"
+                }
+              }
+            },
+            "description": "Validation failed. A requirement-scoped error names its `index`; target refusals answer `INVALID_REQUIREMENT_TARGET` (or `EVENT_NOT_CHARGEABLE` / `REQUIREMENT_SHARING_DISABLED`) with a `reason`"
+          },
+          "403": {
+            "description": "Not an admin"
           }
         },
         "security": [
@@ -8641,7 +9352,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Create Mission",
+        "summary": "Create mission",
         "tags": [
           "admin:missions"
         ]
@@ -8649,7 +9360,7 @@
     },
     "/v1/admin/missions/{id}": {
       "delete": {
-        "description": "Soft delete a gamification mission.",
+        "description": "Soft delete (`active = false`).",
         "parameters": [
           {
             "in": "path",
@@ -8671,7 +9382,6 @@
                     "data": {
                       "properties": {
                         "success": {
-                          "example": true,
                           "type": "boolean"
                         }
                       },
@@ -8688,7 +9398,10 @@
                 }
               }
             },
-            "description": "Successfully deleted mission"
+            "description": "Mission deleted"
+          },
+          "403": {
+            "description": "Not an admin"
           },
           "404": {
             "description": "Mission not found"
@@ -8699,13 +9412,60 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Delete Mission",
+        "summary": "Delete mission",
+        "tags": [
+          "admin:missions"
+        ]
+      },
+      "get": {
+        "description": "The mission with its requirements in position order and its audience.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MissionDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Mission detail"
+          },
+          "404": {
+            "description": "Mission not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get mission",
         "tags": [
           "admin:missions"
         ]
       },
       "patch": {
-        "description": "Update an existing gamification mission.",
+        "description": "After `startAt`, only `title`, `description`, `active` and extending `endAt` are accepted; changing `startAt`, `mode`, `enrollmentMode`, `xpReward` or `badgeId` answers `409 MISSION_STARTED`. An `endAt` never shortens the mission below now.",
         "parameters": [
           {
             "in": "path",
@@ -8722,56 +9482,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "properties": {
-                  "active": {
-                    "example": true,
-                    "type": "boolean"
-                  },
-                  "badgeId": {
-                    "example": null,
-                    "format": "uuid",
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "description": {
-                    "example": "New description",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "endAt": {
-                    "example": "2023-01-08T12:00:00Z",
-                    "format": "date-time",
-                    "type": "string"
-                  },
-                  "predicateKind": {
-                    "example": "topics_completed",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "predicateParams": {
-                    "example": "4",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "startAt": {
-                    "example": "2023-01-01T12:00:00Z",
-                    "format": "date-time",
-                    "type": "string"
-                  },
-                  "title": {
-                    "example": "Updated Sprint",
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "xpReward": {
-                    "example": 600,
-                    "minimum": 0,
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
+                "$ref": "#/components/schemas/MissionPatchBody"
               }
             }
           }
@@ -8783,76 +9494,7 @@
                 "schema": {
                   "properties": {
                     "data": {
-                      "properties": {
-                        "active": {
-                          "example": true,
-                          "type": "boolean"
-                        },
-                        "badgeId": {
-                          "example": null,
-                          "format": "uuid",
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "createdAt": {
-                          "example": "2023-01-01T12:00:00Z",
-                          "type": "string"
-                        },
-                        "description": {
-                          "example": "Complete 3 topics.",
-                          "type": "string"
-                        },
-                        "endAt": {
-                          "example": "2023-01-08T12:00:00Z",
-                          "type": "string"
-                        },
-                        "id": {
-                          "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                          "format": "uuid",
-                          "type": "string"
-                        },
-                        "predicateKind": {
-                          "example": "topics_completed",
-                          "type": "string"
-                        },
-                        "predicateParams": {
-                          "example": "3",
-                          "type": "string"
-                        },
-                        "startAt": {
-                          "example": "2023-01-01T12:00:00Z",
-                          "type": "string"
-                        },
-                        "title": {
-                          "example": "Weekly Sprint",
-                          "type": "string"
-                        },
-                        "updatedAt": {
-                          "example": "2023-01-01T13:00:00Z",
-                          "type": "string"
-                        },
-                        "xpReward": {
-                          "example": 500,
-                          "type": "integer"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "title",
-                        "description",
-                        "startAt",
-                        "endAt",
-                        "predicateKind",
-                        "predicateParams",
-                        "xpReward",
-                        "badgeId",
-                        "active",
-                        "createdAt",
-                        "updatedAt"
-                      ],
-                      "type": "object"
+                      "$ref": "#/components/schemas/Mission"
                     }
                   },
                   "required": [
@@ -8862,10 +9504,143 @@
                 }
               }
             },
-            "description": "Successfully updated mission"
+            "description": "Mission updated"
           },
           "400": {
-            "description": "Bad Request / Validation Failed"
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "Mission not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionStartedError"
+                }
+              }
+            },
+            "description": "MISSION_STARTED — the mission started; `fields` names the locked fields"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update mission",
+        "tags": [
+          "admin:missions"
+        ]
+      }
+    },
+    "/v1/admin/missions/{id}/audience": {
+      "put": {
+        "description": "Replace-all of the groups and users of an `assigned` mission. Newly covered users are enrolled; users no longer covered get `leftAt`, keeping their progress and rewards.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionAudience"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MissionAudience"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Audience replaced"
+          },
+          "400": {
+            "description": "Validation failed, or UNKNOWN_AUDIENCE_TARGET"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "Mission not found"
+          },
+          "409": {
+            "description": "MISSION_NOT_ASSIGNED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Replace mission audience",
+        "tags": [
+          "admin:missions"
+        ]
+      }
+    },
+    "/v1/admin/missions/{id}/participants": {
+      "get": {
+        "description": "Enrollments (active and left) ordered by join time, with aggregate and per-step progress. Keyset-paginated; a malformed cursor answers `400 InvalidCursor`.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "description": "Opaque `nextCursor` of the previous page",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionParticipantPage"
+                }
+              }
+            },
+            "description": "One page of participants"
+          },
+          "400": {
+            "description": "InvalidCursor"
           },
           "404": {
             "description": "Mission not found"
@@ -8876,7 +9651,158 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Update Mission",
+        "summary": "List mission participants",
+        "tags": [
+          "admin:missions"
+        ]
+      }
+    },
+    "/v1/admin/missions/{id}/requirements": {
+      "put": {
+        "description": "Replaces the ordered list; positions are the array order. Refused once the mission started.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceMissionRequirementsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "$ref": "#/components/schemas/MissionRequirement"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Requirements replaced"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionRequirementError"
+                }
+              }
+            },
+            "description": "Validation failed. A requirement-scoped error names its `index`; target refusals answer `INVALID_REQUIREMENT_TARGET` (or `EVENT_NOT_CHARGEABLE` / `REQUIREMENT_SHARING_DISABLED`) with a `reason`"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "Mission not found"
+          },
+          "409": {
+            "description": "MISSION_STARTED, or MISSION_LEGACY for a legacy predicate mission"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Replace mission requirements",
+        "tags": [
+          "admin:missions"
+        ]
+      }
+    },
+    "/v1/admin/missions/{id}/requirements/{reqId}": {
+      "patch": {
+        "description": "The title is the one requirement field editable after start; the requirement keeps its id and progress.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reqId",
+            "required": true,
+            "schema": {
+              "example": "b1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionRequirementTitleBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MissionRequirement"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Requirement renamed"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "Requirement not found on this mission"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Rename a mission requirement",
         "tags": [
           "admin:missions"
         ]
