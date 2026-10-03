@@ -1,6 +1,6 @@
 # Task 07 — Backend: Student missions API — steps, teasers, join, leave, manual check (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Backend API
@@ -76,22 +76,23 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A student not in an `assigned` mission sees it in `GET /v1/me/missions` only as an entry
+- [x] A student not in an `assigned` mission sees it in `GET /v1/me/missions` only as an entry
       with `locked.reason = 'assigned'`, its title, group names and `steps: []`, and gets `404` on
       its detail, join and check.
-- [ ] An `auto` mission targeting a topic outside a student's access set is absent from their list;
+- [x] An `auto` mission targeting a topic outside a student's access set is absent from their list;
       an admin's list shows no implicit enrollment in `auto` missions.
-- [ ] A topic target outside the caller's access set is returned with `topicId`, `title` null and
+- [x] A topic target outside the caller's access set is returned with `topicId`, `title` null and
       `accessible: false`.
-- [ ] Joining an `open` mission mid-window returns `201`; evidence created before the join does not
+- [x] Joining an `open` mission mid-window returns `201`; evidence created before the join does not
       count, evidence after it does; leaving and rejoining keeps the first `counts_from`.
-- [ ] Ticking a `manual_check` step completes it in the same request, writes one
+- [x] Ticking a `manual_check` step completes it in the same request, writes one
       `mission_step_reward` when it has XP, advances `user_streak`, and a second tick changes
       nothing; a locked sequential step answers `409 MISSION_STEP_LOCKED`.
-- [ ] Two `GET /v1/me/missions` calls create no row in `mission_enrollments` or
+- [x] Two `GET /v1/me/missions` calls create no row in `mission_enrollments` or
       `mission_requirement_progress`.
-- [ ] Changed files lint clean; `make test-api` green; `pnpm dump-openapi` leaves no diff.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green; `pnpm dump-openapi` leaves no diff.
+- [x] No diff outside the scope guardrail.
+      _Closed 2026-10-03. Authorized widening: `buildMeRouter` slice gains `events` (the call site already passes the container). Choices: controller methods take a `{ userId, roles }` caller; implicit enrollments show `current = 0` or the stored row (the evidence count covers saved enrollments only); a soft-deleted mission is `404` everywhere and `MISSION_CLOSED` means outside the window; a rejoin after Leave answers `201`; the new routes send `Cache-Control: private, no-store`; without a wired evaluator the write routes answer `500 MISSION_EVALUATOR_UNAVAILABLE`._
 
 ## Verification Plan
 
