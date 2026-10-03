@@ -3483,8 +3483,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List All Missions
-         * @description Retrieve a list of all gamification missions.
+         * List missions
+         * @description Every mission, legacy rows included, with requirement, enrolled and completed counts.
          */
         get: {
             parameters: {
@@ -3495,54 +3495,30 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Successfully retrieved missions */
+                /** @description Missions */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            data: {
-                                /** @example true */
-                                active: boolean;
-                                /**
-                                 * Format: uuid
-                                 * @example null
-                                 */
-                                badgeId: string | null;
-                                /** @example 2023-01-01T12:00:00Z */
-                                createdAt: string;
-                                /** @example Complete 3 topics. */
-                                description: string;
-                                /** @example 2023-01-08T12:00:00Z */
-                                endAt: string;
-                                /**
-                                 * Format: uuid
-                                 * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
-                                 */
-                                id: string;
-                                /** @example topics_completed */
-                                predicateKind: string;
-                                /** @example 3 */
-                                predicateParams: string;
-                                /** @example 2023-01-01T12:00:00Z */
-                                startAt: string;
-                                /** @example Weekly Sprint */
-                                title: string;
-                                /** @example 2023-01-01T13:00:00Z */
-                                updatedAt: string;
-                                /** @example 500 */
-                                xpReward: number;
-                            }[];
+                            data: components["schemas"]["MissionListItem"][];
                         };
                     };
+                };
+                /** @description Not staff */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
             };
         };
         put?: never;
         /**
-         * Create Mission
-         * @description Create a new gamification mission.
+         * Create mission
+         * @description Creates a mission and its 1..20 ordered requirements in one batch, stored with `predicateKind = 'requirements'`. An audience is accepted only with `enrollmentMode = 'assigned'`; its users (direct and group members) are enrolled.
          */
         post: {
             parameters: {
@@ -3553,82 +3529,32 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": {
-                        /** @example true */
-                        active?: boolean;
-                        /**
-                         * Format: uuid
-                         * @example null
-                         */
-                        badgeId?: string | null;
-                        /** @example Complete 3 topics. */
-                        description: string;
-                        /**
-                         * Format: date-time
-                         * @example 2023-01-08T12:00:00Z
-                         */
-                        endAt: string;
-                        /** @example topics_completed */
-                        predicateKind: string;
-                        /** @example 3 */
-                        predicateParams: string;
-                        /**
-                         * Format: date-time
-                         * @example 2023-01-01T12:00:00Z
-                         */
-                        startAt: string;
-                        /** @example Weekly Sprint */
-                        title: string;
-                        /** @example 500 */
-                        xpReward: number;
-                    };
+                    "application/json": components["schemas"]["MissionCreateBody"];
                 };
             };
             responses: {
-                /** @description Successfully created mission */
+                /** @description Mission created */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            data: {
-                                /** @example true */
-                                active: boolean;
-                                /**
-                                 * Format: uuid
-                                 * @example null
-                                 */
-                                badgeId: string | null;
-                                /** @example 2023-01-01T12:00:00Z */
-                                createdAt: string;
-                                /** @example Complete 3 topics. */
-                                description: string;
-                                /** @example 2023-01-08T12:00:00Z */
-                                endAt: string;
-                                /**
-                                 * Format: uuid
-                                 * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
-                                 */
-                                id: string;
-                                /** @example topics_completed */
-                                predicateKind: string;
-                                /** @example 3 */
-                                predicateParams: string;
-                                /** @example 2023-01-01T12:00:00Z */
-                                startAt: string;
-                                /** @example Weekly Sprint */
-                                title: string;
-                                /** @example 2023-01-01T13:00:00Z */
-                                updatedAt: string;
-                                /** @example 500 */
-                                xpReward: number;
-                            };
+                            data: components["schemas"]["MissionDetail"];
                         };
                     };
                 };
-                /** @description Bad Request / Validation Failed */
+                /** @description Validation failed. A requirement-scoped error names its `index`; target refusals answer `INVALID_REQUIREMENT_TARGET` (or `EVENT_NOT_CHARGEABLE` / `REQUIREMENT_SHARING_DISABLED`) with a `reason` */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MissionRequirementError"];
+                    };
+                };
+                /** @description Not an admin */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -3649,12 +3575,46 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get mission
+         * @description The mission with its requirements in position order and its audience.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Mission detail */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MissionDetail"];
+                        };
+                    };
+                };
+                /** @description Mission not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         put?: never;
         post?: never;
         /**
-         * Delete Mission
-         * @description Soft delete a gamification mission.
+         * Delete mission
+         * @description Soft delete (`active = false`).
          */
         delete: {
             parameters: {
@@ -3667,7 +3627,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Successfully deleted mission */
+                /** @description Mission deleted */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -3675,11 +3635,17 @@ export interface paths {
                     content: {
                         "application/json": {
                             data: {
-                                /** @example true */
                                 success: boolean;
                             };
                         };
                     };
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Mission not found */
                 404: {
@@ -3693,8 +3659,8 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Update Mission
-         * @description Update an existing gamification mission.
+         * Update mission
+         * @description After `startAt`, only `title`, `description`, `active` and extending `endAt` are accepted; changing `startAt`, `mode`, `enrollmentMode`, `xpReward` or `badgeId` answers `409 MISSION_STARTED`. An `endAt` never shortens the mission below now.
          */
         patch: {
             parameters: {
@@ -3707,81 +3673,164 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": {
-                        /** @example true */
-                        active?: boolean;
-                        /**
-                         * Format: uuid
-                         * @example null
-                         */
-                        badgeId?: string | null;
-                        /** @example New description */
-                        description?: string;
-                        /**
-                         * Format: date-time
-                         * @example 2023-01-08T12:00:00Z
-                         */
-                        endAt?: string;
-                        /** @example topics_completed */
-                        predicateKind?: string;
-                        /** @example 4 */
-                        predicateParams?: string;
-                        /**
-                         * Format: date-time
-                         * @example 2023-01-01T12:00:00Z
-                         */
-                        startAt?: string;
-                        /** @example Updated Sprint */
-                        title?: string;
-                        /** @example 600 */
-                        xpReward?: number;
-                    };
+                    "application/json": components["schemas"]["MissionPatchBody"];
                 };
             };
             responses: {
-                /** @description Successfully updated mission */
+                /** @description Mission updated */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            data: {
-                                /** @example true */
-                                active: boolean;
-                                /**
-                                 * Format: uuid
-                                 * @example null
-                                 */
-                                badgeId: string | null;
-                                /** @example 2023-01-01T12:00:00Z */
-                                createdAt: string;
-                                /** @example Complete 3 topics. */
-                                description: string;
-                                /** @example 2023-01-08T12:00:00Z */
-                                endAt: string;
-                                /**
-                                 * Format: uuid
-                                 * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
-                                 */
-                                id: string;
-                                /** @example topics_completed */
-                                predicateKind: string;
-                                /** @example 3 */
-                                predicateParams: string;
-                                /** @example 2023-01-01T12:00:00Z */
-                                startAt: string;
-                                /** @example Weekly Sprint */
-                                title: string;
-                                /** @example 2023-01-01T13:00:00Z */
-                                updatedAt: string;
-                                /** @example 500 */
-                                xpReward: number;
-                            };
+                            data: components["schemas"]["Mission"];
                         };
                     };
                 };
-                /** @description Bad Request / Validation Failed */
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Mission not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description MISSION_STARTED — the mission started; `fields` names the locked fields */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MissionStartedError"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/admin/missions/{id}/audience": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace mission audience
+         * @description Replace-all of the groups and users of an `assigned` mission. Newly covered users are enrolled; users no longer covered get `leftAt`, keeping their progress and rewards.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MissionAudience"];
+                };
+            };
+            responses: {
+                /** @description Audience replaced */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MissionAudience"];
+                        };
+                    };
+                };
+                /** @description Validation failed, or UNKNOWN_AUDIENCE_TARGET */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Mission not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description MISSION_NOT_ASSIGNED */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/missions/{id}/participants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List mission participants
+         * @description Enrollments (active and left) ordered by join time, with aggregate and per-step progress. Keyset-paginated; a malformed cursor answers `400 InvalidCursor`.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of participants */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MissionParticipantPage"];
+                    };
+                };
+                /** @description InvalidCursor */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3789,6 +3838,215 @@ export interface paths {
                     content?: never;
                 };
                 /** @description Mission not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/missions/{id}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reconcile mission
+         * @description Runs the daily reconciliation for this mission now: materialises implicit enrollments, backfills captured evidence and recomputes every enrollment. It may complete steps and the mission (`completedBy = 'reconcile'`) and grant their rewards; it never reopens anything and records no streak activity. Legacy predicate missions answer `404`.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The run counts */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MissionReconcileReport"];
+                        };
+                    };
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Mission not found, or a legacy predicate mission */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/missions/{id}/requirements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace mission requirements
+         * @description Replaces the ordered list; positions are the array order. Refused once the mission started.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ReplaceMissionRequirementsBody"];
+                };
+            };
+            responses: {
+                /** @description Requirements replaced */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MissionRequirement"][];
+                        };
+                    };
+                };
+                /** @description Validation failed. A requirement-scoped error names its `index`; target refusals answer `INVALID_REQUIREMENT_TARGET` (or `EVENT_NOT_CHARGEABLE` / `REQUIREMENT_SHARING_DISABLED`) with a `reason` */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MissionRequirementError"];
+                    };
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Mission not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description MISSION_STARTED, or MISSION_LEGACY for a legacy predicate mission */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/missions/{id}/requirements/{reqId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename a mission requirement
+         * @description The title is the one requirement field editable after start; the requirement keeps its id and progress.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    reqId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["MissionRequirementTitleBody"];
+                };
+            };
+            responses: {
+                /** @description Requirement renamed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MissionRequirement"];
+                        };
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not an admin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Requirement not found on this mission */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -8312,7 +8570,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             badges?: unknown;
-                            missions?: unknown;
+                            missions: components["schemas"]["DashboardMissionEntry"][] | null;
                             questsDaily: unknown[];
                             questsWeekly: unknown[];
                             streak?: unknown;
@@ -8339,7 +8597,7 @@ export interface paths {
         };
         /**
          * Get Missions
-         * @description Retrieves the active missions and current progress for the authenticated user.
+         * @description Active missions for the authenticated user: those they are enrolled in (an `auto` mission whose gate they pass shows an implicit enrollment, computed read-only), joinable `open` missions, and locked teasers of `assigned` missions they are not in (title and audience group names only, `steps: []`). An `auto` mission targeting a topic outside the caller's access is absent, and staff are never implicitly enrolled. Never writes.
          */
         get: {
             parameters: {
@@ -8356,13 +8614,273 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": unknown[] | null;
+                        "application/json": components["schemas"]["DashboardMissionEntry"][] | null;
                     };
                 };
             };
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/missions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one of my missions
+         * @description One active mission with its steps (the mission page), as `GET /me/missions` lists it. A locked teaser, a gated-out `auto` mission and a mission outside its window answer `404`. Never writes.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The mission entry */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DashboardMissionEntry"];
+                    };
+                };
+                /** @description `NotFound` — no such mission or step, or the caller cannot see it */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/missions/{id}/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join an open mission
+         * @description Enrolls the caller (`source = self`) in an `open` mission inside its window; evidence counts from the join. A rejoin after Leave keeps the first `countsFrom`.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Already joined: the current entry */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DashboardMissionEntry"];
+                    };
+                };
+                /** @description Joined: the new entry */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DashboardMissionEntry"];
+                    };
+                };
+                /** @description `NotFound` — no such mission or step, or the caller cannot see it */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `MISSION_NOT_JOINABLE` (not an `open` mission) or `MISSION_CLOSED` (outside its window) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/missions/{id}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Leave a mission
+         * @description Leaves a `self` enrollment: completed steps and rewards stay, and a later Join keeps the original `countsFrom`.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Left */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description `NotFound` — no such mission or step, or the caller cannot see it */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `MISSION_NOT_LEAVABLE` — the enrollment is not `self` (implicit or by audience) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/missions/{id}/requirements/{reqId}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tick a manual-check step
+         * @description Marks a `manual_check` step as done and evaluates the mission in the same request, so the step completes, earns its XP and records streak activity. A second tick changes nothing and answers the current step.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    reqId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The step and its mission entry */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MissionCheckResult"];
+                    };
+                };
+                /** @description `NotFound` — no such mission or step, or the caller cannot see it */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `MISSION_STEP_LOCKED` (a sequential predecessor is incomplete) or `MISSION_CLOSED` (outside the window) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `MISSION_EVALUATOR_UNAVAILABLE` */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -10885,6 +11403,16 @@ export interface components {
             name: string;
             scopeTopicId?: string | null;
         };
+        DashboardMissionEntry: {
+            enrollment: components["schemas"]["MissionEnrollmentView"];
+            /** @description `open` mission, inside its window, caller not enrolled */
+            joinable: boolean;
+            locked: components["schemas"]["MissionLocked"];
+            mission: components["schemas"]["Mission"] & unknown;
+            progress: components["schemas"]["MissionProgress"];
+            /** @description Ordered steps; `[]` for a legacy mission or a teaser */
+            steps: components["schemas"]["MissionStepView"][];
+        };
         EditSubmissionBody: {
             /** @description Markdown; sanitised, then must be ≤ SUBMISSION_DESCRIPTION_MAX characters */
             description?: string;
@@ -11074,6 +11602,502 @@ export interface components {
             } | null;
             uploaderId: string;
         };
+        Mission: {
+            /** @example true */
+            active: boolean;
+            /** @example null */
+            badgeId: string | null;
+            /** @example 2026-10-01T12:00:00.000Z */
+            createdAt: string;
+            /** @example Three demonstrations, then the seminar. */
+            description: string;
+            /** @example 2026-10-31T23:59:59.000Z */
+            endAt: string;
+            /**
+             * @description Who takes part: implicit (`auto`), by Join (`open`) or by audience (`assigned`)
+             * @example auto
+             * @enum {string}
+             */
+            enrollmentMode: "auto" | "open" | "assigned";
+            /**
+             * Format: uuid
+             * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
+             */
+            id: string;
+            /**
+             * @description `parallel`: every step open at once; `sequential`: step N opens when N-1 completes
+             * @example sequential
+             * @enum {string}
+             */
+            mode: "parallel" | "sequential";
+            /**
+             * @deprecated
+             * @description Legacy M7 predicate; `requirements` for every mission defined by requirements
+             * @example requirements
+             */
+            predicateKind: string;
+            /**
+             * @deprecated
+             * @description Legacy M7 predicate params; `{}` for every mission defined by requirements
+             * @example {}
+             */
+            predicateParams: string;
+            /** @example 2026-10-01T12:00:00.000Z */
+            startAt: string;
+            /** @example Kihon month */
+            title: string;
+            /** @example 2026-10-01T13:00:00.000Z */
+            updatedAt: string;
+            /** @example 500 */
+            xpReward: number;
+        };
+        MissionAudience: {
+            /**
+             * @example [
+             *       "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+             *     ]
+             */
+            groupIds: string[];
+            /** @example [] */
+            userIds: string[];
+        };
+        MissionCheckResult: {
+            mission: components["schemas"]["DashboardMissionEntry"];
+            step: components["schemas"]["MissionStepView"];
+        };
+        MissionCreateBody: {
+            audience?: components["schemas"]["MissionAudience"] & unknown;
+            /**
+             * Format: uuid
+             * @default null
+             * @example null
+             */
+            badgeId: string | null;
+            /** @example Three demonstrations, then the seminar. */
+            description: string;
+            /**
+             * Format: date-time
+             * @description Must be after `startAt`
+             * @example 2026-10-31T23:59:59.000Z
+             */
+            endAt: string;
+            /**
+             * @description Who takes part: implicit (`auto`), by Join (`open`) or by audience (`assigned`)
+             * @default auto
+             * @example auto
+             * @enum {string}
+             */
+            enrollmentMode: "auto" | "open" | "assigned";
+            /**
+             * @description `parallel`: every step open at once; `sequential`: step N opens when N-1 completes
+             * @default parallel
+             * @example sequential
+             * @enum {string}
+             */
+            mode: "parallel" | "sequential";
+            /** @description 1..20 steps; positions follow the array order */
+            requirements: components["schemas"]["MissionRequirementInput"][];
+            /**
+             * Format: date-time
+             * @example 2026-10-01T12:00:00.000Z
+             */
+            startAt: string;
+            /** @example Kihon month */
+            title: string;
+            /**
+             * @default 0
+             * @example 500
+             */
+            xpReward: number;
+        };
+        MissionDetail: {
+            audience: components["schemas"]["MissionAudience"];
+            mission: components["schemas"]["Mission"];
+            /** @description Ordered by position */
+            requirements: components["schemas"]["MissionRequirement"][];
+        };
+        MissionEnrollmentView: {
+            /** @description Granted by the policy, no row written yet (reads never write) */
+            implicit: boolean;
+            /**
+             * @description null for an implicit enrollment
+             * @example null
+             */
+            joinedAt: string | null;
+            /** @enum {string} */
+            source: "auto" | "self" | "admin";
+        } | null;
+        MissionEventTarget: {
+            /**
+             * @description null when the event is not visible to the caller
+             * @example seminar-2026
+             */
+            slug: string | null;
+            /** @example 2026-10-20T13:00:00.000Z */
+            startsAt: string | null;
+            /** @example Seminar */
+            title: string | null;
+            /** @enum {string} */
+            type: "event";
+        };
+        MissionListItem: components["schemas"]["Mission"] & {
+            /**
+             * @description Enrolled users whose mission progress is completed
+             * @example 3
+             */
+            completedCount: number;
+            /**
+             * @description Active enrollments
+             * @example 12
+             */
+            enrolledCount: number;
+            /**
+             * @description Steps of the mission (0 for a legacy mission)
+             * @example 2
+             */
+            requirementCount: number;
+        };
+        /** @description Teaser of an `assigned` mission the caller is not in */
+        MissionLocked: {
+            /**
+             * @description Names of the mission's audience groups
+             * @example [
+             *       "Black belts"
+             *     ]
+             */
+            groups: string[];
+            /** @enum {string} */
+            reason: "assigned";
+        } | null;
+        MissionParticipant: {
+            /** @example 2026-10-01T12:00:00.000Z */
+            countsFrom: string;
+            /** @example student@example.com */
+            email: string | null;
+            /** @example 2026-10-01 12:00:00 */
+            joinedAt: string;
+            /** @example null */
+            leftAt: string | null;
+            /** @example Student A */
+            name: string | null;
+            progress: {
+                completed: boolean;
+                completedAt: string | null;
+                /** @description Completed steps */
+                currentValue: number;
+                /** @description Step count */
+                targetValue: number;
+            } | null;
+            /** @enum {string} */
+            source: "auto" | "self" | "admin";
+            /** @description Evaluated steps, in position order */
+            steps: components["schemas"]["MissionParticipantStep"][];
+            /** @example a1b2c3d4-e5f6-7890-1234-567890abcdef */
+            userId: string;
+        };
+        MissionParticipantPage: {
+            data: components["schemas"]["MissionParticipant"][];
+            /**
+             * @description Opaque cursor of the next page; null on the last page
+             * @example null
+             */
+            nextCursor: string | null;
+        };
+        MissionParticipantStep: {
+            checkedAt: string | null;
+            /** @description Evidence instant of the target-th item */
+            completedAt: string | null;
+            /** @enum {string|null} */
+            completedBy: "hook" | "reconcile" | null;
+            currentCount: number;
+            /** Format: uuid */
+            requirementId: string;
+            targetCount: number;
+        };
+        MissionPatchBody: {
+            active?: boolean;
+            /**
+             * Format: uuid
+             * @description Locked once the mission started
+             */
+            badgeId?: string | null;
+            description?: string;
+            /**
+             * Format: date-time
+             * @description Once started, may only be extended
+             */
+            endAt?: string;
+            /**
+             * @description Locked once the mission started
+             * @example auto
+             * @enum {string}
+             */
+            enrollmentMode?: "auto" | "open" | "assigned";
+            /**
+             * @description Locked once the mission started
+             * @example sequential
+             * @enum {string}
+             */
+            mode?: "parallel" | "sequential";
+            /**
+             * Format: date-time
+             * @description Locked once the mission started
+             */
+            startAt?: string;
+            title?: string;
+            /** @description Locked once the mission started */
+            xpReward?: number;
+        };
+        MissionProgress: {
+            completed: boolean;
+            /** @example null */
+            completedAt: string | null;
+            /**
+             * @description Completed steps (or the legacy single counter)
+             * @example 1
+             */
+            currentValue: number;
+            missionId: string;
+            /**
+             * @description Step count (or the legacy target)
+             * @example 3
+             */
+            targetValue: number;
+            /** @example 2026-10-02T12:00:00.000Z */
+            updatedAt: string;
+            userId: string;
+        } | null;
+        MissionReconcileReport: {
+            /**
+             * @description Implicit enrollments materialised
+             * @example 3
+             */
+            enrollmentsCreated: number;
+            /**
+             * @description Active enrollments evaluated
+             * @example 12
+             */
+            enrollmentsEvaluated: number;
+            /**
+             * @description Evidence rows captured with `source = 'backfill'`
+             * @example 2
+             */
+            evidenceBackfilled: number;
+            /**
+             * @description Missions whose reconciliation failed (0 or 1 here)
+             * @example 0
+             */
+            failed: number;
+            /**
+             * @description Missions reconciled (1 for this route)
+             * @example 1
+             */
+            missions: number;
+            /**
+             * @description Mission completions granted by this run
+             * @example 1
+             */
+            missionsClosed: number;
+            /**
+             * @description Steps completed by this run (`completedBy = 'reconcile'`)
+             * @example 4
+             */
+            stepsClosed: number;
+        };
+        MissionRequirement: {
+            /** @example 2026-10-01 12:00:00 */
+            createdAt: string;
+            /**
+             * @description Target of `event_participation`; null otherwise
+             * @example null
+             */
+            eventId: string | null;
+            /**
+             * Format: uuid
+             * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
+             */
+            id: string;
+            /**
+             * @example submissions_on_topic
+             * @enum {string}
+             */
+            kind: "submissions_on_topic" | "topic_visited" | "video_watched" | "manual_check" | "event_participation";
+            /**
+             * Format: uuid
+             * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
+             */
+            missionId: string;
+            /**
+             * @description The kind's params, defaults applied
+             * @example {
+             *       "countModerated": false,
+             *       "minCount": 3,
+             *       "requireDescription": false,
+             *       "visibility": "any"
+             *     }
+             */
+            params: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description 1-based order inside the mission
+             * @example 1
+             */
+            position: number;
+            /** @example Three demonstrations */
+            title: string;
+            /**
+             * @description Target of the three topic kinds; null otherwise
+             * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
+             */
+            topicId: string | null;
+            /** @example 2026-10-01 12:00:00 */
+            updatedAt: string;
+            /** @example 50 */
+            xpReward: number;
+        };
+        MissionRequirementError: {
+            /** @enum {string} */
+            error: "ValidationError" | "INVALID_REQUIREMENT_TARGET" | "EVENT_NOT_CHARGEABLE" | "REQUIREMENT_SHARING_DISABLED";
+            /**
+             * @description Schema errors: the path inside the item
+             * @example params.minCount
+             */
+            field?: string;
+            /** @description Index of the offending item in `requirements` */
+            index?: number;
+            /**
+             * @description TOPIC_NOT_FOUND · TOPIC_NOT_PUBLISHED · TOPIC_ARCHIVED · TOPIC_HAS_NO_VIDEO · EVENT_NOT_FOUND · EVENT_NOT_PUBLISHED · EVENT_NOT_CHARGEABLE · REQUIREMENT_SHARING_DISABLED, or a schema reason (UNKNOWN_KIND, UNRECOGNIZED_KEYS, TOO_SMALL, …)
+             * @example TOPIC_ARCHIVED
+             */
+            reason?: string;
+        };
+        /** @description One step, discriminated on `kind`; every object is strict (unknown keys are refused) */
+        MissionRequirementInput: {
+            /** @enum {string} */
+            kind: "submissions_on_topic";
+            params: {
+                /** @default false */
+                countModerated: boolean;
+                minCount: number;
+                /** @default false */
+                requireDescription: boolean;
+                /**
+                 * @default any
+                 * @enum {string}
+                 */
+                visibility: "any" | "shared_only";
+            };
+            title: string;
+            /** Format: uuid */
+            topicId: string;
+            /** @default 0 */
+            xpReward: number;
+        } | {
+            /** @enum {string} */
+            kind: "topic_visited";
+            /** @default {} */
+            params: Record<string, never>;
+            title: string;
+            /** Format: uuid */
+            topicId: string;
+            /** @default 0 */
+            xpReward: number;
+        } | {
+            /** @enum {string} */
+            kind: "video_watched";
+            params: {
+                minCount: number;
+            };
+            title: string;
+            /** Format: uuid */
+            topicId: string;
+            /** @default 0 */
+            xpReward: number;
+        } | {
+            /** @enum {string} */
+            kind: "manual_check";
+            /** @default {} */
+            params: {
+                /** @default  */
+                instructions: string;
+            };
+            title: string;
+            /** @default 0 */
+            xpReward: number;
+        } | {
+            /** Format: uuid */
+            eventId: string;
+            /** @enum {string} */
+            kind: "event_participation";
+            /** @default {} */
+            params: Record<string, never>;
+            title: string;
+            /** @default 0 */
+            xpReward: number;
+        };
+        MissionRequirementTitleBody: {
+            /** @example Three demonstrations */
+            title: string;
+        };
+        MissionStartedError: {
+            /** @enum {string} */
+            error: "MISSION_STARTED";
+            /**
+             * @example [
+             *       "mode"
+             *     ]
+             */
+            fields: string[];
+        };
+        MissionStepView: {
+            /**
+             * @description Evidence instant of the target-th item
+             * @example null
+             */
+            completedAt: string | null;
+            /** @example 1 */
+            current: number;
+            /**
+             * @description Requirement id
+             * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
+             */
+            id: string;
+            /**
+             * @description `manual_check` only
+             * @example null
+             */
+            instructions: string | null;
+            /**
+             * @example submissions_on_topic
+             * @enum {string}
+             */
+            kind: "submissions_on_topic" | "topic_visited" | "video_watched" | "manual_check" | "event_participation";
+            /** @example 1 */
+            position: number;
+            /** @example 3 */
+            required: number;
+            /** @enum {string} */
+            state: "locked" | "open" | "completed";
+            /** @description A topic or event the caller cannot open is redacted (no id, title or slug); null for `manual_check` */
+            target: components["schemas"]["MissionTopicTarget"] | components["schemas"]["MissionEventTarget"] | null;
+            /** @example Three demonstrations */
+            title: string;
+            /** @example 50 */
+            xpReward: number;
+        };
+        MissionTopicTarget: {
+            accessible: boolean;
+            /** @example Kihon */
+            title: string | null;
+            /**
+             * @description null when the topic is outside the caller's access
+             * @example a1b2c3d4-e5f6-7890-1234-567890abcdef
+             */
+            topicId: string | null;
+            /** @enum {string} */
+            type: "topic";
+        };
         MoveSubmissionsBody: {
             /**
              * @description 1..10 ids of the caller's own ready submissions, moved in this order
@@ -11250,6 +12274,10 @@ export interface components {
             /** @example Aspirante */
             rankTitle: string;
         }[];
+        ReplaceMissionRequirementsBody: {
+            /** @description 1..20 steps; positions follow the array order */
+            requirements: components["schemas"]["MissionRequirementInput"][];
+        };
         ResetPasswordRequest: {
             /** @example newpassword123 */
             newPassword: string;
