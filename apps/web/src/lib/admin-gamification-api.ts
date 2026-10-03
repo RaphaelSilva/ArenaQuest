@@ -1,3 +1,9 @@
+import type {
+  MissionEnrollmentMode as SharedMissionEnrollmentMode,
+  MissionMode as SharedMissionMode,
+  RequirementInput,
+  RequirementKind,
+} from '@arenaquest/shared/domain/missions/requirements';
 import type { HttpTransport } from './api-client';
 
 // ---------------------------------------------------------------------------
@@ -41,19 +47,64 @@ export type UpdateBadgeInput = {
   active?: boolean;
 };
 
+/**
+ * Missions (RFC 0022 §6). Step kinds and params are defined once in
+ * `@arenaquest/shared/domain/missions/requirements`; the wire shapes below
+ * mirror `MissionListItem`, `MissionDetail` and `MissionCreateBody`. The
+ * deprecated `predicateKind` / `predicateParams` response fields are not read.
+ */
+export type MissionMode = SharedMissionMode;
+export type MissionEnrollmentMode = SharedMissionEnrollmentMode;
+/** One step as the admin submits it, discriminated on `kind`. */
+export type MissionRequirementInput = RequirementInput;
+
 export type Mission = {
   id: string;
   title: string;
   description: string;
   startAt: string;
   endAt: string;
-  predicateKind: string;
-  predicateParams: string;
   xpReward: number;
   badgeId: string | null;
   active: boolean;
+  mode: MissionMode;
+  enrollmentMode: MissionEnrollmentMode;
   createdAt: string;
   updatedAt: string;
+};
+
+export type MissionListItem = Mission & {
+  /** Steps of the mission; `0` for a legacy predicate mission. */
+  requirementCount: number;
+  enrolledCount: number;
+  completedCount: number;
+};
+
+export type MissionRequirement = {
+  id: string;
+  missionId: string;
+  /** 1-based order inside the mission. */
+  position: number;
+  kind: RequirementKind;
+  title: string;
+  topicId: string | null;
+  eventId: string | null;
+  /** The kind's params, defaults applied. */
+  params: Record<string, unknown>;
+  xpReward: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MissionAudience = {
+  groupIds: string[];
+  userIds: string[];
+};
+
+export type MissionDetail = {
+  mission: Mission;
+  requirements: MissionRequirement[];
+  audience: MissionAudience;
 };
 
 export type CreateMissionInput = {
@@ -61,20 +112,23 @@ export type CreateMissionInput = {
   description: string;
   startAt: string;
   endAt: string;
-  predicateKind: string;
-  predicateParams: string;
+  mode: MissionMode;
+  enrollmentMode: MissionEnrollmentMode;
   xpReward: number;
-  badgeId?: string | null;
-  active?: boolean;
+  badgeId: string | null;
+  requirements: MissionRequirementInput[];
+  /** Only with `enrollmentMode = 'assigned'`. */
+  audience?: MissionAudience;
 };
 
+/** After `startAt` only `title`, `description`, `active` and an extended `endAt` are accepted. */
 export type UpdateMissionInput = {
   title?: string;
   description?: string;
   startAt?: string;
   endAt?: string;
-  predicateKind?: string;
-  predicateParams?: string;
+  mode?: MissionMode;
+  enrollmentMode?: MissionEnrollmentMode;
   xpReward?: number;
   badgeId?: string | null;
   active?: boolean;
@@ -161,10 +215,33 @@ export class AdminGamificationApiError extends Error {
   constructor(
     public readonly code: string,
     public readonly status: number,
+    /** The whole error body, so a caller can read `index`, `reason`, `field`, `fields`, `issues`. */
     public readonly details: Record<string, unknown> = {},
   ) {
     super(code);
     this.name = 'AdminGamificationApiError';
+  }
+
+  /** Index of the offending item in `requirements`, when the API named one. */
+  get index(): number | undefined {
+    return typeof this.details.index === 'number' ? this.details.index : undefined;
+  }
+
+  /** Target refusal (`TOPIC_ARCHIVED`, …) or schema reason (`TOO_SMALL`, …). */
+  get reason(): string | undefined {
+    return typeof this.details.reason === 'string' ? this.details.reason : undefined;
+  }
+
+  /** Schema errors: the path inside the requirement, e.g. `params.minCount`. */
+  get field(): string | undefined {
+    return typeof this.details.field === 'string' ? this.details.field : undefined;
+  }
+
+  /** `MISSION_STARTED`: the fields locked by the start. */
+  get fields(): string[] {
+    return Array.isArray(this.details.fields)
+      ? this.details.fields.filter((f): f is string => typeof f === 'string')
+      : [];
   }
 }
 
@@ -203,17 +280,24 @@ export function createAdminGamificationApi(http: HttpTransport) {
     },
 
     missions: {
-      async list(): Promise<Mission[]> {
+      async list(): Promise<MissionListItem[]> {
         const res = await http('GET', '/admin/missions');
         if (!res.ok) await rejectWith(res, 'MISSIONS_LIST_FAILED');
-        const body = (await res.json()) as { data: Mission[] };
+        const body = (await res.json()) as { data: MissionListItem[] };
         return body.data;
       },
 
-      async create(input: CreateMissionInput): Promise<Mission> {
+      async get(id: string): Promise<MissionDetail> {
+        const res = await http('GET', `/admin/missions/${id}`);
+        if (!res.ok) await rejectWith(res, 'MISSION_GET_FAILED');
+        const body = (await res.json()) as { data: MissionDetail };
+        return body.data;
+      },
+
+      async create(input: CreateMissionInput): Promise<MissionDetail> {
         const res = await http('POST', '/admin/missions', { body: JSON.stringify(input) });
         if (!res.ok) await rejectWith(res, 'MISSION_CREATE_FAILED');
-        const body = (await res.json()) as { data: Mission };
+        const body = (await res.json()) as { data: MissionDetail };
         return body.data;
       },
 
@@ -221,6 +305,36 @@ export function createAdminGamificationApi(http: HttpTransport) {
         const res = await http('PATCH', `/admin/missions/${id}`, { body: JSON.stringify(input) });
         if (!res.ok) await rejectWith(res, 'MISSION_UPDATE_FAILED');
         const body = (await res.json()) as { data: Mission };
+        return body.data;
+      },
+
+      /** Replaces the ordered list; positions follow the array order. Refused once started. */
+      async replaceRequirements(
+        id: string,
+        requirements: MissionRequirementInput[],
+      ): Promise<MissionRequirement[]> {
+        const res = await http('PUT', `/admin/missions/${id}/requirements`, {
+          body: JSON.stringify({ requirements }),
+        });
+        if (!res.ok) await rejectWith(res, 'MISSION_REQUIREMENTS_FAILED');
+        const body = (await res.json()) as { data: MissionRequirement[] };
+        return body.data;
+      },
+
+      /** The one requirement field editable after start; the step keeps its id and progress. */
+      async updateRequirementTitle(id: string, requirementId: string, title: string): Promise<MissionRequirement> {
+        const res = await http('PATCH', `/admin/missions/${id}/requirements/${requirementId}`, {
+          body: JSON.stringify({ title }),
+        });
+        if (!res.ok) await rejectWith(res, 'MISSION_REQUIREMENT_TITLE_FAILED');
+        const body = (await res.json()) as { data: MissionRequirement };
+        return body.data;
+      },
+
+      async replaceAudience(id: string, audience: MissionAudience): Promise<MissionAudience> {
+        const res = await http('PUT', `/admin/missions/${id}/audience`, { body: JSON.stringify(audience) });
+        if (!res.ok) await rejectWith(res, 'MISSION_AUDIENCE_FAILED');
+        const body = (await res.json()) as { data: MissionAudience };
         return body.data;
       },
 
