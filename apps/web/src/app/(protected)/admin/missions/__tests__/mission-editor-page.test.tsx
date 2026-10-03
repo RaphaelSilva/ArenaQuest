@@ -34,6 +34,8 @@ const api = {
   events: vi.fn(),
   price: vi.fn(),
   media: vi.fn(),
+  listParticipants: vi.fn(),
+  reconcile: vi.fn(),
 };
 
 vi.mock('next/navigation', () => ({
@@ -57,6 +59,8 @@ vi.mock('@web/context/auth-context', async () => {
         replaceRequirements: (...a: unknown[]) => api.replaceRequirements(...a),
         updateRequirementTitle: (...a: unknown[]) => api.updateRequirementTitle(...a),
         replaceAudience: (...a: unknown[]) => api.replaceAudience(...a),
+        listParticipants: (...a: unknown[]) => api.listParticipants(...a),
+        reconcile: (...a: unknown[]) => api.reconcile(...a),
       },
       badges: { list: (...a: unknown[]) => api.badges(...a) },
     },
@@ -184,6 +188,7 @@ describe('AdminMissionEditorPage', () => {
     api.update.mockResolvedValue(detail('2099-01-01T00:00:00.000Z').mission);
     api.replaceRequirements.mockResolvedValue([]);
     api.updateRequirementTitle.mockResolvedValue({});
+    api.listParticipants.mockResolvedValue({ data: [], nextCursor: null });
   });
 
   it('creates a sequential mission with a demonstrations and a self-check step', async () => {
@@ -401,6 +406,63 @@ describe('AdminMissionEditorPage', () => {
     expect(screen.getByLabelText(d.fields.endAt)).toBeDisabled();
     expect(within(cards()[0]).getByLabelText(r.fields.title)).toBeDisabled();
     expect(api.price).not.toHaveBeenCalled();
+  });
+
+  it('has no Participants tab on the create page', async () => {
+    renderPage();
+    await screen.findByRole('heading', { name: d.createTitle });
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: d.participants.tabParticipants })).not.toBeInTheDocument();
+  });
+
+  it('switches between the editor and the participants of an existing mission', async () => {
+    routeId = MISSION;
+    api.get.mockResolvedValue(detail('2020-01-01T00:00:00.000Z'));
+    api.listParticipants.mockResolvedValue({
+      data: [
+        {
+          userId: 'u1',
+          name: 'Student A',
+          email: 'a@example.com',
+          source: 'auto',
+          joinedAt: '2026-10-02 08:00:00',
+          countsFrom: '2026-10-01T00:00:00.000Z',
+          leftAt: null,
+          progress: null,
+          steps: [],
+        },
+      ],
+      nextCursor: null,
+    });
+    renderPage();
+    await screen.findByRole('heading', { name: d.editTitle });
+
+    const editorTab = screen.getByRole('tab', { name: d.participants.tabEditor });
+    expect(editorTab).toHaveAttribute('aria-selected', 'true');
+    expect(api.listParticipants).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('tab', { name: d.participants.tabParticipants }));
+    expect(await screen.findByText('Student A')).toBeInTheDocument();
+    expect(api.listParticipants).toHaveBeenCalledWith(MISSION);
+    expect(screen.queryByLabelText(d.fields.title)).not.toBeInTheDocument();
+    // Sequential mission with no evaluated step: the first is open, the second waits.
+    expect(screen.getAllByTestId('step-chip').map((c) => c.dataset.state)).toEqual(['open', 'locked']);
+    expect(screen.getByRole('button', { name: d.participants.reconcileButton })).toBeInTheDocument();
+
+    fireEvent.click(editorTab);
+    expect(screen.getByLabelText(d.fields.title)).toHaveValue('Kihon month');
+  });
+
+  it('shows a content creator the Participants tab without Reconcile now', async () => {
+    role = 'content_creator';
+    routeId = MISSION;
+    api.get.mockResolvedValue(detail('2099-01-01T00:00:00.000Z'));
+    renderPage();
+    await screen.findByRole('heading', { level: 1, name: d.viewTitle });
+
+    fireEvent.click(screen.getByRole('tab', { name: d.participants.tabParticipants }));
+    expect(await screen.findByText(d.participants.empty)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: d.participants.reconcileButton })).not.toBeInTheDocument();
   });
 
   it('sends a content creator away from the create page', async () => {
