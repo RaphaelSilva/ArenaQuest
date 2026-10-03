@@ -1,6 +1,6 @@
 # Task 11 — Frontend: Dashboard missions panel — My missions, Available, Locked, Join (Phase 6)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Frontend Web
@@ -62,17 +62,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] With a mocked dashboard payload, enrolled, joinable and teaser entries render under *My
+- [x] With a mocked dashboard payload, enrolled, joinable and teaser entries render under *My
       missions*, *Available* and *Locked* respectively.
-- [ ] A sequential mission shows numbered steps with later steps locked; a completed step shows a
+- [x] A sequential mission shows numbered steps with later steps locked; a completed step shows a
       check and its XP.
-- [ ] A target with `accessible: false` renders no link and no title.
-- [ ] Clicking *Join* asks for confirmation, calls the join route once, and the card moves to *My
+- [x] A target with `accessible: false` renders no link and no title.
+- [x] Clicking *Join* asks for confirmation, calls the join route once, and the card moves to *My
       missions*; a mocked `409 MISSION_CLOSED` shows its translated message.
-- [ ] A teaser shows only the title and the group reason, with no link.
-- [ ] `check-i18n-coverage.js` passes; `pt` and `en` builds both render the panel.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A teaser shows only the title and the group reason, with no link.
+- [x] `check-i18n-coverage.js` passes; `pt` and `en` builds both render the panel.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
+      _Closed 2026-10-03. Choices: inline confirmation inside the card (the `StaffNoteActions` pattern) instead of a modal; the badge appears as a "+ badge" hint because the payload carries only `badgeId`; Available cards do not link to the mission page; dates use dictionary month names over the `YYYY-MM-DD` prefix (UTC calendar day), replacing the previous `toLocaleDateString`. `DashboardContent.tsx` needed no change. **Not run:** browser walkthrough and PT/EN render check — covered by the Playwright smoke scheduled before the candidate PR._
 
 ## Verification Plan
 

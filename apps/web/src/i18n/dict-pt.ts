@@ -2321,10 +2321,8 @@ export const dictPt = {
       empty: 'Nenhum desafio semanal esta semana.',
     },
     missions: {
-      title: 'Tarefas Especiais',
-      empty: 'Nenhuma tarefa ativa no momento.',
-      ends: 'Termina',
-      badge: 'Badge:',
+      title: 'Missões Especiais',
+      empty: 'Nenhuma missão ativa no momento.',
     },
     badges: {
       title: 'Badges',
@@ -3084,6 +3082,70 @@ export const dictPt = {
       network: 'Problema de conexão. Verifique a sua internet e tente de novo.',
       notFound: 'Esta demonstração não existe mais.',
       generic: 'Algo deu errado. Tente de novo.',
+    },
+  },
+  missions: {
+    groups: {
+      mine: 'Minhas missões',
+      available: 'Disponíveis',
+      locked: 'Restritas',
+    },
+    empty: {
+      mine: 'Você ainda não participa de nenhuma missão.',
+      available: 'Nenhuma missão aberta para participar no momento.',
+      locked: 'Nenhuma missão restrita no momento.',
+    },
+    window: {
+      ends: (date: string) => `Termina em ${date}`,
+      date: (month: string, day: number) => `${day} de ${month}`,
+    },
+    months: ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
+    card: {
+      completed: 'Concluída',
+      xp: (xp: number) => `+${xp} XP`,
+      badgeReward: '+ medalha',
+      badgeRewardLabel: 'Esta missão também concede uma medalha',
+      progressLabel: (title: string, current: number, target: number) =>
+        `${title}: ${current} de ${target} concluídos`,
+      progressCount: (current: number, target: number) => `${current}/${target}`,
+      lockedIcon: 'Missão restrita',
+    },
+    join: {
+      button: 'Participar',
+      buttonLabel: (title: string) => `Participar de ${title}`,
+      confirmLabel: (title: string) => `Confirmar participação em ${title}`,
+      confirmPrompt: 'Só a atividade a partir de agora conta para esta missão. Participar?',
+      confirm: 'Sim, participar',
+      cancel: 'Cancelar',
+      pending: 'Entrando…',
+    },
+    locked: {
+      reason: (groups: readonly string[]) => {
+        if (groups.length === 0) return 'Reservada a grupos específicos';
+        if (groups.length === 1) return `Para o grupo ${groups[0]}`;
+        return `Para os grupos ${groups.slice(0, -1).join(', ')} e ${groups[groups.length - 1]}`;
+      },
+    },
+    steps: {
+      listLabel: (title: string) => `Etapas de ${title}`,
+      number: (position: number) => `${position}.`,
+      completed: 'Etapa concluída',
+      locked: 'Etapa bloqueada: conclua a etapa anterior primeiro',
+      progress: (current: number, required: number) => `${current} de ${required} feitos`,
+      counter: (current: number, required: number) => `${current}/${required}`,
+      restricted: 'Conteúdo indisponível para você',
+      openTarget: 'Abrir',
+      selfCheck: 'Autoavaliação: marque como feita na página da missão',
+    },
+    errors: {
+      MISSION_CLOSED: 'Esta missão está fora do prazo e não aceita mais participantes.',
+      MISSION_NOT_JOINABLE: 'Não é possível participar desta missão.',
+      MISSION_NOT_LEAVABLE: 'Você foi incluído nesta missão e não pode sair dela.',
+      MISSION_STEP_LOCKED: 'Conclua a etapa anterior primeiro.',
+      MISSION_EVALUATOR_UNAVAILABLE: 'As missões estão temporariamente indisponíveis. Tente novamente mais tarde.',
+      NotFound: 'Esta missão não está mais disponível.',
+      network: 'Problema de conexão. Verifique sua internet e tente novamente.',
+      generic: 'Algo deu errado. Tente novamente.',
     },
   },
   common: {

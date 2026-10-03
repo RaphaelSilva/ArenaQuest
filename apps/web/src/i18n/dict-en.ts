@@ -2319,8 +2319,6 @@ export const dictEn = {
     missions: {
       title: 'Special Missions',
       empty: 'No active missions right now.',
-      ends: 'Ends',
-      badge: 'Badge:',
     },
     badges: {
       title: 'Badges',
@@ -3076,6 +3074,70 @@ export const dictEn = {
       storageUnavailable: 'Storage did not respond. Try again.',
       network: 'Connection problem. Check your internet and try again.',
       notFound: 'This demonstration no longer exists.',
+      generic: 'Something went wrong. Try again.',
+    },
+  },
+  missions: {
+    groups: {
+      mine: 'My missions',
+      available: 'Available',
+      locked: 'Locked',
+    },
+    empty: {
+      mine: 'You are not taking part in any mission yet.',
+      available: 'No missions are open to join right now.',
+      locked: 'No restricted missions right now.',
+    },
+    window: {
+      ends: (date: string) => `Ends ${date}`,
+      date: (month: string, day: number) => `${month} ${day}`,
+    },
+    months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    card: {
+      completed: 'Completed',
+      xp: (xp: number) => `+${xp} XP`,
+      badgeReward: '+ badge',
+      badgeRewardLabel: 'This mission also awards a badge',
+      progressLabel: (title: string, current: number, target: number) =>
+        `${title}: ${current} of ${target} completed`,
+      progressCount: (current: number, target: number) => `${current}/${target}`,
+      lockedIcon: 'Locked mission',
+    },
+    join: {
+      button: 'Join',
+      buttonLabel: (title: string) => `Join ${title}`,
+      confirmLabel: (title: string) => `Confirm joining ${title}`,
+      confirmPrompt: 'Only activity from now on counts toward this mission. Join it?',
+      confirm: 'Yes, join',
+      cancel: 'Cancel',
+      pending: 'Joining…',
+    },
+    locked: {
+      reason: (groups: readonly string[]) => {
+        if (groups.length === 0) return 'Reserved for specific groups';
+        if (groups.length === 1) return `For the ${groups[0]} group`;
+        return `For the ${groups.slice(0, -1).join(', ')} and ${groups[groups.length - 1]} groups`;
+      },
+    },
+    steps: {
+      listLabel: (title: string) => `Steps of ${title}`,
+      number: (position: number) => `${position}.`,
+      completed: 'Step completed',
+      locked: 'Step locked: complete the previous step first',
+      progress: (current: number, required: number) => `${current} of ${required} done`,
+      counter: (current: number, required: number) => `${current}/${required}`,
+      restricted: 'Content not available to you',
+      openTarget: 'Open',
+      selfCheck: 'Self-check: mark it done on the mission page',
+    },
+    errors: {
+      MISSION_CLOSED: 'This mission is outside its window and can no longer be joined.',
+      MISSION_NOT_JOINABLE: 'This mission cannot be joined.',
+      MISSION_NOT_LEAVABLE: 'You were added to this mission and cannot leave it.',
+      MISSION_STEP_LOCKED: 'Complete the previous step first.',
+      MISSION_EVALUATOR_UNAVAILABLE: 'Missions are temporarily unavailable. Try again later.',
+      NotFound: 'This mission is no longer available.',
+      network: 'Connection problem. Check your internet and try again.',
       generic: 'Something went wrong. Try again.',
     },
   },
