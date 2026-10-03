@@ -17,6 +17,8 @@ import { D1QuestRepository } from '@api/adapters/db/d1-quest-repository';
 import { D1BadgeRepository } from '@api/adapters/db/d1-badge-repository';
 import { D1GamificationRepository } from '@api/adapters/db/d1-gamification-repository';
 import { D1MissionRepository } from '@api/adapters/db/d1-mission-repository';
+import { D1MissionParticipationRepository } from '@api/adapters/db/d1-mission-participation-repository';
+import { D1MissionEvidenceRepository } from '@api/adapters/db/d1-mission-evidence-repository';
 import { D1CommentRepository } from '@api/adapters/db/d1-comment-repository';
 import { D1NoteRepository } from '@api/adapters/db/d1-note-repository';
 import { D1SubmissionRepository } from '@api/adapters/db/d1-submission-repository';
@@ -71,6 +73,8 @@ import type {
   INoteRepository,
   ISubmissionRepository,
   IMissionRepository,
+  IMissionParticipationRepository,
+  IMissionEvidenceRepository,
   IActivationTokenRepository,
   IPasswordResetTokenRepository,
   IOAuthAccountRepository,
@@ -135,6 +139,10 @@ export interface GamificationContext {
   badgeRepo: IBadgeRepository;
   gamificationRepo: IGamificationRepository;
   missionRepo: IMissionRepository;
+  /** Mission enrollments, per-step progress and captured evidence (RFC 0022). */
+  missionParticipationRepo: IMissionParticipationRepository;
+  /** Set-based evidence counting over the source tables (RFC 0022 §3.4). */
+  missionEvidenceRepo: IMissionEvidenceRepository;
   xpEngine?: XpEngine;
   streakEngine?: StreakEngine;
   questEvaluator?: QuestEvaluator;
@@ -281,6 +289,8 @@ export function buildContainer(env: Env): AppContainer {
   const questRepo = new D1QuestRepository(env.DB);
   const badgeRepo = new D1BadgeRepository(env.DB);
   const missionRepo = new D1MissionRepository(env.DB);
+  const missionParticipationRepo = new D1MissionParticipationRepository(env.DB);
+  const missionEvidenceRepo = new D1MissionEvidenceRepository(env.DB);
 
   const xpEngine = new XpEngine(
     gamificationRepo,
@@ -407,7 +417,18 @@ export function buildContainer(env: Env): AppContainer {
       submissionRateLimiter,
     },
     progress: { progressRepo, enrollmentRepo },
-    gamification: { questRepo, badgeRepo, gamificationRepo, missionRepo, xpEngine, streakEngine, questEvaluator, badgeEngine },
+    gamification: {
+      questRepo,
+      badgeRepo,
+      gamificationRepo,
+      missionRepo,
+      missionParticipationRepo,
+      missionEvidenceRepo,
+      xpEngine,
+      streakEngine,
+      questEvaluator,
+      badgeEngine,
+    },
     billing: { billingRepo, billingService, accountingService, eventChargeRepo, eventChargeService },
     events: { eventRepo, storage, users, userGroups },
     infra: {

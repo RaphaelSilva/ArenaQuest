@@ -5,10 +5,12 @@ import type {
   MissionCreateInput,
 } from '@arenaquest/shared/ports/i-mission-repository';
 import type { Mission, MissionProgress, MissionRequirement } from '@arenaquest/shared/domain/mission';
-
-// The requirement, audience and mode methods land with migration 0031 (M27 Task 04).
-const notImplemented = (method: string): Error =>
-  new Error(`D1MissionRepository.${method}: not implemented: Task 04`);
+import {
+  REQUIREMENTS_PREDICATE_KIND,
+  parseRequirementParams,
+  type RequirementInput,
+  type RequirementKind,
+} from '@arenaquest/shared/domain/missions/requirements';
 
 type MissionRow = {
   id: string;
@@ -21,12 +23,47 @@ type MissionRow = {
   xp_reward: number;
   badge_id: string | null;
   active: number;
-  // Columns added by migration 0031 (M27 Task 04); absent until then.
-  mode?: Mission['mode'];
-  enrollment_mode?: Mission['enrollmentMode'];
+  // Columns added by migration 0031 (RFC 0022 section 1).
+  mode: Mission['mode'] | null;
+  enrollment_mode: Mission['enrollmentMode'] | null;
   created_at: string;
   updated_at: string;
 };
+
+type RequirementRow = {
+  id: string;
+  mission_id: string;
+  position: number;
+  kind: RequirementKind;
+  title: string;
+  topic_node_id: string | null;
+  event_id: string | null;
+  params: string;
+  xp_reward: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** A requirement joined with its mission: the requirement columns carry an `r_` prefix. */
+type CandidateRow = MissionRow & {
+  r_id: string;
+  r_mission_id: string;
+  r_position: number;
+  r_kind: RequirementKind;
+  r_title: string;
+  r_topic_node_id: string | null;
+  r_event_id: string | null;
+  r_params: string;
+  r_xp_reward: number;
+  r_created_at: string;
+  r_updated_at: string;
+};
+
+/**
+ * Window predicate of an active mission at `?` (bound twice). Both sides go through
+ * `datetime()`: `missions` stores ISO-8601 strings, callers may pass either form.
+ */
+const IN_WINDOW_SQL = 'datetime(m.start_at) <= datetime(?) AND datetime(?) <= datetime(m.end_at)';
 
 type MissionProgressRow = {
   user_id: string;
@@ -198,7 +235,8 @@ export class D1MissionRepository implements IMissionRepository {
         `INSERT INTO mission_progress (user_id, mission_id, current_value, target_value, updated_at)
          VALUES (?, ?, ?, ?, datetime('now'))
          ON CONFLICT(user_id, mission_id) DO UPDATE SET
-           current_value = MIN(target_value, current_value + ?),
+           current_value = MIN(excluded.target_value, current_value + ?),
+           target_value = excluded.target_value,
            updated_at = datetime('now')`,
       )
       .bind(userId, missionId, Math.min(increment, target), target, increment)
@@ -218,7 +256,7 @@ export class D1MissionRepository implements IMissionRepository {
       .prepare(
         `UPDATE mission_progress
          SET completed = 1, completed_at = datetime('now'), updated_at = datetime('now')
-         WHERE user_id = ? AND mission_id = ?`,
+         WHERE user_id = ? AND mission_id = ? AND completed = 0`,
       )
       .bind(userId, missionId)
       .run();
@@ -228,36 +266,204 @@ export class D1MissionRepository implements IMissionRepository {
     return progress;
   }
 
-  async createWithRequirements(): Promise<{ mission: Mission; requirements: MissionRequirement[] }> {
-    throw notImplemented('createWithRequirements');
+  async createWithRequirements(
+    input: MissionCreateInput,
+    requirements: RequirementInput[],
+  ): Promise<{ mission: Mission; requirements: MissionRequirement[] }> {
+    const id = crypto.randomUUID();
+    const insertMission = this.db
+      .prepare(
+        `INSERT INTO missions
+           (id, title, description, start_at, end_at, predicate_kind, predicate_params,
+            xp_reward, badge_id, active, mode, enrollment_mode)
+         VALUES (?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        id,
+        input.title,
+        input.description,
+        input.startAt,
+        input.endAt,
+        REQUIREMENTS_PREDICATE_KIND,
+        input.xpReward,
+        input.badgeId,
+        input.active ? 1 : 0,
+        input.mode ?? 'parallel',
+        input.enrollmentMode ?? 'auto',
+      );
+    await this.db.batch([insertMission, ...this.requirementInserts(id, requirements)]);
+
+    const mission = await this.findById(id);
+    if (!mission) throw new Error('D1MissionRepository: failed to fetch mission after createWithRequirements');
+    return { mission, requirements: await this.listRequirements(id) };
   }
 
-  async listRequirements(): Promise<MissionRequirement[]> {
-    throw notImplemented('listRequirements');
+  async listRequirements(missionId: string): Promise<MissionRequirement[]> {
+    const { results } = await this.db
+      .prepare('SELECT * FROM mission_requirements WHERE mission_id = ? ORDER BY position ASC')
+      .bind(missionId)
+      .all<RequirementRow>();
+    return results.map((row) => this.rowToRequirement(row));
   }
 
-  async replaceRequirements(): Promise<MissionRequirement[]> {
-    throw notImplemented('replaceRequirements');
+  async replaceRequirements(missionId: string, requirements: RequirementInput[]): Promise<MissionRequirement[]> {
+    await this.db.batch([
+      this.db.prepare('DELETE FROM mission_requirements WHERE mission_id = ?').bind(missionId),
+      ...this.requirementInserts(missionId, requirements),
+    ]);
+    return this.listRequirements(missionId);
   }
 
-  async findCandidateRequirements(): Promise<MissionCandidate[]> {
-    throw notImplemented('findCandidateRequirements');
+  async findCandidateRequirements(
+    target: { kind: RequirementKind; topicId?: string; eventId?: string },
+    nowIso: string,
+  ): Promise<MissionCandidate[]> {
+    // The target filter matches one of the two partial indexes; a kind with neither
+    // target (manual_check) only matches rows whose two target columns are NULL.
+    let targetSql: string;
+    const targetValues: string[] = [];
+    if (target.topicId !== undefined) {
+      targetSql = 'r.topic_node_id = ?';
+      targetValues.push(target.topicId);
+    } else if (target.eventId !== undefined) {
+      targetSql = 'r.event_id = ?';
+      targetValues.push(target.eventId);
+    } else {
+      targetSql = 'r.topic_node_id IS NULL AND r.event_id IS NULL';
+    }
+
+    const { results } = await this.db
+      .prepare(
+        `SELECT m.*,
+                r.id AS r_id, r.mission_id AS r_mission_id, r.position AS r_position, r.kind AS r_kind,
+                r.title AS r_title, r.topic_node_id AS r_topic_node_id, r.event_id AS r_event_id,
+                r.params AS r_params, r.xp_reward AS r_xp_reward,
+                r.created_at AS r_created_at, r.updated_at AS r_updated_at
+           FROM mission_requirements r
+           JOIN missions m ON m.id = r.mission_id
+          WHERE ${targetSql}
+            AND r.kind = ?
+            AND m.active = 1
+            AND m.predicate_kind = ?
+            AND ${IN_WINDOW_SQL}
+          ORDER BY m.end_at ASC, m.id ASC, r.position ASC`,
+      )
+      .bind(...targetValues, target.kind, REQUIREMENTS_PREDICATE_KIND, nowIso, nowIso)
+      .all<CandidateRow>();
+
+    return results.map((row) => ({
+      mission: this.rowToMission(row),
+      requirement: this.rowToRequirement({
+        id: row.r_id,
+        mission_id: row.r_mission_id,
+        position: row.r_position,
+        kind: row.r_kind,
+        title: row.r_title,
+        topic_node_id: row.r_topic_node_id,
+        event_id: row.r_event_id,
+        params: row.r_params,
+        xp_reward: row.r_xp_reward,
+        created_at: row.r_created_at,
+        updated_at: row.r_updated_at,
+      }),
+    }));
   }
 
-  async getAudience(): Promise<MissionAudience> {
-    throw notImplemented('getAudience');
+  async getAudience(missionId: string): Promise<MissionAudience> {
+    const [groups, users] = await this.db.batch<{ id: string }>([
+      this.db
+        .prepare('SELECT group_id AS id FROM mission_audience_group WHERE mission_id = ? ORDER BY group_id')
+        .bind(missionId),
+      this.db
+        .prepare('SELECT user_id AS id FROM mission_audience_user WHERE mission_id = ? ORDER BY user_id')
+        .bind(missionId),
+    ]);
+    return {
+      groupIds: (groups?.results ?? []).map((r) => r.id),
+      userIds: (users?.results ?? []).map((r) => r.id),
+    };
   }
 
-  async replaceAudience(): Promise<void> {
-    throw notImplemented('replaceAudience');
+  /** Replace-all, like event audiences: one batch, so a reader never sees half a list. */
+  async replaceAudience(missionId: string, audience: MissionAudience): Promise<void> {
+    const statements: D1PreparedStatement[] = [
+      this.db.prepare('DELETE FROM mission_audience_group WHERE mission_id = ?').bind(missionId),
+      this.db.prepare('DELETE FROM mission_audience_user WHERE mission_id = ?').bind(missionId),
+    ];
+    for (const groupId of new Set(audience.groupIds)) {
+      statements.push(
+        this.db
+          .prepare('INSERT INTO mission_audience_group (mission_id, group_id) VALUES (?, ?)')
+          .bind(missionId, groupId),
+      );
+    }
+    for (const userId of new Set(audience.userIds)) {
+      statements.push(
+        this.db
+          .prepare('INSERT INTO mission_audience_user (mission_id, user_id) VALUES (?, ?)')
+          .bind(missionId, userId),
+      );
+    }
+    await this.db.batch(statements);
   }
 
-  async listActiveLegacyMissions(): Promise<Mission[]> {
-    throw notImplemented('listActiveLegacyMissions');
+  async listActiveLegacyMissions(nowIso: string): Promise<Mission[]> {
+    return this.listActiveByPredicate('<>', nowIso);
   }
 
-  async listActiveRequirementMissions(): Promise<Mission[]> {
-    throw notImplemented('listActiveRequirementMissions');
+  async listActiveRequirementMissions(nowIso: string): Promise<Mission[]> {
+    return this.listActiveByPredicate('=', nowIso);
+  }
+
+  private async listActiveByPredicate(op: '=' | '<>', nowIso: string): Promise<Mission[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT m.* FROM missions m
+          WHERE m.active = 1 AND m.predicate_kind ${op} ? AND ${IN_WINDOW_SQL}
+          ORDER BY m.end_at ASC, m.id ASC`,
+      )
+      .bind(REQUIREMENTS_PREDICATE_KIND, nowIso, nowIso)
+      .all<MissionRow>();
+    return results.map((row) => this.rowToMission(row));
+  }
+
+  /** One INSERT per requirement; positions follow the array order starting at 1. */
+  private requirementInserts(missionId: string, requirements: RequirementInput[]): D1PreparedStatement[] {
+    return requirements.map((requirement, index) =>
+      this.db
+        .prepare(
+          `INSERT INTO mission_requirements
+             (id, mission_id, position, kind, title, topic_node_id, event_id, params, xp_reward)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          missionId,
+          index + 1,
+          requirement.kind,
+          requirement.title,
+          'topicId' in requirement ? requirement.topicId : null,
+          'eventId' in requirement ? requirement.eventId : null,
+          JSON.stringify(parseRequirementParams(requirement.kind, requirement.params ?? {})),
+          requirement.xpReward ?? 0,
+        ),
+    );
+  }
+
+  private rowToRequirement(row: RequirementRow): MissionRequirement {
+    return {
+      id: row.id,
+      missionId: row.mission_id,
+      position: row.position,
+      kind: row.kind,
+      title: row.title,
+      topicId: row.topic_node_id,
+      eventId: row.event_id,
+      params: parseRequirementParams(row.kind, JSON.parse(row.params)),
+      xpReward: row.xp_reward,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 
   async countCompletedMissions(userId: string): Promise<number> {
