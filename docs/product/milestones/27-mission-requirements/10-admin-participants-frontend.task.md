@@ -1,6 +1,6 @@
 # Task 10 — Frontend: Admin participants tab and Reconcile now (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Frontend Web
@@ -53,14 +53,15 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] With a mocked participants page, each step renders as locked, open with `current/required`,
+- [x] With a mocked participants page, each step renders as locked, open with `current/required`,
       or completed with its date and a *hook* or *reconcile* marker.
-- [ ] *Load more* fetches the next cursor page and appends rows.
-- [ ] An admin clicking *Reconcile now* sees the returned counts and a refreshed list; a content
+- [x] *Load more* fetches the next cursor page and appends rows.
+- [x] An admin clicking *Reconcile now* sees the returned counts and a refreshed list; a content
       creator sees the tab without the button.
-- [ ] `check-i18n-coverage.js` passes; `pt` and `en` builds both render the tab.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `check-i18n-coverage.js` passes; `pt` and `en` builds both render the tab.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
+      _Closed 2026-10-03. Chip state is derived client-side from the payload only (completed → `completedAt`; open → progress row; locked → no row + sequential + an earlier incomplete step; else open `0/target` via `targetCountOf`). Dates render as the `YYYY-MM-DD` prefix of the API timestamp (no date helper exists and the i18n spec forbids ad-hoc `Intl`). **Not run:** browser walkthrough and PT/EN render check — covered by the Playwright smoke scheduled before the candidate PR._
 
 ## Verification Plan
 

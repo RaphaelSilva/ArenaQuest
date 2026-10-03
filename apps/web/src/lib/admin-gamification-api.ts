@@ -5,6 +5,7 @@ import type {
   RequirementKind,
 } from '@arenaquest/shared/domain/missions/requirements';
 import type { HttpTransport } from './api-client';
+import type { components } from './api-types.gen';
 
 // ---------------------------------------------------------------------------
 // Wire types — string ids/dates mirroring the backend admin gamification API.
@@ -106,6 +107,18 @@ export type MissionDetail = {
   requirements: MissionRequirement[];
   audience: MissionAudience;
 };
+
+/** One step of a participant, as evaluated by the API (no `state`: the UI derives its chip). */
+export type MissionParticipantStep = components['schemas']['MissionParticipantStep'];
+
+/** One enrollment (active or left) with its aggregate and per-step progress. */
+export type MissionParticipant = components['schemas']['MissionParticipant'];
+
+/** A cursor-paginated page of participants; `nextCursor` is `null` on the last page. */
+export type MissionParticipantPage = { data: MissionParticipant[]; nextCursor: string | null };
+
+/** The counts of one `Reconcile now` run. */
+export type MissionReconcileReport = components['schemas']['MissionReconcileReport'];
 
 export type CreateMissionInput = {
   title: string;
@@ -335,6 +348,22 @@ export function createAdminGamificationApi(http: HttpTransport) {
         const res = await http('PUT', `/admin/missions/${id}/audience`, { body: JSON.stringify(audience) });
         if (!res.ok) await rejectWith(res, 'MISSION_AUDIENCE_FAILED');
         const body = (await res.json()) as { data: MissionAudience };
+        return body.data;
+      },
+
+      /** One page of participants (50 per page); a malformed cursor answers `400 InvalidCursor`. */
+      async listParticipants(id: string, cursor?: string | null): Promise<MissionParticipantPage> {
+        const path = `/admin/missions/${id}/participants`;
+        const res = await http('GET', cursor ? `${path}?cursor=${encodeURIComponent(cursor)}` : path);
+        if (!res.ok) await rejectWith(res, 'MISSION_PARTICIPANTS_FAILED');
+        return (await res.json()) as MissionParticipantPage;
+      },
+
+      /** Admin only: runs the daily reconciliation for this mission now and returns its counts. */
+      async reconcile(id: string): Promise<MissionReconcileReport> {
+        const res = await http('POST', `/admin/missions/${id}/reconcile`);
+        if (!res.ok) await rejectWith(res, 'MISSION_RECONCILE_FAILED');
+        const body = (await res.json()) as { data: MissionReconcileReport };
         return body.data;
       },
 

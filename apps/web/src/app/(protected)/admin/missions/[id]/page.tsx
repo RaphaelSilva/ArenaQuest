@@ -11,6 +11,7 @@ import { Spinner } from '@web/components/spinner';
 import { Button } from '@web/components/design-system';
 import { MissionForm } from '@web/components/missions/MissionForm';
 import { RequirementEditor } from '@web/components/missions/RequirementEditor';
+import { ParticipantsPanel } from '@web/components/missions/ParticipantsPanel';
 import {
   audienceChanged,
   draftFromDetail,
@@ -75,6 +76,9 @@ export default function AdminMissionEditorPage() {
   const [formError, setFormError] = useState('');
   const [stepErrors, setStepErrors] = useState<Record<number, string>>({});
   const [saved, setSaved] = useState(false);
+  // The Participants tab reads the stored mission and its steps, not the draft.
+  const [detail, setDetail] = useState<MissionDetail | null>(null);
+  const [tab, setTab] = useState<'editor' | 'participants'>('editor');
 
   useEffect(() => {
     if (authLoading) return;
@@ -84,6 +88,7 @@ export default function AdminMissionEditorPage() {
 
   const applyDetail = useCallback((detail: MissionDetail) => {
     const next = draftFromDetail(detail);
+    setDetail(detail);
     setOriginal(next);
     setDraft(next);
     // Read once per load: the lock follows the stored start, as the API's does.
@@ -266,6 +271,11 @@ export default function AdminMissionEditorPage() {
   if (!canAccess || (isNew && !canWrite)) return null;
 
   const heading = isNew ? d.createTitle : readOnly ? d.viewTitle : d.editTitle;
+  const p = d.participants;
+  const tabs = [
+    { id: 'editor', label: p.tabEditor },
+    { id: 'participants', label: p.tabParticipants },
+  ] as const;
 
   return (
     <main className="flex-1 overflow-y-auto">
@@ -282,82 +292,123 @@ export default function AdminMissionEditorPage() {
           </h1>
         </div>
 
+        {!isNew && !loadError && (
+          <div role="tablist" aria-label={p.tabsLabel} className="flex gap-2 border-b" style={{ borderColor: 'var(--border)' }}>
+            {tabs.map((t) => {
+              const selected = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  id={`mission-tab-${t.id}`}
+                  aria-selected={selected}
+                  aria-controls={`mission-panel-${t.id}`}
+                  onClick={() => setTab(t.id)}
+                  className="-mb-px border-b-2 px-3 py-2 text-sm font-semibold transition-colors"
+                  style={{
+                    borderColor: selected ? 'var(--accent)' : 'transparent',
+                    color: selected ? 'var(--text)' : 'var(--text2)',
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {loadError ? (
           <p role="alert" className="text-sm" style={errorStyle}>
             {loadError}
           </p>
-        ) : (
-          <form onSubmit={handleSave} noValidate className="space-y-6">
-            {readOnly && (
-              <p
-                role="status"
-                className="rounded-lg px-4 py-3 text-sm"
-                style={{ background: 'var(--bg3)', color: 'var(--text2)' }}
-              >
-                {d.readOnlyNotice}
-              </p>
-            )}
-            {started && (
-              <p
-                role="status"
-                data-testid="started-banner"
-                className="rounded-lg px-4 py-3 text-sm"
-                style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
-              >
-                {d.startedBanner}
-              </p>
-            )}
-
-            <MissionForm
-              draft={draft}
-              onChange={updateDraft}
-              badges={badges}
-              readOnly={readOnly}
-              started={started}
-              isNew={isNew}
-              originalEndAt={original?.endAt ?? ''}
+        ) : tab === 'participants' && detail ? (
+          <div role="tabpanel" id="mission-panel-participants" aria-labelledby="mission-tab-participants">
+            <ParticipantsPanel
+              missionId={missionId}
+              mission={detail.mission}
+              requirements={detail.requirements}
+              canReconcile={canWrite}
             />
+          </div>
+        ) : (
+          <div
+            role={isNew ? undefined : 'tabpanel'}
+            id="mission-panel-editor"
+            aria-labelledby={isNew ? undefined : 'mission-tab-editor'}
+          >
+            <form onSubmit={handleSave} noValidate className="space-y-6">
+              {readOnly && (
+                <p
+                  role="status"
+                  className="rounded-lg px-4 py-3 text-sm"
+                  style={{ background: 'var(--bg3)', color: 'var(--text2)' }}
+                >
+                  {d.readOnlyNotice}
+                </p>
+              )}
+              {started && (
+                <p
+                  role="status"
+                  data-testid="started-banner"
+                  className="rounded-lg px-4 py-3 text-sm"
+                  style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
+                >
+                  {d.startedBanner}
+                </p>
+              )}
 
-            <section className={`${cardClass} space-y-4`} style={cardStyle}>
-              <h2 className={eyebrowClass} style={eyebrowStyle}>
-                {d.sections.requirements}
-              </h2>
-              <RequirementEditor
-                steps={draft.steps}
-                onChange={(steps) => updateDraft({ steps })}
-                mode={draft.mode}
-                structureLocked={readOnly || started}
-                titleLocked={readOnly}
-                errors={stepErrors}
-                topics={topics}
-                events={events}
-                eventPriced={eventPriced}
-                mediaStats={mediaStats}
+              <MissionForm
+                draft={draft}
+                onChange={updateDraft}
+                badges={badges}
+                readOnly={readOnly}
+                started={started}
+                isNew={isNew}
+                originalEndAt={original?.endAt ?? ''}
               />
-            </section>
 
-            {formError && (
-              <p role="alert" className="text-sm" style={errorStyle}>
-                {formError}
-              </p>
-            )}
-            {saved && (
-              <p role="status" className="text-sm" style={{ color: 'var(--accent3)' }}>
-                {d.savedMessage}
-              </p>
-            )}
+              <section className={`${cardClass} space-y-4`} style={cardStyle}>
+                <h2 className={eyebrowClass} style={eyebrowStyle}>
+                  {d.sections.requirements}
+                </h2>
+                <RequirementEditor
+                  steps={draft.steps}
+                  onChange={(steps) => updateDraft({ steps })}
+                  mode={draft.mode}
+                  structureLocked={readOnly || started}
+                  titleLocked={readOnly}
+                  errors={stepErrors}
+                  topics={topics}
+                  events={events}
+                  eventPriced={eventPriced}
+                  mediaStats={mediaStats}
+                />
+              </section>
 
-            {!readOnly && (
-              <div className="flex justify-end gap-3">
-                <Button type="button" variant="secondary" size="md" onClick={() => router.push('/admin/missions')}>
-                  {d.cancelButton}
-                </Button>
-                <Button type="submit" variant="primary" size="md" disabled={saving} isLoading={saving}>
-                  {saving ? d.savingButton : d.saveButton}
-                </Button>
-              </div>
-            )}
-          </form>
+              {formError && (
+                <p role="alert" className="text-sm" style={errorStyle}>
+                  {formError}
+                </p>
+              )}
+              {saved && (
+                <p role="status" className="text-sm" style={{ color: 'var(--accent3)' }}>
+                  {d.savedMessage}
+                </p>
+              )}
+
+              {!readOnly && (
+                <div className="flex justify-end gap-3">
+                  <Button type="button" variant="secondary" size="md" onClick={() => router.push('/admin/missions')}>
+                    {d.cancelButton}
+                  </Button>
+                  <Button type="submit" variant="primary" size="md" disabled={saving} isLoading={saving}>
+                    {saving ? d.savingButton : d.saveButton}
+                  </Button>
+                </div>
+              )}
+            </form>
+          </div>
         )}
       </div>
     </main>
