@@ -1,5 +1,14 @@
-import type { IMissionRepository } from '@arenaquest/shared/ports/i-mission-repository';
-import type { Mission, MissionProgress } from '@arenaquest/shared/domain/mission';
+import type {
+  IMissionRepository,
+  MissionAudience,
+  MissionCandidate,
+  MissionCreateInput,
+} from '@arenaquest/shared/ports/i-mission-repository';
+import type { Mission, MissionProgress, MissionRequirement } from '@arenaquest/shared/domain/mission';
+
+// The requirement, audience and mode methods land with migration 0031 (M27 Task 04).
+const notImplemented = (method: string): Error =>
+  new Error(`D1MissionRepository.${method}: not implemented: Task 04`);
 
 type MissionRow = {
   id: string;
@@ -12,6 +21,9 @@ type MissionRow = {
   xp_reward: number;
   badge_id: string | null;
   active: number;
+  // Columns added by migration 0031 (M27 Task 04); absent until then.
+  mode?: Mission['mode'];
+  enrollment_mode?: Mission['enrollmentMode'];
   created_at: string;
   updated_at: string;
 };
@@ -37,7 +49,7 @@ export class D1MissionRepository implements IMissionRepository {
     return row ? this.rowToMission(row) : null;
   }
 
-  async create(mission: Omit<Mission, 'id' | 'createdAt' | 'updatedAt'>): Promise<Mission> {
+  async create(mission: MissionCreateInput): Promise<Mission> {
     const id = crypto.randomUUID();
     await this.db
       .prepare(
@@ -140,6 +152,8 @@ export class D1MissionRepository implements IMissionRepository {
       xpReward: row.xp_reward,
       badgeId: row.badge_id,
       active: row.active === 1,
+      mode: row.mode ?? 'parallel',
+      enrollmentMode: row.enrollment_mode ?? 'auto',
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     };
@@ -212,6 +226,38 @@ export class D1MissionRepository implements IMissionRepository {
     const progress = await this.findProgress(userId, missionId);
     if (!progress) throw new Error(`D1MissionRepository: failed to fetch progress after markCompleted (userId=${userId}, missionId=${missionId})`);
     return progress;
+  }
+
+  async createWithRequirements(): Promise<{ mission: Mission; requirements: MissionRequirement[] }> {
+    throw notImplemented('createWithRequirements');
+  }
+
+  async listRequirements(): Promise<MissionRequirement[]> {
+    throw notImplemented('listRequirements');
+  }
+
+  async replaceRequirements(): Promise<MissionRequirement[]> {
+    throw notImplemented('replaceRequirements');
+  }
+
+  async findCandidateRequirements(): Promise<MissionCandidate[]> {
+    throw notImplemented('findCandidateRequirements');
+  }
+
+  async getAudience(): Promise<MissionAudience> {
+    throw notImplemented('getAudience');
+  }
+
+  async replaceAudience(): Promise<void> {
+    throw notImplemented('replaceAudience');
+  }
+
+  async listActiveLegacyMissions(): Promise<Mission[]> {
+    throw notImplemented('listActiveLegacyMissions');
+  }
+
+  async listActiveRequirementMissions(): Promise<Mission[]> {
+    throw notImplemented('listActiveRequirementMissions');
   }
 
   async countCompletedMissions(userId: string): Promise<number> {
