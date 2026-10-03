@@ -129,7 +129,7 @@ tasks.
 | 05 | [Admin missions API — admin-only writes, typed requirements, start lock, audience, participants](./05-admin-missions-api.task.md) | 3 | Backend | ✅ Done |
 | 06 | [Mission hooks at the evidence write sites](./06-mission-hooks.task.md) | 4 | Backend | ✅ Done |
 | 07 | [Student missions API — steps, teasers, join, leave, manual check](./07-student-missions-api.task.md) | 4 | Backend | ✅ Done |
-| 08 | [Daily reconciliation, admin reconcile endpoint and legacy loop narrowing](./08-reconciliation-job.task.md) | 4 | Backend | ☐ Open |
+| 08 | [Daily reconciliation, admin reconcile endpoint and legacy loop narrowing](./08-reconciliation-job.task.md) | 4 | Backend | ✅ Done |
 | 09 | [Admin mission editor — requirements editor, pickers, audience, badge suggestion](./09-admin-mission-editor-frontend.task.md) | 5 | Frontend | ☐ Open |
 | 10 | [Admin participants tab and Reconcile now](./10-admin-participants-frontend.task.md) | 5 | Frontend | ☐ Open |
 | 11 | [Dashboard missions panel — My missions, Available, Locked, Join](./11-dashboard-missions-panel-frontend.task.md) | 6 | Frontend | ☐ Open |
