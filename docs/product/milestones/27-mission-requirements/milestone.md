@@ -127,7 +127,7 @@ tasks.
 | 03 | [Mission evaluator — windowing, sequential unlock, write-once rewards, streak](./03-mission-evaluator-domain.task.md) | 1 | Backend | ✅ Done |
 | 04 | [Migration 0031 and D1 adapters with per-kind counting](./04-schema-and-d1-adapters.task.md) | 2 | Backend | ✅ Done |
 | 05 | [Admin missions API — admin-only writes, typed requirements, start lock, audience, participants](./05-admin-missions-api.task.md) | 3 | Backend | ✅ Done |
-| 06 | [Mission hooks at the evidence write sites](./06-mission-hooks.task.md) | 4 | Backend | ☐ Open |
+| 06 | [Mission hooks at the evidence write sites](./06-mission-hooks.task.md) | 4 | Backend | ✅ Done |
 | 07 | [Student missions API — steps, teasers, join, leave, manual check](./07-student-missions-api.task.md) | 4 | Backend | ☐ Open |
 | 08 | [Daily reconciliation, admin reconcile endpoint and legacy loop narrowing](./08-reconciliation-job.task.md) | 4 | Backend | ☐ Open |
 | 09 | [Admin mission editor — requirements editor, pickers, audience, badge suggestion](./09-admin-mission-editor-frontend.task.md) | 5 | Frontend | ☐ Open |

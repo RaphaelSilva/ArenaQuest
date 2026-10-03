@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { ProgressService } from '@api/core/progress/progress-service';
 import { respondWith } from '@api/routes/_shared/envelope';
+import { runMissionHook } from '@api/core/missions/hook';
 import type { ProgressContext, EngagementContext, ContentContext, GamificationContext } from '@api/container';
 
 const CACHE_CONTROL = 'private, max-age=15';
@@ -242,6 +243,8 @@ export function buildMeProgressRouter(slice: {
     const topicId = c.req.valid('param').id;
 
     const result = await service.visitTopic(userId, topicId);
+    // Every successful visit, not only a status change: a repeat visit inside a window is new evidence.
+    if (result.ok) await runMissionHook(slice, { kind: 'topic_visit', userId, topicId });
     return respondWith(c, result);
   });
 

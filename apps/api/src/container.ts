@@ -34,6 +34,12 @@ import { XpEngine } from '@arenaquest/shared/domain/gamification/xp-engine';
 import { StreakEngine } from '@arenaquest/shared/domain/gamification/streak-engine';
 import { QuestEvaluator } from '@arenaquest/shared/domain/gamification/quest-evaluator';
 import { BadgeEngine } from '@arenaquest/shared/domain/gamification/badge-engine';
+import {
+  MissionEvaluator,
+  isMissionStaff,
+  type MissionContextResolver,
+} from '@arenaquest/shared/domain/gamification/mission-evaluator';
+import { Entities } from '@arenaquest/shared/types/entities';
 import { AuthService } from '@api/core/auth/auth-service';
 import {
   parseSubmissionConfig,
@@ -147,6 +153,8 @@ export interface GamificationContext {
   streakEngine?: StreakEngine;
   questEvaluator?: QuestEvaluator;
   badgeEngine?: BadgeEngine;
+  /** Requirement-based missions (RFC 0022 §3): behind the hooks, the manual check and the reconciliation. */
+  missionEvaluator?: MissionEvaluator;
 }
 
 /**
@@ -237,6 +245,46 @@ export interface AppContainer {
 // Factory
 // ---------------------------------------------------------------------------
 
+/**
+ * The user and media facts the mission evaluator needs (RFC 0022 §3.1, §5),
+ * answered through the existing identity, enrollment and media ports. Only an
+ * active user takes part. The identity port has no "groups of a user" read, so
+ * group membership is derived from the group listing; the evaluator memoises
+ * the context per signal and asks for it only while the user has no enrollment
+ * in a candidate mission.
+ */
+function buildMissionContextResolver(
+  users: IUserRepository,
+  userGroups: IUserGroupRepository,
+  enrollmentRepo: IEnrollmentRepository,
+  media: IMediaRepository,
+): MissionContextResolver {
+  return {
+    async getUserContext(userId) {
+      const user = await users.findById(userId);
+      if (!user || user.status !== Entities.Config.UserStatus.ACTIVE) return null;
+      const [groups, accessibleTopicIds] = await Promise.all([
+        userGroups.listAll(),
+        enrollmentRepo.getEffectiveAccessTopicIds(userId),
+      ]);
+      const members = await Promise.all(groups.map((group) => userGroups.listMembers(group.id)));
+      const groupIds = groups
+        .filter((_, i) => members[i].some((member) => member.userId === userId))
+        .map((group) => group.id);
+      return { isStaff: isMissionStaff(user.roles.map((role) => role.name)), groupIds, accessibleTopicIds };
+    },
+    async isReadyVideoOfTopic(topicId, mediaId) {
+      const row = await media.findById(mediaId);
+      return (
+        row !== null &&
+        row.topicNodeId === topicId &&
+        row.status === Entities.Config.MediaStatus.READY &&
+        row.type.startsWith('video/')
+      );
+    },
+  };
+}
+
 export function buildContainer(env: Env): AppContainer {
   // Infra: auth adapter
   const auth = new JwtAuthAdapter({
@@ -302,6 +350,18 @@ export function buildContainer(env: Env): AppContainer {
   );
   const questEvaluator = new QuestEvaluator(questRepo, missionRepo, xpEngine);
   const badgeEngine = new BadgeEngine(badgeRepo, gamificationRepo, missionRepo, xpEngine);
+  const missionEvaluator = new MissionEvaluator(
+    missionRepo,
+    missionParticipationRepo,
+    missionEvidenceRepo,
+    badgeRepo,
+    xpEngine,
+    streakEngine,
+    buildMissionContextResolver(users, userGroups, enrollmentRepo, media),
+    // A malformed SUBMISSIONS_* var already fails every submission route; a
+    // `shared_only` step then simply counts nothing.
+    { sharingEnabled: submissionConfig.ok ? submissionConfig.config.sharingEnabled : false },
+  );
 
   // Billing repo + service
   const billingRepo = new D1BillingRepository(env.DB);
@@ -428,6 +488,7 @@ export function buildContainer(env: Env): AppContainer {
       streakEngine,
       questEvaluator,
       badgeEngine,
+      missionEvaluator,
     },
     billing: { billingRepo, billingService, accountingService, eventChargeRepo, eventChargeService },
     events: { eventRepo, storage, users, userGroups },
