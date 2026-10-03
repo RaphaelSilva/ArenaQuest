@@ -134,7 +134,7 @@ tasks.
 | 10 | [Admin participants tab and Reconcile now](./10-admin-participants-frontend.task.md) | 5 | Frontend | ✅ Done |
 | 11 | [Dashboard missions panel — My missions, Available, Locked, Join](./11-dashboard-missions-panel-frontend.task.md) | 6 | Frontend | ✅ Done |
 | 12 | [Mission page — steps, manual check, leave](./12-mission-page-frontend.task.md) | 6 | Frontend | ✅ Done |
-| 13 | [Demo seed mission as typed requirements](./13-demo-seed-requirements.task.md) | 7 | Backend | ☐ Open |
+| 13 | [Demo seed mission as typed requirements](./13-demo-seed-requirements.task.md) | 7 | Backend | ✅ Done |
 | 14 | [Documentation closeout, backlog items and release note](./14-docs-and-closeout.task.md) | 7 | Backend | ☐ Open |
 
 Dependency graph:
