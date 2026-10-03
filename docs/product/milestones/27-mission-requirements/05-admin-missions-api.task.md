@@ -1,6 +1,6 @@
 # Task 05 — Backend: Admin missions API — admin-only writes, typed requirements, start lock, audience, participants (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Backend API
@@ -73,23 +73,24 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A content creator gets `403` on `POST`, `PATCH`, `PUT …/requirements`,
+- [x] A content creator gets `403` on `POST`, `PATCH`, `PUT …/requirements`,
       `PATCH …/requirements/{reqId}`, `PUT …/audience` and `DELETE`, and `200` on list, detail and
       participants; an admin gets `201` on create.
-- [ ] A create with an unknown `kind`, `minCount: 0`, an extra params key, an archived topic, a
+- [x] A create with an unknown `kind`, `minCount: 0`, an extra params key, an archived topic, a
       topic with no video for `video_watched`, or an unpriced event answers `400` naming the
       requirement index and the reason.
-- [ ] A `shared_only` requirement answers `400 REQUIREMENT_SHARING_DISABLED` when
+- [x] A `shared_only` requirement answers `400 REQUIREMENT_SHARING_DISABLED` when
       `SUBMISSIONS_SHARING_ENABLED=false`.
-- [ ] After `start_at`, `PUT …/requirements` and a `PATCH` of `mode` or `xpReward` answer
+- [x] After `start_at`, `PUT …/requirements` and a `PATCH` of `mode` or `xpReward` answer
       `409 MISSION_STARTED`; a `PATCH` of `title` or a later `endAt` answers `200`.
-- [ ] `PUT …/audience` on an `auto` mission answers `409 MISSION_NOT_ASSIGNED`; removing a user
+- [x] `PUT …/audience` on an `auto` mission answers `409 MISSION_NOT_ASSIGNED`; removing a user
       sets their enrollment's `left_at` and leaves their progress rows and `xp_events` intact.
-- [ ] A created mission reads back with `predicateKind = 'requirements'` and its requirements in
+- [x] A created mission reads back with `predicateKind = 'requirements'` and its requirements in
       position order.
-- [ ] `routes/admin/index.ts` is unchanged; no `@ValidateBody` / `@Body()` in the diff.
-- [ ] Changed files lint clean; `make test-api` green; `pnpm dump-openapi` leaves no diff.
-- [ ] No diff outside the scope guardrail.
+- [x] `routes/admin/index.ts` is unchanged; no `@ValidateBody` / `@Body()` in the diff.
+- [x] Changed files lint clean; `make test-api` green; `pnpm dump-openapi` leaves no diff.
+- [x] No diff outside the scope guardrail.
+      _Closed 2026-10-03. Authorized additions: `updateRequirementTitle` on `IMissionRepository` + its D1 implementation (a title edit must keep the requirement id, or progress rows would cascade away), and `D1MissionRepository.update` now persists `mode` / `enrollment_mode` (it silently dropped them). Extra codes: `409 MISSION_LEGACY` on replacing requirements of a legacy mission, `400 BADGE_NOT_FOUND`, `400 AUDIENCE_NOT_ALLOWED`, `400 UNKNOWN_AUDIENCE_TARGET`. The start lock compares values, so resubmitting an unchanged form after start is accepted. Group members are enrolled eagerly on create/audience replace. Follow-up: `list()` and participants count through the ports (one progress read per enrollment); a set-based adapter count is the follow-up if rosters grow. The `curl` walkthrough was not run; the router spec covers the flows end to end._
 
 ## Verification Plan
 
