@@ -1,8 +1,8 @@
 # RFC 0022: Mission requirements — evidence-driven missions with ordered steps, enrollment and per-step rewards
 
 **Date:** 2026-10-02
-**Status:** Draft
-**Revised:** 2026-10-02
+**Status:** Implemented
+**Revised:** 2026-10-03
 **Author:** raphaelsilva
 **Affected:**
 - `apps/api/migrations/0031_create_mission_requirements.sql` (new — `mission_requirements`, `mission_enrollments`, `mission_requirement_progress`, `mission_evidence`, `mission_audience_group`, `mission_audience_user`; adds `mode` and `enrollment_mode` to `missions`. No statement touches `topic_nodes`, `topic_progress`, `topic_submissions` or any billing table)
