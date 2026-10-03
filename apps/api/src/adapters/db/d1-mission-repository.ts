@@ -152,6 +152,14 @@ export class D1MissionRepository implements IMissionRepository {
       updates.push('active = ?');
       values.push(mission.active ? 1 : 0);
     }
+    if (mission.mode !== undefined) {
+      updates.push('mode = ?');
+      values.push(mission.mode);
+    }
+    if (mission.enrollmentMode !== undefined) {
+      updates.push('enrollment_mode = ?');
+      values.push(mission.enrollmentMode);
+    }
 
     if (updates.length === 0) {
       const existing = await this.findById(id);
@@ -312,6 +320,22 @@ export class D1MissionRepository implements IMissionRepository {
       ...this.requirementInserts(missionId, requirements),
     ]);
     return this.listRequirements(missionId);
+  }
+
+  async updateRequirementTitle(
+    missionId: string,
+    requirementId: string,
+    title: string,
+  ): Promise<MissionRequirement | null> {
+    const row = await this.db
+      .prepare(
+        `UPDATE mission_requirements SET title = ?, updated_at = datetime('now')
+          WHERE id = ? AND mission_id = ?
+          RETURNING *`,
+      )
+      .bind(title, requirementId, missionId)
+      .first<RequirementRow>();
+    return row ? this.rowToRequirement(row) : null;
   }
 
   async findCandidateRequirements(
