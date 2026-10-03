@@ -10,6 +10,7 @@ import { respondNoContent, respondWith } from '@api/routes/_shared/envelope';
 import { encodeCursor, invalidCursorResponse, parseCursorParam } from '@api/routes/_shared/cursor';
 import { cursorQuerySchema } from '@api/routes/notes.router';
 import { NO_STORE } from '@api/routes/submissions.router';
+import { runMissionHook } from '@api/core/missions/hook';
 import type { AppContainer } from '@api/container';
 
 /**
@@ -139,16 +140,19 @@ export function buildAdminSubmissionsRouter(container: AppContainer): OpenAPIHon
 
   router.openapi(unshareSubmissionRoute, async (c) => {
     const result = await controller.forceUnshare(c.req.valid('param').id, submissionCaller(c));
+    if (result.ok) await runMissionHook(container, { kind: 'submission_by_id', submissionId: c.req.valid('param').id });
     return respondWith(c, result) as any;
   });
 
   router.openapi(clearSubmissionModerationRoute, async (c) => {
     const result = await controller.clearModeration(c.req.valid('param').id, submissionCaller(c));
+    if (result.ok) await runMissionHook(container, { kind: 'submission_by_id', submissionId: c.req.valid('param').id });
     return respondNoContent(c, result) as any;
   });
 
   router.openapi(removeSubmissionRoute, async (c) => {
     const result = await controller.removeByStaff(c.req.valid('param').id, submissionCaller(c));
+    if (result.ok) await runMissionHook(container, { kind: 'submission_by_id', submissionId: c.req.valid('param').id });
     return respondNoContent(c, result) as any;
   });
 
