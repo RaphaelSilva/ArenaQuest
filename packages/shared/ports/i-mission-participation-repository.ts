@@ -1,4 +1,4 @@
-import type { MissionEnrollment, MissionRequirementProgress } from '../domain/mission';
+import type { Mission, MissionEnrollment, MissionRequirement, MissionRequirementProgress } from '../domain/mission';
 import type { CompletedBy, EvidenceSource } from '../domain/missions/requirements';
 
 /**
@@ -16,6 +16,31 @@ export interface IMissionParticipationRepository {
     source: 'auto' | 'admin',
     countsFrom: string,
   ): Promise<boolean>;
+  /**
+   * Daily reconciliation (RFC 0022 §4 step 2): creates every implicit enrollment the
+   * mission's policy grants, in one set-based statement. `auto` — every active user
+   * without the `admin` or `content_creator` role whose effective access set holds
+   * every id of `topicTargetIds` (all of them when the list is empty), `source = 'auto'`;
+   * `assigned` — direct audience users and members of the audience groups,
+   * `source = 'admin'`; `open` — nothing. `countsFrom = mission.startAt`. Existing rows,
+   * active or left, are left untouched. Returns the number of rows inserted.
+   */
+  materializeImplicitEnrollments(
+    mission: Pick<Mission, 'id' | 'startAt' | 'enrollmentMode'>,
+    topicTargetIds: string[],
+  ): Promise<number>;
+  /**
+   * Daily reconciliation (RFC 0022 §4 step 3): captures, with `source = 'backfill'`,
+   * the evidence the source tables still prove for the mission's active enrollments
+   * inside `[startAt, endAt]` — first video watches from the XP log for
+   * `video_watched`, topic visits from topic progress for `topic_visited`. Existing
+   * rows (hook rows included) are kept. Other kinds insert nothing. Returns the number
+   * of rows inserted.
+   */
+  backfillEvidence(
+    mission: Pick<Mission, 'id' | 'startAt' | 'endAt'>,
+    requirement: Pick<MissionRequirement, 'id' | 'kind' | 'topicId'>,
+  ): Promise<number>;
   /**
    * Joins as `self` with `countsFrom = nowIso`. A re-join clears `leftAt` and keeps the
    * original `countsFrom`, so leaving can never reset a window.

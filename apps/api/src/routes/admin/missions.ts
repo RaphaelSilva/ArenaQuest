@@ -12,6 +12,7 @@ import {
   MissionListItemSchema,
   MissionParticipantPageSchema,
   MissionPatchBodySchema,
+  MissionReconcileReportSchema,
   MissionRequirementErrorSchema,
   MissionRequirementSchema,
   MissionRequirementTitleBodySchema,
@@ -215,6 +216,23 @@ export const deleteMissionRoute = createRoute({
   },
 });
 
+export const reconcileMissionRoute = createRoute({
+  method: 'post',
+  path: '/{id}/reconcile',
+  middleware: adminOnly,
+  summary: 'Reconcile mission',
+  description:
+    "Runs the daily reconciliation for this mission now: materialises implicit enrollments, backfills captured evidence and recomputes every enrollment. It may complete steps and the mission (`completedBy = 'reconcile'`) and grant their rewards; it never reopens anything and records no streak activity. Legacy predicate missions answer `404`.",
+  tags: TAGS,
+  security: SECURITY,
+  request: { params: idParams },
+  responses: {
+    200: { description: 'The run counts', ...json(z.object({ data: MissionReconcileReportSchema })) },
+    403: { description: 'Not an admin' },
+    404: { description: 'Mission not found, or a legacy predicate mission' },
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Validation errors
 // ---------------------------------------------------------------------------
@@ -259,6 +277,7 @@ export function buildAdminMissionsRouter(container: AppContainer) {
     users: container.identity.users,
     badges: badgeRepo,
     sharingEnabled: submissionConfig.ok ? submissionConfig.config.sharingEnabled : null,
+    evaluator: container.gamification.missionEvaluator,
   });
 
   const router = new OpenAPIHono({
@@ -321,6 +340,12 @@ export function buildAdminMissionsRouter(container: AppContainer) {
 
   router.openapi(deleteMissionRoute, async (c) => {
     const result = await controller.delete(c.req.valid('param').id);
+    if (!result.ok) return respondWith(c, result);
+    return c.json({ data: result.data }, 200);
+  });
+
+  router.openapi(reconcileMissionRoute, async (c) => {
+    const result = await controller.reconcile(c.req.valid('param').id);
     if (!result.ok) return respondWith(c, result);
     return c.json({ data: result.data }, 200);
   });
