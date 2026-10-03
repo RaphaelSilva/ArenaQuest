@@ -250,6 +250,8 @@ class World {
         this.enrollments.set(k, { missionId, userId, source, joinedAt: countsFrom, countsFrom, leftAt: null });
         return true;
       }),
+      materializeImplicitEnrollments: vi.fn(notUsed),
+      backfillEvidence: vi.fn(notUsed),
       join: vi.fn(notUsed),
       leave: vi.fn(notUsed),
       findEnrollment: vi.fn(async (missionId: string, userId: string) => this.enrollments.get(key(missionId, userId)) ?? null),

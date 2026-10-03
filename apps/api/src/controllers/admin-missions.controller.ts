@@ -23,7 +23,9 @@ import {
   type RequirementInput,
 } from '@arenaquest/shared/domain/missions/requirements';
 import { Entities } from '@arenaquest/shared/types/entities';
+import type { MissionEvaluator } from '@arenaquest/shared/domain/gamification/mission-evaluator';
 import type { ControllerResult } from '@api/core/result';
+import { reconcileOneMission, type ReconcileRunReport } from '@api/jobs/reconcile-missions';
 import type {
   MissionCreateBodySchema,
   MissionPatchBodySchema,
@@ -109,6 +111,8 @@ export interface AdminMissionsDeps {
   badges: IBadgeRepository;
   /** The label's submission sharing switch; `null` when the submission config is invalid. */
   sharingEnabled: boolean | null;
+  /** Requirement-based evaluation, behind the on-demand reconciliation. */
+  evaluator?: MissionEvaluator;
   now?: () => Date;
 }
 
@@ -141,6 +145,7 @@ export class AdminMissionsController {
   private readonly users: IUserRepository;
   private readonly badges: IBadgeRepository;
   private readonly sharingEnabled: boolean | null;
+  private readonly evaluator: MissionEvaluator | undefined;
   private readonly now: () => Date;
 
   constructor(deps: AdminMissionsDeps) {
@@ -154,6 +159,7 @@ export class AdminMissionsController {
     this.users = deps.users;
     this.badges = deps.badges;
     this.sharingEnabled = deps.sharingEnabled;
+    this.evaluator = deps.evaluator;
     this.now = deps.now ?? (() => new Date());
   }
 
@@ -404,6 +410,20 @@ export class AdminMissionsController {
 
     await this.missions.update(id, { active: false });
     return { ok: true, data: { success: true } };
+  }
+
+  /**
+   * Runs the daily reconciliation (RFC 0022 §4) for this one mission — the same
+   * routine `scheduled()` calls. `404` for an unknown or legacy predicate mission.
+   */
+  async reconcile(id: string): Promise<ControllerResult<ReconcileRunReport>> {
+    const report = await reconcileOneMission(
+      { missions: this.missions, participation: this.participation, evaluator: this.evaluator },
+      id,
+      this.now(),
+    );
+    if (!report) return NOT_FOUND;
+    return { ok: true, data: report };
   }
 
   // -- rules -----------------------------------------------------------------

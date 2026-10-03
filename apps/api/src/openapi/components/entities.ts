@@ -700,6 +700,16 @@ export const MissionParticipantPageSchema = z.object({
   nextCursor: nextCursorField,
 }).openapi('MissionParticipantPage');
 
+export const MissionReconcileReportSchema = z.object({
+  missions: z.number().int().openapi({ description: 'Missions reconciled (1 for this route)', example: 1 }),
+  enrollmentsCreated: z.number().int().openapi({ description: 'Implicit enrollments materialised', example: 3 }),
+  evidenceBackfilled: z.number().int().openapi({ description: "Evidence rows captured with `source = 'backfill'`", example: 2 }),
+  enrollmentsEvaluated: z.number().int().openapi({ description: 'Active enrollments evaluated', example: 12 }),
+  stepsClosed: z.number().int().openapi({ description: "Steps completed by this run (`completedBy = 'reconcile'`)", example: 4 }),
+  missionsClosed: z.number().int().openapi({ description: 'Mission completions granted by this run', example: 1 }),
+  failed: z.number().int().openapi({ description: 'Missions whose reconciliation failed (0 or 1 here)', example: 0 }),
+}).openapi('MissionReconcileReport');
+
 // ---------------------------------------------------------------------------
 // Student missions (RFC 0022 §5, §6, §8)
 // ---------------------------------------------------------------------------

@@ -3653,6 +3653,55 @@
           "null"
         ]
       },
+      "MissionReconcileReport": {
+        "properties": {
+          "enrollmentsCreated": {
+            "description": "Implicit enrollments materialised",
+            "example": 3,
+            "type": "integer"
+          },
+          "enrollmentsEvaluated": {
+            "description": "Active enrollments evaluated",
+            "example": 12,
+            "type": "integer"
+          },
+          "evidenceBackfilled": {
+            "description": "Evidence rows captured with `source = 'backfill'`",
+            "example": 2,
+            "type": "integer"
+          },
+          "failed": {
+            "description": "Missions whose reconciliation failed (0 or 1 here)",
+            "example": 0,
+            "type": "integer"
+          },
+          "missions": {
+            "description": "Missions reconciled (1 for this route)",
+            "example": 1,
+            "type": "integer"
+          },
+          "missionsClosed": {
+            "description": "Mission completions granted by this run",
+            "example": 1,
+            "type": "integer"
+          },
+          "stepsClosed": {
+            "description": "Steps completed by this run (`completedBy = 'reconcile'`)",
+            "example": 4,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "missions",
+          "enrollmentsCreated",
+          "evidenceBackfilled",
+          "enrollmentsEvaluated",
+          "stepsClosed",
+          "missionsClosed",
+          "failed"
+        ],
+        "type": "object"
+      },
       "MissionRequirement": {
         "properties": {
           "createdAt": {
@@ -9985,6 +10034,58 @@
           }
         ],
         "summary": "List mission participants",
+        "tags": [
+          "admin:missions"
+        ]
+      }
+    },
+    "/v1/admin/missions/{id}/reconcile": {
+      "post": {
+        "description": "Runs the daily reconciliation for this mission now: materialises implicit enrollments, backfills captured evidence and recomputes every enrollment. It may complete steps and the mission (`completedBy = 'reconcile'`) and grant their rewards; it never reopens anything and records no streak activity. Legacy predicate missions answer `404`.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MissionReconcileReport"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The run counts"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "Mission not found, or a legacy predicate mission"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Reconcile mission",
         "tags": [
           "admin:missions"
         ]

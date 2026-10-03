@@ -1,6 +1,6 @@
 # Task 08 — Backend: Daily reconciliation, admin reconcile endpoint and legacy loop narrowing (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Backend API
@@ -76,22 +76,23 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] With hooks bypassed, three qualifying submissions inside the window lead `scheduled()` to
+- [x] With hooks bypassed, three qualifying submissions inside the window lead `scheduled()` to
       complete the step and mission with `completed_by = 'reconcile'`, one
       `mission_step_reward` and one `mission_reward`, and `completed_at` equal to the third
       submission's `created_at`.
-- [ ] Running `scheduled()` twice in a row changes no row the second time.
-- [ ] After evidence of a completed mission is deleted, `scheduled()` leaves every `completed_at`,
+- [x] Running `scheduled()` twice in a row changes no row the second time.
+- [x] After evidence of a completed mission is deleted, `scheduled()` leaves every `completed_at`,
       `xp_events` and `user_badges` row unchanged; `user_streak` is never written by the job.
-- [ ] No `admin` or `content_creator` is enrolled in an `auto` mission by the job; a student lacking
+- [x] No `admin` or `content_creator` is enrolled in an `auto` mission by the job; a student lacking
       access to one topic target is not enrolled.
-- [ ] `POST /v1/admin/missions/{id}/reconcile` returns the run's counts for an admin and `403` for
+- [x] `POST /v1/admin/missions/{id}/reconcile` returns the run's counts for an admin and `403` for
       a content creator.
-- [ ] A legacy mission still advances on a mapped quest source; a `requirements` mission is not
+- [x] A legacy mission still advances on a mapped quest source; a `requirements` mission is not
       touched by `QuestEvaluator`.
-- [ ] A thrown error in the job does not prevent billing or the sweep from running (spec).
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A thrown error in the job does not prevent billing or the sweep from running (spec).
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
+      _Closed 2026-10-03. Authorized additions: `materializeImplicitEnrollments` and `backfillEvidence` on `IMissionParticipationRepository`, each one set-based `INSERT … SELECT … ON CONFLICT DO NOTHING` (the access rule mirrors `getEffectiveAccessTopicIds`, with a parity spec). **Not met, follow-up filed in Task 14:** completions and partial counts are still written one row at a time through the evaluator's `reconcileMission` (write-once and change-only, but O(enrollments) statements), not in `db.batch` chunks of 100 — a set-based writer in the evaluator is the follow-up. `reconcileOneMission` (admin route) ignores the 48 h window; a failure inside it answers `200` with `failed: 1`._
 
 ## Verification Plan
 

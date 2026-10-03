@@ -5,7 +5,16 @@ import { applyMigrations } from '../helpers/apply-migrations';
 import { v1 } from '../helpers/v1';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { encodeCursor } from '@api/routes/_shared/cursor';
-import { enroll, insertEvent, insertMedia, insertTopic, insertUser } from '../db/mission-fixtures';
+import {
+  enroll,
+  insertEvent,
+  insertMedia,
+  insertMission,
+  insertRequirement,
+  insertSubmission,
+  insertTopic,
+  insertUser,
+} from '../db/mission-fixtures';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -144,6 +153,7 @@ describe('admin missions - role matrix', () => {
     ['PATCH', `/admin/missions/${missionId}/requirements/${requirementId}`, { title: 'Renamed step' }],
     ['PUT', `/admin/missions/${missionId}/audience`, { groupIds: [], userIds: [] }],
     ['DELETE', `/admin/missions/${missionId}`, undefined],
+    ['POST', `/admin/missions/${missionId}/reconcile`, undefined],
   ] as const;
 
   const reads = () => [
@@ -708,5 +718,57 @@ describe('legacy missions and delete', () => {
 
     const missing = await req('DELETE', `/admin/missions/${crypto.randomUUID()}`, { token: adminToken });
     expect(missing.status).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reconcile (RFC 0022 §4, §6)
+// ---------------------------------------------------------------------------
+
+describe('POST /admin/missions/{id}/reconcile', () => {
+  it('runs the reconciliation for one mission and returns its counts; a second call closes nothing', async () => {
+    const topicId = await publishedTopicId();
+    const missionId = await insertMission({ startAt: iso(-DAY), endAt: iso(DAY), enrollmentMode: 'open' });
+    const requirementId = await insertRequirement(missionId, 1, 'submissions_on_topic', { topicId, params: { minCount: 1 } });
+    const student = await insertUser();
+    await enroll(missionId, student, { source: 'self', countsFrom: iso(-DAY) });
+    await insertSubmission(topicId, student, iso(-3_600_000).slice(0, 19).replace('T', ' '));
+
+    const res = await req('POST', `/admin/missions/${missionId}/reconcile`, { token: adminToken });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      data: {
+        missions: 1,
+        enrollmentsCreated: 0,
+        evidenceBackfilled: 0,
+        enrollmentsEvaluated: 1,
+        stepsClosed: 1,
+        missionsClosed: 1,
+        failed: 0,
+      },
+    });
+    const step = await env.DB
+      .prepare('SELECT completed_by FROM mission_requirement_progress WHERE requirement_id = ? AND user_id = ?')
+      .bind(requirementId, student)
+      .first<{ completed_by: string }>();
+    expect(step?.completed_by).toBe('reconcile');
+
+    const again = await req('POST', `/admin/missions/${missionId}/reconcile`, { token: adminToken });
+    expect((await again.json<{ data: Body }>()).data).toMatchObject({ stepsClosed: 0, missionsClosed: 0 });
+  });
+
+  it('is 403 for a content creator', async () => {
+    const missionId = await insertMission({ startAt: iso(-DAY), endAt: iso(DAY) });
+    const res = await req('POST', `/admin/missions/${missionId}/reconcile`, { token: contentCreatorToken });
+    expect(res.status).toBe(403);
+  });
+
+  it('is 404 for an unknown mission and for a legacy predicate mission', async () => {
+    const unknown = await req('POST', `/admin/missions/${crypto.randomUUID()}/reconcile`, { token: adminToken });
+    expect(unknown.status).toBe(404);
+
+    const legacy = await insertMission({ predicateKind: 'topics_completed' });
+    const res = await req('POST', `/admin/missions/${legacy}/reconcile`, { token: adminToken });
+    expect(res.status).toBe(404);
   });
 });
