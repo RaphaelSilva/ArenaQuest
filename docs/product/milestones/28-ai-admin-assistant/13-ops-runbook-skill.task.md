@@ -2,7 +2,7 @@
 
 **Status:** 📝 Open
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
-**RFC:** [RFC 0023](../../RFCs/0023-ai-admin-assistant.md)
+**RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
 **Depends On:** [Task 05](./05-job-runs-recording.task.md), [Task 12](./12-aq-mcp-ops-tools.task.md)
 
@@ -21,7 +21,7 @@ computed predicates that are not columns ("past" events, effective topic access)
 only for a named person on request; and where to look first (`aq-mcp` tools from Task 12) before
 writing SQL. The task also documents how to mint `AQ_CF_READ_TOKEN` with the minimum scopes and
 tests whether a D1-read-scoped token can run `SELECT` through the query endpoint; the answer is
-recorded in RFC 0023 as a Resolved Decision.
+recorded in RFC 0025 as a Resolved Decision.
 
 ## Dependencies
 
@@ -34,7 +34,7 @@ recorded in RFC 0023 as a Resolved Decision.
   - `.claude/skills/ops-runbook/SKILL.md` and any reference file under that folder (the path is a
     symlink to `.agents/skills/`; write through the real path if needed).
   - `docs/onboarding.md` — the read-only token procedure.
-  - `docs/product/RFCs/0023-ai-admin-assistant.md` — moving OQ 5 into Resolved Decisions with the
+  - `docs/product/RFCs/0025-ai-admin-assistant.md` — moving OQ 5 into Resolved Decisions with the
     date and the tested answer.
 - **Documentation only.** No code, no migration, no new tool; if OQ 5's answer is "yes", the
   query tool is filed as a follow-up task, not built here.
@@ -61,7 +61,7 @@ Out:
 - [ ] The rules section states `SELECT` only, the private-notes exclusion, the credentials
       exclusion and the "ask before production" rule verbatim.
 - [ ] `docs/onboarding.md` describes minting `AQ_CF_READ_TOKEN` with the exact scopes.
-- [ ] RFC 0023 records OQ 5's tested answer as a Resolved Decision with date and decider.
+- [ ] RFC 0025 records OQ 5's tested answer as a Resolved Decision with date and decider.
 - [ ] `make lint` green (docs only, `make test-api` unaffected).
 - [ ] No diff outside the scope guardrail.
 

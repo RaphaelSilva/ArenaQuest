@@ -2,7 +2,7 @@
 
 **Status:** 📝 Open
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
-**RFC:** [RFC 0023](../../RFCs/0023-ai-admin-assistant.md)
+**RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Frontend Web
 **Depends On:** [Task 07](./07-topic-publish-gate.task.md)
 

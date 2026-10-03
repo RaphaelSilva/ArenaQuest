@@ -2,7 +2,7 @@
 
 **Status:** 📝 Open
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
-**RFC:** [RFC 0023](../../RFCs/0023-ai-admin-assistant.md)
+**RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
 **Depends On:** [Task 01](./01-backup-bucket-and-provision-check.task.md), [Task 06](./06-admin-ops-health-api.task.md), [Task 10](./10-aq-mcp-authoring-tools.task.md), [Task 11](./11-backup-status-report.task.md)
 

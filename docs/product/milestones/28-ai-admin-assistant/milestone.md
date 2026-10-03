@@ -1,9 +1,9 @@
 # Milestone 28 — AI Admin Assistant
 
 **Status:** 📝 Draft
-**Scope:** `scripts/backup/` + `.github/workflows/backup.yml` + the label profile and provisioner (off-database backups of D1 and R2, restore drill, backup status), `apps/api` (`job_runs` recording, admin ops health and job-run routes, admin-only topic publish gate), `apps/web` (topic publish controls follow the gate), `scripts/lib/` + `scripts/mcp/` (shared API client, the local `aq-mcp` MCP server), `.claude/skills/ops-runbook/` and `docs/operations/`. Derived from [RFC 0023](../../RFCs/0023-ai-admin-assistant.md).
+**Scope:** `scripts/backup/` + `.github/workflows/backup.yml` + the label profile and provisioner (off-database backups of D1 and R2, restore drill, backup status), `apps/api` (`job_runs` recording, admin ops health and job-run routes, admin-only topic publish gate), `apps/web` (topic publish controls follow the gate), `scripts/lib/` + `scripts/mcp/` (shared API client, the local `aq-mcp` MCP server), `.claude/skills/ops-runbook/` and `docs/operations/`. Derived from [RFC 0025](../../RFCs/0025-ai-admin-assistant.md).
 
-> **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: the new `scripts/backup/**`, `scripts/lib/**`, `scripts/mcp/**` and `.github/workflows/backup.yml`; `scripts/content/import-media.mjs` and `scripts/media/convert-skipped.mjs` **only** to import what moves to `scripts/lib/` (behaviour and CLI unchanged, their existing tests green and unedited except for import paths); `scripts/cloudflare/provision-label.mjs` for the backup bucket and a read-only `--check` mode; the `backup` block in `config/labels/*.jsonc` and the profile schema that validates it; one new migration `apps/api/migrations/00NN_create_job_runs.sql` (next free number at implementation time — `0031` is claimed by M27); `apps/api/src/index.ts` (`scheduled()` recording), `apps/api/src/core/billing/billing-service.ts` (return counts only), `apps/api/src/jobs/**`, the new `apps/api/src/routes/admin/ops.ts`, `apps/api/src/controllers/admin-ops.controller.ts`, a `D1JobRunRepository` with its port in `packages/shared/ports/`, the wiring lines in `routes/admin/index.ts` and `container.ts`, the publish gate in `apps/api/src/routes/admin/topics.ts`, `apps/api/test/**`, the regenerated `apps/api/openapi.json` and `apps/web/src/lib/api-types.gen.ts`; the topic publish controls under `apps/web/src/app/(protected)/admin/topics/**` and `apps/web/src/components/admin/topics/**` with both i18n dictionaries; the root `package.json`/lockfile for `@modelcontextprotocol/sdk` only; the new `.claude/skills/ops-runbook/**`, `docs/operations/backup-restore.md`, the `aq-mcp` section of `docs/onboarding.md`, a CLAUDE.md paragraph per new surface; the `Makefile` for new `backup-*-prod`, `backup-status-prod` and `infra-check-<env>` targets only; `.gitignore` only for `.arenaquest/` if not yet ignored; and, for the closeout, RFC 0023's `Status:` header and its README row. It is explicitly **not** an opportunity to: build a **remote MCP server** in the Worker or any OAuth flow (RFC Alternative 1); let the assistant **publish, archive, delete or move** topics; write to D1 through **SQL** from any tool; let any tool **restore, reset or deploy** — tier 3 only prints the command; back up **staging** or **KV**, or store **secret values** anywhere; add **multi-operator** access or a new role; change the public, anonymous **`/health`**; touch **`topic_notes` bodies** or **submission files** from any tool. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
+> **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: the new `scripts/backup/**`, `scripts/lib/**`, `scripts/mcp/**` and `.github/workflows/backup.yml`; `scripts/content/import-media.mjs` and `scripts/media/convert-skipped.mjs` **only** to import what moves to `scripts/lib/` (behaviour and CLI unchanged, their existing tests green and unedited except for import paths); `scripts/cloudflare/provision-label.mjs` for the backup bucket and a read-only `--check` mode; the `backup` block in `config/labels/*.jsonc` and the profile schema that validates it; one new migration `apps/api/migrations/00NN_create_job_runs.sql` (next free number at implementation time — `0031` is claimed by M27); `apps/api/src/index.ts` (`scheduled()` recording), `apps/api/src/core/billing/billing-service.ts` (return counts only), `apps/api/src/jobs/**`, the new `apps/api/src/routes/admin/ops.ts`, `apps/api/src/controllers/admin-ops.controller.ts`, a `D1JobRunRepository` with its port in `packages/shared/ports/`, the wiring lines in `routes/admin/index.ts` and `container.ts`, the publish gate in `apps/api/src/routes/admin/topics.ts`, `apps/api/test/**`, the regenerated `apps/api/openapi.json` and `apps/web/src/lib/api-types.gen.ts`; the topic publish controls under `apps/web/src/app/(protected)/admin/topics/**` and `apps/web/src/components/admin/topics/**` with both i18n dictionaries; the root `package.json`/lockfile for `@modelcontextprotocol/sdk` only; the new `.claude/skills/ops-runbook/**`, `docs/operations/backup-restore.md`, the `aq-mcp` section of `docs/onboarding.md`, a CLAUDE.md paragraph per new surface; the `Makefile` for new `backup-*-prod`, `backup-status-prod` and `infra-check-<env>` targets only; `.gitignore` only for `.arenaquest/` if not yet ignored; and, for the closeout, RFC 0025's `Status:` header and its README row. It is explicitly **not** an opportunity to: build a **remote MCP server** in the Worker or any OAuth flow (RFC Alternative 1); let the assistant **publish, archive, delete or move** topics; write to D1 through **SQL** from any tool; let any tool **restore, reset or deploy** — tier 3 only prints the command; back up **staging** or **KV**, or store **secret values** anywhere; add **multi-operator** access or a new role; change the public, anonymous **`/health`**; touch **`topic_notes` bodies** or **submission files** from any tool. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
 
 ---
 
@@ -19,7 +19,7 @@
 - **Ops and backup questions go through tiered tools.** Tier 1 diagnoses freely on a read-only Cloudflare token, tier 2 acts only after a confirmed plan, tier 3 returns the command and never runs it (RFC §5).
 - **Ad-hoc SQL questions have a runbook.** The `ops-runbook` skill: schema map, canned `SELECT`s, computed predicates and the data-exposure rules (RFC §3.3, §3.4, §6).
 
-Out of scope (explicit, from RFC 0023 Non-Goals):
+Out of scope (explicit, from RFC 0025 Non-Goals):
 - **Remote MCP in the Worker / claude.ai / phone access** — deferred, RFC Alternative 1; needs OAuth without external auth deps.
 - **Publish, archive, delete or move from the assistant** — the operator does these in the backoffice.
 - **SQL writes** — RFC Alternative 2; content writes go through the API.
@@ -139,9 +139,9 @@ script suites it touches).
 
 ---
 
-## 6. Decisions recorded (from RFC 0023)
+## 6. Decisions recorded (from RFC 0025)
 
-RFC 0023 has no Resolved Decisions yet. Decisions 1–4 below come from the
+RFC 0025 has no Resolved Decisions yet. Decisions 1–4 below come from the
 design itself. Decisions 5–10 are the **recommended defaults** for its Open
 Questions, recorded here so tasks can be written; they are **pending
 confirmation by raphaelsilva** and must be confirmed (and moved into the RFC's
@@ -170,8 +170,8 @@ whether Plane B moves into an `aq-mcp` `query` tool.
 - [ ] All milestone-level acceptance criteria in §3 pass.
 - [ ] `make lint`, `make test-api`, and `make test-web` pass green.
 - [ ] Every production label shows a passing drill less than 8 days old in its manifest.
-- [ ] Decisions 5–10 confirmed by the owner and recorded as Resolved Decisions in RFC 0023.
+- [ ] Decisions 5–10 confirmed by the owner and recorded as Resolved Decisions in RFC 0025.
 - [ ] Closeout note written at `./closeout-analysis.md`.
-- [ ] RFC 0023 status set to `Implemented` in its header and
+- [ ] RFC 0025 status set to `Implemented` in its header and
       `docs/product/RFCs/README.md`; deferred items (remote MCP, off-account copy, daily brief) remain backlog.
 - [ ] No diff outside the scope declared in the guardrail.

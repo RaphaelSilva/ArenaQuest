@@ -2,7 +2,7 @@
 
 **Status:** 📝 Open
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
-**RFC:** [RFC 0023](../../RFCs/0023-ai-admin-assistant.md)
+**RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
 
 ## Summary
@@ -11,7 +11,7 @@ Makes publishing a topic an **admin** act, exactly as publishing an event alread
 `POST /v1/admin/topics` and `PATCH /v1/admin/topics/{id}`, a body carrying
 `status: 'published'` requires the `admin` role; a `content_creator` receives `403`. Every other
 write — drafts, edits, `archived`, moves, media — stays open to both staff roles. This is the
-server-side layer of the assistant's "never publishes" guarantee (RFC 0023 §2, layer 3): the
+server-side layer of the assistant's "never publishes" guarantee (RFC 0025 §2, layer 3): the
 `aq-mcp` account is a content creator, so no tool path can publish even if a tool were wrong.
 The gate follows the events precedent (`publishGate`, `routes/admin/events.ts`), extended to the
 create route because topics, unlike events, accept a status on create. **Before merging, the

@@ -1,4 +1,4 @@
-# RFC 0023: AI Admin Assistant: Content Authoring, Operational Queries and Backups
+# RFC 0025: AI Admin Assistant: Content Authoring, Operational Queries and Backups
 
 **Date:** 2026-10-02
 **Status:** Draft
