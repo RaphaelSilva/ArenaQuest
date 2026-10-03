@@ -131,7 +131,7 @@ tasks.
 | 07 | [Student missions API — steps, teasers, join, leave, manual check](./07-student-missions-api.task.md) | 4 | Backend | ✅ Done |
 | 08 | [Daily reconciliation, admin reconcile endpoint and legacy loop narrowing](./08-reconciliation-job.task.md) | 4 | Backend | ✅ Done |
 | 09 | [Admin mission editor — requirements editor, pickers, audience, badge suggestion](./09-admin-mission-editor-frontend.task.md) | 5 | Frontend | ✅ Done |
-| 10 | [Admin participants tab and Reconcile now](./10-admin-participants-frontend.task.md) | 5 | Frontend | ☐ Open |
+| 10 | [Admin participants tab and Reconcile now](./10-admin-participants-frontend.task.md) | 5 | Frontend | ✅ Done |
 | 11 | [Dashboard missions panel — My missions, Available, Locked, Join](./11-dashboard-missions-panel-frontend.task.md) | 6 | Frontend | ☐ Open |
 | 12 | [Mission page — steps, manual check, leave](./12-mission-page-frontend.task.md) | 6 | Frontend | ☐ Open |
 | 13 | [Demo seed mission as typed requirements](./13-demo-seed-requirements.task.md) | 7 | Backend | ☐ Open |
