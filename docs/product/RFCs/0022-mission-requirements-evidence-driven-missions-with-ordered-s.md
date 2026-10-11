@@ -1167,20 +1167,18 @@ Each item below is a **separate future document**, and **none blocks M27**:
 1. **Backlog (no RFC)** — fix the quest seed mismatch (`login` vs `daily_login`, `count` vs
    `target` in `0019_seed_quests.sql`), the demo seed's mission params
    (`scripts/demo/dataset/base.json`), and fire `visit` on topic page mount (Open Question 6, decided).
-2. **RFC 0023 — *Challenges as recurring missions*** — a mission template plus a recurrence rule;
+2. **RFC — *Challenges as recurring missions*** — a mission template plus a recurrence rule;
    the cron instantiates the next window; daily and weekly quests converge on the mission engine.
-3. **RFC 0024 — *Tasks as mission templates*** — Task + TaskStage become the reusable mold (steps
+3. **RFC — *Tasks as mission templates*** — Task + TaskStage become the reusable mold (steps
    and targets, no window or reward), and a mission is the assignment of a mold to a group with a
    window and XP; migrates or retires `task_progress`.
 
-4. **RFC — *Media acknowledgment as evidence*** (number to be picked at planning time; 0023 is
-   already taken by another proposal) — a per-user, per-media "I read / watched this" record for
+4. **RFC 0023 — *Media acknowledgment*** (this RFC) — a per-user, per-media "I read / watched this" record for
    documents and images (and an optional explicit confirmation for videos), the route that writes
    it, whether and how it earns XP, and a `media_viewed` requirement kind so a mission step can
    ask for a topic's documents to be acknowledged. Raised by the product owner during the m27
    preview walkthrough (2026-10-11): only videos produce evidence today, automatically; a document
    or image offers no way to say it was read.
 
-RFC 0023 and RFC 0024 may merge into one if M27 shows that the template and the recurrence want the
-same table. The numbers above were reserved before another planning stream took 0023; re-pick them
-when each RFC is opened.
+The challenges and tasks RFCs (items 2 and 3) may merge into one if M27 shows that the template and
+the recurrence want the same table; they will be numbered when opened (0024 onward).

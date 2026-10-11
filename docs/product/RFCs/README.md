@@ -30,6 +30,7 @@ it lives in the linked milestone, and is summarised in
 | [0020](./0020-student-submissions.md) | Student submissions — students upload, manage and move demonstration media per topic | ✅ Implemented | [M23](../milestones/23-student-submissions/milestone.md) | 2026-09-29 |
 | [0021](./0021-release-candidate-previews-and-demo-seed.md) | Release-candidate previews on staging and a reproducible demo seed | ✅ Implemented | [M26](../milestones/26-release-candidate-previews-and-demo-seed/milestone.md) | 2026-09-29 |
 | [0022](./0022-mission-requirements-evidence-driven-missions-with-ordered-s.md) | Mission requirements — evidence-driven missions with ordered steps, enrollment and per-step rewards | ✅ Implemented | [M27](../milestones/27-mission-requirements/milestone.md) | 2026-10-02 |
+| [0023](./0023-media-acknowledgment-read-and-watched-marks-as-mission-evide.md) | Media acknowledgment — read and watched marks as mission evidence | 📝 Draft | — | 2026-10-11 |
 
 Milestones 1–7 predate this process and derive directly from
 [`../specification.md`](../specification.md).
