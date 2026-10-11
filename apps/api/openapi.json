@@ -11903,7 +11903,7 @@
         ]
       },
       "post": {
-        "description": "Create a new topic node.",
+        "description": "Create a new topic node. `status: \"published\"` additionally requires the `admin` role; a `draft` (the default) does not.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -12136,6 +12136,9 @@
           },
           "400": {
             "description": "Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters)"
+          },
+          "403": {
+            "description": "Forbidden — `status: \"published\"` requires the admin role"
           },
           "404": {
             "description": "Parent topic not found"
@@ -12370,7 +12373,7 @@
         ]
       },
       "patch": {
-        "description": "Update metadata of a topic node.",
+        "description": "Update metadata of a topic node. `status: \"published\"` additionally requires the `admin` role; `archived` does not.",
         "parameters": [
           {
             "in": "path",
@@ -12604,6 +12607,9 @@
           },
           "400": {
             "description": "Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters)"
+          },
+          "403": {
+            "description": "Forbidden — `status: \"published\"` requires the admin role"
           },
           "404": {
             "description": "Topic not found"

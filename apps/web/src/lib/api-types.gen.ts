@@ -5854,7 +5854,7 @@ export interface paths {
         put?: never;
         /**
          * Create Topic Node
-         * @description Create a new topic node.
+         * @description Create a new topic node. `status: "published"` additionally requires the `admin` role; a `draft` (the default) does not.
          */
         post: {
             parameters: {
@@ -5938,6 +5938,13 @@ export interface paths {
                 };
                 /** @description Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters) */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — `status: "published"` requires the admin role */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6079,7 +6086,7 @@ export interface paths {
         head?: never;
         /**
          * Update Topic Node
-         * @description Update metadata of a topic node.
+         * @description Update metadata of a topic node. `status: "published"` additionally requires the `admin` role; `archived` does not.
          */
         patch: {
             parameters: {
@@ -6163,6 +6170,13 @@ export interface paths {
                 };
                 /** @description Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters) */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — `status: "published"` requires the admin role */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
