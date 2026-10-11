@@ -41,7 +41,8 @@
         list-kv-staging list-kv-prod cf-info-staging cf-info-prod \
         secret-staging secret-prod create-google-oauth-secret \
         label-new label-scaffold label-check \
-        set-new-label \
+        set-new-label infra-check-staging infra-check-production \
+        backup-d1-prod backup-r2-prod backup-status-prod backup-pull-prod backup-restore-local \
         clean clean-cache clean-all \
         confirm-prod guard-no-dev-seed-staging guard-no-dev-seed-prod \
         db-migrations-dev db-migrations-staging db-migrations-prod db-seed-dev \
@@ -183,7 +184,23 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/demo/extensions.test.mjs \
 		scripts/demo/ci-check.test.mjs \
 		scripts/db/reset-remote.test.mjs \
-		scripts/db/check-migrations.test.mjs
+		scripts/db/check-migrations.test.mjs \
+		scripts/backup/manifest.test.mjs \
+		scripts/backup/export-d1.test.mjs \
+		scripts/backup/s3.test.mjs \
+		scripts/backup/mirror-r2.test.mjs \
+		scripts/backup/drill.test.mjs \
+		scripts/backup/status.test.mjs \
+		scripts/backup/pull.test.mjs \
+		scripts/backup/restore-local.test.mjs \
+		scripts/lib/api-client.test.mjs \
+		scripts/lib/convert.test.mjs \
+		scripts/mcp/aq-mcp.test.mjs \
+		scripts/mcp/audit.test.mjs \
+		scripts/mcp/tools/authoring.test.mjs \
+		scripts/mcp/confirm.test.mjs \
+		scripts/mcp/tools/ops.test.mjs \
+		scripts/mcp/no-destructive.test.mjs
 
 # Migration lint (RFC 0021 §2.1): base migrations are frozen, new ones additive
 # unless their header carries `-- @contract: <reason>`. Compares with BASE
@@ -239,6 +256,20 @@ db-reset-local: ## Delete the local D1 replica, re-migrate and re-seed
 db-seed-demo-local: ## Seed the demo dataset into the local replica (LABEL=arenaquest|budo|spaziord; DRY_RUN=1 writes SQL + plan only)
 	node scripts/demo/seed-demo.mjs --label $(DEMO_LABEL) -e local \
 		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+# Replay production locally (RFC 0025 §4.3): the dump pulled by backup-pull-prod is
+# verified against the pulled manifest, then applied to the local D1 replica
+# (apps/api/.wrangler/state/v3/d1 is removed first) and the pulled media is put into
+# wrangler's local bucket in-process. Local only: -e staging/-e production and any
+# production- or staging-named --persist-to are refused before any write. The CLI
+# confirms (the replica holds real student data); CONFIRM=1 passes --yes.
+backup-restore-local: ## Replace the local D1 replica + local bucket with a pulled production backup (LABEL=x; FROM=dir, PERSIST_TO=dir, SKIP_MEDIA=1, DRY_RUN=1 plans only; CONFIRM=1 skips the prompt)
+	node scripts/backup/restore-local.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e local \
+		$(if $(FROM),--from $(FROM),) \
+		$(if $(PERSIST_TO),--persist-to $(PERSIST_TO),) \
+		$(if $(filter 1,$(SKIP_MEDIA)),--skip-media,) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,) \
+		$(if $(filter 1,$(CONFIRM)),--yes,)
 
 bootstrap-admin: ## Interactively create the first admin (prompts for local/staging/prod)
 	@bash scripts/bootstrap-first-admin.sh
@@ -371,6 +402,46 @@ db-migrate-prod: confirm-prod ## Apply D1 migrations to the REMOTE production da
 r2-cors-prod: confirm-prod ## Apply the profile-derived CORS rules to the production bucket
 	node scripts/cloudflare/provision-label.mjs $(DEPLOY_LABEL) --production --only cors --yes
 
+# Off-database backup (RFC 0025 §4.1): gzipped D1 dump + SHA-256 + row counts
+# into the label's backup bucket, then d1/production/manifest.json. Read-only on
+# D1 (the export and two SELECTs); the script itself never prompts — the
+# confirmation is confirm-prod, which passes --yes. Staging/local are refused.
+backup-d1-prod: confirm-prod ## Export a label's production D1 to its backup bucket (LABEL=x; DRY_RUN=1 plans only; CONFIRM=1 skips the prompt)
+	node scripts/backup/export-d1.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e production --yes \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+# R2 media mirror (RFC 0025 §4.2): incremental server-side copy of the production
+# media bucket into the backup bucket under r2/production/, diffed by key + ETag.
+# A removed object is tombstoned (kept 90 days, backup.retention.tombstoneDays)
+# and pruned only after the window; the source is never written. Needs
+# R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY in the environment (never argv).
+backup-r2-prod: confirm-prod ## Mirror a label's production media bucket into its backup bucket (LABEL=x; DRY_RUN=1 plans only; MAX_BYTES=n MAX_SECONDS=n bound the run; CONFIRM=1 skips the prompt)
+	node scripts/backup/mirror-r2.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e production --yes \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,) \
+		$(if $(MAX_BYTES),--max-bytes $(MAX_BYTES),) \
+		$(if $(MAX_SECONDS),--max-seconds $(MAX_SECONDS),)
+
+# Backup status (RFC 0025 §4.5): dump age, size delta, last drill, mirror lag,
+# Time Travel bookmark and the age of the last home-lab pull on this machine,
+# each line green/amber/red with the command that fixes it — printed, never run.
+# Read-only (r2 object get + d1 time-travel info): no confirmation, the
+# read-only token is enough. Exit 0 green, 1 any red, 2 amber only.
+backup-status-prod: ## Report a label's production backup state with fix commands (LABEL=x; JSON=1 prints the report as JSON)
+	node scripts/backup/status.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e production \
+		$(if $(filter 1,$(JSON)),--json,)
+
+# Home-lab pull (RFC 0025 §4.3, Resolved Decision 4): the latest dump (SHA-256
+# verified against the manifest) and every mirrored object not yet on disk, from
+# the BACKUP bucket only (never the media bucket, never D1) into
+# .arenaquest/backups/<label>-production/. Read-only on the cloud, so no
+# confirmation and the read-only token is enough; resumable (a second run
+# downloads nothing). Writes the ledger backup-status-prod's home-lab line reads.
+backup-pull-prod: ## Pull a label's latest dump + mirrored media from its backup bucket to this machine (LABEL=x; OUT=dir, CONCURRENCY=n, DRY_RUN=1 plans only)
+	node scripts/backup/pull.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e production \
+		$(if $(OUT),--out $(OUT),) \
+		$(if $(CONCURRENCY),--concurrency $(CONCURRENCY),) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
 import-media-prod: ## Import a media tree into production (LABEL=x, SOURCE=path | DRIVE_FOLDER=id; MANIFEST=path; CLI confirms; LIMIT=n, SKIP_INVALID=1, ROOT_TOPIC=uuid, SKIPPED_REPORT=path)
 	@test -n "$(SOURCE)$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  SOURCE or DRIVE_FOLDER is required — e.g. make import-media-prod SOURCE=./content$(RESET)\n"; exit 1; }
 	@test -z "$(SOURCE)" -o -z "$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  Pass SOURCE or DRIVE_FOLDER, not both$(RESET)\n"; exit 1; }
@@ -416,6 +487,17 @@ set-new-label: ## Provision a label end-to-end (LABEL=x; PRODUCTION=1, WITH_DOMA
 		$(if $(filter 1,$(WITH_DOMAIN)),--with-domain,) \
 		$(if $(ONLY),--only $(ONLY),) \
 		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+# Read-only: which staging/production resources exist and which secrets are set
+# (by name) for a label, each gap with its fix command. No confirmation: nothing
+# is created, written or deployed. JSON=1 prints the machine-readable report.
+infra-check-staging: ## Read-only report of a label's staging resources + secret names (LABEL=x; JSON=1)
+	node scripts/cloudflare/provision-label.mjs --label $(LABEL) -e staging --check \
+		$(if $(filter 1,$(JSON)),--json,)
+
+infra-check-production: ## Read-only report of a label's production resources + secret names (LABEL=x; JSON=1)
+	node scripts/cloudflare/provision-label.mjs --label $(LABEL) -e production --check \
+		$(if $(filter 1,$(JSON)),--json,)
 
 # ==============================================================================
 ##@ 🧹 CLEAN

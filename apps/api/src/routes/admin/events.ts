@@ -1,7 +1,5 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import type { MiddlewareHandler } from 'hono';
-import { requireRole } from '@api/middleware/require-role';
-import { ROLES } from '@arenaquest/shared/constants/roles';
+import { publishGate } from '@api/middleware/publish-gate';
 import { AdminEventsController } from '@api/controllers/admin-events.controller';
 import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
 import { ALLOWED_MEDIA_TYPES, IMAGE_MEDIA_TYPES } from '@arenaquest/shared/domain/media/limits';
@@ -297,43 +295,11 @@ export const deleteFlyerRoute = createRoute({
 });
 
 // ---------------------------------------------------------------------------
-// The publish gate
+// Limits
 // ---------------------------------------------------------------------------
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
-
-/**
- * Admin-only, **on the publish transition alone**.
- *
- * `routes/admin/billing.ts` sets the precedent for a sub-router that is
- * stricter than the `/v1/admin/*` umbrella, but it applies `requireRole` to the
- * whole router. Doing that here would lock a `content_creator` out of the
- * drafts they are employed to write. The gate is therefore conditional on the
- * payload: publishing puts a page and a person's phone number on the open
- * internet, and that act is an admin's; every other edit, `archived` included,
- * stays open to both roles.
- *
- * Reading the body here is safe — `HonoRequest.json()` caches its parse, so the
- * Zod validator downstream sees the same object rather than a consumed stream.
- * A body that is not JSON is passed through untouched, so the validator (and
- * not this middleware) owns the `400`.
- */
-export const publishGate: MiddlewareHandler = async (c, next) => {
-  if (c.req.method !== 'PATCH') return next();
-
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return next();
-  }
-
-  const status = (body as { status?: unknown } | null)?.status;
-  if (status !== 'published') return next();
-
-  return requireRole(ROLES.ADMIN)(c, next);
-};
 
 // ---------------------------------------------------------------------------
 // Router
@@ -356,9 +322,11 @@ export function buildAdminEventsRouter(container: AppContainer) {
     },
   });
 
-  // Registered before the routes so it runs ahead of them, and scoped to
-  // `/:id` so it can never touch the list, the create or the flyer paths.
-  router.use('/:id', publishGate);
+  // Admin-only on the publish transition (`middleware/publish-gate.ts`, the
+  // payload-conditional gate shared with the topics router). Registered before
+  // the routes so it runs ahead of them, PATCH only, and scoped to `/:id` so
+  // it can never touch the list, the create or the flyer paths.
+  router.use('/:id', publishGate());
 
   router.openapi(listAdminEventsRoute, async (c) => {
     const query = c.req.valid('query');

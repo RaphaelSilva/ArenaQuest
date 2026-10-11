@@ -660,6 +660,8 @@ export const dictEn = {
         visibilityRestricted: 'Restricted',
         visibilityPrivate: 'Private',
         visibilityHelp: 'Public: visible to everyone. Restricted: active enrolments only. Private: admins and creators only.',
+        publishAdminOnly: 'Only an administrator can publish a topic, so that option is not offered here. You can keep editing the draft.',
+        publishForbidden: (message: string) => `The API refused (${message}): publishing requires the administrator role.`,
       },
       media: {
         sectionTitle: 'Media Attachments',

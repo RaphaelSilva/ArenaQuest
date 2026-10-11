@@ -2472,6 +2472,45 @@
         ],
         "type": "object"
       },
+      "DependencyHealth": {
+        "properties": {
+          "error": {
+            "description": "First line of the failure, or `timeout`; only when down",
+            "example": "timeout",
+            "type": "string"
+          },
+          "latencyMs": {
+            "example": 12,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "enum": [
+              "d1",
+              "kv",
+              "r2"
+            ],
+            "example": "d1",
+            "type": "string"
+          },
+          "status": {
+            "description": "`degraded`: answered but slower than the threshold; `down`: threw or timed out",
+            "enum": [
+              "ok",
+              "degraded",
+              "down"
+            ],
+            "example": "ok",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "latencyMs"
+        ],
+        "type": "object"
+      },
       "EditSubmissionBody": {
         "properties": {
           "description": {
@@ -2750,6 +2789,157 @@
         },
         "required": [
           "subscriptionId"
+        ],
+        "type": "object"
+      },
+      "JobHealth": {
+        "properties": {
+          "job": {
+            "enum": [
+              "billing",
+              "sweep_submissions"
+            ],
+            "example": "billing",
+            "type": "string"
+          },
+          "lastRun": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JobRun"
+              },
+              {
+                "properties": {
+                  "ageMs": {
+                    "description": "Milliseconds since the run started",
+                    "example": 3600000,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "ageMs"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ],
+            "description": "Null when the job has never run"
+          }
+        },
+        "required": [
+          "job",
+          "lastRun"
+        ],
+        "type": "object"
+      },
+      "JobRun": {
+        "properties": {
+          "actorId": {
+            "description": "The admin behind a manual run; null for the cron",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "example": 2000,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "error": {
+            "description": "Truncated message; null unless failed",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finishedAt": {
+            "description": "Null while running",
+            "example": "2026-10-11T03:00:02.000Z",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+            "type": "string"
+          },
+          "job": {
+            "enum": [
+              "billing",
+              "sweep_submissions"
+            ],
+            "example": "billing",
+            "type": "string"
+          },
+          "startedAt": {
+            "example": "2026-10-11T03:00:00.000Z",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "ok",
+              "failed"
+            ],
+            "example": "ok",
+            "type": "string"
+          },
+          "summary": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Integer counts only",
+            "example": {
+              "issued": 2
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "trigger": {
+            "enum": [
+              "cron",
+              "manual"
+            ],
+            "example": "cron",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "job",
+          "trigger",
+          "status",
+          "actorId",
+          "startedAt",
+          "finishedAt",
+          "durationMs",
+          "summary",
+          "error"
+        ],
+        "type": "object"
+      },
+      "JobRunList": {
+        "properties": {
+          "runs": {
+            "description": "Newest first",
+            "items": {
+              "$ref": "#/components/schemas/JobRun"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "runs"
         ],
         "type": "object"
       },
@@ -4420,6 +4610,53 @@
         },
         "required": [
           "error"
+        ],
+        "type": "object"
+      },
+      "OpsHealth": {
+        "properties": {
+          "checkedAt": {
+            "example": "2026-10-11T12:00:00.000Z",
+            "type": "string"
+          },
+          "dependencies": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyHealth"
+            },
+            "type": "array"
+          },
+          "jobs": {
+            "description": "One entry per known job",
+            "items": {
+              "$ref": "#/components/schemas/JobHealth"
+            },
+            "type": "array"
+          },
+          "latestMigration": {
+            "description": "Newest applied migration name",
+            "example": "0032_create_job_runs.sql",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "The worst dependency status",
+            "enum": [
+              "ok",
+              "degraded",
+              "down"
+            ],
+            "example": "ok",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "checkedAt",
+          "dependencies",
+          "latestMigration",
+          "jobs"
         ],
         "type": "object"
       },
@@ -10349,6 +10586,113 @@
         ]
       }
     },
+    "/v1/admin/ops/health": {
+      "get": {
+        "description": "Probes the database, the rate-limit store and the object storage with one read each, bounded by a per-probe timeout, and reports the latency, the newest applied migration and the last run of every job. Always `200`: the verdict is in the body.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpsHealth"
+                }
+              }
+            },
+            "description": "Health report"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Forbidden — staff only"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Measured health of every dependency",
+        "tags": [
+          "admin:ops"
+        ]
+      }
+    },
+    "/v1/admin/ops/job-runs": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "job",
+            "required": false,
+            "schema": {
+              "enum": [
+                "billing",
+                "sweep_submissions"
+              ],
+              "example": "billing",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "description": "ISO timestamp; only runs started at or after it.",
+              "example": "2026-10-01T00:00:00Z",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "example": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRunList"
+                }
+              }
+            },
+            "description": "Job runs"
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Forbidden — staff only"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List job runs, newest first",
+        "tags": [
+          "admin:ops"
+        ]
+      }
+    },
     "/v1/admin/players/{userId}/badges/{badgeId}": {
       "delete": {
         "description": "Remove a badge a player holds. Returns 404 when the player does not hold it. Does not touch XP.",
@@ -12921,7 +13265,7 @@
         ]
       },
       "post": {
-        "description": "Create a new topic node.",
+        "description": "Create a new topic node. `status: \"published\"` additionally requires the `admin` role; a `draft` (the default) does not.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -13154,6 +13498,9 @@
           },
           "400": {
             "description": "Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters)"
+          },
+          "403": {
+            "description": "Forbidden — `status: \"published\"` requires the admin role"
           },
           "404": {
             "description": "Parent topic not found"
@@ -13388,7 +13735,7 @@
         ]
       },
       "patch": {
-        "description": "Update metadata of a topic node.",
+        "description": "Update metadata of a topic node. `status: \"published\"` additionally requires the `admin` role; `archived` does not.",
         "parameters": [
           {
             "in": "path",
@@ -13622,6 +13969,9 @@
           },
           "400": {
             "description": "Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters)"
+          },
+          "403": {
+            "description": "Forbidden — `status: \"published\"` requires the admin role"
           },
           "404": {
             "description": "Topic not found"

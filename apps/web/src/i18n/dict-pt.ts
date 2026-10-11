@@ -659,6 +659,8 @@ export const dictPt = {
         visibilityRestricted: 'Restrito',
         visibilityPrivate: 'Privado',
         visibilityHelp: 'Público: visível para todos. Restrito: somente matrículas ativas. Privado: somente admins e criadores.',
+        publishAdminOnly: 'Só um administrador pode publicar um tópico, então essa opção não é oferecida aqui. Você pode continuar editando o rascunho.',
+        publishForbidden: (message: string) => `A API recusou (${message}): publicar exige o papel de administrador.`,
       },
       media: {
         sectionTitle: 'Anexos de Mídia',

@@ -18,6 +18,7 @@ import { buildAdminEventsRouter } from './events';
 import { buildAdminNotesRouter } from './notes';
 import { buildAdminSubmissionsRouter } from './submissions';
 import { buildAdminStorageRouter } from './storage';
+import { buildAdminOpsRouter } from './ops';
 import type { AppContainer } from '@api/container';
 
 export function buildAdminRouter(container: AppContainer) {
@@ -52,6 +53,8 @@ export function buildAdminRouter(container: AppContainer) {
   app.route('/billing', buildAdminBillingRouter(container));
   // Carries its own requireRole(ROLES.ADMIN) — the bucket view is admin only (RFC 0018).
   app.route('/storage', buildAdminStorageRouter(container));
+  // No stricter guard: both staff roles may read measured health and job runs (RFC 0025 section 3.2).
+  app.route('/ops', buildAdminOpsRouter(container));
   // Carries its own requireRole(ROLES.ADMIN) on the publish transition only —
   // a content creator writes drafts here, but does not put them on the internet.
   app.route('/events', buildAdminEventsRouter(container));

@@ -6,6 +6,8 @@ import {
   AdminEventChargeController,
 } from '@api/controllers/admin-billing.controller';
 import { billingRunDeps } from '@api/core/billing/billing-service';
+import { recordJobRun, billingOutcome } from '@api/jobs/record-job-run';
+import { Entities } from '@arenaquest/shared/types/entities';
 import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
 import { runMissionHook } from '@api/core/missions/hook';
 import type { AppContainer } from '@api/container';
@@ -1241,8 +1243,18 @@ export function buildAdminBillingRouter(container: AppContainer) {
   // The manual twin. `runBillingCycle` is the one routine; the cron in
   // `src/index.ts` reaches it through `runScheduledBilling` and this route
   // reaches it through the controller — never a second implementation.
+  //
+  // The run is recorded as a `job_runs` row with `trigger = 'manual'` and the
+  // admin as its actor (RFC 0025 §3.1) - here rather than in the controller,
+  // because who triggered it is an HTTP concern. The response is unchanged.
   router.openapi(runInvoiceCycleRoute, async (c) => {
-    const result = await controller.runInvoiceCycle(c.req.valid('json'), c.get('user').sub);
+    const actorId = c.get('user').sub;
+    const result = await recordJobRun(
+      container.infra.jobRuns,
+      { job: Entities.Config.JobName.BILLING, trigger: Entities.Config.JobTrigger.MANUAL, actorId },
+      () => controller.runInvoiceCycle(c.req.valid('json'), actorId),
+      billingOutcome,
+    );
     if (!result.ok) return respondWith(c, result);
     return c.json(result.data, 200);
   });

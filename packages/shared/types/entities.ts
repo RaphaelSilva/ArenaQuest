@@ -219,6 +219,32 @@ export namespace Entities {
             SHARED = 'shared',
         }
 
+        /**
+         * The jobs whose executions `job_runs` records (RFC 0025 section 3.1).
+         * Constrained by the `job IN (...)` CHECK on the table.
+         */
+        export enum JobName {
+            /** The daily billing run (RFC 0013 section 6). */
+            BILLING = 'billing',
+            /** The abandoned-upload sweep (RFC 0020 section 9). */
+            SWEEP_SUBMISSIONS = 'sweep_submissions',
+        }
+
+        /** What started a job run. */
+        export enum JobTrigger {
+            /** The Worker's `scheduled()` handler. */
+            CRON = 'cron',
+            /** An admin, through an HTTP route. */
+            MANUAL = 'manual',
+        }
+
+        /** Lifecycle of one job run: `running` is written before the job starts. */
+        export enum JobRunStatus {
+            RUNNING = 'running',
+            OK = 'ok',
+            FAILED = 'failed',
+        }
+
     }
 
     export namespace Security {
@@ -663,6 +689,31 @@ export namespace Entities {
      * on every read by `resolveStanding` and never stored, because a stored flag
      * goes stale at midnight when nothing is running.
      */
+    /**
+     * Operations (RFC 0025 section 3). Records *about* the system rather than
+     * about a student or a topic; nothing here is read by a non-admin surface.
+     */
+    export namespace Ops {
+        /** One execution of a scheduled or manually triggered job. */
+        export interface JobRun {
+            id: string;
+            job: Config.JobName;
+            trigger: Config.JobTrigger;
+            status: Config.JobRunStatus;
+            /** The admin behind a manual run; `null` for the cron. */
+            actorId: string | null;
+            /** ISO timestamp. */
+            startedAt: string;
+            /** ISO timestamp; `null` while `running`. */
+            finishedAt: string | null;
+            durationMs: number | null;
+            /** Integer counts only - never ids, names, amounts or payloads. */
+            summary: Record<string, number> | null;
+            /** A message truncated to 1024 characters; `null` unless `failed`. */
+            error: string | null;
+        }
+    }
+
     export namespace Billing {
         /** Reference data. `exponent` is how many minor units make one whole. */
         export interface Currency {

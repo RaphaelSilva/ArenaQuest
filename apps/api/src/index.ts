@@ -16,6 +16,14 @@ import { buildContainer } from '@api/container';
 import { runScheduledBilling } from '@api/core/billing/billing-service';
 import { sweepPendingSubmissions } from '@api/jobs/sweep-pending-submissions';
 import { reconcileMissions } from '@api/jobs/reconcile-missions';
+import {
+  recordJobRun,
+  pruneJobRuns,
+  billingOutcome,
+  sweepOutcome,
+  JOB_RUNS_RETENTION_DAYS,
+} from '@api/jobs/record-job-run';
+import { Entities } from '@arenaquest/shared/types/entities';
 import { AppRouter } from '@api/routes';
 import { configureOpenAPIDocument } from '@api/openapi/document';
 import '@api/types/hono-env';
@@ -55,9 +63,18 @@ export default {
    * daily trigger, in a `finally` so a billing failure never skips it; the
    * sweep itself never throws, so it cannot affect billing either.
    *
-   * The mission reconciliation (RFC 0022 §4) runs last, in its own `finally`
-   * link, so neither a billing nor a sweep failure skips it; it never throws
-   * either, so it cannot affect them.
+   * Each job is wrapped in `recordJobRun` (RFC 0025 §3.1), which leaves one
+   * `job_runs` row per execution - `ok` with counts, or `failed` with the
+   * error - and rethrows whatever the job threw, so the `try/finally` above
+   * keeps its meaning. A failing `job_runs` write is logged and changes
+   * nothing about the jobs.
+   *
+   * The mission reconciliation (RFC 0022 §4) runs after the sweep, in its own
+   * `finally` link, so neither a billing nor a sweep failure skips it; it
+   * never throws either, so it cannot affect them. It is not recorded in
+   * `job_runs` yet: the table's `job` CHECK (migration 0032) names only
+   * billing and the sweep, so adding it needs a migration (follow-up). Rows
+   * older than 180 days are pruned last.
    */
   async scheduled(
     _controller: ScheduledController,
@@ -65,20 +82,34 @@ export default {
     _ctx: ExecutionContext,
   ): Promise<void> {
     const container = buildContainer(env);
+    const jobRuns = container.infra.jobRuns;
+    const { JobName, JobTrigger } = Entities.Config;
     try {
-      await runScheduledBilling(container);
+      await recordJobRun(
+        jobRuns,
+        { job: JobName.BILLING, trigger: JobTrigger.CRON },
+        () => runScheduledBilling(container),
+        billingOutcome,
+      );
     } finally {
       try {
-        await sweepPendingSubmissions({
-          submissions: container.engagement.submissionRepo,
-          storage: container.content.storage,
-        });
+        await recordJobRun(
+          jobRuns,
+          { job: JobName.SWEEP_SUBMISSIONS, trigger: JobTrigger.CRON },
+          () =>
+            sweepPendingSubmissions({
+              submissions: container.engagement.submissionRepo,
+              storage: container.content.storage,
+            }),
+          sweepOutcome,
+        );
       } finally {
         await reconcileMissions({
           missions: container.gamification.missionRepo,
           participation: container.gamification.missionParticipationRepo,
           evaluator: container.gamification.missionEvaluator,
         });
+        await pruneJobRuns(jobRuns, JOB_RUNS_RETENTION_DAYS);
       }
     }
   },

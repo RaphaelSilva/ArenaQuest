@@ -37,6 +37,8 @@
       "kv":   { "binding": "RATE_LIMIT_KV", "id": "8490968f05aa41a0a0abd57f7551e63d" },
       "r2":   { "bucket": "budo-media", "s3Endpoint": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com" },
       "cookieSameSite": "Strict",
-      "mail": { "driver": "resend", "from": "Budo <noreply@budo.app>" }
+      "mail": { "driver": "resend", "from": "Budo <noreply@budo.app>" },
+      "backup": { "bucket": "budo-backups",
+                  "retention": { "dailyDays": 35, "monthlyMonths": 12, "tombstoneDays": 90 } }
     }
   } }

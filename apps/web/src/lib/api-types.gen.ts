@@ -4159,6 +4159,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/ops/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Measured health of every dependency
+         * @description Probes the database, the rate-limit store and the object storage with one read each, bounded by a per-probe timeout, and reports the latency, the newest applied migration and the last run of every job. Always `200`: the verdict is in the body.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Health report */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpsHealth"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — staff only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/ops/job-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List job runs, newest first */
+        get: {
+            parameters: {
+                query?: {
+                    job?: "billing" | "sweep_submissions";
+                    since?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Job runs */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobRunList"];
+                    };
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — staff only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/players/{userId}/badges/{badgeId}": {
         parameters: {
             query?: never;
@@ -5991,7 +6112,7 @@ export interface paths {
         put?: never;
         /**
          * Create Topic Node
-         * @description Create a new topic node.
+         * @description Create a new topic node. `status: "published"` additionally requires the `admin` role; a `draft` (the default) does not.
          */
         post: {
             parameters: {
@@ -6075,6 +6196,13 @@ export interface paths {
                 };
                 /** @description Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters) */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — `status: "published"` requires the admin role */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6216,7 +6344,7 @@ export interface paths {
         head?: never;
         /**
          * Update Topic Node
-         * @description Update metadata of a topic node.
+         * @description Update metadata of a topic node. `status: "published"` additionally requires the `admin` role; `archived` does not.
          */
         patch: {
             parameters: {
@@ -6300,6 +6428,13 @@ export interface paths {
                 };
                 /** @description Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters) */
                 400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — `status: "published"` requires the admin role */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -11413,6 +11548,26 @@ export interface components {
             /** @description Ordered steps; `[]` for a legacy mission or a teaser */
             steps: components["schemas"]["MissionStepView"][];
         };
+        DependencyHealth: {
+            /**
+             * @description First line of the failure, or `timeout`; only when down
+             * @example timeout
+             */
+            error?: string;
+            /** @example 12 */
+            latencyMs: number;
+            /**
+             * @example d1
+             * @enum {string}
+             */
+            name: "d1" | "kv" | "r2";
+            /**
+             * @description `degraded`: answered but slower than the threshold; `down`: threw or timed out
+             * @example ok
+             * @enum {string}
+             */
+            status: "ok" | "degraded" | "down";
+        };
         EditSubmissionBody: {
             /** @description Markdown; sanitised, then must be ≤ SUBMISSION_DESCRIPTION_MAX characters */
             description?: string;
@@ -11499,6 +11654,72 @@ export interface components {
             /** @example 2026-01-01 */
             referenceDate?: string;
             subscriptionId: string;
+        };
+        JobHealth: {
+            /**
+             * @example billing
+             * @enum {string}
+             */
+            job: "billing" | "sweep_submissions";
+            /** @description Null when the job has never run */
+            lastRun: components["schemas"]["JobRun"] & ({
+                /**
+                 * @description Milliseconds since the run started
+                 * @example 3600000
+                 */
+                ageMs: number;
+            } | null);
+        };
+        JobRun: {
+            /**
+             * @description The admin behind a manual run; null for the cron
+             * @example null
+             */
+            actorId: string | null;
+            /** @example 2000 */
+            durationMs: number | null;
+            /**
+             * @description Truncated message; null unless failed
+             * @example null
+             */
+            error: string | null;
+            /**
+             * @description Null while running
+             * @example 2026-10-11T03:00:02.000Z
+             */
+            finishedAt: string | null;
+            /** @example a1b2c3d4-e5f6-7890-1234-567890abcdef */
+            id: string;
+            /**
+             * @example billing
+             * @enum {string}
+             */
+            job: "billing" | "sweep_submissions";
+            /** @example 2026-10-11T03:00:00.000Z */
+            startedAt: string;
+            /**
+             * @example ok
+             * @enum {string}
+             */
+            status: "running" | "ok" | "failed";
+            /**
+             * @description Integer counts only
+             * @example {
+             *       "issued": 2
+             *     }
+             */
+            summary: {
+                [key: string]: number;
+            } | null;
+            /**
+             * @example cron
+             * @enum {string}
+             */
+            trigger: "cron" | "manual";
+        };
+        JobRunList: {
+            /** @description Newest first */
+            runs: components["schemas"]["JobRun"][];
         };
         LoginRequest: {
             /**
@@ -12177,6 +12398,24 @@ export interface components {
              * @enum {string}
              */
             error: "NOTE_STALE" | "NOTE_MODERATED";
+        };
+        OpsHealth: {
+            /** @example 2026-10-11T12:00:00.000Z */
+            checkedAt: string;
+            dependencies: components["schemas"]["DependencyHealth"][];
+            /** @description One entry per known job */
+            jobs: components["schemas"]["JobHealth"][];
+            /**
+             * @description Newest applied migration name
+             * @example 0032_create_job_runs.sql
+             */
+            latestMigration: string | null;
+            /**
+             * @description The worst dependency status
+             * @example ok
+             * @enum {string}
+             */
+            status: "ok" | "degraded" | "down";
         };
         PlayerProgression: {
             badges: {
