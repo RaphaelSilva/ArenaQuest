@@ -1,6 +1,6 @@
 # Task 10 — Backend: aq-mcp server with draft authoring tools (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -60,18 +60,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `claude mcp add aq-test -- node scripts/mcp/aq-mcp.mjs --label budo -e staging` lists
+- [x] `claude mcp add aq-test -- node scripts/mcp/aq-mcp.mjs --label budo -e staging` lists
       exactly the seven tools with their annotations.
-- [ ] No tool's input schema contains a status property (asserted by a test over the tool list).
-- [ ] `create_topic_draft` produces a `draft` topic; `update_topic_draft` and `upload_media` on a
+- [x] No tool's input schema contains a status property (asserted by a test over the tool list).
+- [x] `create_topic_draft` produces a `draft` topic; `update_topic_draft` and `upload_media` on a
       published topic are refused with a clear message and **no** API write call (stubbed client
       asserts).
-- [ ] `upload_media` with a local `.mov` converts and uploads it; the media reaches `ready` on
+- [x] `upload_media` with a local `.mov` converts and uploads it; the media reaches `ready` on
       staging. An oversized file is refused before presign; a missing `ffmpeg` returns its
       install command.
-- [ ] Each call appends one audit line with tool, arguments minus bodies, and outcome.
-- [ ] `node --test scripts/mcp/` green; `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] Each call appends one audit line with tool, arguments minus bodies, and outcome.
+- [x] `node --test scripts/mcp/` green; `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -116,7 +116,7 @@ script/CI task is filed under **Backend** (the only non-web team).
 | 07 | [Admin-only topic publish gate](./07-topic-publish-gate.task.md) | 2 | Backend | ✅ Done |
 | 08 | [Topic publish controls follow the role](./08-topic-publish-controls.task.md) | 2 | Frontend | ✅ Done |
 | 09 | [Shared script library for the API client and media conversion](./09-shared-script-library.task.md) | 3 | Backend | ✅ Done |
-| 10 | [aq-mcp server with draft authoring tools](./10-aq-mcp-authoring-tools.task.md) | 3 | Backend | ☐ Open |
+| 10 | [aq-mcp server with draft authoring tools](./10-aq-mcp-authoring-tools.task.md) | 3 | Backend | ✅ Done |
 | 11 | [Backup status report](./11-backup-status-report.task.md) | 4 | Backend | ☐ Open |
 | 12 | [aq-mcp ops tools in three tiers](./12-aq-mcp-ops-tools.task.md) | 4 | Backend | ☐ Open |
 | 13 | [ops-runbook skill and read-only token procedure](./13-ops-runbook-skill.task.md) | 4 | Backend | ☐ Open |
