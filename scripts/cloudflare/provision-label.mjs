@@ -38,6 +38,16 @@
  * Worker's own secrets. Same contract: JWT_SECRET generated here, piped over
  * stdin, set only when absent; the external ones detected by name and reported.
  * Production has no previews, so its secrets group never touches them.
+ *
+ * Backups (RFC 0025): a PRODUCTION env also gets its backup bucket
+ * (`environments.production.backup.bucket`) with two lifecycle rules derived
+ * from the profile's `retention` block (daily dumps, monthly dumps). Staging
+ * is disposable (RFC 0021 §4) and gets none — the dry run says so.
+ *
+ * `--check` is the read-only twin of a provisioning run: it walks the SAME
+ * plan, executes only each step's probe (`… list`) and reports every resource
+ * as present / missing / unknown and every secret by NAME, each gap with its
+ * fix command. No create / put / set / deploy command is reachable from it.
  */
 
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
@@ -56,6 +66,10 @@ import {
   workersDevHost,
   kvNamespaceName,
   requiredWhenActive,
+  backupBucketName,
+  validateProfile,
+  formatChecklist,
+  mapExitCode,
 } from '../label.mjs';
 import { confirmProduction } from '../deploy/core.mjs';
 import log from '../lib/log.mjs';
@@ -67,17 +81,25 @@ const ACCOUNT_RESOURCE_ID_RE = /\b[0-9a-f]{32}\b/i;
 const CF_API = 'https://api.cloudflare.com/client/v4';
 
 /** `--only` groups. `all` runs the full pipeline. */
-export const ONLY_STEPS = ['all', 'cors', 'secrets', 'worker', 'domain'];
+export const ONLY_STEPS = ['all', 'backup', 'cors', 'secrets', 'worker', 'domain'];
+
+const ENVIRONMENTS = ['staging', 'production'];
 
 function usage() {
   console.log(`Usage: node scripts/cloudflare/provision-label.mjs <label> [options]
+       node scripts/cloudflare/provision-label.mjs --label <label> -e <env> --check [--json]
 
 Options:
+  --label <label> The label (alias of the positional argument)
   --production    Provision production after staging and a second confirmation
+  -e, --env <env> Target ONE environment (staging | production) instead of the default
   --yes           Bypass the production prompt (or use CONFIRM=1)
   --with-domain   Attach the apiHost custom domain when its zone is in the account
   --only <step>   Run one group only: ${ONLY_STEPS.join(' | ')} (default: all)
-  --dry-run       Print the planned commands without changing Cloudflare or files`);
+  --dry-run       Print the planned commands without changing Cloudflare or files
+  --check         Read-only: report which resources exist and which secrets are set
+                  (by name) for one environment, each gap with its fix command
+  --json          With --check: print the report as JSON instead of the checklist`);
 }
 
 export function parseArgs(argv) {
@@ -88,7 +110,11 @@ export function parseArgs(argv) {
     dryRun: false,
     withDomain: false,
     only: 'all',
+    env: null,
+    check: false,
+    json: false,
   };
+  const seen = new Set();
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -96,19 +122,48 @@ export function parseArgs(argv) {
     else if (arg === '--yes') args.yes = true;
     else if (arg === '--dry-run') args.dryRun = true;
     else if (arg === '--with-domain') args.withDomain = true;
+    else if (arg === '--check') args.check = true;
+    else if (arg === '--json') args.json = true;
     else if (arg === '--only') {
       const value = argv[++i];
       if (!ONLY_STEPS.includes(value)) {
         throw new Error(`--only must be one of: ${ONLY_STEPS.join(', ')}`);
       }
       args.only = value;
+    } else if (arg === '--env' || arg === '-e') {
+      const value = argv[++i];
+      if (!ENVIRONMENTS.includes(value)) {
+        throw new Error(`${arg} must be one of: ${ENVIRONMENTS.join(', ')}`);
+      }
+      args.env = value;
+    } else if (arg === '--label') {
+      const value = argv[++i];
+      if (!value || value.startsWith('-')) throw new Error('--label needs a value');
+      if (args.label) throw new Error(`unexpected argument: ${value}`);
+      args.label = value;
     } else if (arg === '--help' || arg === '-h') args.help = true;
     else if (arg.startsWith('-')) throw new Error(`unknown option: ${arg}`);
     else if (args.label) throw new Error(`unexpected argument: ${arg}`);
     else args.label = arg;
+    seen.add(arg);
   }
 
-  if (!args.help && !args.label) throw new Error('label is required');
+  if (args.help) return args;
+  if (!args.label) throw new Error('label is required');
+  if (args.env && args.production) {
+    throw new Error('--env and --production are mutually exclusive (use -e production)');
+  }
+  if (args.check) {
+    // --check is read-only by construction: none of the provisioning knobs may
+    // reach it, so a typo cannot turn a report into a write.
+    const incompatible = ['--dry-run', '--only', '--with-domain', '--yes', '--production', '-p']
+      .filter((flag) => seen.has(flag));
+    if (incompatible.length) {
+      throw new Error(`--check is read-only and cannot be combined with ${incompatible.join(', ')}`);
+    }
+  } else if (args.json) {
+    throw new Error('--json is only valid together with --check');
+  }
   return args;
 }
 
@@ -132,8 +187,8 @@ function childEnv() {
   return env;
 }
 
-function runCommand(argv, { allowFailure = false } = {}) {
-  log.cmd(renderCommand(argv));
+function runCommand(argv, { allowFailure = false, quiet = false } = {}) {
+  if (!quiet) log.cmd(renderCommand(argv));
   const result = spawnSync(argv[0], argv.slice(1), {
     cwd: ROOT,
     encoding: 'utf8',
@@ -227,10 +282,15 @@ function loadProfile(label) {
   const text = readFileSync(path, 'utf8');
   const profile = parseJsonc(text);
   if (profile.label !== label) throw new Error(`profile label mismatch: expected ${label}`);
-  for (const env of ['staging', 'production']) {
+  for (const env of ENVIRONMENTS) {
     if (!profile.environments?.[env]) throw new Error(`profile has no ${env} environment`);
   }
+  validateProfile(profile, loadSchema());
   return { path, text, profile };
+}
+
+function loadSchema() {
+  return parseJsonc(readFileSync(PATHS.schema, 'utf8'));
 }
 
 export function wranglerEnvName(label, env) {
@@ -248,6 +308,56 @@ export function pagesProductionBranch(env) {
  */
 function corsFilePath(label, env) {
   return join(tmpdir(), `aq-cors-${label}-${env}.json`);
+}
+
+/** Same contract as corsFilePath, for the backup bucket's lifecycle document. */
+function backupLifecycleFilePath(label, env) {
+  return join(tmpdir(), `aq-backup-lifecycle-${label}-${env}.json`);
+}
+
+const DAY_SECONDS = 86_400;
+
+/**
+ * The lifecycle rules of the backup bucket, derived from the profile's
+ * `backup.retention` block (RFC 0025 §4). Pure. Empty for an env with no
+ * backup bucket (staging).
+ *
+ * Key layout: daily dumps live under `d1/<env>/daily/` and expire after
+ * `dailyDays`; the monthly keeper copies live under `d1/<env>/monthly/` and
+ * expire after `monthlyMonths` months (365/12 days each). The two prefixes are
+ * disjoint, so the daily rule can never reap a monthly object. Tasks 02/03
+ * read the retention values from the profile, not from here.
+ */
+export function backupLifecycleRules(profile, env) {
+  const bucket = backupBucketName(profile, env);
+  if (!bucket) return [];
+  const { dailyDays, monthlyMonths } = profile.environments[env].backup.retention;
+  const monthlyDays = Math.round((monthlyMonths * 365) / 12);
+  const expireAfter = (days) => ({ condition: { type: 'Age', maxAge: days * DAY_SECONDS } });
+  return [
+    {
+      id: 'd1-daily',
+      enabled: true,
+      conditions: { prefix: `d1/${env}/daily/` },
+      deleteObjectsTransition: expireAfter(dailyDays),
+    },
+    {
+      id: 'd1-monthly',
+      enabled: true,
+      conditions: { prefix: `d1/${env}/monthly/` },
+      deleteObjectsTransition: expireAfter(monthlyDays),
+    },
+  ];
+}
+
+/** The document `wrangler r2 bucket lifecycle set --file` reads. */
+export function renderLifecycleFile(rules) {
+  return `${JSON.stringify({ rules }, null, 2)}\n`;
+}
+
+function describeLifecycleRule(rule) {
+  const days = rule.deleteObjectsTransition.condition.maxAge / DAY_SECONDS;
+  return `${rule.id}: ${rule.conditions.prefix} expires after ${days} days`;
 }
 
 /**
@@ -298,6 +408,7 @@ export function buildProvisionPlan(profile, env, options = {}) {
   const e = profile.environments[env];
   const wEnv = wranglerEnvName(label, env);
   const origins = deriveCorsRules(profile, env)[0].allowed.origins;
+  const backupBucket = backupBucketName(profile, env);
 
   const all = [
     {
@@ -324,6 +435,25 @@ export function buildProvisionPlan(profile, env, options = {}) {
         wranglerArgv('api', 'r2', 'bucket', 'create', e.r2.bucket),
       ],
     },
+    // Production only: backupBucketName() is null for staging, which is
+    // disposable (RFC 0021 §4) — printPlan prints that as a one-line hint.
+    ...(backupBucket
+      ? [{
+        id: 'backup',
+        title: `Backup bucket ${backupBucket} + lifecycle rules`,
+        commands: [
+          wranglerArgv('api', 'r2', 'bucket', 'list'),
+          wranglerArgv('api', 'r2', 'bucket', 'create', backupBucket),
+          wranglerArgv('api', 'r2', 'bucket', 'lifecycle', 'list', backupBucket),
+          wranglerArgv('api', 'r2', 'bucket', 'lifecycle', 'set', backupBucket,
+            '--file', backupLifecycleFilePath(label, env), '-y'),
+        ],
+        note: [
+          'production only — staging is disposable (RFC 0021 §4) and gets no backup bucket',
+          `rules (from backup.retention): ${backupLifecycleRules(profile, env).map(describeLifecycleRule).join('; ')}`,
+        ].join('\n'),
+      }]
+      : []),
     {
       id: 'subdomain',
       title: 'Resolve the account workers.dev subdomain',
@@ -555,13 +685,14 @@ async function findZoneForHost(host) {
 // Steps: data-plane resources (unchanged behaviour)
 // ════════════════════════════════════════════════════════════════════════════
 
-function listD1(name) {
-  const result = runCommand(wranglerArgv('api', 'd1', 'list', '--json'));
+// Pure readers of a `… list` result, shared by the ensure* steps and --check
+// so both answer "does it exist?" from the same parsing.
+
+function d1IdFrom(result, name) {
   return findJsonResource(parseJsonOutput(result.stdout || result.output), name, ['uuid', 'id']);
 }
 
-function listKv(names) {
-  const result = runCommand(wranglerArgv('api', 'kv', 'namespace', 'list'));
+function kvIdFrom(result, names) {
   const parsed = parseJsonOutput(result.stdout);
   for (const name of names) {
     const existing = findJsonResource(parsed, name, ['id', 'namespace_id', 'namespaceId']);
@@ -570,8 +701,7 @@ function listKv(names) {
   return findTextResource(result.output, names);
 }
 
-function listR2(name) {
-  const result = runCommand(wranglerArgv('api', 'r2', 'bucket', 'list'));
+function r2PresentIn(result, name) {
   return hasJsonResource(parseJsonOutput(result.stdout), name) || Boolean(
     String(result.output).split(/\r?\n/).some((line) => {
       const trimmed = line.trim();
@@ -580,9 +710,24 @@ function listR2(name) {
   );
 }
 
-function listPages(name) {
-  const result = runCommand(wranglerArgv('web', 'pages', 'project', 'list', '--json'));
+function pagesPresentIn(result, name) {
   return hasJsonResource(parseJsonOutput(result.stdout || result.output), name);
+}
+
+function listD1(name) {
+  return d1IdFrom(runCommand(wranglerArgv('api', 'd1', 'list', '--json')), name);
+}
+
+function listKv(names) {
+  return kvIdFrom(runCommand(wranglerArgv('api', 'kv', 'namespace', 'list')), names);
+}
+
+function listR2(name, run = runCommand) {
+  return r2PresentIn(run(wranglerArgv('api', 'r2', 'bucket', 'list')), name);
+}
+
+function listPages(name) {
+  return pagesPresentIn(runCommand(wranglerArgv('web', 'pages', 'project', 'list', '--json')), name);
 }
 
 function ensureD1(profileEnv) {
@@ -626,6 +771,95 @@ function ensureR2(profileEnv) {
   }
   runCommand(wranglerArgv('api', 'r2', 'bucket', 'create', bucket));
   log.ok(`R2 ${bucket} provisioned`);
+}
+
+/**
+ * The backup bucket (production only — the plan carries no `backup` step for
+ * staging, so this is never reached for it). Create when absent, like ensureR2.
+ * `run` is injectable so the idempotency contract is unit-tested without
+ * wrangler.
+ */
+export function ensureBackupBucket(profile, env, { run = runCommand } = {}) {
+  const bucket = backupBucketName(profile, env);
+  if (!bucket) throw new Error(`no backup bucket is declared for ${profile.label}/${env}`);
+  if (listR2(bucket, run)) {
+    log.ok(`Backup bucket ${bucket} already exists`);
+    return;
+  }
+  run(wranglerArgv('api', 'r2', 'bucket', 'create', bucket));
+  log.ok(`Backup bucket ${bucket} provisioned`);
+}
+
+/**
+ * Parse `wrangler r2 bucket lifecycle list` output back into rule objects.
+ * wrangler prints one labelled block per rule (name / enabled / prefix /
+ * action, "Expire objects after N days"); a JSON `rules` array — should a
+ * future wrangler print one — is taken as is.
+ */
+export function parseLifecycleList(output) {
+  const parsed = parseJsonOutput(output);
+  if (Array.isArray(parsed?.rules)) return parsed.rules;
+  if (Array.isArray(parsed)) return parsed;
+
+  const rules = [];
+  for (const block of String(output || '').split(/\r?\n\s*\r?\n/)) {
+    const fields = {};
+    for (const line of block.split(/\r?\n/)) {
+      const m = line.match(/^\s*(name|enabled|prefix|action):\s*(.*)$/);
+      if (m) fields[m[1]] = m[2].trim();
+    }
+    if (!fields.name) continue;
+    const days = fields.action?.match(/Expire objects after (\d+) days/);
+    rules.push({
+      id: fields.name,
+      enabled: fields.enabled !== 'No',
+      conditions: { prefix: fields.prefix === '(all prefixes)' ? '' : (fields.prefix ?? '') },
+      ...(days
+        ? { deleteObjectsTransition: { condition: { type: 'Age', maxAge: Number(days[1]) * DAY_SECONDS } } }
+        : {}),
+    });
+  }
+  return rules;
+}
+
+/** Do the bucket's current lifecycle rules already equal the derived set? */
+export function lifecycleMatches(output, rules) {
+  const key = (r) => [
+    r.id,
+    r.enabled !== false,
+    r.conditions?.prefix ?? '',
+    r.deleteObjectsTransition?.condition?.maxAge ?? '',
+  ].join('|');
+  const current = parseLifecycleList(output).map(key).sort();
+  const wanted = rules.map(key).sort();
+  return current.length === wanted.length && current.every((k, i) => k === wanted[i]);
+}
+
+/**
+ * Apply the derived lifecycle rules to the backup bucket, mirroring
+ * ensureR2Cors: `lifecycle set` replaces the whole configuration, so the
+ * `list` pre-check is what makes a re-run write nothing when the rules are
+ * already in place.
+ */
+export function ensureBackupLifecycle(profile, env, { run = runCommand } = {}) {
+  const bucket = backupBucketName(profile, env);
+  const rules = backupLifecycleRules(profile, env);
+  if (!bucket || rules.length === 0) throw new Error(`no backup bucket is declared for ${profile.label}/${env}`);
+
+  const current = run(wranglerArgv('api', 'r2', 'bucket', 'lifecycle', 'list', bucket), { allowFailure: true });
+  if (current.status === 0 && lifecycleMatches(current.output, rules)) {
+    log.ok(`Backup lifecycle rules for ${bucket} already correct`);
+    return;
+  }
+
+  const file = backupLifecycleFilePath(profile.label, env);
+  writeFileSync(file, renderLifecycleFile(rules), { mode: 0o600 });
+  try {
+    run(wranglerArgv('api', 'r2', 'bucket', 'lifecycle', 'set', bucket, '--file', file, '-y'));
+  } finally {
+    rmSync(file, { force: true });
+  }
+  log.ok(`Backup lifecycle rules applied to ${bucket} (${rules.map(describeLifecycleRule).join('; ')})`);
 }
 
 function ensurePages(profileEnv, env) {
@@ -789,7 +1023,7 @@ function ensurePreviewSecrets(wranglerEnv) {
 
 /** Report — never write — the external secrets on the Preview base config (staging only). */
 function reportExternalPreviewSecrets(profile, env, wranglerEnv) {
-  const schema = parseJsonc(readFileSync(PATHS.schema, 'utf8'));
+  const schema = loadSchema();
   const names = listSecretNames(wranglerEnv, { preview: true });
   if (names === null) {
     log.warn(`Could not list Preview base-config secrets for env.${wranglerEnv} — external secret status unknown.`);
@@ -817,7 +1051,7 @@ function reportExternalPreviewSecrets(profile, env, wranglerEnv) {
  * warnings below as release-blocking follow-ups, not optional polish.
  */
 function reportExternalSecrets(profile, env, wranglerEnv) {
-  const schema = parseJsonc(readFileSync(PATHS.schema, 'utf8'));
+  const schema = loadSchema();
   const names = listSecretNames(wranglerEnv);
 
   if (names === null) {
@@ -919,6 +1153,169 @@ async function ensureCustomDomain(state, env) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// --check: the read-only twin of a provisioning run
+// ════════════════════════════════════════════════════════════════════════════
+
+const isListCommand = (argv) => argv.includes('list');
+const isCreateCommand = (argv) => argv.includes('create');
+
+/**
+ * What `--check` probes and how each gap is fixed, derived from
+ * buildProvisionPlan so there is no second list of what a label needs: a
+ * resource's probe is its step's `list` command and its fix the step's
+ * `create` command; the secret names come from externalSecretNames plus the
+ * generated JWT_SECRET; the backup bucket is the `backup` step (production).
+ *
+ * The one probe the plan does not carry is the Worker's, whose step IS the
+ * deploy: `wrangler deployments list --env <wEnv>` stands in (read-only).
+ *
+ * Returns { label, env, resources: [{ id, kind, name, probe }], secrets:
+ * { worker: [names], preview: [names] }, probes: { worker, preview }, fixes }.
+ * Every argv under `resources[].probe` and `probes` is a list; `fixes` are
+ * rendered strings and never executed.
+ */
+export function buildCheckPlan(profile, env, schema) {
+  const label = profile.label;
+  const e = profile.environments[env];
+  const wEnv = wranglerEnvName(label, env);
+  const plan = buildProvisionPlan(profile, env, { schema });
+  const step = (id) => plan.find((s) => s.id === id);
+
+  const resources = [];
+  const fixes = {};
+  const fromStep = (id, kind, name) => {
+    const s = step(id);
+    if (!s) return;
+    resources.push({ id, kind, name, probe: s.commands.find(isListCommand) });
+    fixes[id] = renderCommand(s.commands.find(isCreateCommand));
+  };
+  fromStep('d1', 'd1', e.d1.name);
+  fromStep('kv', 'kv', kvNamespaceName(label, env));
+  fromStep('r2', 'r2', e.r2.bucket);
+  fromStep('backup', 'r2', backupBucketName(profile, env));
+  fromStep('pages', 'pages', e.pagesProject);
+  resources.push({
+    id: 'worker',
+    kind: 'worker',
+    name: e.worker,
+    probe: wranglerArgv('api', 'deployments', 'list', '--env', wEnv),
+  });
+  fixes.worker = renderCommand(step('worker').commands[0]);
+
+  const names = ['JWT_SECRET', ...externalSecretNames(schema, profile, env)];
+  const secretCommands = step('secrets').commands.filter(isListCommand);
+  const probes = {
+    worker: secretCommands.find((argv) => !argv.includes('preview')),
+    preview: secretCommands.find((argv) => argv.includes('preview')) ?? null,
+  };
+  const secrets = { worker: names, preview: probes.preview ? names : [] };
+  const provisionSecrets = `make set-new-label LABEL=${label} ONLY=secrets${env === 'production' ? ' PRODUCTION=1' : ''}`;
+  for (const name of names) {
+    fixes[name] = name === 'JWT_SECRET'
+      ? provisionSecrets
+      : `bash ${PATHS.createSecrets} ${name} --env ${wEnv}`;
+    if (probes.preview) {
+      fixes[`preview:${name}`] = name === 'JWT_SECRET'
+        ? provisionSecrets
+        : previewSecretFixCommand(name, wEnv);
+    }
+  }
+
+  return { label, env, resources, secrets, probes, fixes };
+}
+
+/** Every argv a --check run may execute — the surface the read-only test pins. */
+export function checkProbes(checkPlan) {
+  return [
+    ...checkPlan.resources.map((r) => r.probe),
+    checkPlan.probes.worker,
+    checkPlan.probes.preview,
+  ].filter(Boolean);
+}
+
+/** Presence from a successful probe result; the Worker's is its exit status. */
+function presenceFrom(kind, result, name) {
+  if (kind === 'worker') {
+    if (result.status === 0) return true;
+    // A missing script is a definite answer; anything else (no creds, network)
+    // is unknown and must never be reported as missing.
+    return /script_not_found|\b10007\b|could not find|not found/i.test(String(result.output)) ? false : null;
+  }
+  if (result.status !== 0) return null;
+  switch (kind) {
+    case 'd1': return d1IdFrom(result, name) !== null;
+    case 'kv': return kvIdFrom(result, [name]) !== null;
+    case 'r2': return r2PresentIn(result, name);
+    case 'pages': return pagesPresentIn(result, name);
+    default: return null;
+  }
+}
+
+/** Secret NAMES from a `secret list` result, or null when the list failed. */
+function secretNamesFrom(result) {
+  if (result.status !== 0) return null;
+  const parsed = parseJsonOutput(result.stdout);
+  if (!Array.isArray(parsed)) return null;
+  return parsed.map((s) => s?.name).filter(Boolean);
+}
+
+/**
+ * Execute the probes of buildCheckPlan — list commands only — and report.
+ *
+ * present: true | false | null, where null means the probe failed ("unknown"):
+ * a failed list is never read as absent, the same rule secretAction applies.
+ * Secret values are never captured: `list` prints names only.
+ */
+export function runCheck(profile, env, schema, { run = runCommand } = {}) {
+  const plan = buildCheckPlan(profile, env, schema);
+  const probe = (argv) => run(argv, { allowFailure: true });
+
+  const resources = plan.resources.map((r) => {
+    const present = presenceFrom(r.kind, probe(r.probe), r.name);
+    return { id: r.id, kind: r.kind, name: r.name, present, fix: present === true ? null : plan.fixes[r.id] };
+  });
+
+  const secrets = [];
+  const report = (scope, names, available) => {
+    for (const name of names) {
+      const present = available === null ? null : available.includes(name);
+      const fixKey = scope === 'preview' ? `preview:${name}` : name;
+      secrets.push({ name, scope, present, fix: present === true ? null : plan.fixes[fixKey] });
+    }
+  };
+  report('worker', plan.secrets.worker, secretNamesFrom(probe(plan.probes.worker)));
+  if (plan.probes.preview) report('preview', plan.secrets.preview, secretNamesFrom(probe(plan.probes.preview)));
+
+  return { label: plan.label, env, resources, secrets };
+}
+
+const PRESENCE_STATUS = { true: 'pass', false: 'fail', null: 'skip' };
+const PRESENCE_DETAIL = { true: 'present', false: 'missing', null: 'unknown (probe failed — no creds?)' };
+
+/** The runCheck report as formatChecklist / mapExitCode items (0 ok · 1 missing · 2 unknown). */
+export function checkResults(report) {
+  const wEnv = wranglerEnvName(report.label, report.env);
+  return [
+    ...report.resources.map((r) => ({
+      group: 'cf-resources',
+      key: `${r.id} ${r.name}`,
+      status: PRESENCE_STATUS[r.present],
+      detail: PRESENCE_DETAIL[r.present],
+      fix: r.fix ?? undefined,
+    })),
+    ...report.secrets.map((s) => ({
+      group: s.scope === 'preview' ? 'previews' : 'api-secrets',
+      key: s.name,
+      status: PRESENCE_STATUS[s.present],
+      detail: s.scope === 'preview'
+        ? `${s.present === true ? 'set' : s.present === false ? 'not set' : 'unknown'} on the Preview base config of env.${wEnv}`
+        : `${s.present === true ? 'set' : s.present === false ? 'not set' : 'unknown'} for env.${wEnv}`,
+      fix: s.fix ?? undefined,
+    })),
+  ];
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // Orchestration
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -965,12 +1362,13 @@ function printManualFollowups(profile, environments) {
 
 function printPlan(profile, env, options) {
   log.info(`${env} plan`);
-  const schema = parseJsonc(readFileSync(PATHS.schema, 'utf8'));
+  const schema = loadSchema();
   for (const step of buildProvisionPlan(profile, env, { ...options, schema })) {
     log.ok(step.title);
     for (const argv of step.commands) log.cmd(renderCommand(argv));
     if (step.note) for (const line of step.note.split('\n')) log.hint(line);
   }
+  if (!backupBucketName(profile, env)) log.hint('backup bucket: none for staging (disposable — RFC 0021 §4)');
 }
 
 async function provisionEnvironment(state, env, options) {
@@ -999,6 +1397,10 @@ async function provisionEnvironment(state, env, options) {
     log.ok(`Profile and wrangler.jsonc updated for ${env}`);
   }
 
+  if (has('backup')) {
+    ensureBackupBucket(state.profile, env);
+    ensureBackupLifecycle(state.profile, env);
+  }
   if (has('cors')) ensureR2Cors(state.profile, env);
   if (has('pages')) ensurePages(state.profile.environments[env], env);
   if (has('secrets')) {
@@ -1017,13 +1419,31 @@ export async function main(argv = process.argv.slice(2)) {
   const state = loadProfile(args.label);
   const options = { withDomain: args.withDomain, only: args.only };
 
+  if (args.check) {
+    // Read-only: no confirmation gate, no account id, no file written. The
+    // probes run through the same spawner; in --json mode it stays quiet so
+    // stdout carries the report alone.
+    const env = args.env ?? 'staging';
+    const run = (argv, opts) => runCommand(argv, { ...opts, quiet: args.json });
+    if (!args.json) log.heading(`Check ${args.label} → ${env}  (read-only)`);
+    const report = runCheck(state.profile, env, loadSchema(), { run });
+    const results = checkResults(report);
+    const code = mapExitCode(results);
+    if (args.json) console.log(JSON.stringify({ ...report, exitCode: code }, null, 2));
+    else console.log(formatChecklist(args.label, env, state.profile.displayName, results));
+    return code;
+  }
+
   // A full run is a bring-up: staging first, then production behind its gate.
   // A `--only` run is a targeted repair of ONE environment, so `--production`
   // there means production *instead of* staging — otherwise `make r2-cors-prod`
   // would quietly rewrite staging too, against the Makefile's naming rule.
-  const environments = args.only === 'all'
-    ? (args.production ? ['staging', 'production'] : ['staging'])
-    : (args.production ? ['production'] : ['staging']);
+  // `-e <env>` always names exactly one environment.
+  const environments = args.env
+    ? [args.env]
+    : args.only === 'all'
+      ? (args.production ? ['staging', 'production'] : ['staging'])
+      : (args.production ? ['production'] : ['staging']);
 
   if (args.dryRun) {
     log.heading(`Dry run: ${args.label}`);
@@ -1046,8 +1466,10 @@ export async function main(argv = process.argv.slice(2)) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
-  main().catch((error) => {
-    log.fail(error.message);
-    process.exitCode = 1;
-  });
+  main()
+    .then((code) => { process.exitCode = code; })
+    .catch((error) => {
+      log.fail(error.message);
+      process.exitCode = 1;
+    });
 }

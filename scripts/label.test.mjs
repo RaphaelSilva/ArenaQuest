@@ -31,6 +31,8 @@ import {
   setPreviewsBlockText,
   checkPreviewsBlock,
   diffPaths,
+  validateProfile,
+  backupBucketName,
 } from './label.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -432,4 +434,76 @@ test('checkPreviewsBlock flags a missing staging block, a stray cron, and any pr
 test('diffPaths reports array length and nested value drift by path', () => {
   assert.deepEqual(diffPaths({ a: [1, 2] }, { a: [1] }, 'x'), [{ path: 'x.a[1]', expected: 2, actual: undefined }]);
   assert.deepEqual(diffPaths({ a: { b: 'c' } }, { a: { b: 'c' } }), []);
+});
+
+// ── backup block (RFC 0025, M28 Task 01) ────────────────────────────────────
+const withBackup = (p = profile()) => {
+  p.environments.production.backup = {
+    bucket: 'acme-backups',
+    retention: { dailyDays: 35, monthlyMonths: 12, tombstoneDays: 90 },
+  };
+  return p;
+};
+
+test('validateProfile requires the backup block for production, naming the block', () => {
+  assert.throws(
+    () => validateProfile(profile(), schema()),
+    /profile acme: environments\.production\.backup is required \(bucket \+ retention\) — see config\/deployment\.schema\.jsonc/,
+  );
+});
+
+test('validateProfile passes a production block and does not require one for staging', () => {
+  const p = withBackup();
+  assert.equal(p.environments.staging.backup, undefined);
+  assert.equal(validateProfile(p, schema()), p);
+});
+
+test('validateProfile names a missing bucket or retention key', () => {
+  const noBucket = withBackup();
+  delete noBucket.environments.production.backup.bucket;
+  assert.throws(() => validateProfile(noBucket, schema()), /environments\.production\.backup\.bucket is required/);
+
+  const noMonthly = withBackup();
+  delete noMonthly.environments.production.backup.retention.monthlyMonths;
+  assert.throws(() => validateProfile(noMonthly, schema()), /environments\.production\.backup\.retention\.monthlyMonths is required/);
+
+  const noRetention = withBackup();
+  delete noRetention.environments.production.backup.retention;
+  assert.throws(() => validateProfile(noRetention, schema()), /environments\.production\.backup\.retention\.dailyDays is required/);
+});
+
+test('validateProfile rejects non-positive, fractional or non-numeric retention values', () => {
+  for (const bad of [0, -1, 1.5, '35', null]) {
+    const p = withBackup();
+    p.environments.production.backup.retention.dailyDays = bad;
+    const expected = bad === null ? /dailyDays is required/ : /environments\.production\.backup\.retention\.dailyDays must be a positive integer/;
+    assert.throws(() => validateProfile(p, schema()), expected, `dailyDays=${JSON.stringify(bad)}`);
+  }
+  const p = withBackup();
+  p.environments.production.backup.bucket = '   ';
+  assert.throws(() => validateProfile(p, schema()), /backup\.bucket must be a non-empty string/);
+  const arr = withBackup();
+  arr.environments.production.backup = [];
+  assert.throws(() => validateProfile(arr, schema()), /environments\.production\.backup must be an object/);
+});
+
+test('validateProfile checks a staging block when one is declared, even though none is required', () => {
+  const p = withBackup();
+  p.environments.staging.backup = { bucket: 'acme-backups-staging', retention: { dailyDays: 7, monthlyMonths: 1 } };
+  assert.throws(() => validateProfile(p, schema()), /environments\.staging\.backup\.retention\.tombstoneDays is required/);
+});
+
+test('the three committed profiles validate against the schema', () => {
+  for (const label of ['arenaquest', 'budo', 'spaziord']) {
+    const p = parseJsonc(readFileSync(join(ROOT, 'config', 'labels', `${label}.jsonc`), 'utf8'));
+    assert.equal(validateProfile(p, schema()), p, label);
+    assert.equal(backupBucketName(p, 'production'), `${label}-backups`);
+    assert.equal(backupBucketName(p, 'staging'), null);
+  }
+});
+
+test('backupBucketName is the declared production bucket, null for staging and for a profile without one', () => {
+  assert.equal(backupBucketName(withBackup(), 'production'), 'acme-backups');
+  assert.equal(backupBucketName(withBackup(), 'staging'), null);
+  assert.equal(backupBucketName(profile(), 'production'), null);
 });

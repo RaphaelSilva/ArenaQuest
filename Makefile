@@ -41,7 +41,7 @@
         list-kv-staging list-kv-prod cf-info-staging cf-info-prod \
         secret-staging secret-prod create-google-oauth-secret \
         label-new label-scaffold label-check \
-        set-new-label \
+        set-new-label infra-check-staging infra-check-production \
         clean clean-cache clean-all \
         confirm-prod guard-no-dev-seed-staging guard-no-dev-seed-prod \
         db-migrations-dev db-migrations-staging db-migrations-prod db-seed-dev \
@@ -416,6 +416,17 @@ set-new-label: ## Provision a label end-to-end (LABEL=x; PRODUCTION=1, WITH_DOMA
 		$(if $(filter 1,$(WITH_DOMAIN)),--with-domain,) \
 		$(if $(ONLY),--only $(ONLY),) \
 		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+# Read-only: which staging/production resources exist and which secrets are set
+# (by name) for a label, each gap with its fix command. No confirmation: nothing
+# is created, written or deployed. JSON=1 prints the machine-readable report.
+infra-check-staging: ## Read-only report of a label's staging resources + secret names (LABEL=x; JSON=1)
+	node scripts/cloudflare/provision-label.mjs --label $(LABEL) -e staging --check \
+		$(if $(filter 1,$(JSON)),--json,)
+
+infra-check-production: ## Read-only report of a label's production resources + secret names (LABEL=x; JSON=1)
+	node scripts/cloudflare/provision-label.mjs --label $(LABEL) -e production --check \
+		$(if $(filter 1,$(JSON)),--json,)
 
 # ==============================================================================
 ##@ 🧹 CLEAN

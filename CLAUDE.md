@@ -104,7 +104,11 @@ the deploy CLI, so there is still one release code path). Extra knobs:
 in the account; `ONLY=cors|secrets|worker|domain` runs one group for a targeted
 repair, against a single environment. `make r2-cors-*` now forward to it —
 R2 CORS is derived from the profile's `webOrigin`, not from a committed file.
-`create-db-*` / `create-kv-*` are superseded by `set-new-label`.
+`create-db-*` / `create-kv-*` are superseded by `set-new-label`. Every production
+profile declares a `backup` block (`<label>-backups` + retention; RFC 0025) that the
+provisioner creates in production only, with its lifecycle rules, and
+`--check` / `make infra-check-<env> LABEL=x` (`JSON=1`) reports the label's
+resources and secret *names* read-only, each gap with its fix command.
 
 **Secret contract for provisioning.** `JWT_SECRET` is generated per label *and* per
 environment (a shared key would let a token minted for one tenant verify on another),
