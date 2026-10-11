@@ -211,6 +211,27 @@ describe('admin missions - role matrix', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /admin/missions', () => {
+  it('accepts a seeded badge id, which is a slug-shaped TEXT id rather than a uuid', async () => {
+    // Migration 0021 seeds badges such as `badge-tecnica-afiada`; a `.uuid()` check on
+    // `badgeId` refused every real badge in the picker (preview walkthrough, 2026-10-11).
+    const res = await req('POST', '/admin/missions', { token: adminToken, body: missionBody({ badgeId: 'badge-tecnica-afiada' }) });
+    expect(res.status).toBe(201);
+    const created = (await res.json<{ data: MissionDetail }>()).data;
+    expect(created.mission.badgeId).toBe('badge-tecnica-afiada');
+
+    const patched = await req('PATCH', `/admin/missions/${created.mission.id}`, { token: adminToken, body: { badgeId: 'badge-alicerce-solido' } });
+    // The mission has not started here only if startAt is in the future; the helper's default may have started it,
+    // so accept either the applied patch or the start lock — the schema must not answer a uuid ValidationError.
+    expect([200, 409]).toContain(patched.status);
+    expect((await patched.json<{ error?: string }>()).error ?? '').not.toBe('ValidationError');
+  });
+
+  it('answers 400 BADGE_NOT_FOUND for an unknown badge id', async () => {
+    const res = await req('POST', '/admin/missions', { token: adminToken, body: missionBody({ badgeId: 'badge-does-not-exist' }) });
+    expect(res.status).toBe(400);
+    expect((await res.json<{ error: string }>()).error).toBe('BADGE_NOT_FOUND');
+  });
+
   it('creates a sequential two-step mission that reads back in position order', async () => {
     const created = await createMission();
     expect(created.mission.predicateKind).toBe('requirements');

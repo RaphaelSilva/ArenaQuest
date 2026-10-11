@@ -629,7 +629,7 @@ export const MissionCreateBodySchema = z.object({
   mode: MissionModeSchema.default('parallel'),
   enrollmentMode: MissionEnrollmentModeSchema.default('auto'),
   xpReward: z.number().int().min(0).default(0).openapi({ example: 500 }),
-  badgeId: z.string().uuid().nullable().default(null).openapi({ example: null }),
+  badgeId: z.string().min(1).max(64).nullable().default(null).openapi({ example: null }),
   requirements: requirementListField,
   audience: MissionAudienceSchema.optional().openapi({ description: "Only with `enrollmentMode = 'assigned'`" }),
 }).strict().openapi('MissionCreateBody');
@@ -642,7 +642,7 @@ export const MissionPatchBodySchema = z.object({
   mode: MissionModeSchema.optional().openapi({ description: 'Locked once the mission started' }),
   enrollmentMode: MissionEnrollmentModeSchema.optional().openapi({ description: 'Locked once the mission started' }),
   xpReward: z.number().int().min(0).optional().openapi({ description: 'Locked once the mission started' }),
-  badgeId: z.string().uuid().nullable().optional().openapi({ description: 'Locked once the mission started' }),
+  badgeId: z.string().min(1).max(64).nullable().optional().openapi({ description: 'Locked once the mission started' }),
   active: z.boolean().optional(),
 }).strict().openapi('MissionPatchBody');
 

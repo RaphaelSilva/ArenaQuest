@@ -11668,7 +11668,6 @@ export interface components {
         MissionCreateBody: {
             audience?: components["schemas"]["MissionAudience"] & unknown;
             /**
-             * Format: uuid
              * @default null
              * @example null
              */
@@ -11816,10 +11815,7 @@ export interface components {
         };
         MissionPatchBody: {
             active?: boolean;
-            /**
-             * Format: uuid
-             * @description Locked once the mission started
-             */
+            /** @description Locked once the mission started */
             badgeId?: string | null;
             description?: string;
             /**
