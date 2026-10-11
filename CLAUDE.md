@@ -118,6 +118,20 @@ secrets (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `GOOGLE_CLIENT_SECRET`,
 provisioning never writes them, and no secret value ever reaches argv, disk or a log
 line. See RFC 0012 and `docs/onboarding.md`.
 
+**Backups (RFC 0025 §4).** `.github/workflows/backup.yml` runs, per production label,
+the D1 export then the R2 mirror daily at 07:30 UTC (offset from the 06:00 billing cron)
+and the restore drill on Sunday 09:30 UTC; `workflow_dispatch` runs one label or `all`,
+with `drill: true` for the drill. Every step calls the scripts with their flags —
+`make backup-d1-prod LABEL=x` (`scripts/backup/export-d1.mjs`: gzipped dump + SHA-256 +
+row counts, verified before `d1/production/manifest.json` is updated), `make backup-r2-prod
+LABEL=x` (`scripts/backup/mirror-r2.mjs`: incremental copy under `r2/production/`, deleted
+objects tombstoned 90 days) and `node scripts/backup/drill.mjs --label x -e production --yes`
+(latest dump → SHA-256 check → throwaway local D1 → row counts vs the manifest → `drill:
+{ at, ok, mismatches }`). A failed export, mirror or drill fails the job; staging is never
+backed up and nothing writes to a remote database. **Restore is manual** — Time Travel,
+dump restore and R2 copy-back are tier-3 commands a human runs from
+`docs/operations/backup-restore.md`; no target or script wraps them.
+
 **Bulk media import (folder tree → topics):**
 ```bash
 make import-media-staging SOURCE=./content DRY_RUN=1        # preview a local tree

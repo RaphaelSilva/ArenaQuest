@@ -110,7 +110,7 @@ script/CI task is filed under **Backend** (the only non-web team).
 | 01 | [Backup bucket in the label profile and provisioner check mode](./01-backup-bucket-and-provision-check.task.md) | 0 | Backend | ✅ Done |
 | 02 | [D1 export and backup manifest](./02-d1-export-and-manifest.task.md) | 0 | Backend | ✅ Done |
 | 03 | [R2 media mirror](./03-r2-media-mirror.task.md) | 0 | Backend | ✅ Done |
-| 04 | [Backup workflow, restore drill and restore runbook](./04-backup-workflow-drill-and-runbook.task.md) | 0 | Backend | ☐ Open |
+| 04 | [Backup workflow, restore drill and restore runbook](./04-backup-workflow-drill-and-runbook.task.md) | 0 | Backend | ✅ Done |
 | 05 | [Record scheduled and manual job runs](./05-job-runs-recording.task.md) | 1 | Backend | ☐ Open |
 | 06 | [Admin ops health and job-runs API](./06-admin-ops-health-api.task.md) | 1 | Backend | ☐ Open |
 | 07 | [Admin-only topic publish gate](./07-topic-publish-gate.task.md) | 2 | Backend | ☐ Open |
