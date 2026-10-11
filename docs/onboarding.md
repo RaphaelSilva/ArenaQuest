@@ -667,7 +667,8 @@ refusals included, lands in the audit log.
 
 **Credentials per tier.** `AQ_CF_READ_TOKEN` is the **only** Cloudflare
 credential the server loads: a token with read-only scopes (D1 read, R2 read on
-the backup bucket, Workers read — see the read-only token procedure, Task 13).
+the backup bucket, Workers read — minted as described under *Minting
+`AQ_CF_READ_TOKEN`* below).
 Tier-1 children receive it as `CLOUDFLARE_API_TOKEN` through their environment
 object only (never argv, never a log line, never a tool result), on top of a
 small allowlist (`PATH`, `HOME`, `NODE_*`, `PNPM_*`, `XDG_*`, `TMPDIR`); when it
@@ -708,6 +709,74 @@ notebook driving an `aq-mcp` on another host would need a remote transport
 ---
 
 ---
+
+#### Minting `AQ_CF_READ_TOKEN`
+
+The tier-1 ops tools hand this token to their `wrangler` children as
+`CLOUDFLARE_API_TOKEN` (`scripts/mcp/tools/ops.mjs`) for `whoami`, `d1 list`,
+`d1 time-travel info`, `r2 bucket list`, `r2 object get` on the backup bucket,
+`kv namespace list`, `pages project list`, `secret list` and `deployments list`.
+Those are reads, so the token carries **read permissions only** — six rows,
+nothing else:
+
+1. Dashboard → **My Profile → API Tokens → Create Token → Create Custom Token**.
+2. Name it after the machine (`arenaquest-read-<machine>`), one token per
+   machine, so a lost laptop revokes one token and nothing else.
+3. **Permissions** — every row at the *Account* level:
+
+   | Level | Scope | Permission |
+   |---|---|---|
+   | Account | D1 | Read |
+   | Account | Workers R2 Storage | Read |
+   | Account | Workers Scripts | Read |
+   | Account | Workers KV Storage | Read |
+   | Account | Cloudflare Pages | Read |
+   | Account | Account Settings | Read |
+
+   No `Edit`/`Write` row, no zone row, no user row. `Account Settings · Read`
+   is what lets `wrangler whoami` resolve the account; without it every tier-1
+   call stops at "no account found".
+4. **Account Resources** → *Include* → the one Cloudflare account. **Zone
+   Resources**: none.
+5. **Client IP Address Filtering** and **TTL**: optional. If you set an end
+   date, an expired token is a `note` in the tool result (tier 1 falls back
+   to your `wrangler login`), not a failure.
+6. *Continue to summary* → *Create Token* → copy it **once**. Store it in the
+   same untracked `.env` as `AQ_ADMIN_EMAIL` / `AQ_ADMIN_PASSWORD` — never in
+   the repo, never on a command line, never in a tool argument.
+
+**Verify** (from the repository root, with the token exported in the shell):
+
+```bash
+export AQ_CF_READ_TOKEN='…'
+CLOUDFLARE_API_TOKEN="$AQ_CF_READ_TOKEN" pnpm --filter api exec wrangler whoami    # prints the six read scopes
+CLOUDFLARE_API_TOKEN="$AQ_CF_READ_TOKEN" pnpm --filter api exec wrangler d1 list   # lists the databases
+```
+
+A `SELECT` is **expected to succeed** with this token: Cloudflare's API
+reference lists `D1 Read` among the accepted permissions of the query endpoint
+(RFC 0025, Resolved Decision 5). What must **fail** is a write — and checking
+that is the two-minute empirical confirmation that decision asks the operator
+for. Use the **staging** D1 of the label (`config/labels/<label>.jsonc` →
+`environments.staging.d1.id`; the account id is in `wrangler whoami`):
+
+```bash
+Q="https://api.cloudflare.com/client/v4/accounts/<account_id>/d1/database/<staging_database_id>/query"
+curl -sS -X POST "$Q" -H "Authorization: Bearer $AQ_CF_READ_TOKEN" \
+     -H "Content-Type: application/json" --data '{"sql":"SELECT 1"}'
+# expected: HTTP 200, "success": true
+
+curl -sS -X POST "$Q" -H "Authorization: Bearer $AQ_CF_READ_TOKEN" \
+     -H "Content-Type: application/json" --data '{"sql":"DELETE FROM job_runs WHERE 0"}'
+# expected: HTTP 403 / "success": false with an authorization error
+```
+
+`WHERE 0` matches no row, so the second call is a no-op even if it goes
+through. If it **does** go through, the token is not read-only on the query
+endpoint: revoke nothing, but record it — RFC 0025 Resolved Decision 5 flips
+to "no" and the `query` tool follow-up is dropped. Either way, nothing under
+`scripts/mcp/` runs `d1 execute` or the query endpoint today (the static
+guard), so `AQ_CF_READ_TOKEN` is never used to run SQL by any tool.
 
 ## 5. Troubleshooting
 
