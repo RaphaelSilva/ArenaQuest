@@ -94,6 +94,17 @@ const missionPath = (id: string) => `/me/missions/${encodeURIComponent(id)}`;
 /** Student missions (`/v1/me/missions/*`). Responses are bare entries — no `{ data }` envelope. */
 export function createMissionsApi(http: HttpTransport) {
   return {
+    /**
+     * Every mission the caller sees (the missions page): enrolments, joinable
+     * `open` missions and locked teasers, in the API's order. The route answers
+     * the bare array, or `null` when there is nothing to show.
+     */
+    async list(): Promise<DashboardMissionEntry[] | null> {
+      const res = await send(http, 'GET', '/me/missions');
+      if (!res.ok) return rejectWith(res);
+      return (await res.json()) as DashboardMissionEntry[] | null;
+    },
+
     /** One mission with its steps (the mission page). A miss is `NotFound`. */
     async getMission(id: string): Promise<DashboardMissionEntry> {
       const res = await send(http, 'GET', missionPath(id));

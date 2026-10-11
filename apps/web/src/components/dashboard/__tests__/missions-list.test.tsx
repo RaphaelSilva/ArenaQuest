@@ -4,7 +4,7 @@ import { DictProvider } from '@web/context/dict-context';
 import { dictEn } from '@web/i18n/dict-en';
 import { createMissionsApi } from '@web/lib/missions-api';
 import type { DashboardMissionEntry } from '@web/lib/missions-api';
-import { MissionsList, groupMissions } from '../MissionsList';
+import { DASHBOARD_MISSIONS_PER_GROUP, MissionsList, groupMissions } from '../MissionsList';
 import { entry, step, TOPIC } from '../../missions/__tests__/mission-fixtures';
 
 const d = dictEn.missions;
@@ -196,5 +196,41 @@ describe('MissionsList', () => {
   it('renders the panel empty state when there are no missions', () => {
     renderList([]);
     expect(screen.getByText(dictEn.dashboard.missions.empty)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: dictEn.dashboard.missions.seeAll })).not.toBeInTheDocument();
+  });
+
+  it('caps each group at three cards and links to the full missions page', () => {
+    const mine = [1, 2, 3, 4, 5].map((n) =>
+      entry(`m-mine-${n}`, `Mine ${n}`, { enrollment: { source: 'admin', joinedAt: null, implicit: false } }),
+    );
+    const open = [1, 2, 3, 4].map((n) => entry(`m-open-${n}`, `Open ${n}`, { joinable: true }));
+    renderList([...mine, ...open, TEASER]);
+
+    expect(DASHBOARD_MISSIONS_PER_GROUP).toBe(3);
+    expect(within(group('mine')).getAllByTestId('mission-card')).toHaveLength(3);
+    expect(within(group('mine')).getByText('Mine 3')).toBeInTheDocument();
+    expect(within(group('mine')).queryByText('Mine 4')).not.toBeInTheDocument();
+    expect(within(group('available')).getAllByTestId('mission-card')).toHaveLength(3);
+    expect(within(group('locked')).getAllByTestId('mission-card')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: dictEn.dashboard.missions.seeAll })).toHaveAttribute('href', '/missions');
+  });
+
+  it('shows the See all link even when nothing is capped', () => {
+    renderList([ENROLLED]);
+    expect(screen.getByRole('link', { name: dictEn.dashboard.missions.seeAll })).toHaveAttribute('href', '/missions');
+  });
+
+  it('keeps a just-joined mission visible when My missions is already full', async () => {
+    const mine = [1, 2, 3].map((n) =>
+      entry(`m-mine-${n}`, `Mine ${n}`, { enrollment: { source: 'admin', joinedAt: null, implicit: false } }),
+    );
+    http.mockResolvedValueOnce(json(JOINED, 201));
+    renderList([...mine, OPEN]);
+
+    fireEvent.click(screen.getByRole('button', { name: d.join.buttonLabel('Open seminar') }));
+    fireEvent.click(screen.getByRole('button', { name: d.join.confirm }));
+
+    await waitFor(() => expect(within(group('mine')).getByText('Open seminar')).toBeInTheDocument());
+    expect(within(group('mine')).getAllByTestId('mission-card')).toHaveLength(3);
   });
 });

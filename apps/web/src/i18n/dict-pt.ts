@@ -2323,6 +2323,7 @@ export const dictPt = {
     missions: {
       title: 'Missões Especiais',
       empty: 'Nenhuma missão ativa no momento.',
+      seeAll: 'Ver todas as missões',
     },
     badges: {
       title: 'Badges',
@@ -2680,6 +2681,7 @@ export const dictPt = {
       dashboard: 'Dashboard',
       catalog: 'Catálogo',
       myNotes: 'Minhas notas',
+      missions: 'Missões',
       events: 'Eventos',
       tasks: 'Tarefas',
       settings: 'Configurações',
@@ -3146,6 +3148,28 @@ export const dictPt = {
       NotFound: 'Esta missão não está mais disponível.',
       network: 'Problema de conexão. Verifique sua internet e tente novamente.',
       generic: 'Algo deu errado. Tente novamente.',
+    },
+    index: {
+      title: 'Missões',
+      subtitle: 'Todas as missões das quais você participa, pode participar ou que são reservadas a um grupo.',
+      loading: 'Carregando as missões…',
+      loadError: 'Não foi possível carregar suas missões.',
+      retry: 'Tentar novamente',
+      empty: 'Não há missões para você no momento. As novas aparecerão aqui.',
+      filterLabel: 'Filtrar missões',
+      filters: {
+        all: 'Todas',
+        inProgress: 'Em andamento',
+        completed: 'Concluídas',
+        available: 'Disponíveis',
+        locked: 'Restritas',
+      },
+      filterEmpty: {
+        inProgress: 'Nenhuma missão em andamento.',
+        completed: 'Você ainda não concluiu nenhuma missão.',
+        available: 'Nenhuma missão aberta para participar no momento.',
+        locked: 'Nenhuma missão restrita no momento.',
+      },
     },
     page: {
       loading: 'Carregando a missão…',
