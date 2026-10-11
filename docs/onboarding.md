@@ -581,9 +581,11 @@ itself is correct.
 
 ### The AI admin assistant (aq-mcp)
 
-`scripts/mcp/aq-mcp.mjs` is a **local MCP server** (RFC 0025, Plane A) that lets
-Claude Code author **draft** topics and upload local media through the public
-API — nothing else. It runs over stdio on the machine where Claude Code runs,
+`scripts/mcp/aq-mcp.mjs` is a **local MCP server** (RFC 0025) with two planes:
+the **authoring** tools (Plane A) let Claude Code author **draft** topics and
+upload local media through the public API, and the **ops** tools (Plane B, RFC
+§5) answer "is the system healthy?", "was a backup made?" and "what do I do if
+not?" in three tiers. It runs over stdio on the machine where Claude Code runs,
 one registration per label and environment, and talks to the API as a dedicated
 `content_creator` account through the same client the bulk importer uses
 (`scripts/lib/api-client.mjs`). **Claude Code is the only supported client**
@@ -599,17 +601,24 @@ pnpm install --frozen-lockfile
 # that starts Claude Code:
 export AQ_ADMIN_EMAIL=assistant@example.com
 export AQ_ADMIN_PASSWORD='…'
+# Optional: a READ-ONLY Cloudflare token for the tier-1 ops tools (see below).
+export AQ_CF_READ_TOKEN='…'
 claude mcp add aq-budo-prod -- node /abs/path/ArenaQuest/scripts/mcp/aq-mcp.mjs --label budo -e production
 claude mcp add aq-budo-staging -- node /abs/path/ArenaQuest/scripts/mcp/aq-mcp.mjs --label budo -e staging
 ```
 
 Credentials come from the environment **only** — never argv, never a tool
-argument, never a log line. The target comes from `config/labels/<label>.jsonc`;
-`AQ_API_BASE_URL` overrides it only towards loopback (`make dev-api`), like the
-importer. Login is lazy (first tool call), so registering against an unreachable
-API still lists the tools. `node scripts/mcp/aq-mcp.mjs --help` prints the usage.
+argument, never a log line. The server reads exactly four variables —
+`AQ_ADMIN_EMAIL`, `AQ_ADMIN_PASSWORD`, `AQ_API_BASE_URL`, `AQ_CF_READ_TOKEN` —
+and nothing else (a test wraps its environment in a `Proxy` and asserts the
+access list): `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN` and the `R2_*` pair are
+never read and never inherited by a child process. The target comes from
+`config/labels/<label>.jsonc`; `AQ_API_BASE_URL` overrides it only towards
+loopback (`make dev-api`), like the importer. Login is lazy (first tool call),
+so registering against an unreachable API still lists the tools.
+`node scripts/mcp/aq-mcp.mjs --help` prints the usage.
 
-**The seven tools:**
+**The seven authoring tools:**
 
 | Tool | Does | Annotation |
 |---|---|---|
@@ -626,10 +635,55 @@ can auto-approve reads and prompt on writes. A **refusal** (not a draft, over th
 limit, no `ffmpeg`) is a normal result with `refused: true` and a reason, not an
 error — the model reads it and tells you what to do.
 
+**The eight ops tools, in three tiers** (RFC 0025 §5). Tier 1 *diagnoses*:
+read-only facts the assistant may gather freely. Tier 2 *acts reversibly*:
+creates something, destroys nothing, and only after the operator confirms a
+printed plan. Tier 3 is *destructive*: the tool returns the exact command and
+the runbook section — **it executes nothing**; a human types the command.
+
+| Tool | Tier | Does | Annotation |
+|---|---|---|---|
+| `system_health()` | 1 | `GET /v1/admin/ops/health`: D1/KV/R2 probes with latency, newest migration, last run of every job | read |
+| `job_runs(job?, since?, limit?)` | 1 | `GET /v1/admin/ops/job-runs`: the scheduled-job ledger, newest first | read |
+| `backup_status()` | 1 | `scripts/backup/status.mjs --json` for the label's **production** data — the same report as `make backup-status-prod`; red/amber is data, not an error | read |
+| `time_travel_status()` | 1 | The `timeTravel` slice of that report (bookmark + window note); reuses a report younger than 30 s | read |
+| `infra_status(env?)` | 1 | `provision-label.mjs --check --json`: which resources exist and which secrets are set, **by name only** | read |
+| `backup_now(confirmationId?)` | 2 | Runs `scripts/backup/export-d1.mjs` for the label's production D1 (first call: the `--dry-run` plan + an id; second call: `--yes`) | action |
+| `bookmark_now(confirmationId?)` | 2 | Records a D1 Time Travel bookmark (`wrangler d1 time-travel info`) of the server's environment and returns the restore command **as text** | action |
+| `restore_instructions(scenario, bookmark?)` | 3 | The restore command and the `docs/operations/backup-restore.md` anchor for `minutes-ago` (Time Travel), `database-lost` (restore a dump) or `object-deleted` (R2 copy-back), filled for the label; spawns nothing | read |
+
+Tier 1 and tier 3 carry `readOnlyHint: true`; tier 2 carries `readOnlyHint:
+false, destructiveHint: false`. The tools **wrap** the existing scripts (they
+spawn them with `--json` and parse the output) — no tool assembles a wrangler
+command of its own except the bookmark read the deploy CLI already uses.
+
+**Two-call confirmation (tier 2).** The first call, without an id, returns the
+plan and a `confirmationId`: random, **single-use**, bound to the tool and its
+arguments, valid for **5 minutes**. The second call, carrying the id, executes.
+A reused, expired or foreign id (one issued for `bookmark_now` cannot confirm
+`backup_now`) is a refusal with `refused: true` and no process is started; ask
+for a fresh plan. Ids live in the server process's memory only. Every call,
+refusals included, lands in the audit log.
+
+**Credentials per tier.** `AQ_CF_READ_TOKEN` is the **only** Cloudflare
+credential the server loads: a token with read-only scopes (D1 read, R2 read on
+the backup bucket, Workers read — see the read-only token procedure, Task 13).
+Tier-1 children receive it as `CLOUDFLARE_API_TOKEN` through their environment
+object only (never argv, never a log line, never a tool result), on top of a
+small allowlist (`PATH`, `HOME`, `NODE_*`, `PNPM_*`, `XDG_*`, `TMPDIR`); when it
+is unset nothing fails — the tier-1 scripts fall back to your `wrangler login`
+session and the result says so in a `note`. Tier-2 children get the same
+allowlist **without any token**, so a confirmed action runs on your own
+`wrangler login`, in your own process. Tier 3 has no executor at all. A static
+guard (`scripts/mcp/no-destructive.test.mjs`) fails the suite if any code path
+under `scripts/mcp/` spawns `time-travel restore`, `d1 execute`, `deploy`,
+`delete` or `secret put`.
+
 **What it never does:** publish, archive, delete or move a topic or media;
-change a status or a visibility; run SQL or wrangler; touch R2 directly; read
-private note bodies or submission files. Publishing a topic is an admin act in
-the backoffice (the API refuses `status: 'published'` from a `content_creator`).
+change a status or a visibility; run SQL; write to D1 or R2 directly; read
+private note bodies or submission files; **restore, reset or deploy** anything —
+tier 3 only prints the command. Publishing a topic is an admin act in the
+backoffice (the API refuses `status: 'published'` from a `content_creator`).
 To edit a published topic: **unpublish it in the backoffice (back to `draft`),
 let the assistant edit, publish again** (Resolved Decision 3).
 

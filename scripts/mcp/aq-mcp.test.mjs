@@ -19,8 +19,9 @@ import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 
-import { REPO_ROOT, SERVER_NAME, createServer, loadConfig, parseArgs, readVersion, usage } from './aq-mcp.mjs';
+import { ENV_VARS, REPO_ROOT, SERVER_NAME, TOOL_NAMES, createServer, loadConfig, parseArgs, readVersion, usage } from './aq-mcp.mjs';
 import { AUTHORING_TOOL_NAMES } from './tools/authoring.mjs';
+import { OPS_TOOL_NAMES, TIER_1_TOOL_NAMES, TIER_2_TOOL_NAMES, TIER_3_TOOL_NAMES } from './tools/ops.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SERVER_PATH = join(HERE, 'aq-mcp.mjs');
@@ -28,8 +29,19 @@ const SERVER_PATH = join(HERE, 'aq-mcp.mjs');
 const PROFILE = {
   label: 'budo',
   environments: {
-    staging: { apiHost: 'api-budo-staging.example', webOrigin: 'budo-web-staging.pages.dev' },
-    production: { apiHost: 'api-budo.example', webOrigin: 'budo.example' },
+    staging: {
+      apiHost: 'api-budo-staging.example',
+      webOrigin: 'budo-web-staging.pages.dev',
+      d1: { name: 'budo-db-staging' },
+      r2: { bucket: 'budo-media-staging' },
+    },
+    production: {
+      apiHost: 'api-budo.example',
+      webOrigin: 'budo.example',
+      d1: { name: 'budo-db' },
+      r2: { bucket: 'budo-media' },
+      backup: { bucket: 'budo-backups' },
+    },
   },
 };
 const fakeLoadProfile = () => PROFILE;
@@ -58,13 +70,19 @@ test('parseArgs accepts --label and -e/--env only', () => {
   assert.throws(() => parseArgs(['--label', 'budo', '-e', 'staging', '--email', 'x']), /invalid arguments/);
 });
 
-test('usage mentions the environment variables and the seven tools, never a credential flag', () => {
+test('usage mentions the environment variables and all fifteen tools grouped by tier, never a credential flag', () => {
   const text = usage();
   assert.match(text, /AQ_ADMIN_EMAIL/);
   assert.match(text, /AQ_ADMIN_PASSWORD/);
+  assert.match(text, /AQ_CF_READ_TOKEN/);
   assert.match(text, /claude mcp add/);
-  for (const name of AUTHORING_TOOL_NAMES) assert.ok(text.includes(name), name);
-  assert.doesNotMatch(text, /--password|--email/);
+  assert.deepEqual(TOOL_NAMES, [...AUTHORING_TOOL_NAMES, ...OPS_TOOL_NAMES]);
+  assert.equal(TOOL_NAMES.length, 15);
+  for (const name of TOOL_NAMES) assert.ok(text.includes(name), name);
+  assert.match(text, /tier 1[^\n]*system_health/);
+  assert.match(text, /tier 2[^\n]*backup_now/);
+  assert.match(text, /tier 3[^\n]*restore_instructions/);
+  assert.doesNotMatch(text, /--password|--email|--token/);
 });
 
 // -- loadConfig ---------------------------------------------------------------
@@ -86,7 +104,7 @@ test('loadConfig names a missing credential without echoing any value', () => {
   assert.throws(() => loadConfig({ env: {}, label: 'budo', envName: 'local', loadProfile: fakeLoadProfile }), /env must be one of/);
 });
 
-test('loadConfig resolves the target from the profile, derives webOrigin and the state paths under the repo root', () => {
+test('loadConfig resolves the target from the profile, derives webOrigin, the ops names and the state paths under the repo root', () => {
   const env = { AQ_ADMIN_EMAIL: 'bot@example.invalid', AQ_ADMIN_PASSWORD: 'pw' };
   const config = loadConfig({ env, label: 'budo', envName: 'production', rootDir: '/repo', loadProfile: fakeLoadProfile, resolveBaseUrl: fakeResolveBaseUrl });
   assert.deepEqual(config, {
@@ -96,10 +114,76 @@ test('loadConfig resolves the target from the profile, derives webOrigin and the
     webOrigin: 'https://budo.example',
     email: 'bot@example.invalid',
     password: 'pw',
+    cfReadToken: null,
+    ops: {
+      database: 'budo-db',
+      wranglerEnv: 'budo',
+      production: { database: 'budo-db', mediaBucket: 'budo-media', backupBucket: 'budo-backups' },
+    },
     auditPath: '/repo/.arenaquest/mcp-audit-budo-production.jsonl',
     uploadLedgerPath: '/repo/.arenaquest/mcp-upload-budo-production.jsonl',
     convertDir: '/repo/.arenaquest/mcp-convert/budo-production',
   });
+
+  // Staging: its own D1 for bookmark_now, the production names for the restore text.
+  const staging = loadConfig({ env, label: 'budo', envName: 'staging', rootDir: '/repo', loadProfile: fakeLoadProfile, resolveBaseUrl: fakeResolveBaseUrl });
+  assert.deepEqual(staging.ops, {
+    database: 'budo-db-staging',
+    wranglerEnv: 'budo-staging',
+    production: { database: 'budo-db', mediaBucket: 'budo-media', backupBucket: 'budo-backups' },
+  });
+
+  // A profile without the blocks falls back to the runbook's conventions.
+  const bare = loadConfig({ env, label: 'x', envName: 'production', loadProfile: () => ({ environments: {} }), resolveBaseUrl: () => 'https://api.x' });
+  assert.deepEqual(bare.ops, { database: null, wranglerEnv: 'x', production: { database: 'x-db', mediaBucket: 'x-media', backupBucket: 'x-backups' } });
+});
+
+test('loadConfig takes AQ_CF_READ_TOKEN when set (blank counts as unset) and never echoes it', () => {
+  const base = { AQ_ADMIN_EMAIL: 'bot@example.invalid', AQ_ADMIN_PASSWORD: 'pw' };
+  const opts = { label: 'budo', envName: 'production', loadProfile: fakeLoadProfile, resolveBaseUrl: fakeResolveBaseUrl };
+  assert.equal(loadConfig({ env: base, ...opts }).cfReadToken, null);
+  assert.equal(loadConfig({ env: { ...base, AQ_CF_READ_TOKEN: '   ' }, ...opts }).cfReadToken, null);
+  assert.equal(loadConfig({ env: { ...base, AQ_CF_READ_TOKEN: 'cf-read-token-value' }, ...opts }).cfReadToken, 'cf-read-token-value');
+  // A token never makes a missing credential's message leak.
+  assert.throws(
+    () => loadConfig({ env: { AQ_CF_READ_TOKEN: 'cf-read-token-value' }, ...opts }),
+    (err) => !err.message.includes('cf-read-token-value') && /missing AQ_ADMIN_EMAIL and AQ_ADMIN_PASSWORD/.test(err.message),
+  );
+});
+
+test('loadConfig reads exactly the four AQ_* variables from the environment — no Cloudflare or R2 variable', () => {
+  const reads = new Set();
+  const actual = {
+    AQ_ADMIN_EMAIL: 'bot@example.invalid',
+    AQ_ADMIN_PASSWORD: 'pw',
+    AQ_API_BASE_URL: 'http://127.0.0.1:8787',
+    AQ_CF_READ_TOKEN: 'cf-read-token-value',
+    CF_API_TOKEN: 'must-not-be-read',
+    CLOUDFLARE_API_TOKEN: 'must-not-be-read',
+    CF_ACCOUNT_ID: 'must-not-be-read',
+    R2_ACCESS_KEY_ID: 'must-not-be-read',
+    R2_SECRET_ACCESS_KEY: 'must-not-be-read',
+    JWT_SECRET: 'must-not-be-read',
+  };
+  const env = new Proxy(actual, {
+    get(target, key) {
+      if (typeof key === 'string') reads.add(key);
+      return target[key];
+    },
+    has(target, key) {
+      if (typeof key === 'string') reads.add(key);
+      return key in target;
+    },
+    ownKeys(target) {
+      reads.add('*enumerated*');
+      return Reflect.ownKeys(target);
+    },
+  });
+  const config = loadConfig({ env, label: 'budo', envName: 'staging', loadProfile: fakeLoadProfile, resolveBaseUrl: fakeResolveBaseUrl });
+  assert.deepEqual([...reads].sort(), [...ENV_VARS].sort());
+  assert.deepEqual([...ENV_VARS], ['AQ_ADMIN_EMAIL', 'AQ_ADMIN_PASSWORD', 'AQ_API_BASE_URL', 'AQ_CF_READ_TOKEN']);
+  assert.equal(config.cfReadToken, 'cf-read-token-value');
+  assert.equal(JSON.stringify(config).includes('must-not-be-read'), false);
 });
 
 test('loadConfig rejects a non-loopback AQ_API_BASE_URL and accepts a loopback one (real resolver)', () => {
@@ -119,14 +203,16 @@ test('loadConfig falls back to localhost:3000 for a placeholder webOrigin', () =
 
 // -- createServer -------------------------------------------------------------
 
-test('createServer registers the seven tools on an McpServer with a stub client and audit', () => {
+test('createServer registers the fifteen tools (authoring, then ops) on an McpServer with a stub client and audit', () => {
   const config = loadConfig({
     env: { AQ_ADMIN_EMAIL: 'bot@example.invalid', AQ_ADMIN_PASSWORD: 'pw' }, label: 'budo', envName: 'staging', rootDir: '/repo', loadProfile: fakeLoadProfile, resolveBaseUrl: fakeResolveBaseUrl,
   });
   const client = { request: async () => { throw new Error('not in this test'); } };
-  const { server, tools } = createServer({ config, client, audit: { record: () => {} }, version: '9.9.9' });
+  const spawn = () => { throw new Error('no spawn in this test'); };
+  const { server, tools } = createServer({ config, client, audit: { record: () => {} }, version: '9.9.9', deps: { spawn } });
   assert.ok(server);
-  assert.deepEqual(tools.map((t) => t.name), AUTHORING_TOOL_NAMES);
+  assert.deepEqual(tools.map((t) => t.name), [...AUTHORING_TOOL_NAMES, ...OPS_TOOL_NAMES]);
+  assert.equal(tools.length, 15);
   assert.equal(SERVER_NAME, 'aq-mcp');
   assert.throws(() => createServer({}), /config is required/);
   assert.equal(readVersion(REPO_ROOT), JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')).version);
@@ -136,7 +222,7 @@ test('createServer registers the seven tools on an McpServer with a stub client 
 
 // -- one stdio round-trip -----------------------------------------------------
 
-test('stdio round-trip: the spawned server lists exactly the seven tools with their annotations (no network)', async (t) => {
+test('stdio round-trip: the spawned server lists exactly the fifteen tools with their annotations (no network)', async (t) => {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [SERVER_PATH, '--label', 'budo', '-e', 'staging'],
@@ -146,6 +232,7 @@ test('stdio round-trip: the spawned server lists exactly the seven tools with th
       AQ_ADMIN_PASSWORD: 'dummy-password-never-sent',
       // Loopback and not listening: a login attempt would fail loudly.
       AQ_API_BASE_URL: 'http://127.0.0.1:1',
+      AQ_CF_READ_TOKEN: 'cf-read-token-never-logged',
     },
     stderr: 'pipe',
   });
@@ -161,19 +248,26 @@ test('stdio round-trip: the spawned server lists exactly the seven tools with th
 
     const { tools } = await client.listTools();
     const names = tools.map((tool) => tool.name);
-    assert.deepEqual(names, AUTHORING_TOOL_NAMES);
+    assert.deepEqual(names, [...AUTHORING_TOOL_NAMES, ...OPS_TOOL_NAMES]);
+    const reads = ['list_topics', 'read_topic', 'topic_comments', 'review_link', ...TIER_1_TOOL_NAMES, ...TIER_3_TOOL_NAMES];
     for (const tool of tools) {
       t.diagnostic(`tool ${tool.name} ${JSON.stringify(tool.annotations)}`);
-      const isRead = ['list_topics', 'read_topic', 'topic_comments', 'review_link'].includes(tool.name);
+      const isRead = reads.includes(tool.name);
       assert.equal(tool.annotations.readOnlyHint, isRead, tool.name);
       assert.equal(tool.annotations.destructiveHint, false, tool.name);
       assert.equal(tool.inputSchema.type, 'object');
       assert.equal('status' in (tool.inputSchema.properties ?? {}), false, `${tool.name} has no status input`);
+      if (TIER_2_TOOL_NAMES.includes(tool.name)) {
+        assert.deepEqual(Object.keys(tool.inputSchema.properties), ['confirmationId'], `${tool.name} takes only the confirmation id`);
+        assert.match(tool.description, /Tier 2/);
+      }
     }
     assert.deepEqual(Object.keys(tools.find((x) => x.name === 'upload_media').inputSchema.properties), ['topicId', 'path']);
+    assert.deepEqual(Object.keys(tools.find((x) => x.name === 'restore_instructions').inputSchema.properties), ['scenario', 'bookmark']);
   } finally {
     await client.close();
   }
-  assert.doesNotMatch(stderr, /dummy-password-never-sent|bot@example\.invalid/, 'no credential on stderr');
-  assert.match(stderr, /7 tools/);
+  assert.doesNotMatch(stderr, /dummy-password-never-sent|bot@example\.invalid|cf-read-token-never-logged/, 'no credential on stderr');
+  assert.match(stderr, /15 tools/);
+  assert.match(stderr, /AQ_CF_READ_TOKEN set/);
 });
