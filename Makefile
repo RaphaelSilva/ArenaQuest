@@ -42,7 +42,7 @@
         secret-staging secret-prod create-google-oauth-secret \
         label-new label-scaffold label-check \
         set-new-label infra-check-staging infra-check-production \
-        backup-d1-prod backup-r2-prod \
+        backup-d1-prod backup-r2-prod backup-status-prod \
         clean clean-cache clean-all \
         confirm-prod guard-no-dev-seed-staging guard-no-dev-seed-prod \
         db-migrations-dev db-migrations-staging db-migrations-prod db-seed-dev \
@@ -188,7 +188,14 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/backup/manifest.test.mjs \
 		scripts/backup/export-d1.test.mjs \
 		scripts/backup/s3.test.mjs \
-		scripts/backup/mirror-r2.test.mjs
+		scripts/backup/mirror-r2.test.mjs \
+		scripts/backup/drill.test.mjs \
+		scripts/backup/status.test.mjs \
+		scripts/lib/api-client.test.mjs \
+		scripts/lib/convert.test.mjs \
+		scripts/mcp/aq-mcp.test.mjs \
+		scripts/mcp/audit.test.mjs \
+		scripts/mcp/tools/authoring.test.mjs
 
 # Migration lint (RFC 0021 §2.1): base migrations are frozen, new ones additive
 # unless their header carries `-- @contract: <reason>`. Compares with BASE
@@ -394,6 +401,15 @@ backup-r2-prod: confirm-prod ## Mirror a label's production media bucket into it
 		$(if $(filter 1,$(DRY_RUN)),--dry-run,) \
 		$(if $(MAX_BYTES),--max-bytes $(MAX_BYTES),) \
 		$(if $(MAX_SECONDS),--max-seconds $(MAX_SECONDS),)
+
+# Backup status (RFC 0025 §4.5): dump age, size delta, last drill, mirror lag,
+# Time Travel bookmark and the age of the last home-lab pull on this machine,
+# each line green/amber/red with the command that fixes it — printed, never run.
+# Read-only (r2 object get + d1 time-travel info): no confirmation, the
+# read-only token is enough. Exit 0 green, 1 any red, 2 amber only.
+backup-status-prod: ## Report a label's production backup state with fix commands (LABEL=x; JSON=1 prints the report as JSON)
+	node scripts/backup/status.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e production \
+		$(if $(filter 1,$(JSON)),--json,)
 
 import-media-prod: ## Import a media tree into production (LABEL=x, SOURCE=path | DRIVE_FOLDER=id; MANIFEST=path; CLI confirms; LIMIT=n, SKIP_INVALID=1, ROOT_TOPIC=uuid, SKIPPED_REPORT=path)
 	@test -n "$(SOURCE)$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  SOURCE or DRIVE_FOLDER is required — e.g. make import-media-prod SOURCE=./content$(RESET)\n"; exit 1; }
