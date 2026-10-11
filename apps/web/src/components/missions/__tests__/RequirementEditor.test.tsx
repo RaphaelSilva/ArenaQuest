@@ -107,8 +107,8 @@ describe('RequirementEditor', () => {
     expect(within(card).getByLabelText(d.fields.countModerated)).not.toBeChecked();
     expect(within(card).getByLabelText(d.fields.xpReward)).toHaveValue(0);
     // Only published, non-archived topics are offered.
-    expect(within(card).getByRole('checkbox', { name: /Kihon/ })).toBeInTheDocument();
-    expect(within(card).queryByRole('checkbox', { name: /Draft topic/ })).not.toBeInTheDocument();
+    expect(within(card).getByRole('radio', { name: /Kihon/ })).toBeInTheDocument();
+    expect(within(card).queryByRole('radio', { name: /Draft topic/ })).not.toBeInTheDocument();
   });
 
   it('renders the fields of the visit, video, self-check and event kinds', () => {
@@ -121,7 +121,7 @@ describe('RequirementEditor', () => {
 
     expect(within(visit).getByText(d.visitHint)).toBeInTheDocument();
     expect(within(visit).queryByLabelText(d.fields.minCount)).not.toBeInTheDocument();
-    expect(within(visit).getByRole('checkbox', { name: /Kihon/ })).toBeInTheDocument();
+    expect(within(visit).getByRole('radio', { name: /Kihon/ })).toBeInTheDocument();
 
     expect(within(video).getByLabelText(d.fields.minCount)).toHaveValue(1);
     expect(within(video).queryByLabelText(d.fields.countModerated)).not.toBeInTheDocument();
@@ -138,11 +138,11 @@ describe('RequirementEditor', () => {
     renderEditor();
     addStep('topic_visited');
     const card = cards()[0];
-    fireEvent.click(within(card).getByRole('checkbox', { name: /Kihon/ }));
+    fireEvent.click(within(card).getByRole('radio', { name: /Kihon/ }));
     expect(within(card).getByText(d.topicSelected('Kihon'))).toBeInTheDocument();
-    fireEvent.click(within(card).getByRole('checkbox', { name: /Kata/ }));
+    fireEvent.click(within(card).getByRole('radio', { name: /Kata/ }));
     expect(within(card).getByText(d.topicSelected('Kata'))).toBeInTheDocument();
-    expect(within(card).getByRole('checkbox', { name: /Kihon/ })).not.toBeChecked();
+    expect(within(card).getByRole('radio', { name: /Kihon/ })).not.toBeChecked();
   });
 
   it('warns when a visited topic has no media and shows the video count for a video step', () => {
@@ -165,7 +165,7 @@ describe('RequirementEditor', () => {
     renderEditor({ initial: [privateStep] });
     addStep('submissions_on_topic');
     const shared = cards()[1];
-    fireEvent.click(within(shared).getByRole('checkbox', { name: /Kihon/ }));
+    fireEvent.click(within(shared).getByRole('radio', { name: /Kihon/ }));
     expect(within(shared).getByLabelText(d.fields.xpReward)).toHaveValue(0);
     fireEvent.click(within(shared).getByLabelText(d.fields.visibilitySharedOnly));
     expect(within(shared).getByLabelText(d.fields.xpReward)).toHaveValue(60);
@@ -182,7 +182,7 @@ describe('RequirementEditor', () => {
     renderEditor({ initial: [privateStep] });
     addStep('submissions_on_topic');
     const shared = cards()[1];
-    fireEvent.click(within(shared).getByRole('checkbox', { name: /Kata/ }));
+    fireEvent.click(within(shared).getByRole('radio', { name: /Kata/ }));
     fireEvent.click(within(shared).getByLabelText(d.fields.visibilitySharedOnly));
     expect(within(shared).getByLabelText(d.fields.xpReward)).toHaveValue(0);
   });
