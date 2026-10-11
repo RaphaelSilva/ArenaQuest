@@ -1,6 +1,6 @@
 # Task 01 — Backend: Backup bucket in the label profile and provisioner check mode (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -59,18 +59,18 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make set-new-label LABEL=budo PRODUCTION=1 DRY_RUN=1` lists the backup bucket and its two
+- [x] `make set-new-label LABEL=budo PRODUCTION=1 DRY_RUN=1` lists the backup bucket and its two
       lifecycle rules for production and nothing for staging.
-- [ ] A profile missing `backup` for production fails schema validation with a message naming the
+- [x] A profile missing `backup` for production fails schema validation with a message naming the
       block; staging without it validates.
-- [ ] `provision-label.mjs --label budo -e production --check` prints each required resource as
+- [x] `provision-label.mjs --label budo -e production --check` prints each required resource as
       present/missing and each external secret by name, with a fix command per missing item; its
       `--json` output carries the same data.
-- [ ] A test asserts that in `--check` mode the planned commands contain no create, put, delete,
+- [x] A test asserts that in `--check` mode the planned commands contain no create, put, delete,
       deploy or `secret put` invocation.
-- [ ] Re-running provisioning against a label whose bucket and rules exist plans no write.
-- [ ] The existing `provision-label.test.mjs` and `label.test.mjs` suites pass; `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] Re-running provisioning against a label whose bucket and rules exist plans no write.
+- [x] The existing `provision-label.test.mjs` and `label.test.mjs` suites pass; `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -35,7 +35,9 @@
       "kv":   { "binding": "RATE_LIMIT_KV", "id": "<fill after `wrangler kv namespace create RATE_LIMIT_KV`>" },
       "r2":   { "bucket": "arenaquest-media", "s3Endpoint": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com", "publicBase": "" },
       "cookieSameSite": "Strict",
-      "mail": { "driver": "resend", "from": "ArenaQuest <noreply@arenaquest.app>" }
+      "mail": { "driver": "resend", "from": "ArenaQuest <noreply@arenaquest.app>" },
+      "backup": { "bucket": "arenaquest-backups",
+                  "retention": { "dailyDays": 35, "monthlyMonths": 12, "tombstoneDays": 90 } }
     }
   }
 }
