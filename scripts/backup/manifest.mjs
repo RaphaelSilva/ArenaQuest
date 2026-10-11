@@ -16,7 +16,18 @@
  *       monthly: [{ month: 'YYYY-MM', key, ts }],   // one per calendar month, newest last
  *     },
  *     r2: null | { lastRun: R2Run },           // Task 03: the R2 mirror's last run
- *     drill: null,  // Task 04 fills { at, ok, mismatches }
+ *     drill: null | Drill,                     // Task 04: the restore drill's last result
+ *   }
+ *
+ *   Drill = {                                      // written by scripts/backup/drill.mjs
+ *     at: '2026-10-12T09:30:00.000Z',              // start of the drill, ISO 8601 UTC
+ *     ok: true,                                    // restored AND every row count matched
+ *     dumpTs: '2026-10-11T07:30:02.000Z',          // d1.latest.ts of the dump that was drilled
+ *     dumpKey: 'd1/production/daily/…/….sql.gz',   // d1.latest.key of that dump
+ *     mismatches: [{ table, expected, actual }],   // per-table count differences; a table on
+ *                                                  //   one side only has null on the other
+ *     durationMs: 12345,                           // download → compare
+ *     error?: 'wrangler d1 execute exited …',      // only when the dump did not restore at all
  *   }
  *
  *   R2Run = {                                      // written by scripts/backup/mirror-r2.mjs
@@ -122,6 +133,12 @@ export function parseManifest(text) {
       throw new Error('manifest.json: r2 must be null or { lastRun }');
     }
   }
+  if (parsed.drill !== null && parsed.drill !== undefined) {
+    const drill = parsed.drill;
+    if (!drill || typeof drill !== 'object' || Array.isArray(drill) || typeof drill.at !== 'string' || typeof drill.ok !== 'boolean') {
+      throw new Error('manifest.json: drill must be null or { at, ok, … }');
+    }
+  }
   return parsed;
 }
 
@@ -158,6 +175,50 @@ export function validateR2Run(run) {
 export function setR2LastRun(manifest, run) {
   validateR2Run(run);
   return { ...manifest, r2: { ...(manifest.r2 ?? {}), lastRun: { ...run } } };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PURE: drill section (Task 04 — the restore drill's last result)
+// ════════════════════════════════════════════════════════════════════════════
+
+function isIsoTimestamp(value) {
+  return typeof value === 'string' && !Number.isNaN(new Date(value).getTime());
+}
+
+function validateMismatch(item, index) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`drill: mismatches[${index}] must be an object`);
+  if (typeof item.table !== 'string' || item.table === '') throw new Error(`drill: mismatches[${index}].table is required`);
+  for (const side of ['expected', 'actual']) {
+    const n = item[side];
+    if (n !== null && (!Number.isInteger(n) || n < 0)) throw new Error(`drill: mismatches[${index}].${side} must be null or a non-negative integer`);
+  }
+  if (item.expected === null && item.actual === null) throw new Error(`drill: mismatches[${index}] has no count on either side`);
+}
+
+/** Throws unless `drill` has the Drill shape documented in the header. */
+export function validateDrill(drill) {
+  if (!drill || typeof drill !== 'object' || Array.isArray(drill)) throw new Error('drill must be an object');
+  if (!isIsoTimestamp(drill.at)) throw new Error('drill: at must be an ISO timestamp');
+  if (typeof drill.ok !== 'boolean') throw new Error('drill: ok must be a boolean');
+  if (!isIsoTimestamp(drill.dumpTs)) throw new Error('drill: dumpTs must be an ISO timestamp');
+  if (typeof drill.dumpKey !== 'string' || drill.dumpKey === '') throw new Error('drill: dumpKey is required');
+  if (!Array.isArray(drill.mismatches)) throw new Error('drill: mismatches must be an array');
+  drill.mismatches.forEach(validateMismatch);
+  if (typeof drill.durationMs !== 'number' || !Number.isFinite(drill.durationMs) || drill.durationMs < 0) {
+    throw new Error('drill: durationMs must be a non-negative number');
+  }
+  if (drill.error !== undefined && drill.error !== null && (typeof drill.error !== 'string' || drill.error === '')) {
+    throw new Error('drill: error must be a non-empty string when present');
+  }
+  if (drill.ok && (drill.mismatches.length > 0 || drill.error)) throw new Error('drill: ok cannot be true with mismatches or an error');
+}
+
+/** A new manifest (the input is never mutated) whose `drill` is `drill`. */
+export function setDrill(manifest, drill) {
+  validateDrill(drill);
+  const stored = { ...drill, mismatches: drill.mismatches.map((item) => ({ ...item })) };
+  if (stored.error === undefined || stored.error === null) delete stored.error;
+  return { ...manifest, drill: stored };
 }
 
 /** `YYYY-MM` of a Date or ISO string, in UTC. */
