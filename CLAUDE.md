@@ -130,7 +130,14 @@ objects tombstoned 90 days) and `node scripts/backup/drill.mjs --label x -e prod
 { at, ok, mismatches }`). A failed export, mirror or drill fails the job; staging is never
 backed up and nothing writes to a remote database. **Restore is manual** — Time Travel,
 dump restore and R2 copy-back are tier-3 commands a human runs from
-`docs/operations/backup-restore.md`; no target or script wraps them.
+`docs/operations/backup-restore.md`; no target or script wraps them. The off-account copy
+is the operator's disk: `make backup-pull-prod LABEL=x` (`scripts/backup/pull.mjs`) reads
+the **backup bucket only** with the read-only token, resumably, into
+`.arenaquest/backups/<label>-production/` and writes the ledger the status line reads, and
+`make backup-restore-local LABEL=x` (`scripts/backup/restore-local.mjs`) replays that pull
+on the local D1 replica + local bucket after re-verifying the SHA-256 and confirming —
+refusing `-e staging`, `-e production` and any production- or staging-named `--persist-to`
+before any write.
 
 **AI admin assistant (`aq-mcp`, RFC 0025 §2).** `scripts/mcp/aq-mcp.mjs` is a local stdio MCP
 server for Claude Code — `claude mcp add aq-<label>-<env> -- node /abs/path/scripts/mcp/aq-mcp.mjs

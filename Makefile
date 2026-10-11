@@ -42,7 +42,7 @@
         secret-staging secret-prod create-google-oauth-secret \
         label-new label-scaffold label-check \
         set-new-label infra-check-staging infra-check-production \
-        backup-d1-prod backup-r2-prod backup-status-prod \
+        backup-d1-prod backup-r2-prod backup-status-prod backup-pull-prod backup-restore-local \
         clean clean-cache clean-all \
         confirm-prod guard-no-dev-seed-staging guard-no-dev-seed-prod \
         db-migrations-dev db-migrations-staging db-migrations-prod db-seed-dev \
@@ -191,6 +191,8 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/backup/mirror-r2.test.mjs \
 		scripts/backup/drill.test.mjs \
 		scripts/backup/status.test.mjs \
+		scripts/backup/pull.test.mjs \
+		scripts/backup/restore-local.test.mjs \
 		scripts/lib/api-client.test.mjs \
 		scripts/lib/convert.test.mjs \
 		scripts/mcp/aq-mcp.test.mjs \
@@ -254,6 +256,20 @@ db-reset-local: ## Delete the local D1 replica, re-migrate and re-seed
 db-seed-demo-local: ## Seed the demo dataset into the local replica (LABEL=arenaquest|budo|spaziord; DRY_RUN=1 writes SQL + plan only)
 	node scripts/demo/seed-demo.mjs --label $(DEMO_LABEL) -e local \
 		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+# Replay production locally (RFC 0025 §4.3): the dump pulled by backup-pull-prod is
+# verified against the pulled manifest, then applied to the local D1 replica
+# (apps/api/.wrangler/state/v3/d1 is removed first) and the pulled media is put into
+# wrangler's local bucket in-process. Local only: -e staging/-e production and any
+# production- or staging-named --persist-to are refused before any write. The CLI
+# confirms (the replica holds real student data); CONFIRM=1 passes --yes.
+backup-restore-local: ## Replace the local D1 replica + local bucket with a pulled production backup (LABEL=x; FROM=dir, PERSIST_TO=dir, SKIP_MEDIA=1, DRY_RUN=1 plans only; CONFIRM=1 skips the prompt)
+	node scripts/backup/restore-local.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e local \
+		$(if $(FROM),--from $(FROM),) \
+		$(if $(PERSIST_TO),--persist-to $(PERSIST_TO),) \
+		$(if $(filter 1,$(SKIP_MEDIA)),--skip-media,) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,) \
+		$(if $(filter 1,$(CONFIRM)),--yes,)
 
 bootstrap-admin: ## Interactively create the first admin (prompts for local/staging/prod)
 	@bash scripts/bootstrap-first-admin.sh
@@ -413,6 +429,18 @@ backup-r2-prod: confirm-prod ## Mirror a label's production media bucket into it
 backup-status-prod: ## Report a label's production backup state with fix commands (LABEL=x; JSON=1 prints the report as JSON)
 	node scripts/backup/status.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e production \
 		$(if $(filter 1,$(JSON)),--json,)
+
+# Home-lab pull (RFC 0025 §4.3, Resolved Decision 4): the latest dump (SHA-256
+# verified against the manifest) and every mirrored object not yet on disk, from
+# the BACKUP bucket only (never the media bucket, never D1) into
+# .arenaquest/backups/<label>-production/. Read-only on the cloud, so no
+# confirmation and the read-only token is enough; resumable (a second run
+# downloads nothing). Writes the ledger backup-status-prod's home-lab line reads.
+backup-pull-prod: ## Pull a label's latest dump + mirrored media from its backup bucket to this machine (LABEL=x; OUT=dir, CONCURRENCY=n, DRY_RUN=1 plans only)
+	node scripts/backup/pull.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e production \
+		$(if $(OUT),--out $(OUT),) \
+		$(if $(CONCURRENCY),--concurrency $(CONCURRENCY),) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
 import-media-prod: ## Import a media tree into production (LABEL=x, SOURCE=path | DRIVE_FOLDER=id; MANIFEST=path; CLI confirms; LIMIT=n, SKIP_INVALID=1, ROOT_TOPIC=uuid, SKIPPED_REPORT=path)
 	@test -n "$(SOURCE)$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  SOURCE or DRIVE_FOLDER is required — e.g. make import-media-prod SOURCE=./content$(RESET)\n"; exit 1; }

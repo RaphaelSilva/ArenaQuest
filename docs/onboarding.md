@@ -704,7 +704,11 @@ machine. The expected production console is the home-lab server with the repo
 cloned and Claude Code started over `ssh`: only media that is *new* has to sit on
 that machine's disk; everything already deployed is read through the API. A
 notebook driving an `aq-mcp` on another host would need a remote transport
-(RFC 0025, Alternative 1 — deferred).
+(RFC 0025, Alternative 1 — deferred). The same machine holds the off-account backup
+copy: `make backup-pull-prod LABEL=<label>` downloads the latest dump and the mirrored
+media into `.arenaquest/backups/<label>-production/` with the read-only token alone, and
+`make backup-restore-local LABEL=<label>` replays that copy on the local replica (never
+staging or production) — see `docs/operations/backup-restore.md` §5–§6.
 
 ---
 
