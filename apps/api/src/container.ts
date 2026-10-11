@@ -20,6 +20,7 @@ import { D1MissionRepository } from '@api/adapters/db/d1-mission-repository';
 import { D1CommentRepository } from '@api/adapters/db/d1-comment-repository';
 import { D1NoteRepository } from '@api/adapters/db/d1-note-repository';
 import { D1SubmissionRepository } from '@api/adapters/db/d1-submission-repository';
+import { D1JobRunRepository } from '@api/adapters/db/d1-job-run-repository';
 import { D1BillingRepository } from '@api/adapters/db/d1-billing-repository';
 import { D1EventChargeRepository } from '@api/adapters/db/d1-event-charge-repository';
 import { D1EventRepository } from '@api/adapters/db/d1-event-repository';
@@ -78,6 +79,7 @@ import type {
   IBillingRepository,
   IEventChargeRepository,
   IEventRepository,
+  IJobRunRepository,
 } from '@arenaquest/shared/ports';
 
 // ---------------------------------------------------------------------------
@@ -203,6 +205,12 @@ export interface InfraContext {
   cookies: {
     sameSite: 'Strict' | 'Lax' | 'None';
   };
+  /**
+   * The `job_runs` ledger (RFC 0025 section 3.1): one row per billing run and
+   * per submissions sweep, cron or manual. Infra rather than billing because
+   * it records every job, and nothing in it is a billing rule.
+   */
+  jobRuns: IJobRunRepository;
 }
 
 export interface ControllersContext {
@@ -315,6 +323,9 @@ export function buildContainer(env: Env): AppContainer {
   // only to its own ledger.
   const eventChargeService = new EventChargeService(eventChargeRepo, eventRepo, userGroups, billingRepo);
 
+  // Infra: job runs
+  const jobRuns = new D1JobRunRepository(env.DB);
+
   // Infra: mail
   const mailer: IMailer = env.MAIL_DRIVER === 'resend'
     ? new ResendMailAdapter({ apiKey: env.RESEND_API_KEY, from: env.MAIL_FROM })
@@ -421,6 +432,7 @@ export function buildContainer(env: Env): AppContainer {
         strict: env.ALLOWED_ORIGINS !== undefined && env.ALLOWED_ORIGINS.trim() !== '',
       },
       cookies: { sameSite: parseCookieSameSite(env.COOKIE_SAMESITE) },
+      jobRuns,
     },
     controllers: { passwordController, accountController, googleOAuthController, registerController, activateController },
   };

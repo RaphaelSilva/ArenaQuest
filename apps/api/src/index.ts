@@ -15,6 +15,14 @@ import { Scalar } from '@scalar/hono-api-reference';
 import { buildContainer } from '@api/container';
 import { runScheduledBilling } from '@api/core/billing/billing-service';
 import { sweepPendingSubmissions } from '@api/jobs/sweep-pending-submissions';
+import {
+  recordJobRun,
+  pruneJobRuns,
+  billingOutcome,
+  sweepOutcome,
+  JOB_RUNS_RETENTION_DAYS,
+} from '@api/jobs/record-job-run';
+import { Entities } from '@arenaquest/shared/types/entities';
 import { AppRouter } from '@api/routes';
 import { configureOpenAPIDocument } from '@api/openapi/document';
 import '@api/types/hono-env';
@@ -53,6 +61,12 @@ export default {
    * The abandoned-upload sweep (RFC 0020 §9) runs after billing on the same
    * daily trigger, in a `finally` so a billing failure never skips it; the
    * sweep itself never throws, so it cannot affect billing either.
+   *
+   * Each job is wrapped in `recordJobRun` (RFC 0025 §3.1), which leaves one
+   * `job_runs` row per execution - `ok` with counts, or `failed` with the
+   * error - and rethrows whatever the job threw, so the `try/finally` above
+   * keeps its meaning. A failing `job_runs` write is logged and changes
+   * nothing about the jobs. Rows older than 180 days are pruned last.
    */
   async scheduled(
     _controller: ScheduledController,
@@ -60,13 +74,27 @@ export default {
     _ctx: ExecutionContext,
   ): Promise<void> {
     const container = buildContainer(env);
+    const jobRuns = container.infra.jobRuns;
+    const { JobName, JobTrigger } = Entities.Config;
     try {
-      await runScheduledBilling(container);
+      await recordJobRun(
+        jobRuns,
+        { job: JobName.BILLING, trigger: JobTrigger.CRON },
+        () => runScheduledBilling(container),
+        billingOutcome,
+      );
     } finally {
-      await sweepPendingSubmissions({
-        submissions: container.engagement.submissionRepo,
-        storage: container.content.storage,
-      });
+      await recordJobRun(
+        jobRuns,
+        { job: JobName.SWEEP_SUBMISSIONS, trigger: JobTrigger.CRON },
+        () =>
+          sweepPendingSubmissions({
+            submissions: container.engagement.submissionRepo,
+            storage: container.content.storage,
+          }),
+        sweepOutcome,
+      );
+      await pruneJobRuns(jobRuns, JOB_RUNS_RETENTION_DAYS);
     }
   },
 } satisfies ExportedHandler<AppEnv>;
