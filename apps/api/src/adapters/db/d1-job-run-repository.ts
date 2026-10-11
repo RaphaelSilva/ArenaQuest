@@ -7,6 +7,7 @@ import {
   type StartJobRunParams,
   type FinishJobRunParams,
   type ListJobRunsOptions,
+  type DatabaseProbeResult,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
 
@@ -152,5 +153,24 @@ export class D1JobRunRepository implements IJobRunRepository {
     const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
     const result = await this.db.prepare('DELETE FROM job_runs WHERE started_at < ?').bind(cutoff).run();
     return result.meta.changes ?? 0;
+  }
+
+  /**
+   * Reads the newest row of wrangler's `d1_migrations` ledger. A database that
+   * has never been migrated by wrangler (a bare test replica, say) has no such
+   * table: that one case answers `null`; every other error propagates.
+   */
+  async databaseProbe(): Promise<DatabaseProbeResult> {
+    try {
+      const row = await this.db
+        .prepare('SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1')
+        .first<{ name: string }>();
+      return { latestMigration: row?.name ?? null };
+    } catch (err) {
+      if (err instanceof Error && /no such table/i.test(err.message)) {
+        return { latestMigration: null };
+      }
+      throw err;
+    }
   }
 }

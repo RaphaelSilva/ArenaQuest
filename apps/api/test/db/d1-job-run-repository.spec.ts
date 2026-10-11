@@ -135,6 +135,24 @@ describe('D1JobRunRepository', () => {
     expect(await repo.pruneOlderThan(180)).toBe(0);
   });
 
+  it('databaseProbe answers null when wrangler has not created the migration ledger', async () => {
+    await env.DB.exec('DROP TABLE IF EXISTS d1_migrations');
+    expect(await repo.databaseProbe()).toEqual({ latestMigration: null });
+  });
+
+  it('databaseProbe reports the newest applied migration name', async () => {
+    // Wrangler's own ledger shape; the suite's applyMigrations does not write it.
+    await env.DB.exec(
+      'CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+    );
+    await env.DB.batch([
+      env.DB.prepare('INSERT INTO d1_migrations (name) VALUES (?)').bind('0030_create_topic_submissions.sql'),
+      env.DB.prepare('INSERT INTO d1_migrations (name) VALUES (?)').bind('0032_create_job_runs.sql'),
+    ]);
+    expect(await repo.databaseProbe()).toEqual({ latestMigration: '0032_create_job_runs.sql' });
+    expect(await repo.list()).toEqual([]);
+  });
+
   it('a malformed stored summary reads back as null rather than throwing', async () => {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();

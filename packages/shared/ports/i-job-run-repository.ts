@@ -66,4 +66,20 @@ export interface IJobRunRepository {
 
   /** Deletes runs started more than `days` days ago; returns how many. */
   pruneOlderThan(days: number): Promise<number>;
+
+  /**
+   * The **health probe** of the admin ops surface (RFC 0025 section 3.2,
+   * Task 06): one trivial read that proves the store answers and reports the
+   * name of the newest applied migration. Pure read — nothing is written.
+   * A store that has no migration ledger yet answers `latestMigration: null`
+   * rather than throwing; any other failure propagates so the caller can
+   * report the dependency as `down`.
+   */
+  databaseProbe(): Promise<DatabaseProbeResult>;
+}
+
+/** Output of {@link IJobRunRepository.databaseProbe}. */
+export interface DatabaseProbeResult {
+  /** The newest applied migration name, or `null` when none is recorded. */
+  latestMigration: string | null;
 }
