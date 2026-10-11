@@ -195,7 +195,10 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/lib/convert.test.mjs \
 		scripts/mcp/aq-mcp.test.mjs \
 		scripts/mcp/audit.test.mjs \
-		scripts/mcp/tools/authoring.test.mjs
+		scripts/mcp/tools/authoring.test.mjs \
+		scripts/mcp/confirm.test.mjs \
+		scripts/mcp/tools/ops.test.mjs \
+		scripts/mcp/no-destructive.test.mjs
 
 # Migration lint (RFC 0021 §2.1): base migrations are frozen, new ones additive
 # unless their header carries `-- @contract: <reason>`. Compares with BASE

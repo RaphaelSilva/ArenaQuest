@@ -6,13 +6,20 @@
  *
  * A stdio MCP server registered once per machine and target
  * (`claude mcp add aq-budo-prod -- node /abs/path/scripts/mcp/aq-mcp.mjs --label budo -e production`).
- * It exposes the draft-authoring tools of `tools/authoring.mjs` (Plane A); the
- * ops and backup tools of Task 12 are registered on the same server.
+ * It exposes the draft-authoring tools of `tools/authoring.mjs` (Plane A) and
+ * the three-tier ops and backup tools of `tools/ops.mjs` (Plane B) on the same
+ * server.
  *
  * Contract:
  *   - credentials come from `AQ_ADMIN_EMAIL` / `AQ_ADMIN_PASSWORD` in the
  *     environment — never argv, never a tool argument, never a log line. The
  *     account is a dedicated `content_creator`;
+ *   - `AQ_CF_READ_TOKEN` (optional) is the ONLY Cloudflare credential the
+ *     server loads: a read-only token for the tier-1 tools, handed to a child
+ *     process through its env object only. The server reads exactly four
+ *     `AQ_*` variables and nothing else from its environment (a test pins the
+ *     access list); `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN` and `R2_*` are
+ *     never read and never inherited by a child;
  *   - the target comes from `config/labels/<label>.jsonc`; `AQ_API_BASE_URL`
  *     overrides it only towards loopback (the importer's rule);
  *   - every call goes through the public API via `scripts/lib/api-client.mjs`;
@@ -35,11 +42,18 @@ import { loadProfile as defaultLoadProfile } from '../deploy/core.mjs';
 import { API_ENVS, createApiClient, resolveBaseUrl as defaultResolveBaseUrl } from '../lib/api-client.mjs';
 import { createAudit } from './audit.mjs';
 import { AUTHORING_TOOL_NAMES, registerAuthoringTools } from './tools/authoring.mjs';
+import { OPS_TOOL_NAMES, TIER_1_TOOL_NAMES, TIER_2_TOOL_NAMES, TIER_3_TOOL_NAMES, registerOpsTools } from './tools/ops.mjs';
 
 export const SERVER_NAME = 'aq-mcp';
 
 /** The repository root — two levels above this file. State files live under it. */
 export const REPO_ROOT = resolvePath(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/** Every tool the server registers, authoring first, then ops by tier. */
+export const TOOL_NAMES = Object.freeze([...AUTHORING_TOOL_NAMES, ...OPS_TOOL_NAMES]);
+
+/** The environment variables the server reads — by name, and nothing else. */
+export const ENV_VARS = Object.freeze(['AQ_ADMIN_EMAIL', 'AQ_ADMIN_PASSWORD', 'AQ_API_BASE_URL', 'AQ_CF_READ_TOKEN']);
 
 /** Version reported in the MCP handshake: the root package.json's. */
 export function readVersion(rootDir = REPO_ROOT) {
@@ -104,8 +118,14 @@ export function usage() {
     AQ_ADMIN_EMAIL         Dedicated content_creator account
     AQ_ADMIN_PASSWORD      Its password
     AQ_API_BASE_URL        Optional; loopback only (local development)
+    AQ_CF_READ_TOKEN       Optional; read-only Cloudflare token for the tier-1 tools
+                           (unset: the tier-1 scripts use the wrangler login session)
 
-  Tools: ${AUTHORING_TOOL_NAMES.join(', ')}
+  Tools
+    authoring (drafts)     ${AUTHORING_TOOL_NAMES.join(', ')}
+    tier 1 — diagnose      ${TIER_1_TOOL_NAMES.join(', ')}
+    tier 2 — act           ${TIER_2_TOOL_NAMES.join(', ')} (two calls: plan + confirmation id)
+    tier 3 — instructions  ${TIER_3_TOOL_NAMES.join(', ')} (returns the command; never runs it)
   Audit: .arenaquest/mcp-audit-<label>-<env>.jsonl (repository root)
 `;
 }
@@ -143,6 +163,25 @@ export function loadConfig({
     ? (String(rawOrigin).startsWith('http') ? String(rawOrigin) : `https://${rawOrigin}`)
     : 'http://localhost:3000';
 
+  // The one Cloudflare credential, optional: tier 1 degrades to the wrangler
+  // login session without it. Read by name; the value is never echoed.
+  const rawToken = env.AQ_CF_READ_TOKEN;
+  const cfReadToken = typeof rawToken === 'string' && rawToken.trim() !== '' ? rawToken : null;
+
+  // What the ops tools need from the profile, resolved once: the server
+  // environment's D1 (bookmark_now) and the production names the restore
+  // instructions are filled with. Conventions are the runbook's fallbacks.
+  const production = profile?.environments?.production ?? {};
+  const ops = {
+    database: environment?.d1?.name ?? null,
+    wranglerEnv: envName === 'production' ? label : `${label}-staging`,
+    production: {
+      database: production?.d1?.name ?? `${label}-db`,
+      mediaBucket: production?.r2?.bucket ?? `${label}-media`,
+      backupBucket: production?.backup?.bucket ?? `${label}-backups`,
+    },
+  };
+
   const stateDir = join(rootDir, '.arenaquest');
   return {
     label,
@@ -151,6 +190,8 @@ export function loadConfig({
     webOrigin,
     email: env.AQ_ADMIN_EMAIL,
     password: env.AQ_ADMIN_PASSWORD,
+    cfReadToken,
+    ops,
     auditPath: join(stateDir, `mcp-audit-${label}-${envName}.jsonl`),
     uploadLedgerPath: join(stateDir, `mcp-upload-${label}-${envName}.jsonl`),
     convertDir: join(stateDir, 'mcp-convert', `${label}-${envName}`),
@@ -160,8 +201,10 @@ export function loadConfig({
 // -- server -------------------------------------------------------------------
 
 /**
- * Build the `McpServer` with every tool registered. `client` defaults to the
- * shared API client over `config`; tests pass a stub. Returns `{ server, tools }`.
+ * Build the `McpServer` with every tool registered: the authoring tools, then
+ * the ops tools by tier. `client` defaults to the shared API client over
+ * `config`; tests pass a stub (and, through `deps`, a `spawn` stub for the ops
+ * tools). Returns `{ server, tools }`.
  */
 export function createServer({ config, client, audit, deps = {}, version = readVersion() }) {
   if (!config) throw new TypeError('createServer: config is required');
@@ -171,8 +214,9 @@ export function createServer({ config, client, audit, deps = {}, version = readV
   const auditLog = audit ?? createAudit(config.auditPath);
 
   const server = new McpServer({ name: SERVER_NAME, version });
-  const tools = registerAuthoringTools(server, { client: apiClient, config, audit: auditLog, ...deps });
-  return { server, tools };
+  const authoring = registerAuthoringTools(server, { client: apiClient, config, audit: auditLog, ...deps });
+  const ops = registerOpsTools(server, { client: apiClient, config, audit: auditLog, ...deps });
+  return { server, tools: [...authoring, ...ops] };
 }
 
 function log(message) {
@@ -209,8 +253,11 @@ export async function main(argv = process.argv.slice(2)) {
   const { server, tools } = createServer({ config, version });
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  // The account is named only by the variable, never by its value.
-  log(`v${version} — label ${config.label}, env ${config.env} → ${config.baseUrl} (AQ_ADMIN_EMAIL set)`);
+  // Credentials are named only by their variable, never by a value.
+  log(
+    `v${version} — label ${config.label}, env ${config.env} → ${config.baseUrl} ` +
+      `(AQ_ADMIN_EMAIL set, AQ_CF_READ_TOKEN ${config.cfReadToken ? 'set' : 'unset — tier 1 uses the wrangler login session'})`,
+  );
   log(`${tools.length} tools: ${tools.map((tool) => tool.name).join(', ')}`);
   log(`audit → ${config.auditPath}`);
 }
