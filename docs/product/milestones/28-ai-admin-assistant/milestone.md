@@ -114,7 +114,7 @@ script/CI task is filed under **Backend** (the only non-web team).
 | 05 | [Record scheduled and manual job runs](./05-job-runs-recording.task.md) | 1 | Backend | ✅ Done |
 | 06 | [Admin ops health and job-runs API](./06-admin-ops-health-api.task.md) | 1 | Backend | ✅ Done |
 | 07 | [Admin-only topic publish gate](./07-topic-publish-gate.task.md) | 2 | Backend | ✅ Done |
-| 08 | [Topic publish controls follow the role](./08-topic-publish-controls.task.md) | 2 | Frontend | ☐ Open |
+| 08 | [Topic publish controls follow the role](./08-topic-publish-controls.task.md) | 2 | Frontend | ✅ Done |
 | 09 | [Shared script library for the API client and media conversion](./09-shared-script-library.task.md) | 3 | Backend | ☐ Open |
 | 10 | [aq-mcp server with draft authoring tools](./10-aq-mcp-authoring-tools.task.md) | 3 | Backend | ☐ Open |
 | 11 | [Backup status report](./11-backup-status-report.task.md) | 4 | Backend | ☐ Open |
