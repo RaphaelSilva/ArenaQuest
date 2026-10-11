@@ -1,6 +1,6 @@
 # Task 05 — Backend: Record scheduled and manual job runs (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -56,16 +56,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A Workers test driving `scheduled()` with a passing billing writes two `ok` rows (billing,
+- [x] A Workers test driving `scheduled()` with a passing billing writes two `ok` rows (billing,
       sweep) with counts; a day with nothing to bill writes an `ok` billing row with zero counts.
-- [ ] With billing forced to throw, the billing row is `failed` with a truncated message, the sweep
+- [x] With billing forced to throw, the billing row is `failed` with a truncated message, the sweep
       row is `ok`, and the sweep ran.
-- [ ] With the job-run repository forced to throw, billing and sweep still run and their effects
+- [x] With the job-run repository forced to throw, billing and sweep still run and their effects
       are unchanged.
-- [ ] `POST /v1/admin/billing/invoices/run` writes one billing row with `trigger = 'manual'`.
-- [ ] Rows older than 180 days are pruned by the daily run; newer rows are kept.
-- [ ] No D1 import outside `apps/api/src/adapters/`; `make lint` and `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `POST /v1/admin/billing/invoices/run` writes one billing row with `trigger = 'manual'`.
+- [x] Rows older than 180 days are pruned by the daily run; newer rows are kept.
+- [x] No D1 import outside `apps/api/src/adapters/`; `make lint` and `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -554,6 +554,33 @@ export interface BillingRunReport {
   adminsNotified: number;
 }
 
+/**
+ * The counts of one run, for the `job_runs` row that records it (RFC 0025
+ * section 3.1). Numbers only: lengths and tallies, never an id, a name or an
+ * amount - the report itself is returned to the caller, not persisted.
+ */
+export function summarizeBillingRun(report: BillingRunReport): Record<string, number> {
+  return {
+    eligibleContracts: report.eligibleContracts,
+    issued: report.issued.length,
+    absorbed: report.absorbed,
+    reminders: report.reminders.length,
+    crossings: report.crossings.length,
+    suppressedByHold: report.suppressedByHold.length,
+    divergences: report.divergences.length,
+    extrasReminders: report.extrasReminders.length,
+    extrasCrossings: report.extrasCrossings.length,
+    contractRemindersSent: report.reminderCounts.contract.sent,
+    contractRemindersSuppressed: report.reminderCounts.contract.suppressed,
+    contractRemindersUndeliverable: report.reminderCounts.contract.undeliverable,
+    extrasRemindersSent: report.reminderCounts.extras.sent,
+    extrasRemindersSuppressed: report.reminderCounts.extras.suppressed,
+    extrasRemindersUndeliverable: report.reminderCounts.extras.undeliverable,
+    mailsSent: report.mailsSent,
+    adminsNotified: report.adminsNotified,
+  };
+}
+
 /** The actor recorded on an audit line the cron emitted rather than a person. */
 export const SCHEDULED_BILLING_ACTOR = 'system:scheduled';
 
