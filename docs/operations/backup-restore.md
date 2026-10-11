@@ -74,6 +74,7 @@ never on the command line.
 | Bad migration, bad bulk edit, a delete minutes to days ago; the database still exists | [1. Time Travel](#1-d1-time-travel) | the last **30 days**, to the second | in place, same `database_id` |
 | The database is gone, corrupted beyond Time Travel, or you need a copy to inspect | [2. Restore a dump](#2-restore-a-dump) | 35 days daily, 12 months monthly | a new database (recommended) or the existing one |
 | One or a few media objects deleted or overwritten | [3. R2 copy-back](#3-r2-copy-back) | 90 days after the deletion (tombstone window) | the media bucket, same key |
+| Test a migration or a content change against real data before a deploy; keep a copy outside Cloudflare | [5. Pull to the home lab](#5-pull-to-the-home-lab) then [6. Replay production locally](#6-replay-production-locally) | whatever the pull holds (latest dump + mirror) | the **local** replica only — never a deployed environment |
 
 Time Travel first whenever it applies: it is a Cloudflare-side rewind with no file in the
 loop. Record a bookmark **before** any restore — it is the undo of the restore itself.
@@ -232,6 +233,82 @@ if deleted objects must stay deleted.
 
   `--keep` prints the temp dir holding `dump.sql` and the local `d1/` store, which
   `wrangler d1 execute arenaquest-db --local --persist-to <dir>/d1 --command …` can query.
+
+## 5. Pull to the home lab
+
+The off-account copy ([RFC 0025](../product/RFCs/0025-ai-admin-assistant.md), Resolved
+Decision 4) is the operator's own disk, on demand — there is no schedule in the repo; a
+cron on the home lab is the operator's.
+
+```bash
+make backup-pull-prod LABEL=<label>                 # → .arenaquest/backups/<label>-production/
+make backup-pull-prod LABEL=<label> DRY_RUN=1       # the plan: counts and bytes, nothing written
+make backup-pull-prod LABEL=<label> OUT=/srv/aq CONCURRENCY=6
+```
+
+`scripts/backup/pull.mjs` reads the **backup bucket only** — `wrangler r2 object get
+<label>-backups/…`, never the media bucket, never D1 — so `wrangler login` with the
+read-only token (`AQ_CF_READ_TOKEN`, R2 read on `<label>-backups`) is enough. It leaves:
+
+| Path under `.arenaquest/backups/<label>-production/` | Content |
+|---|---|
+| `d1/<stamp>.sql.gz` | the dump `d1.latest` names, SHA-256 verified against the manifest before it gets its name (a mismatch is removed and the run exits 1) |
+| `d1/manifest.json` | a copy of the manifest at pull time — what §6 verifies against, offline |
+| `r2/index.json` | a copy of the mirror index at pull time |
+| `r2/<key>` | every mirrored object under its source key, tombstoned ones included (the mirror keeps them on purpose) |
+
+Older dumps already on disk are left alone. The run is **resumable**: an object already
+present with the index's size is skipped, an interrupted download leaves a `.part` the
+next run replaces, and a failed object exits 1 after the summary so the next run picks it
+up — a second run on an up-to-date copy downloads nothing and says so. The pull then
+writes `.arenaquest/backup-pull-<label>-production.json` (`{ pulledAt, dumpTs, objects }`),
+the ledger `make backup-status-prod` reads for its home-lab line (green when the pull is
+at most 7 days old). Speed note: there is one `wrangler` process per object, which is
+slower than an S3 client but needs no write-capable credential; `CONCURRENCY` bounds it.
+
+## 6. Replay production locally
+
+Turns the pull into a production replica on **this machine** — the local D1 replica plus
+wrangler's local bucket — so `make dev-api` serves real data for testing a migration or a
+content change before a deploy.
+
+```bash
+make backup-restore-local LABEL=<label> DRY_RUN=1   # the plan: dump, tables, media count, what is replaced
+make backup-restore-local LABEL=<label>             # asks; CONFIRM=1 passes --yes (no TTY without it aborts)
+make backup-restore-local LABEL=<label> PERSIST_TO=/srv/aq/state SKIP_MEDIA=1
+```
+
+`scripts/backup/restore-local.mjs`, in order: finds the newest `d1/*.sql.gz` under the
+pull directory (`FROM=` overrides; `--dump <path>` picks a specific one), looks its
+entry up in the pulled `manifest.json` and **verifies bytes and SHA-256 again** — a
+mismatch aborts with the re-pull command before anything is touched — prints what will
+be replaced and asks, removes **only** `<persist>/v3/d1`, gunzips and applies the dump
+with `wrangler d1 execute arenaquest-db --local --persist-to <dir> --file` (the drill's
+mechanism; the local database name is a handle into the persist dir whatever the label),
+counts the restored tables with export-d1's statements and compares them with the
+entry's `rowCounts` (a mismatch exits 1 and leaves the replica in place for inspection),
+then puts every pulled object into the local bucket in-process through
+`getPlatformProxy` under its source key.
+
+**Local only.** The replica holds real student data. `-e staging` and `-e production`
+are refused before anything is read, and so is a `PERSIST_TO` whose path carries any
+profile's production or staging D1 or bucket name; no wrangler call ever carries
+`--remote`. Never copy the persist directory to a shared machine or a deployed
+environment. The default persist directory is `apps/api/.wrangler/state`, what
+`make dev-api` serves; with `PERSIST_TO=<dir>` start the Worker on that store instead:
+
+```bash
+pnpm --filter api exec wrangler dev --persist-to <dir>
+```
+
+Row counts to check by hand, after `make dev-api`:
+
+```bash
+pnpm --filter api exec wrangler d1 execute arenaquest-db --local --json \
+  --command "SELECT 'users' AS t, COUNT(*) AS n FROM \"users\" UNION ALL SELECT 'topic_nodes' AS t, COUNT(*) AS n FROM \"topic_nodes\""
+```
+
+`make db-reset-local` rebuilds the seeded local replica afterwards.
 
 ## Never automate
 
