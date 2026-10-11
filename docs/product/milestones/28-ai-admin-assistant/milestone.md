@@ -118,7 +118,7 @@ script/CI task is filed under **Backend** (the only non-web team).
 | 09 | [Shared script library for the API client and media conversion](./09-shared-script-library.task.md) | 3 | Backend | ✅ Done |
 | 10 | [aq-mcp server with draft authoring tools](./10-aq-mcp-authoring-tools.task.md) | 3 | Backend | ✅ Done |
 | 11 | [Backup status report](./11-backup-status-report.task.md) | 4 | Backend | ✅ Done |
-| 12 | [aq-mcp ops tools in three tiers](./12-aq-mcp-ops-tools.task.md) | 4 | Backend | ☐ Open |
+| 12 | [aq-mcp ops tools in three tiers](./12-aq-mcp-ops-tools.task.md) | 4 | Backend | ✅ Done |
 | 13 | [ops-runbook skill and read-only token procedure](./13-ops-runbook-skill.task.md) | 4 | Backend | ☐ Open |
 | 14 | [Home-lab backup pull and local restore](./14-backup-pull-and-restore-local.task.md) | 4 | Backend | ☐ Open |
 
