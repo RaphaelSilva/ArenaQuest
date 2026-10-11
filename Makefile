@@ -42,7 +42,7 @@
         secret-staging secret-prod create-google-oauth-secret \
         label-new label-scaffold label-check \
         set-new-label infra-check-staging infra-check-production \
-        backup-d1-prod \
+        backup-d1-prod backup-r2-prod \
         clean clean-cache clean-all \
         confirm-prod guard-no-dev-seed-staging guard-no-dev-seed-prod \
         db-migrations-dev db-migrations-staging db-migrations-prod db-seed-dev \
@@ -186,7 +186,9 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/db/reset-remote.test.mjs \
 		scripts/db/check-migrations.test.mjs \
 		scripts/backup/manifest.test.mjs \
-		scripts/backup/export-d1.test.mjs
+		scripts/backup/export-d1.test.mjs \
+		scripts/backup/s3.test.mjs \
+		scripts/backup/mirror-r2.test.mjs
 
 # Migration lint (RFC 0021 §2.1): base migrations are frozen, new ones additive
 # unless their header carries `-- @contract: <reason>`. Compares with BASE
@@ -381,6 +383,17 @@ r2-cors-prod: confirm-prod ## Apply the profile-derived CORS rules to the produc
 backup-d1-prod: confirm-prod ## Export a label's production D1 to its backup bucket (LABEL=x; DRY_RUN=1 plans only; CONFIRM=1 skips the prompt)
 	node scripts/backup/export-d1.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e production --yes \
 		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
+
+# R2 media mirror (RFC 0025 §4.2): incremental server-side copy of the production
+# media bucket into the backup bucket under r2/production/, diffed by key + ETag.
+# A removed object is tombstoned (kept 90 days, backup.retention.tombstoneDays)
+# and pruned only after the window; the source is never written. Needs
+# R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY in the environment (never argv).
+backup-r2-prod: confirm-prod ## Mirror a label's production media bucket into its backup bucket (LABEL=x; DRY_RUN=1 plans only; MAX_BYTES=n MAX_SECONDS=n bound the run; CONFIRM=1 skips the prompt)
+	node scripts/backup/mirror-r2.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e production --yes \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,) \
+		$(if $(MAX_BYTES),--max-bytes $(MAX_BYTES),) \
+		$(if $(MAX_SECONDS),--max-seconds $(MAX_SECONDS),)
 
 import-media-prod: ## Import a media tree into production (LABEL=x, SOURCE=path | DRIVE_FOLDER=id; MANIFEST=path; CLI confirms; LIMIT=n, SKIP_INVALID=1, ROOT_TOPIC=uuid, SKIPPED_REPORT=path)
 	@test -n "$(SOURCE)$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  SOURCE or DRIVE_FOLDER is required — e.g. make import-media-prod SOURCE=./content$(RESET)\n"; exit 1; }
