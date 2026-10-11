@@ -260,14 +260,43 @@ without the Workers runtime.
 **Code:** `packages/shared/domain/gamification/{xp-engine,streak-engine,level-table}.ts`, `apps/api/src/controllers/leaderboard.controller.ts`
 → [M7 Gamification Engine & Learner UX](./milestones/7-gamification-engine-and-learner-ux/milestone.md) · ✅
 
-### Quests, missions and badges
-Daily quests (24 h reset), weekly challenges (Monday 00:00 reset) and
-time-bound special missions authored by instructors, each granting XP and
-optional badge rewards. Badges unlock by rule ("complete topic X", "hit a 7-day
-streak").
+### Quests and badges
+Daily quests (24 h reset) and weekly challenges (Monday 00:00 reset), each
+granting XP. Badges unlock by rule ("complete topic X", "hit a 7-day streak").
+The M7 predicate missions became *Missions with requirements* below.
 
-**Code:** `apps/api/src/controllers/{me-quests,me-missions,admin-badges}.controller.ts`
+**Code:** `apps/api/src/controllers/{me-quests,admin-badges}.controller.ts`, `packages/shared/domain/gamification/{quest-evaluator,badge-engine}.ts`
 → [M7](./milestones/7-gamification-engine-and-learner-ux/milestone.md) · ✅
+
+### Missions with requirements
+A time-bound mission is an ordered list of 1–20 typed steps: demonstrations on a
+topic (with a minimum count, description, visibility and moderation filters), a
+topic visit, distinct lesson videos watched, a self-check the student ticks on
+the mission page, or a paid participation in a priced event. Steps run in any
+order or in sequence, and evidence counts only inside the mission's window (and,
+in sequence, after the previous step closed). A mission is automatic (every
+non-staff student who can open all its topics), open (*Join* / *Leave* from the
+dashboard) or assigned to users and groups (everyone else sees a locked teaser).
+Each step can grant XP, the mission grants XP and optionally a badge — all
+write-once — and a step closed in a request keeps the daily streak alive. The
+dashboard groups *My missions* (per-step state and target links), *Available*
+and *Locked*; `/missions/{id}` shows every step with *I did it* and *Leave*.
+Admins author missions in a structured editor (kind, topic and event pickers,
+ordering, audience, a badge suggestion for windows of 14 days or more, rules
+frozen after the start) and follow a Participants tab with per-step chips and
+*Reconcile now*; content creators read everything and write nothing. Steps close
+in the request that produced the evidence, and a daily reconciliation closes
+whatever a request missed — it never reopens anything. Watching a lesson video
+to the end in the catalog is reported again, so video XP, the weekly video quest
+and video badges are fed again.
+
+**Code:** `packages/shared/domain/missions/requirements.ts`, `packages/shared/domain/gamification/mission-evaluator.ts`, `apps/api/migrations/0031_create_mission_requirements.sql`, `apps/api/src/{controllers/admin-missions.controller.ts,controllers/me-missions.controller.ts,routes/admin/missions.ts,routes/me/missions.ts,core/missions/hook.ts,jobs/reconcile-missions.ts}`, `apps/api/src/adapters/db/d1-mission-{repository,participation-repository,evidence-repository}.ts`, `apps/web/src/components/missions/`, `apps/web/src/components/dashboard/MissionsList.tsx`, `apps/web/src/app/(protected)/{admin/missions,missions/[id]}/`
+→ [M27 Mission requirements](./milestones/27-mission-requirements/milestone.md) · [RFC 0022](./RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md) · ✅
+_The reconciliation still writes completions and partial counts one row at a
+time rather than in batches of 100 (backlog `refactoring/13`). Missions created
+before M27 keep their M7 predicate and progress on the old loop until they end
+(removal: backlog `refactoring/12`). Recurring missions are RFC 0023 and tasks as
+mission templates RFC 0024 (roadmap). Not yet walked on staging._
 
 ### Topic discussion
 A comment thread attached to each topic node, one reply level deep, with an

@@ -22,7 +22,8 @@ import {
 import { ErrorBody } from '@api/openapi/components/errors';
 import { respondNoContent, respondWith } from '@api/routes/_shared/envelope';
 import { encodeCursor, invalidCursorResponse, parseCursorParam } from '@api/routes/_shared/cursor';
-import type { ContentContext, EngagementContext, ProgressContext } from '@api/container';
+import { runMissionHook } from '@api/core/missions/hook';
+import type { ContentContext, EngagementContext, GamificationContext, ProgressContext } from '@api/container';
 
 const topicParamSchema = z.object({
   id: z.string().min(1).openapi({ example: 'topic-1', description: 'Topic node ID' }),
@@ -217,6 +218,7 @@ export function buildSubmissionsRouter(slice: {
   engagement: EngagementContext;
   content: ContentContext;
   progress: ProgressContext;
+  gamification: GamificationContext;
 }): OpenAPIHono {
   const controller = new SubmissionsController(
     slice.engagement.submissionRepo,
@@ -252,18 +254,24 @@ export function buildSubmissionsRouter(slice: {
   router.openapi(finalizeSubmissionRoute, async (c) => {
     const { id, sid } = c.req.valid('param');
     const result = await controller.finalize(id, sid, submissionCaller(c));
+    if (result.ok) await runMissionHook(slice, { kind: 'submission', userId: c.get('user').sub, topicIds: [id] });
     return respondWith(c, result) as any;
   });
 
   router.openapi(editSubmissionRoute, async (c) => {
     const { id, sid } = c.req.valid('param');
     const result = await controller.edit(id, sid, submissionCaller(c), c.req.valid('json') as EditSubmissionInput);
+    // Only a description or visibility change can move a count (RFC 0022 §3.2).
+    if (result.ok && ['description', 'visibility'].some((key) => key in c.req.valid('json'))) {
+      await runMissionHook(slice, { kind: 'submission', userId: c.get('user').sub, topicIds: [id] });
+    }
     return respondWith(c, result) as any;
   });
 
   router.openapi(deleteSubmissionRoute, async (c) => {
     const { id, sid } = c.req.valid('param');
     const result = await controller.remove(id, sid, submissionCaller(c));
+    if (result.ok) await runMissionHook(slice, { kind: 'submission', userId: c.get('user').sub, topicIds: [id] });
     return respondNoContent(c, result) as any;
   });
 

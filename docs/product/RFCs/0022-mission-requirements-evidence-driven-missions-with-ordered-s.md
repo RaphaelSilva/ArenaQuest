@@ -1,8 +1,8 @@
 # RFC 0022: Mission requirements — evidence-driven missions with ordered steps, enrollment and per-step rewards
 
 **Date:** 2026-10-02
-**Status:** Draft
-**Revised:** 2026-10-02
+**Status:** Implemented
+**Revised:** 2026-10-03
 **Author:** raphaelsilva
 **Affected:**
 - `apps/api/migrations/0031_create_mission_requirements.sql` (new — `mission_requirements`, `mission_enrollments`, `mission_requirement_progress`, `mission_evidence`, `mission_audience_group`, `mission_audience_user`; adds `mode` and `enrollment_mode` to `missions`. No statement touches `topic_nodes`, `topic_progress`, `topic_submissions` or any billing table)
@@ -1167,11 +1167,18 @@ Each item below is a **separate future document**, and **none blocks M27**:
 1. **Backlog (no RFC)** — fix the quest seed mismatch (`login` vs `daily_login`, `count` vs
    `target` in `0019_seed_quests.sql`), the demo seed's mission params
    (`scripts/demo/dataset/base.json`), and fire `visit` on topic page mount (Open Question 6, decided).
-2. **RFC 0023 — *Challenges as recurring missions*** — a mission template plus a recurrence rule;
+2. **RFC — *Challenges as recurring missions*** — a mission template plus a recurrence rule;
    the cron instantiates the next window; daily and weekly quests converge on the mission engine.
-3. **RFC 0024 — *Tasks as mission templates*** — Task + TaskStage become the reusable mold (steps
+3. **RFC — *Tasks as mission templates*** — Task + TaskStage become the reusable mold (steps
    and targets, no window or reward), and a mission is the assignment of a mold to a group with a
    window and XP; migrates or retires `task_progress`.
 
-RFC 0023 and RFC 0024 may merge into one if M27 shows that the template and the recurrence want the
-same table.
+4. **[RFC 0023 — *Media acknowledgment*](./0023-media-acknowledgment-read-and-watched-marks-as-mission-evide.md)** — a per-user, per-media "I read / watched this" record for
+   documents and images (and an optional explicit confirmation for videos), the route that writes
+   it, whether and how it earns XP, and a `media_viewed` requirement kind so a mission step can
+   ask for a topic's documents to be acknowledged. Raised by the product owner during the m27
+   preview walkthrough (2026-10-11): only videos produce evidence today, automatically; a document
+   or image offers no way to say it was read.
+
+The challenges and tasks RFCs (items 2 and 3) may merge into one if M27 shows that the template and
+the recurrence want the same table; they will be numbered when opened (0024 onward).

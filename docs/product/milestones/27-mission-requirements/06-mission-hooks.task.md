@@ -1,6 +1,6 @@
 # Task 06 — Backend: Mission hooks at the evidence write sites (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Backend API
@@ -72,20 +72,21 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Finalizing the third ready submission with a description on a topic targeted by a
+- [x] Finalizing the third ready submission with a description on a topic targeted by a
       `submissions_on_topic` step (`minCount: 3`, `requireDescription: true`) completes the step and
       a one-step mission in that request; `xp_events` holds exactly one
       `mission_step_reward:<reqId>:v1` and one `mission_reward:<missionId>:v1`; the finalize
       response is byte-identical to one without missions.
-- [ ] With the evaluator stubbed to throw, every hooked route returns its usual status and body.
-- [ ] Deleting a counted submission of an incomplete step lowers `current_count`; of a completed
+- [x] With the evaluator stubbed to throw, every hooked route returns its usual status and body.
+- [x] Deleting a counted submission of an incomplete step lowers `current_count`; of a completed
       step changes nothing.
-- [ ] Voiding a paid charge before completion takes an `event_participation` count back to 0.
-- [ ] A closed step on a day with no other activity advances `user_streak` once.
-- [ ] `git diff` shows no change in `submissions.controller.ts`, `progress-service.ts`,
+- [x] Voiding a paid charge before completion takes an `event_participation` count back to 0.
+- [x] A closed step on a day with no other activity advances `user_streak` once.
+- [x] `git diff` shows no change in `submissions.controller.ts`, `progress-service.ts`,
       `event-charge-service.ts` or any repository under `apps/api/src/adapters/db/`.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
+      _Closed 2026-10-03. Authorized wiring beyond the guardrail: `gamification` added to the two submissions router slices and passed at `routes/index.ts`. Runner choices: a move signals the target topic plus every `submissions_on_topic` topic of the user's active enrollments (source topics cannot be read after the write), so source regression is immediate rather than left to the daily run; the PATCH hook fires whenever the body carries `description` or `visibility`; staff actions and charge writes are resolved by id inside the runner; the streak is recorded by the evaluator, not twice. Follow-up: the resolver derives a user's groups through `listAll` + `listMembers` because no port lists a user's groups directly (a `listGroupIdsForUser` port method would make it one query)._
 
 ## Verification Plan
 

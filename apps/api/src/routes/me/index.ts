@@ -7,6 +7,7 @@ import { buildMeCommentsRouter } from '@api/routes/me/comments';
 import { buildMeBillingRouter } from '@api/routes/me/billing';
 import { buildMeNotesRouter } from '@api/routes/me/notes';
 import { buildMeSubmissionsRouter } from '@api/routes/me/submissions';
+import { buildMeMissionsRouter } from '@api/routes/me/missions';
 import type {
   BillingContext,
   IdentityContext,
@@ -16,6 +17,7 @@ import type {
   ProgressContext,
   EngagementContext,
   ContentContext,
+  EventsContext,
 } from '@api/container';
 
 export function buildMeRouter(slice: {
@@ -27,6 +29,8 @@ export function buildMeRouter(slice: {
   engagement: EngagementContext;
   content: ContentContext;
   billing: BillingContext;
+  /** Event visibility of mission targets (RFC 0022 §8). */
+  events: EventsContext;
 }): OpenAPIHono {
   const { accountController } = slice.controllers;
 
@@ -43,6 +47,9 @@ export function buildMeRouter(slice: {
 
   // 3. Gamification router
   meRouter.route('/', buildMeGamificationRouter(slice));
+
+  // 3b. One mission, join, leave and the manual check (RFC 0022 §6).
+  meRouter.route('/', buildMeMissionsRouter(slice));
 
   // 4. Comments authored writes router
   meRouter.route('/', buildMeCommentsRouter({ engagement: slice.engagement }));

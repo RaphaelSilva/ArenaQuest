@@ -166,6 +166,16 @@ export default function CatalogTopicPage({ params }: CatalogTopicPageProps) {
         <MediaList
           media={topic.media}
           onVisitTopic={() => client.topics.visit(id)}
+          onVideoWatched={(mediaId) => {
+            // Fire-and-forget: a failed report must never interrupt playback.
+            void Promise.resolve()
+              .then(() => client.topics.markVideoWatched(id, mediaId))
+              .catch((err: unknown) => {
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn('markVideoWatched failed', err);
+                }
+              });
+          }}
         />
       )}
 

@@ -1,6 +1,6 @@
 # Task 02 — Backend: Mission contracts — requirement kinds, params, entities, ports (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Backend API
@@ -76,20 +76,21 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Parsing a `submissions_on_topic` requirement with only `minCount: 3` yields
+- [x] Parsing a `submissions_on_topic` requirement with only `minCount: 3` yields
       `requireDescription: false`, `visibility: 'any'`, `countModerated: false`.
-- [ ] An unknown `kind`, `minCount: 0`, `minCount: 51`, an extra params key, a 121-character title,
+- [x] An unknown `kind`, `minCount: 0`, `minCount: 51`, an extra params key, a 121-character title,
       a `topicId` on `manual_check` and an `eventId` on `video_watched` are each rejected by the
       schema (unit tests).
-- [ ] The target-count helper returns `minCount` for `submissions_on_topic` and `video_watched` and
+- [x] The target-count helper returns `minCount` for `submissions_on_topic` and `video_watched` and
       1 for the other three kinds.
-- [ ] `DashboardMissionEntry` still type-checks against the current `me-missions.controller.ts`
+- [x] `DashboardMissionEntry` still type-checks against the current `me-missions.controller.ts`
       output once the new fields are filled with neutral values (`enrollment: null`,
       `joinable: false`, `locked: null`, `steps: []`).
-- [ ] No D1, R2 or Cloudflare symbol appears in any file under `packages/shared/`.
-- [ ] `make build` passes; `pnpm --filter @arenaquest/shared test` green; changed files lint
+- [x] No D1, R2 or Cloudflare symbol appears in any file under `packages/shared/`.
+- [x] `make build` passes; `pnpm --filter @arenaquest/shared test` green; changed files lint
       clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
+      _Authorized deviation 2026-10-03: `packages/shared/package.json` gains `zod ^3` (resolved to the API's 3.23.8) and `pnpm-lock.yaml` gains the importer entry — the RFC mandates the params schemas in Zod inside shared and the guardrail missed the dependency. `MissionStepView` follows RFC §6 (`id`, typed `target`, `MissionEnrollmentView`) rather than the simpler plan sketch; every new dashboard field is optional._
 
 ## Verification Plan
 

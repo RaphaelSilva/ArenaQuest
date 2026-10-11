@@ -80,6 +80,7 @@ export const SEEDED_TABLES = Object.freeze([
   'user_streak',
   'quest_progress',
   'missions',
+  'mission_requirements',
   'events',
   'event_audience_group',
   'billing_plans',
@@ -205,6 +206,9 @@ export function expectations(dataset) {
   const stageIds = (dataset.tasks ?? []).flatMap((task) => task.stages.map((stage) => id('task-stage', `${task.key}/${stage.key}`)));
   const invoiceIds = billing.invoices.map((invoice) => id('invoice', invoice.key));
   const commentIds = (dataset.comments?.entries ?? []).map((comment) => id('comment', comment.key));
+  // M27: every demo mission is a requirements mission, and carries one row per step.
+  const missions = dataset.gamification.missions;
+  const missionIds = missions.map((mission) => id('mission', mission.key));
   const extension = (what, table, column, ids, wanted, filter = null) => ({ what, table, column, ids, wanted, filter });
   const extensions = [
     extension('events', 'events', 'id', eventIds, eventIds.length, "status = 'published'"),
@@ -220,6 +224,14 @@ export function expectations(dataset) {
     extension('stageTopicLinks', 'task_stage_topic_links', 'stage_id', stageIds, stageIds.length),
     extension('comments', 'topic_comments', 'id', commentIds, commentIds.length, 'deleted_at IS NULL'),
     extension('commentLikes', 'comment_likes', 'comment_id', commentIds, (dataset.comments?.likes ?? []).length),
+    extension('missions', 'missions', 'id', missionIds, missionIds.length, "predicate_kind = 'requirements'"),
+    extension(
+      'missionRequirements',
+      'mission_requirements',
+      'mission_id',
+      missionIds,
+      missions.reduce((n, mission) => n + mission.requirements.length, 0),
+    ),
   ];
   return {
     extensions,

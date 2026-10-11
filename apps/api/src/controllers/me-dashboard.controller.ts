@@ -2,7 +2,7 @@ import type { ControllerResult } from '@api/core/result';
 import type { DashboardShape } from '@arenaquest/shared/types/dashboard';
 import type { MeGamificationController } from './me-gamification.controller';
 import type { MeQuestsController } from './me-quests.controller';
-import type { MeMissionsController } from './me-missions.controller';
+import type { MeMissionsController, MissionCaller } from './me-missions.controller';
 
 export class MeDashboardController {
   constructor(
@@ -11,7 +11,9 @@ export class MeDashboardController {
     private readonly missions: MeMissionsController,
   ) {}
 
-  async getDashboard(userId: string, now: Date): Promise<ControllerResult<DashboardShape>> {
+  /** `roles` decide the missions part: staff are never implicitly enrolled in `auto` missions. */
+  async getDashboard(caller: MissionCaller, now: Date): Promise<ControllerResult<DashboardShape>> {
+    const { userId } = caller;
     const [xpResult, streakResult, badgesResult, dailyResult, weeklyResult, missionsResult] =
       await Promise.all([
         this.gamification.getXp(userId),
@@ -19,7 +21,7 @@ export class MeDashboardController {
         this.gamification.getBadges(userId),
         this.quests.getDailyQuests(userId, now),
         this.quests.getWeeklyQuests(userId, now),
-        this.missions.getMissions(userId, now),
+        this.missions.getMissions(caller, now),
       ]);
 
     return {

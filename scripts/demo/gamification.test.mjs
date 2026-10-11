@@ -10,11 +10,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { loadDataset } from './dataset.mjs';
 import {
   BADGE_RULE_KINDS,
+  REQUIREMENTS_PREDICATE_KIND,
   SOURCE_KIND,
   XP_KEY_VERSION,
   badgesDue,
@@ -68,6 +69,7 @@ test('reference comes from the files that own the rules', () => {
   assert.equal(Object.keys(reference.badges).length, 8);
   assert.deepEqual(reference.quests['weekly-topic'], { kind: 'weekly', target: 2 });
   assert.deepEqual(reference.quests['daily-topic'], { kind: 'daily', target: 1 });
+  assert.deepEqual(reference.requirementLimits, { stepsMax: 20, titleMax: 120, minCountMax: 50, instructionsMax: 500 });
 });
 
 test('totals: student-1 350 (level 3), student-2 950 (level 4, one lesson from 5), student-3 0', () => {
@@ -203,8 +205,11 @@ test('dates are relative to ctx.now: completions end yesterday, the mission runs
   assert.equal(mission.id, demoId('budo', 'mission', 'first-topic'));
   assert.equal(mission.start_at, '2026-09-29T10:00:00.000Z');
   assert.equal(mission.end_at, '2026-10-13T10:00:00.000Z');
-  assert.equal(mission.predicate_kind, 'complete_topic');
-  assert.equal(mission.predicate_params, '{"count":1}');
+  assert.equal(mission.predicate_kind, 'requirements');
+  assert.equal(mission.predicate_params, '{}');
+  assert.equal(mission.mode, 'parallel');
+  assert.equal(mission.enrollment_mode, 'auto');
+  assert.equal(mission.xp_reward, 100);
   assert.equal(mission.badge_id, 'badge-tecnica-afiada');
   assert.equal(mission.active, 1);
 
@@ -214,6 +219,96 @@ test('dates are relative to ctx.now: completions end yesterday, the mission runs
   // Ids and keys do not depend on the date: a re-run on another day converges.
   assert.deepEqual(later.xp_events.map((e) => e.idempotency_key), rows.xp_events.map((e) => e.idempotency_key));
   assert.deepEqual(later.topic_progress.map((p) => p.id), rows.topic_progress.map((p) => p.id));
+  assert.deepEqual(later.mission_requirements, rows.mission_requirements);
+});
+
+// ── Missions (RFC 0022) ────────────────────────────────────────────────────────
+
+/** requirements.ts itself, transpiled (zod resolved from packages/shared) — test only. */
+async function importRequirementsModule() {
+  const require = createRequire(join(ROOT, 'packages', 'shared', 'package.json'));
+  const ts = require('typescript');
+  const { outputText } = ts.transpileModule(read('packages/shared/domain/missions/requirements.ts'), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  });
+  const code = outputText.replace(/from ['"]zod['"]/, `from ${JSON.stringify(pathToFileURL(require.resolve('zod')).href)}`);
+  return import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
+}
+
+test('the mission requirements: one row per step, in order, on seeded topics, with the API’s stored params', async () => {
+  const missionId = demoId('budo', 'mission', 'first-topic');
+  assert.deepEqual(rows.mission_requirements, [
+    {
+      id: demoId('budo', 'mission-requirement', 'first-topic#1'),
+      mission_id: missionId,
+      position: 1,
+      kind: 'topic_visited',
+      title: 'Open your first lesson',
+      topic_node_id: tid('root-1/module-1/lesson-1'),
+      event_id: null,
+      params: '{}',
+      xp_reward: 20,
+    },
+    {
+      id: demoId('budo', 'mission-requirement', 'first-topic#2'),
+      mission_id: missionId,
+      position: 2,
+      kind: 'submissions_on_topic',
+      title: 'Share one demonstration',
+      topic_node_id: tid('root-1/module-1/lesson-2'),
+      event_id: null,
+      params: '{"minCount":1,"requireDescription":true,"visibility":"any","countModerated":false}',
+      xp_reward: 50,
+    },
+  ]);
+
+  // Parity with what the API stores: the predicate marker, and each step's
+  // params as JSON.stringify(parseRequirementParams(kind, params)) (d1-mission-repository.ts).
+  const shared = await importRequirementsModule();
+  assert.equal(REQUIREMENTS_PREDICATE_KIND, shared.REQUIREMENTS_PREDICATE_KIND);
+  const [definition] = dataset.gamification.missions;
+  definition.requirements.forEach((step, index) => {
+    assert.equal(rows.mission_requirements[index].params, JSON.stringify(shared.parseRequirementParams(step.kind, step.params)), step.key);
+  });
+  // The rows satisfy the step schema the admin API validates against (ids for keys).
+  const input = rows.mission_requirements.map((row) => ({
+    kind: row.kind,
+    title: row.title,
+    xpReward: row.xp_reward,
+    params: JSON.parse(row.params),
+    ...(row.topic_node_id ? { topicId: row.topic_node_id } : {}),
+    ...(row.event_id ? { eventId: row.event_id } : {}),
+  }));
+  assert.equal(shared.RequirementInputList.safeParse(input).success, true);
+
+  // No enrollment or progress is seeded: the evaluator creates them.
+  assert.ok(!Object.keys(rows).some((table) => /enrollment|requirement_progress|evidence|audience/.test(table)));
+});
+
+test('the requirement rows match the migration 0031 kind/target CHECK', () => {
+  const migration = read('apps/api/migrations/0031_create_mission_requirements.sql');
+  assert.match(migration, /UNIQUE \(mission_id, position\)/);
+  const topicKinds = migration.match(/kind IN \(('submissions_on_topic'[^)]*)\)\s+AND topic_node_id IS NOT NULL/)?.[1];
+  assert.ok(topicKinds, 'migration 0031 CHECK not found');
+  for (const row of rows.mission_requirements) {
+    assert.ok(topicKinds.includes(`'${row.kind}'`), `${row.kind} targets a topic`);
+    assert.ok(row.topic_node_id && row.event_id === null, row.id);
+    assert.ok(row.position >= 1 && row.xp_reward >= 0, row.id);
+  }
+  // A manual step takes no target; its instructions are trimmed and defaulted.
+  const manual = structuredClone(dataset);
+  manual.gamification.missions[0].requirements.push({ key: 'check', kind: 'manual_check', title: ' Bow ', params: { instructions: ' Ask ' } });
+  const extra = buildGamification(manual, ctx).rows.mission_requirements[2];
+  assert.deepEqual(
+    { position: extra.position, title: extra.title, topic: extra.topic_node_id, event: extra.event_id, params: extra.params, xp: extra.xp_reward },
+    { position: 3, title: 'Bow', topic: null, event: null, params: '{"instructions":"Ask"}', xp: 0 },
+  );
+});
+
+test('a requirement whose params the schema refuses fails the builder', () => {
+  const broken = structuredClone(dataset);
+  broken.gamification.missions[0].requirements[1].params = { minCount: 0 };
+  assert.throws(() => buildGamification(broken, ctx), /mission "first-topic" requirement "demo": params "minCount"/);
 });
 
 test('the builder refuses to run without a clock or a reference', () => {
@@ -224,7 +319,16 @@ test('the builder refuses to run without a clock or a reference', () => {
 
 test('SQL: keyed by each table’s unique key, user_xp is the ledger sum, quest progress is insert-only', () => {
   const { statements, counts } = gamificationSection.build(dataset, ctx);
-  assert.deepEqual(counts, { topic_progress: 3, xp_events: 7, user_badges: 3, user_xp: 2, user_streak: 1, quest_progress: 1, missions: 1 });
+  assert.deepEqual(counts, {
+    topic_progress: 3,
+    xp_events: 7,
+    user_badges: 3,
+    user_xp: 2,
+    user_streak: 1,
+    quest_progress: 1,
+    missions: 1,
+    mission_requirements: 2,
+  });
   const into = (table) => statements.filter((s) => s.startsWith(`INSERT INTO ${table} `));
   for (const s of into('topic_progress')) assert.match(s, /ON CONFLICT\(user_id, topic_node_id\) DO UPDATE/);
   for (const s of into('xp_events')) assert.match(s, /ON CONFLICT\(user_id, source_kind, idempotency_key\) DO UPDATE/);
@@ -236,6 +340,17 @@ test('SQL: keyed by each table’s unique key, user_xp is the ledger sum, quest 
     assert.match(s, /\(SELECT MAX\(0, COALESCE\(SUM\(points\), 0\)\) FROM xp_events WHERE user_id = '[0-9a-f-]{36}'\)/);
   }
   assert.match(into('quest_progress')[0], /ON CONFLICT\(user_id, quest_id, period_key\) DO NOTHING;$/);
+  assert.match(into('missions')[0], /ON CONFLICT\(id\) DO UPDATE SET .*predicate_kind = excluded\.predicate_kind/);
+  assert.match(into('missions')[0], /mode = excluded\.mode, enrollment_mode = excluded\.enrollment_mode/);
+  assert.equal(into('mission_requirements').length, 2);
+  for (const s of into('mission_requirements')) {
+    // Keyed by the table's UNIQUE (mission_id, position); the id is insert-only.
+    assert.match(s, /ON CONFLICT\(mission_id, position\) DO UPDATE SET/);
+    assert.doesNotMatch(s.split('DO UPDATE SET')[1], /\bid = excluded\.id/);
+    assert.match(s, /WHERE mission_requirements\.kind IS NOT excluded\.kind/, 'a no-op re-run leaves updated_at alone');
+  }
+  // Every requirement row follows the mission it references.
+  assert.ok(statements.findLastIndex((s) => s.startsWith('INSERT INTO missions ')) < statements.findIndex((s) => s.startsWith('INSERT INTO mission_requirements ')));
   // The read model is written after every ledger row it sums.
   const lastEvent = statements.findLastIndex((s) => s.startsWith('INSERT INTO xp_events '));
   const firstXp = statements.findIndex((s) => s.startsWith('INSERT INTO user_xp '));

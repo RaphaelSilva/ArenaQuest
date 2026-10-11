@@ -1,6 +1,6 @@
 # Task 03 — Backend: Mission evaluator — windowing, sequential unlock, write-once rewards, streak (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Backend API
@@ -79,22 +79,23 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] In a sequential mission, evidence dated before step 1's `completed_at` does not count for
+- [x] In a sequential mission, evidence dated before step 1's `completed_at` does not count for
       step 2 and evidence dated after it does (unit test).
-- [ ] For a step with `minCount: 3` whose qualifying items are at t1 < t2 < t3 < t4, the step's
+- [x] For a step with `minCount: 3` whose qualifying items are at t1 < t2 < t3 < t4, the step's
       `completed_at` is t3, whether the evaluation runs at t3 or a day later.
-- [ ] Re-evaluating a completed mission after its evidence disappears leaves every `completed_at`
+- [x] Re-evaluating a completed mission after its evidence disappears leaves every `completed_at`
       and the mission completion untouched, and issues no XP or badge call; an incomplete step's
       count drops.
-- [ ] Two evaluations of the same completion grant exactly one `mission_step_reward`, one
+- [x] Two evaluations of the same completion grant exactly one `mission_step_reward`, one
       `mission_reward` and one badge (fakes record calls).
-- [ ] A step closed with origin `hook` or `manual_check` triggers exactly one streak activity call;
+- [x] A step closed with origin `hook` or `manual_check` triggers exactly one streak activity call;
       a step closed with origin `reconcile` triggers none.
-- [ ] An `auto` mission is never enrolled for an `admin` or `content_creator`, nor for a student
+- [x] An `auto` mission is never enrolled for an `admin` or `content_creator`, nor for a student
       whose access set lacks one topic target; an `open` mission is never enrolled implicitly.
-- [ ] No D1, R2 or Hono import in `mission-evaluator.ts`.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] No D1, R2 or Hono import in `mission-evaluator.ts`.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
+      _Closed 2026-10-03. Port gaps left for Task 04 to close in the adapters: `markCompleted` takes no instant and is not conditional (the evaluator guards with a `findProgress` read plus the XP idempotency keys), and `upsertProgress` never updates `target_value` on conflict. `check` applies the implicit auto/assigned policy before answering `not_enrolled`; the mission badge is granted only when active._
 
 ## Verification Plan
 

@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+## Milestone 27 — Mission requirements
+
+> Missions became step-by-step goals built from real evidence — demonstrations, visits, videos, self-checks and event participation — with enrollment, per-step rewards and a daily safety net.
+
+### New Features
+
+- **🎬 Video XP is back**
+  - Watching a lesson video to the end now earns XP and counts toward weekly video challenges and video badges.
+  - The catalog reports a video once it has played 90 % or reached its end, once per video per page view; a failed report never interrupts playback.
+
+- **🧭 Missions with steps**
+  - A mission is an ordered list of 1 to 20 steps of five kinds: demonstrations on a topic, a topic visit, lesson videos watched, a self-check, and participation in a priced event.
+  - Steps run in any order or in sequence; evidence counts only inside the mission's window, and a sequential step only after the previous one closed.
+  - Each step can grant XP; the mission grants XP and optionally a badge. Rewards are granted once and are never taken back, and closing a step keeps the daily streak alive.
+
+- **🙋 Joining and following missions**
+  - Three enrollment modes: automatic (every student who can open the mission's topics), open (*Join* / *Leave* from the dashboard) and assigned to users and groups (everyone else sees a locked teaser).
+  - The dashboard groups missions into *My missions* (per-step progress and links to each target), *Available* and *Locked*.
+  - A new mission page lists every step, with *I did it* for self-check steps (confirmed, final) and *Leave* for missions the student joined.
+
+- **🛠️ Mission editor for admins**
+  - A structured editor: step kind, topic and event pickers, per-kind settings, drag or up/down ordering, audience, and a badge suggestion for windows of 14 days or more.
+  - Rules freeze once a mission starts; its title, description, active flag and step titles stay editable, and its end date can still be extended.
+  - Writes are admin-only; content creators keep read access to the list, the editor and the participants.
+  - A *Participants* tab shows each student's step chips, pages through large rosters and offers *Reconcile now* to admins.
+
+### Platform Enhancements & Fixes
+
+- Steps close in the same request that produced the evidence; a daily reconciliation closes whatever a request missed and never reopens anything.
+- The demo seed ships a *Get started* mission expressed as steps (visit a lesson, share one demonstration).
+- Missions created before this release keep progressing as before until they end; new missions are always built from steps.
+
+---
+
 ## Milestone 5 — Engagement & Student Progress
 
 > The learner loop closed: student-facing dashboards, stage check-ins, and granular enrollment control.

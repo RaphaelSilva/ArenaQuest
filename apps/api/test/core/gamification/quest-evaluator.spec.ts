@@ -91,7 +91,7 @@ function makeQuestRepo(overrides: Partial<IQuestRepository> = {}): IQuestReposit
 
 function makeMissionRepo(overrides: Partial<IMissionRepository> = {}): IMissionRepository {
   return {
-    listActiveMissions: vi.fn(async () => []),
+    listActiveLegacyMissions: vi.fn(async () => []),
     findProgress: vi.fn(async () => null),
     upsertProgress: vi.fn(async () => makeMissionProgress()),
     markCompleted: vi.fn(async () => makeMissionProgress({ completed: true })),
@@ -224,10 +224,10 @@ describe('QuestEvaluator', () => {
   });
 
   describe('mission evaluation', () => {
-    it('does not progress a mission when listActiveMissions returns empty (expired or none)', async () => {
+    it('does not progress a mission when listActiveLegacyMissions returns empty (expired or none)', async () => {
       const questRepo = makeQuestRepo();
       const missionRepo = makeMissionRepo({
-        listActiveMissions: vi.fn(async () => []), // expired missions filtered out
+        listActiveLegacyMissions: vi.fn(async () => []), // expired missions filtered out
       });
       const xpEngine = makeXpEngine();
       const evaluator = new QuestEvaluator(questRepo, missionRepo, xpEngine);
@@ -241,7 +241,7 @@ describe('QuestEvaluator', () => {
       const mission = makeMission({ predicateKind: 'watch_video' });
       const questRepo = makeQuestRepo();
       const missionRepo = makeMissionRepo({
-        listActiveMissions: vi.fn(async () => [mission]),
+        listActiveLegacyMissions: vi.fn(async () => [mission]),
         findProgress: vi.fn(async () => null),
         upsertProgress: vi.fn(async () => makeMissionProgress({ currentValue: 1, completed: false })),
       });
@@ -257,7 +257,7 @@ describe('QuestEvaluator', () => {
       const mission = makeMission({ predicateKind: 'watch_video', xpReward: 100 });
       const questRepo = makeQuestRepo();
       const missionRepo = makeMissionRepo({
-        listActiveMissions: vi.fn(async () => [mission]),
+        listActiveLegacyMissions: vi.fn(async () => [mission]),
         findProgress: vi.fn(async () => null),
         upsertProgress: vi.fn(async () => makeMissionProgress({ currentValue: 3, targetValue: 3, completed: true })),
       });
@@ -270,6 +270,41 @@ describe('QuestEvaluator', () => {
       const awardCall = (xpEngine.award as ReturnType<typeof vi.fn>).mock.calls[0][0] as XpAwardParams;
       expect(awardCall.customPoints).toBe(100);
       expect(awardCall.action).toBe('mission_reward');
+    });
+  });
+
+  describe('legacy narrowing (RFC 0022 §3.7)', () => {
+    it('a legacy mission still advances on its mapped quest source', async () => {
+      const legacy = makeMission({ predicateKind: 'watch_video' });
+      const missionRepo = makeMissionRepo({
+        listActiveLegacyMissions: vi.fn(async () => [legacy]),
+        upsertProgress: vi.fn(async () => makeMissionProgress({ currentValue: 1 })),
+      });
+      const evaluator = new QuestEvaluator(makeQuestRepo(), missionRepo, makeXpEngine());
+
+      await evaluator.evaluate(USER_ID, 'video', NOW);
+
+      expect(missionRepo.listActiveLegacyMissions).toHaveBeenCalledWith(NOW.toISOString());
+      expect(missionRepo.upsertProgress).toHaveBeenCalledWith(USER_ID, legacy.id, 1, 3);
+    });
+
+    it('never reads the unfiltered mission listing, so a requirements mission is not touched', async () => {
+      const requirementsMission = makeMission({ id: 'mission-req', predicateKind: 'requirements', predicateParams: '{}' });
+      const listActiveMissions = vi.fn(async () => [requirementsMission]);
+      const missionRepo = makeMissionRepo({
+        listActiveMissions,
+        // The adapter filters `predicate_kind <> 'requirements'`, so it answers nothing here.
+        listActiveLegacyMissions: vi.fn(async () => []),
+      });
+      const xpEngine = makeXpEngine();
+      const evaluator = new QuestEvaluator(makeQuestRepo(), missionRepo, xpEngine);
+
+      await evaluator.evaluate(USER_ID, 'video', NOW);
+
+      expect(listActiveMissions).not.toHaveBeenCalled();
+      expect(missionRepo.findProgress).not.toHaveBeenCalled();
+      expect(missionRepo.upsertProgress).not.toHaveBeenCalled();
+      expect(xpEngine.award).not.toHaveBeenCalled();
     });
   });
 

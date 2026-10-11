@@ -1,6 +1,6 @@
 # Task 14 — Backend: Documentation closeout, backlog items and release note (Phase 7)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Backend API
@@ -64,19 +64,20 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `CLAUDE.md` has a *Missions* paragraph covering kinds, windowing, enrollment modes, hooks and
+- [x] `CLAUDE.md` has a *Missions* paragraph covering kinds, windowing, enrollment modes, hooks and
       reconciliation, write-once rewards, streak and the role boundary.
-- [ ] `docs/ReleaseNotes.md` announces that watching videos earns XP again, and the new mission
+- [x] `docs/ReleaseNotes.md` announces that watching videos earns XP again, and the new mission
       features.
-- [ ] Backlog items exist for the quest seed mismatch, `visit` on topic page mount and the legacy
+- [x] Backlog items exist for the quest seed mismatch, `visit` on topic page mount and the legacy
       mission cleanup, each passing the backlog checker; the demo mission params are recorded as
       resolved by Task 13 (or filed if it did not land).
-- [ ] `closeout-analysis.md` maps each milestone §3 criterion to its evidence.
-- [ ] RFC 0022 reads `Implemented` in its header and README row;
+- [x] `closeout-analysis.md` maps each milestone §3 criterion to its evidence.
+- [x] RFC 0022 reads `Implemented` in its header and README row;
       `node .claude/skills/write-rfc/check-rfc.mjs` and
       `node .claude/skills/write-tasks/check-task.mjs --milestone 27` pass.
-- [ ] `make test-api` and `make test-web` green on the final tree.
-- [ ] No diff outside the scope guardrail.
+- [x] `make test-api` and `make test-web` green on the final tree.
+- [x] No diff outside the scope guardrail.
+      _Closed 2026-10-03. `closeout-analysis.md` is written in the milestone folder but stays local: the repo gitignores `docs/product/**/closeout-analysis.md` and never force-adds it. Four backlog items were filed (quest seed mismatch, visit on page mount, legacy mission path removal, reconciliation write batching); the demo mission params item is resolved by Task 13. `make test-api` (2155 passed) and `make test-web` (1041 passed) are green on the final tree; the EN `next build` render check was not run (dictionary parity is enforced by the coverage check and the shared key type)._
 
 ## Verification Plan
 

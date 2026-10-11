@@ -17,11 +17,12 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
   const dict = useDict();
 
   // `prefix` marks a section whose detail routes live under its own path — the
-  // entry stays highlighted on `/catalog/<id>` and `/events/<slug>`.
+  // entry stays highlighted on `/catalog/<id>`, `/missions/<id>` and `/events/<slug>`.
   const navLinks = [
     { label: dict.layout.nav.dashboard, href: '/dashboard', prefix: false },
     { label: dict.layout.nav.catalog, href: '/catalog', prefix: true },
     { label: dict.layout.nav.myNotes, href: '/notes', prefix: true },
+    { label: dict.layout.nav.missions, href: '/missions', prefix: true },
     { label: dict.submissions.myDemonstrations.navLabel, href: '/submissions', prefix: false },
     { label: dict.layout.nav.events, href: '/events', prefix: true },
     { label: dict.layout.nav.tasks, href: '/tasks', prefix: false },
@@ -175,6 +176,12 @@ export function Nav() {
             className={(pathname === '/notes' || pathname.startsWith('/notes/')) ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
           >
             {dict.layout.nav.myNotes}
+          </Link>
+          <Link
+            href="/missions"
+            className={(pathname === '/missions' || pathname.startsWith('/missions/')) ? 'text-zinc-900 dark:text-zinc-50' : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'}
+          >
+            {dict.layout.nav.missions}
           </Link>
           <Link
             href="/submissions"

@@ -5,7 +5,8 @@ export type XpAction =
   | 'comment_posted'
   | 'quest_reward'
   | 'mission_reward'
-  | 'badge_award';
+  | 'badge_award'
+  | 'mission_step_reward';
 
 export const XP_POINTS: Record<XpAction, number> = {
   stage_checkin: 20,
@@ -16,4 +17,5 @@ export const XP_POINTS: Record<XpAction, number> = {
   quest_reward: 0,
   mission_reward: 0,
   badge_award: 0,
+  mission_step_reward: 0,
 };

@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import {
   FIXTURES_DIR,
   RFC_FLOOR,
+  SEEDED_TABLES,
   assertNodeVersion,
   checkLabel,
   countDrift,
@@ -25,7 +26,7 @@ import {
   prefillCache,
 } from './ci-check.mjs';
 import { loadDataset } from './dataset.mjs';
-import { listLabels } from './ids.mjs';
+import { demoId, listLabels } from './ids.mjs';
 
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const scratch = () => mkdtempSync(join(tmpdir(), 'demo-ci-check-'));
@@ -99,8 +100,21 @@ test('expectations for budo meet the RFC 0021 criteria', () => {
     stageTopicLinks: 3,
     comments: 2,
     commentLikes: 1,
+    missions: 1,
+    missionRequirements: 2,
   });
   assert.ok(expected.expect.readyMedia >= RFC_FLOOR.readyMedia);
+  const missionId = demoId('budo', 'mission', 'first-topic');
+  const byWhat = Object.fromEntries(expected.extensions.map((entry) => [entry.what, entry]));
+  assert.deepEqual(byWhat.missions, { what: 'missions', table: 'missions', column: 'id', ids: [missionId], wanted: 1, filter: "predicate_kind = 'requirements'" });
+  assert.deepEqual(byWhat.missionRequirements, {
+    what: 'missionRequirements',
+    table: 'mission_requirements',
+    column: 'mission_id',
+    ids: [missionId],
+    wanted: 2,
+    filter: null,
+  });
   assert.deepEqual(
     expected.students.map(({ user, xp, badges }) => ({ user, xp, badges })),
     [
@@ -143,6 +157,23 @@ test('checkLabel accepts a correct seed and names every deviation', () => {
   const gone = goodObservation(expected);
   gone.students = gone.students.slice(1);
   assert.ok(checkLabel(gone, expected).some((line) => /student-1: not found/.test(line)));
+});
+
+test('the second-run count check covers the mission tables', () => {
+  assert.ok(SEEDED_TABLES.includes('missions'));
+  assert.ok(SEEDED_TABLES.includes('mission_requirements'));
+  assert.equal(new Set(SEEDED_TABLES).size, SEEDED_TABLES.length);
+  assert.deepEqual(countDrift({ mission_requirements: 2 }, { mission_requirements: 4 }), ['mission_requirements: 2 → 4']);
+});
+
+test('checkLabel names a mission that is not a requirements mission, or a missing step', () => {
+  const expected = expectations(loadDataset('budo'));
+  const bad = goodObservation(expected);
+  bad.counts.missions = 0;
+  bad.counts.missionRequirements = 1;
+  const problems = checkLabel(bad, expected);
+  assert.ok(problems.includes('missions: 0, expected 1'));
+  assert.ok(problems.includes('missionRequirements: 1, expected 2'));
 });
 
 test('countDrift names the tables whose count changed', () => {

@@ -1,6 +1,6 @@
 # Task 04 — Backend: Migration 0031 and D1 adapters with per-kind counting (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Backend API
@@ -81,24 +81,25 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make db-migrate-local` applies 0031 on a fresh local D1 and on one migrated to 0030;
+- [x] `make db-migrate-local` applies 0031 on a fresh local D1 and on one migrated to 0030;
       existing `missions` rows read back with `mode = 'parallel'` and `enrollment_mode = 'auto'`.
-- [ ] Inserting a `manual_check` requirement with a `topic_node_id`, or a `video_watched` one
+- [x] Inserting a `manual_check` requirement with a `topic_node_id`, or a `video_watched` one
       without, fails on the table check; a duplicate `(mission_id, position)` fails on the unique
       key.
-- [ ] With a mission window starting at `…T10:00:00.000Z`, a submission created at `… 09:59:59`
+- [x] With a mission window starting at `…T10:00:00.000Z`, a submission created at `… 09:59:59`
       is excluded and one at `… 10:00:00` is included.
-- [ ] For three ready submissions with descriptions at t1 < t2 < t3, the count is 3 and the
+- [x] For three ready submissions with descriptions at t1 < t2 < t3, the count is 3 and the
       target-th instant for `minCount: 3` is t3; with one description emptied the count is 2.
-- [ ] A `paid` charge for an event starting tomorrow counts 0; after the event start it counts 1;
+- [x] A `paid` charge for an event starting tomorrow counts 0; after the event start it counts 1;
       a `void` charge counts 0.
-- [ ] Completing an already-completed step reports no change; the partial upsert on a completed row
+- [x] Completing an already-completed step reports no change; the partial upsert on a completed row
       changes nothing.
-- [ ] `git diff` shows no statement touching `topic_nodes`, `topic_progress`, `topic_submissions`,
+- [x] `git diff` shows no statement touching `topic_nodes`, `topic_progress`, `topic_submissions`,
       `tasks*` or `quest_*` in the migration.
-- [ ] No D1 symbol outside `apps/api/src/adapters/`; changed files lint clean; `make test-api`
+- [x] No D1 symbol outside `apps/api/src/adapters/`; changed files lint clean; `make test-api`
       green.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
+      _Closed 2026-10-03. Adapter-level choices beyond the RFC text: `video_watched` counting joins `media` (ready videos of the target topic only), `requireDescription` uses `TRIM(description) <> ''`, duplicate-tolerant inserts use `ON CONFLICT DO NOTHING` (so CHECK violations still surface), `markCompleted` is conditional on `completed = 0` and `upsertProgress` refreshes `target_value`. Shared test fixtures live in `apps/api/test/db/mission-fixtures.ts`._
 
 ## Verification Plan
 

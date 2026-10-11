@@ -21,6 +21,8 @@ export * from './i-quest-repository';
 export * from './i-badge-repository';
 export * from './i-comment-repository';
 export * from './i-mission-repository';
+export * from './i-mission-participation-repository';
+export * from './i-mission-evidence-repository';
 export * from './i-user-group-repository';
 export * from './i-billing-repository';
 export * from './i-event-repository';

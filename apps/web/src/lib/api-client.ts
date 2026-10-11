@@ -24,6 +24,7 @@ import * as dashboardApiModule from './dashboard-api';
 import * as commentsApiModule from './comments-api';
 import * as notesApiModule from './notes-api';
 import * as submissionsApiModule from './submissions-api';
+import * as missionsApiModule from './missions-api';
 
 // HTTP transport interface — injectable for testing
 export interface HttpTransport {
@@ -149,5 +150,9 @@ export class ApiClient {
 
   get submissions() {
     return submissionsApiModule.createSubmissionsApi(this.http);
+  }
+
+  get missions() {
+    return missionsApiModule.createMissionsApi(this.http);
   }
 }

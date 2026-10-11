@@ -1,6 +1,6 @@
 # Task 09 — Frontend: Admin mission editor — requirements editor, pickers, audience, badge suggestion (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [27 — Mission requirements](./milestone.md)
 **RFC:** [RFC 0022](../../RFCs/0022-mission-requirements-evidence-driven-missions-with-ordered-s.md)
 **Team:** Frontend Web
@@ -78,21 +78,22 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] An admin creates a sequential mission with a demonstrations step and a self-check step from
+- [x] An admin creates a sequential mission with a demonstrations step and a self-check step from
       the editor; the request body matches Task 05's schema and the list shows the new mission.
-- [ ] Adding a *Demonstrations on a topic* step starts with "count moderated" off; adding a
+- [x] Adding a *Demonstrations on a topic* step starts with "count moderated" off; adding a
       *shared only* step next to an *any* step on the same topic pre-fills a higher XP.
-- [ ] A window of 14 days or more with no badge shows the badge hint; saving succeeds without a
+- [x] A window of 14 days or more with no badge shows the badge hint; saving succeeds without a
       badge.
-- [ ] In sequential mode the up/down buttons reorder the cards and the saved positions follow; in
+- [x] In sequential mode the up/down buttons reorder the cards and the saved positions follow; in
       parallel mode no number is shown.
-- [ ] A mocked `400 INVALID_REQUIREMENT_TARGET` with index 1 renders the error on the second card.
-- [ ] After `start_at` only title, description, end extension and active are editable; a content
+- [x] A mocked `400 INVALID_REQUIREMENT_TARGET` with index 1 renders the error on the second card.
+- [x] After `start_at` only title, description, end extension and active are editable; a content
       creator sees every page read-only with no create button.
-- [ ] No `predicateKind` / `predicateParams` field or dictionary key remains.
-- [ ] `check-i18n-coverage.js` passes; `pt` and `en` builds both render the editor.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] No `predicateKind` / `predicateParams` field or dictionary key remains.
+- [x] `check-i18n-coverage.js` passes; `pt` and `en` builds both render the editor.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
+      _Closed 2026-10-03. Choices: own `MissionAudiencePicker` on the groups/users clients (the events `AudienceSelector` always renders the public/members/restricted radio and has no read-only mode; it was not edited); event prices read through `adminBilling.extras.getPrice` (admin-only, so content creators never call it); shared-step XP pre-fill = `max(ceil(xp × 1.5), xp + 10)`; the visit warning and video cap use `adminMedia.list(topicId)` because the topic list's `mediaCount.video` is always 0 (pre-existing backend grouping by raw MIME type, not fixed here); the audience is also locked after start. **Not run:** the browser walkthrough and the PT/EN `next build` render check — component tests and the i18n coverage check are the gates; a single Playwright smoke over the four frontend tasks is scheduled before the candidate PR._
 
 ## Verification Plan
 

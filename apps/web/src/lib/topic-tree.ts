@@ -1,12 +1,15 @@
 import type { TopicNode } from '@web/lib/topics-api';
 
+/** The minimal shape `buildTrail` walks — both the catalog and the admin topic types fit it. */
+type TrailNode = { id: string; parentId: string | null };
+
 /**
  * Builds the breadcrumb trail of TopicNodes from a leaf or sub-node up to the root topic,
  * assuming an acyclic topic tree.
  */
-export function buildTrail(nodes: TopicNode[], leafId: string): TopicNode[] {
-  const byId = new Map<string, TopicNode>(nodes.map((n) => [n.id, n]));
-  const trail: TopicNode[] = [];
+export function buildTrail<T extends TrailNode = TopicNode>(nodes: T[], leafId: string): T[] {
+  const byId = new Map<string, T>(nodes.map((n) => [n.id, n]));
+  const trail: T[] = [];
   
   let currentId: string | null = leafId;
   const visited = new Set<string>(); // Cycle protection fallback
