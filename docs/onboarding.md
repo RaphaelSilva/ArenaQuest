@@ -579,6 +579,78 @@ in the backoffice read 0 after an import, because `fetchMediaCount` in
 `'pdf'` while the column stores full MIME strings (`'video/mp4'`). The media
 itself is correct.
 
+### The AI admin assistant (aq-mcp)
+
+`scripts/mcp/aq-mcp.mjs` is a **local MCP server** (RFC 0025, Plane A) that lets
+Claude Code author **draft** topics and upload local media through the public
+API — nothing else. It runs over stdio on the machine where Claude Code runs,
+one registration per label and environment, and talks to the API as a dedicated
+`content_creator` account through the same client the bulk importer uses
+(`scripts/lib/api-client.mjs`). **Claude Code is the only supported client**
+(RFC 0025, Resolved Decision 7).
+
+**Install (any machine with the repo):**
+
+```bash
+git clone <repo> ArenaQuest && cd ArenaQuest
+pnpm install --frozen-lockfile
+# A dedicated content_creator account for the assistant (create it in the backoffice).
+# Put its credentials in a .env you never commit, then export them in the shell
+# that starts Claude Code:
+export AQ_ADMIN_EMAIL=assistant@example.com
+export AQ_ADMIN_PASSWORD='…'
+claude mcp add aq-budo-prod -- node /abs/path/ArenaQuest/scripts/mcp/aq-mcp.mjs --label budo -e production
+claude mcp add aq-budo-staging -- node /abs/path/ArenaQuest/scripts/mcp/aq-mcp.mjs --label budo -e staging
+```
+
+Credentials come from the environment **only** — never argv, never a tool
+argument, never a log line. The target comes from `config/labels/<label>.jsonc`;
+`AQ_API_BASE_URL` overrides it only towards loopback (`make dev-api`), like the
+importer. Login is lazy (first tool call), so registering against an unreachable
+API still lists the tools. `node scripts/mcp/aq-mcp.mjs --help` prints the usage.
+
+**The seven tools:**
+
+| Tool | Does | Annotation |
+|---|---|---|
+| `list_topics(parentId?)` | Topics with status, order, media count and tag names; a parent's children or the whole flat list | read |
+| `read_topic(id)` | Title, markdown, status, tags, estimated minutes, media list, children | read |
+| `topic_comments(id, since?)` | Student comments (deleted ones dropped) — **never** notes or submissions; a draft/archived topic answers an empty list with a note | read |
+| `create_topic_draft(parentId?, title, markdown, tags?, estimatedMinutes?)` | Creates the topic; no `status` input exists, the API defaults to `draft`; creates are serialised | write |
+| `update_topic_draft(id, title?, markdown?, tags?, estimatedMinutes?)` | Edits a draft; refused when the stored topic is not a `draft` | write |
+| `upload_media(topicId, path)` | Local file → type/size preflight → `.mov` converted to `.mp4` → `presign → PUT → finalize`; refused unless the topic is a draft | write |
+| `review_link(topicId)` | The backoffice URL (`/admin/topics`) with the title and status — select the topic by title there | read |
+
+Reads carry `readOnlyHint: true`, writes `destructiveHint: false`, so Claude Code
+can auto-approve reads and prompt on writes. A **refusal** (not a draft, over the
+limit, no `ffmpeg`) is a normal result with `refused: true` and a reason, not an
+error — the model reads it and tells you what to do.
+
+**What it never does:** publish, archive, delete or move a topic or media;
+change a status or a visibility; run SQL or wrangler; touch R2 directly; read
+private note bodies or submission files. Publishing a topic is an admin act in
+the backoffice (the API refuses `status: 'published'` from a `content_creator`).
+To edit a published topic: **unpublish it in the backoffice (back to `draft`),
+let the assistant edit, publish again** (Resolved Decision 3).
+
+**Audit.** Every call appends one line — timestamp, tool, arguments minus content
+bodies (a body is recorded as its byte length), outcome, duration — to
+`.arenaquest/mcp-audit-<label>-<env>.jsonl` under the repository root
+(gitignored). Uploads keep their own resume ledger next to it
+(`.arenaquest/mcp-upload-<label>-<env>.jsonl`), and `.mov` conversions land in
+`.arenaquest/mcp-convert/<label>-<env>/`.
+
+**`ffmpeg`.** A `.mov` is remuxed or transcoded through `scripts/lib/convert.mjs`
+(the rescue CLI's ladder). A missing `ffmpeg` is *detected and reported with its
+install command* in the refusal — never installed.
+
+**Home lab.** The transport is stdio, so Claude Code and `aq-mcp` always share a
+machine. The expected production console is the home-lab server with the repo
+cloned and Claude Code started over `ssh`: only media that is *new* has to sit on
+that machine's disk; everything already deployed is read through the API. A
+notebook driving an `aq-mcp` on another host would need a remote transport
+(RFC 0025, Alternative 1 — deferred).
+
 ---
 
 ---
