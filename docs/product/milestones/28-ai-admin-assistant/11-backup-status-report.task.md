@@ -1,6 +1,6 @@
 # Task 11 — Backend: Backup status report (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -52,14 +52,14 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] With a fresh dump and a passing drill, the D1 lines are green and, on a clean clone, the
+- [x] With a fresh dump and a passing drill, the D1 lines are green and, on a clean clone, the
       home-lab line is amber with "never pulled on this machine" and the pull command.
-- [ ] A dump older than 26 h, a failed drill, or a missing manifest each turn red and print the
+- [x] A dump older than 26 h, a failed drill, or a missing manifest each turn red and print the
       matching fix command from the runbook.
-- [ ] A dump with no passing drill is reported as unverified.
-- [ ] `--json` returns the same states and commands in a stable shape (snapshot test).
-- [ ] Only read calls are issued (asserted); `node --test scripts/backup/` and `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A dump with no passing drill is reported as unverified.
+- [x] `--json` returns the same states and commands in a stable shape (snapshot test).
+- [x] Only read calls are issued (asserted); `node --test scripts/backup/` and `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
