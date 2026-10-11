@@ -132,6 +132,25 @@ backed up and nothing writes to a remote database. **Restore is manual** — Tim
 dump restore and R2 copy-back are tier-3 commands a human runs from
 `docs/operations/backup-restore.md`; no target or script wraps them.
 
+**AI admin assistant (`aq-mcp`, RFC 0025 §2).** `scripts/mcp/aq-mcp.mjs` is a local stdio MCP
+server for Claude Code — `claude mcp add aq-<label>-<env> -- node /abs/path/scripts/mcp/aq-mcp.mjs
+--label <label> -e <staging|production>` — that authors **drafts only** through the public API as
+a dedicated `content_creator` (`AQ_ADMIN_EMAIL` / `AQ_ADMIN_PASSWORD` from the environment, never
+argv, never a tool argument, never logged; `AQ_API_BASE_URL` loopback-only). Seven tools in
+`scripts/mcp/tools/authoring.mjs`: `list_topics`, `read_topic`, `topic_comments` (comments only —
+never notes or submissions), `create_topic_draft`, `update_topic_draft`, `upload_media` (local
+path → shared preflight → `.mov` converted through `scripts/lib/convert.mjs`, a missing `ffmpeg`
+reported with its install command → `presign → PUT → finalize` via `scripts/lib/api-client.mjs`)
+and `review_link`. No input schema has a `status` field and no body ever carries one; update and
+upload **read the topic first and refuse** anything that is not a `draft` before any write call
+(a refusal is a normal result with `refused: true`); creates are serialised (`sort_order` is a
+non-transactional `MAX`). Reads carry `readOnlyHint: true`, writes `destructiveHint: false`.
+**Stdout is the MCP channel — log to stderr only.** Every call appends one line, bodies redacted
+to their byte length, to `.arenaquest/mcp-audit-<label>-<env>.jsonl` (`scripts/mcp/audit.mjs`).
+Publishing stays an admin act in the backoffice: unpublish → edit → republish. Tests:
+`node --test 'scripts/mcp/**/*.test.mjs'` (client, fs and converter stubbed; one stdio
+`listTools` round-trip against a non-listening loopback URL). See `docs/onboarding.md`.
+
 **Bulk media import (folder tree → topics):**
 ```bash
 make import-media-staging SOURCE=./content DRY_RUN=1        # preview a local tree
