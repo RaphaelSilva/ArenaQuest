@@ -1,6 +1,6 @@
 # Task 09 — Backend: Shared script library for the API client and media conversion (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -46,13 +46,13 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `node --test scripts/content/import-media.test.mjs scripts/media/convert-skipped.test.mjs`
+- [x] `node --test scripts/content/import-media.test.mjs scripts/media/convert-skipped.test.mjs`
       passes with both test files byte-identical to `main`.
-- [ ] `node --test scripts/lib/` passes.
-- [ ] `make import-media-staging SOURCE=<fixture> DRY_RUN=1` and
+- [x] `node --test scripts/lib/` passes.
+- [x] `make import-media-staging SOURCE=<fixture> DRY_RUN=1` and
       `make convert-skipped … DRY_RUN=1` print the same plan as on `main` for the same input.
-- [ ] `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
