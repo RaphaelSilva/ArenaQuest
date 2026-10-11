@@ -1173,5 +1173,14 @@ Each item below is a **separate future document**, and **none blocks M27**:
    and targets, no window or reward), and a mission is the assignment of a mold to a group with a
    window and XP; migrates or retires `task_progress`.
 
+4. **RFC — *Media acknowledgment as evidence*** (number to be picked at planning time; 0023 is
+   already taken by another proposal) — a per-user, per-media "I read / watched this" record for
+   documents and images (and an optional explicit confirmation for videos), the route that writes
+   it, whether and how it earns XP, and a `media_viewed` requirement kind so a mission step can
+   ask for a topic's documents to be acknowledged. Raised by the product owner during the m27
+   preview walkthrough (2026-10-11): only videos produce evidence today, automatically; a document
+   or image offers no way to say it was read.
+
 RFC 0023 and RFC 0024 may merge into one if M27 shows that the template and the recurrence want the
-same table.
+same table. The numbers above were reserved before another planning stream took 0023; re-pick them
+when each RFC is opened.
