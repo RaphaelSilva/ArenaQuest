@@ -215,3 +215,50 @@ describe('Nav — the My demonstrations entry', () => {
     expect(soleLinkTo(drawer(), '/submissions')).toHaveTextContent(label);
   });
 });
+
+describe('Nav — the Missions entry', () => {
+  it('links to /missions from the desktop bar', () => {
+    renderNav();
+    expect(soleLinkTo(document.body, '/missions')).toHaveTextContent(navCopy.missions);
+    expect(screen.getByRole('link', { name: navCopy.missions })).toBeInTheDocument();
+  });
+
+  it('links to /missions from the mobile drawer and highlights it there', () => {
+    pathname = '/missions';
+    drawerOpen = true;
+    renderNav();
+    const link = soleLinkTo(drawer(), '/missions');
+    expect(link).toHaveTextContent(navCopy.missions);
+    expect(link.className).toContain('bg-zinc-100');
+  });
+
+  /** A mission's page lives under `/missions/{id}`, so the section stays highlighted there. */
+  it('keeps the entry highlighted on a mission page', () => {
+    pathname = '/missions/m-1';
+    drawerOpen = true;
+    renderNav();
+    expect(soleLinkTo(drawer(), '/missions').className).toContain('bg-zinc-100');
+    expect(soleLinkTo(drawer(), '/notes').className).not.toContain('bg-zinc-100');
+  });
+
+  it('sits between My notes and My demonstrations', () => {
+    drawerOpen = true;
+    renderNav();
+    const hrefs = Array.from(drawer().querySelectorAll('a')).map((a) => a.getAttribute('href'));
+    const at = hrefs.indexOf('/missions');
+    expect(hrefs[at - 1]).toBe('/notes');
+    expect(hrefs[at + 1]).toBe('/submissions');
+  });
+
+  it.each([
+    ['a student', ROLES.STUDENT],
+    ['an admin', ROLES.ADMIN],
+    ['a content creator', ROLES.CONTENT_CREATOR],
+  ])('is offered to %s', (_label, role) => {
+    roles = [role];
+    drawerOpen = true;
+    renderNav();
+    expect(linksTo(document.body, '/missions')).toHaveLength(2);
+    expect(soleLinkTo(drawer(), '/missions')).toHaveTextContent(navCopy.missions);
+  });
+});

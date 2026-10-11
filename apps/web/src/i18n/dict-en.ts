@@ -2319,6 +2319,7 @@ export const dictEn = {
     missions: {
       title: 'Special Missions',
       empty: 'No active missions right now.',
+      seeAll: 'See all missions',
     },
     badges: {
       title: 'Badges',
@@ -2676,6 +2677,7 @@ export const dictEn = {
       dashboard: 'Dashboard',
       catalog: 'Catalogue',
       myNotes: 'My notes',
+      missions: 'Missions',
       events: 'Events',
       tasks: 'Tasks',
       settings: 'Settings',
@@ -3139,6 +3141,28 @@ export const dictEn = {
       NotFound: 'This mission is no longer available.',
       network: 'Connection problem. Check your internet and try again.',
       generic: 'Something went wrong. Try again.',
+    },
+    index: {
+      title: 'Missions',
+      subtitle: 'Every mission you take part in, can join or that is reserved for a group.',
+      loading: 'Loading missions…',
+      loadError: 'Could not load your missions.',
+      retry: 'Try again',
+      empty: 'There are no missions for you right now. New ones will show up here.',
+      filterLabel: 'Filter missions',
+      filters: {
+        all: 'All',
+        inProgress: 'In progress',
+        completed: 'Completed',
+        available: 'Available',
+        locked: 'Locked',
+      },
+      filterEmpty: {
+        inProgress: 'No missions in progress.',
+        completed: 'You have not completed any mission yet.',
+        available: 'No missions are open to join right now.',
+        locked: 'No restricted missions right now.',
+      },
     },
     page: {
       loading: 'Loading the mission…',
