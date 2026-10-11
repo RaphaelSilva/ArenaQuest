@@ -378,3 +378,142 @@ describe('tags on POST / PATCH /admin/topics', () => {
     expect(await countRows('SELECT COUNT(*) AS n FROM topic_node_tags WHERE topic_node_id = ?', topic.id)).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The publish gate (M28 Task 07, RFC 0025 §2 layer 3)
+// ---------------------------------------------------------------------------
+
+describe('the publish gate', () => {
+  async function listCount(): Promise<number> {
+    const res = await req('GET', '/admin/topics', { token: adminToken });
+    expect(res.status).toBe(200);
+    return (await res.json<{ data: unknown[] }>()).data.length;
+  }
+
+  async function statusOf(id: string): Promise<string> {
+    const res = await req('GET', `/admin/topics/${id}`, { token: adminToken });
+    expect(res.status).toBe(200);
+    return (await res.json<{ status: string }>()).status;
+  }
+
+  it('refuses a content_creator POST { status: published } and creates no row', async () => {
+    const before = await listCount();
+
+    const res = await req('POST', '/admin/topics', {
+      token: contentCreatorToken,
+      body: { title: 'Creator may not publish this', status: 'published' },
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json<{ error: string }>()).toEqual({ error: 'Forbidden' });
+    expect(await listCount()).toBe(before);
+  });
+
+  it('refuses a content_creator PATCH { status: published } and leaves the draft untouched', async () => {
+    const node = await createTopic({ title: 'Creator may not publish this either' });
+
+    const res = await req('PATCH', `/admin/topics/${node.id}`, {
+      token: contentCreatorToken,
+      body: { status: 'published' },
+    });
+
+    expect(res.status).toBe(403);
+    expect(await statusOf(node.id)).toBe('draft');
+  });
+
+  it('lets a content_creator create a draft, edit it, archive it and move it', async () => {
+    const parent = await createTopic({ title: 'Creator parent' }, contentCreatorToken);
+    const created = await req('POST', '/admin/topics', {
+      token: contentCreatorToken,
+      body: { title: 'Creator draft', status: 'draft' },
+    });
+    expect(created.status).toBe(201);
+    const node = await created.json<{ id: string; status: string }>();
+    expect(node.status).toBe('draft');
+
+    const renamed = await req('PATCH', `/admin/topics/${node.id}`, {
+      token: contentCreatorToken,
+      body: { title: 'Creator renamed this' },
+    });
+    expect(renamed.status).toBe(200);
+    expect((await renamed.json<{ title: string }>()).title).toBe('Creator renamed this');
+
+    // `/:id` matches one segment only: the move path is never read by the gate.
+    const moved = await req('POST', `/admin/topics/${node.id}/move`, {
+      token: contentCreatorToken,
+      body: { newParentId: parent.id },
+    });
+    expect(moved.status).toBe(200);
+    expect((await moved.json<{ parentId: string }>()).parentId).toBe(parent.id);
+
+    // `archived` is not `published`: removal stays open to both roles.
+    const archived = await req('PATCH', `/admin/topics/${node.id}`, {
+      token: contentCreatorToken,
+      body: { status: 'archived' },
+    });
+    expect(archived.status).toBe(200);
+    expect(await statusOf(node.id)).toBe('archived');
+  });
+
+  it('leaves the media presign path open to a content_creator', async () => {
+    // `media.uploaded_by` references `users(id)`: the presign needs a real row
+    // behind the content-creator token, unlike every other write in this spec.
+    await env.DB
+      .prepare("INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, 'Creator', 'cc@topics.test', 'x')")
+      .bind('cc-topics-test')
+      .run();
+    const node = await createTopic({ title: 'Creator media' }, contentCreatorToken);
+
+    const presign = await req('POST', `/admin/topics/${node.id}/media/presign`, {
+      token: contentCreatorToken,
+      body: { fileName: 'slide.png', contentType: 'image/png', sizeBytes: 500_000 },
+    });
+
+    expect(presign.status).toBe(201);
+  });
+
+  it('lets an admin create published and PATCH to published', async () => {
+    const created = await req('POST', '/admin/topics', {
+      token: adminToken,
+      body: { title: 'Admin publishes on create', status: 'published' },
+    });
+    expect(created.status).toBe(201);
+    expect((await created.json<{ status: string }>()).status).toBe('published');
+
+    const draft = await createTopic({ title: 'Admin publishes on update' });
+    const published = await req('PATCH', `/admin/topics/${draft.id}`, {
+      token: adminToken,
+      body: { status: 'published' },
+    });
+    expect(published.status).toBe(200);
+    expect(await statusOf(draft.id)).toBe('published');
+  });
+
+  it('passes a non-JSON body through to the validator: 400, not 403, for a content_creator', async () => {
+    const node = await createTopic({ title: 'Not JSON' });
+
+    const [create, update] = await Promise.all(
+      [
+        new IncomingRequest(`http://example.com${v1('/admin/topics')}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${contentCreatorToken}` },
+          body: '{status: published',
+        }),
+        new IncomingRequest(`http://example.com${v1(`/admin/topics/${node.id}`)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${contentCreatorToken}` },
+          body: '{status: published',
+        }),
+      ].map(async (request) => {
+        const ctx = createExecutionContext();
+        const res = await worker.fetch(request, env as AppEnv, ctx);
+        await waitOnExecutionContext(ctx);
+        return res;
+      }),
+    );
+
+    expect(create.status).toBe(400);
+    expect(update.status).toBe(400);
+    expect(await statusOf(node.id)).toBe('draft');
+  });
+});
