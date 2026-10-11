@@ -51,6 +51,7 @@ function fakeRepo(overrides: Partial<IJobRunRepository> = {}): Fake {
     list: async () => [],
     latestPerJob: async () => [],
     pruneOlderThan: async () => 0,
+    databaseProbe: async () => ({ latestMigration: null }),
     ...overrides,
   };
 }

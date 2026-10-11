@@ -526,3 +526,51 @@ export const MoveSubmissionsResultSchema = z.object({
     }),
   })),
 }).openapi('MoveSubmissionsResult');
+
+// ---------------------------------------------------------------------------
+// Admin ops — measured health and the job-run ledger (RFC 0025 section 3.2)
+// ---------------------------------------------------------------------------
+
+export const JobRunSchema = z.object({
+  id: z.string().openapi({ example: 'a1b2c3d4-e5f6-7890-1234-567890abcdef' }),
+  job: z.enum(['billing', 'sweep_submissions']).openapi({ example: 'billing' }),
+  trigger: z.enum(['cron', 'manual']).openapi({ example: 'cron' }),
+  status: z.enum(['running', 'ok', 'failed']).openapi({ example: 'ok' }),
+  actorId: z.string().nullable().openapi({ description: 'The admin behind a manual run; null for the cron', example: null }),
+  startedAt: z.string().openapi({ example: '2026-10-11T03:00:00.000Z' }),
+  finishedAt: z.string().nullable().openapi({ description: 'Null while running', example: '2026-10-11T03:00:02.000Z' }),
+  durationMs: z.number().int().nullable().openapi({ example: 2000 }),
+  summary: z.record(z.number()).nullable().openapi({ description: 'Integer counts only', example: { issued: 2 } }),
+  error: z.string().nullable().openapi({ description: 'Truncated message; null unless failed', example: null }),
+}).openapi('JobRun');
+
+export const JobRunListSchema = z.object({
+  runs: z.array(JobRunSchema).openapi({ description: 'Newest first' }),
+}).openapi('JobRunList');
+
+const DependencyStatusSchema = z.enum(['ok', 'degraded', 'down']).openapi({
+  description: '`degraded`: answered but slower than the threshold; `down`: threw or timed out',
+  example: 'ok',
+});
+
+export const DependencyHealthSchema = z.object({
+  name: z.enum(['d1', 'kv', 'r2']).openapi({ example: 'd1' }),
+  status: DependencyStatusSchema,
+  latencyMs: z.number().int().nonnegative().openapi({ example: 12 }),
+  error: z.string().optional().openapi({ description: 'First line of the failure, or `timeout`; only when down', example: 'timeout' }),
+}).openapi('DependencyHealth');
+
+export const JobHealthSchema = z.object({
+  job: z.enum(['billing', 'sweep_submissions']).openapi({ example: 'billing' }),
+  lastRun: JobRunSchema.extend({
+    ageMs: z.number().int().nonnegative().openapi({ description: 'Milliseconds since the run started', example: 3_600_000 }),
+  }).nullable().openapi({ description: 'Null when the job has never run' }),
+}).openapi('JobHealth');
+
+export const OpsHealthSchema = z.object({
+  status: DependencyStatusSchema.openapi({ description: 'The worst dependency status' }),
+  checkedAt: z.string().openapi({ example: '2026-10-11T12:00:00.000Z' }),
+  dependencies: z.array(DependencyHealthSchema),
+  latestMigration: z.string().nullable().openapi({ description: 'Newest applied migration name', example: '0032_create_job_runs.sql' }),
+  jobs: z.array(JobHealthSchema).openapi({ description: 'One entry per known job' }),
+}).openapi('OpsHealth');
