@@ -202,7 +202,7 @@ describe('AdminMissionEditorPage', () => {
     addStep('submissions_on_topic');
     const demo = cards()[0];
     fireEvent.change(within(demo).getByLabelText(r.fields.title), { target: { value: 'Three demonstrations' } });
-    fireEvent.click(within(demo).getByRole('checkbox', { name: /Kihon/ }));
+    fireEvent.click(within(demo).getByRole('radio', { name: /Kihon/ }));
     fireEvent.change(within(demo).getByLabelText(r.fields.minCount), { target: { value: '3' } });
     fireEvent.click(within(demo).getByLabelText(r.fields.requireDescription));
     fireEvent.change(within(demo).getByLabelText(r.fields.xpReward), { target: { value: '50' } });
@@ -291,7 +291,7 @@ describe('AdminMissionEditorPage', () => {
     addStep('topic_visited');
     fireEvent.change(within(cards()[0]).getByLabelText(r.fields.title), { target: { value: 'Check' } });
     fireEvent.change(within(cards()[1]).getByLabelText(r.fields.title), { target: { value: 'Visit' } });
-    fireEvent.click(within(cards()[1]).getByRole('checkbox', { name: /Kihon/ }));
+    fireEvent.click(within(cards()[1]).getByRole('radio', { name: /Kihon/ }));
     // The topic's media are read lazily: none ready → the visit warning.
     expect(await within(cards()[1]).findByText(r.noMediaWarning)).toBeInTheDocument();
     expect(api.media).toHaveBeenCalledWith(TOPIC);
