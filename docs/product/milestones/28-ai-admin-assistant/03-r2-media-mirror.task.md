@@ -1,6 +1,6 @@
 # Task 03 — Backend: R2 media mirror (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -58,14 +58,14 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] A first run copies every source object; a second run with no source change copies nothing.
-- [ ] Changing one object's bytes in a test double copies only that object.
-- [ ] Deleting a source object keeps it in the mirror with a removal date; it is pruned only once
+- [x] A first run copies every source object; a second run with no source change copies nothing.
+- [x] Changing one object's bytes in a test double copies only that object.
+- [x] Deleting a source object keeps it in the mirror with a removal date; it is pruned only once
       the window has passed (time injected in tests).
-- [ ] No call that writes or deletes is issued against the source bucket (asserted).
-- [ ] The manifest's `r2` section reports copied, pending and tombstoned counts after each run.
-- [ ] `node --test scripts/backup/` green; `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] No call that writes or deletes is issued against the source bucket (asserted).
+- [x] The manifest's `r2` section reports copied, pending and tombstoned counts after each run.
+- [x] `node --test scripts/backup/` green; `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
