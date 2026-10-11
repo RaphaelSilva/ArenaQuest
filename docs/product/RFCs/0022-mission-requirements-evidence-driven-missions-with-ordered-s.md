@@ -1173,7 +1173,7 @@ Each item below is a **separate future document**, and **none blocks M27**:
    and targets, no window or reward), and a mission is the assignment of a mold to a group with a
    window and XP; migrates or retires `task_progress`.
 
-4. **RFC 0023 — *Media acknowledgment*** (this RFC) — a per-user, per-media "I read / watched this" record for
+4. **[RFC 0023 — *Media acknowledgment*](./0023-media-acknowledgment-read-and-watched-marks-as-mission-evide.md)** — a per-user, per-media "I read / watched this" record for
    documents and images (and an optional explicit confirmation for videos), the route that writes
    it, whether and how it earns XP, and a `media_viewed` requirement kind so a mission step can
    ask for a topic's documents to be acknowledged. Raised by the product owner during the m27
