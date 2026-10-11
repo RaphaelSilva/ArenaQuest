@@ -1,6 +1,6 @@
 # Task 04 — Backend: Backup workflow, restore drill and restore runbook (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -56,16 +56,16 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `workflow_dispatch` on `backup.yml` succeeds for all three labels and leaves a fresh
+- [x] `workflow_dispatch` on `backup.yml` succeeds for all three labels and leaves a fresh
       `latest` in each manifest.
-- [ ] The drill job restores the latest dump with zero mismatches and writes `drill.ok: true`; a
+- [x] The drill job restores the latest dump with zero mismatches and writes `drill.ok: true`; a
       tampered dump in a test fails the SHA-256 check before any restore.
-- [ ] A row-count mismatch in a test produces `drill.ok: false` with the mismatching tables listed
+- [x] A row-count mismatch in a test produces `drill.ok: false` with the mismatching tables listed
       and a failing job.
-- [ ] Following the runbook on staging, an object deleted from the media bucket is restored from
+- [x] Following the runbook on staging, an object deleted from the media bucket is restored from
       the mirror byte-identical.
-- [ ] `node --test scripts/backup/` green; `make lint` green; the CI workflow lints.
-- [ ] No diff outside the scope guardrail.
+- [x] `node --test scripts/backup/` green; `make lint` green; the CI workflow lints.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

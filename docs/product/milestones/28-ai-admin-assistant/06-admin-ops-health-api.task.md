@@ -1,6 +1,6 @@
 # Task 06 — Backend: Admin ops health and job-runs API (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -50,17 +50,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] With all bindings healthy, `GET /v1/admin/ops/health` returns `ok` for D1, KV and R2, the
+- [x] With all bindings healthy, `GET /v1/admin/ops/health` returns `ok` for D1, KV and R2, the
       latest migration name, and the last billing and sweep rows with their ages.
-- [ ] A test double whose R2 head throws makes R2 `down` and the overall status `down`; a slow
+- [x] A test double whose R2 head throws makes R2 `down` and the overall status `down`; a slow
       double beyond the threshold makes it `degraded`; the response still arrives within the
       timeout.
-- [ ] No write is issued to any binding during a health call (asserted).
-- [ ] `GET /v1/admin/ops/job-runs?job=billing&since=…` returns only matching rows, newest first;
+- [x] No write is issued to any binding during a health call (asserted).
+- [x] `GET /v1/admin/ops/job-runs?job=billing&since=…` returns only matching rows, newest first;
       an invalid `since` returns `400`.
-- [ ] Anonymous → `401`; `student` and `tutor` → `403`; `admin` and `content_creator` → `200`.
-- [ ] `openapi.json` regenerated; `make lint` and `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] Anonymous → `401`; `student` and `tutor` → `403`; `admin` and `content_creator` → `200`.
+- [x] `openapi.json` regenerated; `make lint` and `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -1,6 +1,6 @@
 # Task 12 — Backend: aq-mcp ops tools in three tiers (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -57,19 +57,19 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Tier 1 tools return the same data as their underlying script or route (stubbed and one
+- [x] Tier 1 tools return the same data as their underlying script or route (stubbed and one
       staging run).
-- [ ] `backup_now` without an id returns a plan and an id and performs no export; with the id it
+- [x] `backup_now` without an id returns a plan and an id and performs no export; with the id it
       runs once; reusing or replaying an expired id is refused; an id from `bookmark_now` cannot
       confirm `backup_now`.
-- [ ] `restore_instructions` returns a command string and the runbook anchor and spawns nothing
+- [x] `restore_instructions` returns a command string and the runbook anchor and spawns nothing
       (asserted).
-- [ ] The static guard fails if any file under `scripts/mcp/` references `time-travel restore`,
+- [x] The static guard fails if any file under `scripts/mcp/` references `time-travel restore`,
       `d1 execute`, `deploy`, `delete` or `secret put` as a spawned command.
-- [ ] The server reads no Cloudflare credential other than `AQ_CF_READ_TOKEN` (asserted on the
+- [x] The server reads no Cloudflare credential other than `AQ_CF_READ_TOKEN` (asserted on the
       environment access list).
-- [ ] `node --test scripts/mcp/` and `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `node --test scripts/mcp/` and `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

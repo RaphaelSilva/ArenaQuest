@@ -104,7 +104,11 @@ the deploy CLI, so there is still one release code path). Extra knobs:
 in the account; `ONLY=cors|secrets|worker|domain` runs one group for a targeted
 repair, against a single environment. `make r2-cors-*` now forward to it —
 R2 CORS is derived from the profile's `webOrigin`, not from a committed file.
-`create-db-*` / `create-kv-*` are superseded by `set-new-label`.
+`create-db-*` / `create-kv-*` are superseded by `set-new-label`. Every production
+profile declares a `backup` block (`<label>-backups` + retention; RFC 0025) that the
+provisioner creates in production only, with its lifecycle rules, and
+`--check` / `make infra-check-<env> LABEL=x` (`JSON=1`) reports the label's
+resources and secret *names* read-only, each gap with its fix command.
 
 **Secret contract for provisioning.** `JWT_SECRET` is generated per label *and* per
 environment (a shared key would let a token minted for one tenant verify on another),
@@ -113,6 +117,46 @@ secrets (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `GOOGLE_CLIENT_SECRET`,
 `RESEND_API_KEY`) are only *detected by name* and reported with their fix command —
 provisioning never writes them, and no secret value ever reaches argv, disk or a log
 line. See RFC 0012 and `docs/onboarding.md`.
+
+**Backups (RFC 0025 §4).** `.github/workflows/backup.yml` runs, per production label,
+the D1 export then the R2 mirror daily at 07:30 UTC (offset from the 06:00 billing cron)
+and the restore drill on Sunday 09:30 UTC; `workflow_dispatch` runs one label or `all`,
+with `drill: true` for the drill. Every step calls the scripts with their flags —
+`make backup-d1-prod LABEL=x` (`scripts/backup/export-d1.mjs`: gzipped dump + SHA-256 +
+row counts, verified before `d1/production/manifest.json` is updated), `make backup-r2-prod
+LABEL=x` (`scripts/backup/mirror-r2.mjs`: incremental copy under `r2/production/`, deleted
+objects tombstoned 90 days) and `node scripts/backup/drill.mjs --label x -e production --yes`
+(latest dump → SHA-256 check → throwaway local D1 → row counts vs the manifest → `drill:
+{ at, ok, mismatches }`). A failed export, mirror or drill fails the job; staging is never
+backed up and nothing writes to a remote database. **Restore is manual** — Time Travel,
+dump restore and R2 copy-back are tier-3 commands a human runs from
+`docs/operations/backup-restore.md`; no target or script wraps them. The off-account copy
+is the operator's disk: `make backup-pull-prod LABEL=x` (`scripts/backup/pull.mjs`) reads
+the **backup bucket only** with the read-only token, resumably, into
+`.arenaquest/backups/<label>-production/` and writes the ledger the status line reads, and
+`make backup-restore-local LABEL=x` (`scripts/backup/restore-local.mjs`) replays that pull
+on the local D1 replica + local bucket after re-verifying the SHA-256 and confirming —
+refusing `-e staging`, `-e production` and any production- or staging-named `--persist-to`
+before any write.
+
+**AI admin assistant (`aq-mcp`, RFC 0025 §2).** `scripts/mcp/aq-mcp.mjs` is a local stdio MCP
+server for Claude Code — `claude mcp add aq-<label>-<env> -- node /abs/path/scripts/mcp/aq-mcp.mjs
+--label <label> -e <staging|production>` — that authors **drafts only** through the public API as
+a dedicated `content_creator` (`AQ_ADMIN_EMAIL` / `AQ_ADMIN_PASSWORD` from the environment, never
+argv, never a tool argument, never logged; `AQ_API_BASE_URL` loopback-only). Seven tools in
+`scripts/mcp/tools/authoring.mjs`: `list_topics`, `read_topic`, `topic_comments` (comments only —
+never notes or submissions), `create_topic_draft`, `update_topic_draft`, `upload_media` (local
+path → shared preflight → `.mov` converted through `scripts/lib/convert.mjs`, a missing `ffmpeg`
+reported with its install command → `presign → PUT → finalize` via `scripts/lib/api-client.mjs`)
+and `review_link`. No input schema has a `status` field and no body ever carries one; update and
+upload **read the topic first and refuse** anything that is not a `draft` before any write call
+(a refusal is a normal result with `refused: true`); creates are serialised (`sort_order` is a
+non-transactional `MAX`). Reads carry `readOnlyHint: true`, writes `destructiveHint: false`.
+**Stdout is the MCP channel — log to stderr only.** Every call appends one line, bodies redacted
+to their byte length, to `.arenaquest/mcp-audit-<label>-<env>.jsonl` (`scripts/mcp/audit.mjs`).
+Publishing stays an admin act in the backoffice: unpublish → edit → republish. Tests:
+`node --test 'scripts/mcp/**/*.test.mjs'` (client, fs and converter stubbed; one stdio
+`listTools` round-trip against a non-listening loopback URL). See `docs/onboarding.md`.
 
 **Bulk media import (folder tree → topics):**
 ```bash
@@ -353,6 +397,7 @@ Cloudflare Workers serverless backend (Hono). Patterns to follow:
     3. **Full wildcard** — `*` — echoes back the actual request `Origin` header (required because browsers block `Access-Control-Allow-Origin: *` on credentialed requests). **For local development only — never set this in staging or production.**
   - Production is locked to exact origins; do not introduce wildcards without a security review (see `docs/product/backlog/cors/`). Staging includes the PR-preview wildcard (`https://*.arenaquest-web-staging.pages.dev`). Local development uses `ALLOWED_ORIGINS=http://localhost:3000` (or `*`) in `.dev.vars` — see `.dev.vars.example`.
 - **User Management** — Includes admin lockout guards to prevent deleting the last active admin or self-lockout.
+- **Topic publish gate** — Publishing a topic is admin-only: `POST`/`PATCH /v1/admin/topics` with `status: 'published'` is gated by `middleware/publish-gate.ts` (the events gate, shared); content creators write drafts and may archive (RFC 0025 §2).
 - **Events board (the only anonymous data surface)** — `GET /v1/events`, `/{slug}` and `/{slug}/flyer` answer **without a token** and answer *more* when one is present. They are mounted at `/v1/events`, deliberately **not** under `routes/public/` — that directory means "non-admin, authenticated" and reusing it would blur a security boundary. `middleware/optional-auth.ts` is the one middleware that does not reject: an invalid token degrades to anonymous instead of `401`. Audience (`public` · `members` · `restricted`) is resolved server-side in `D1EventRepository`, whose anonymous listing is a **separate statement** with a literal `audience = 'public'` filter rather than the authenticated query with a null user. Out-of-audience detail reads return **404, not 403**, so the open surface is not an enumeration oracle. "Past" is a computed predicate (`COALESCE(ends_at, starts_at + 1 day) < now`), never a column. Anonymous routes carry an IP-keyed `KvRateLimiter` (60 rpm).
 - **Student notes** — `topic_notes` (migration 0028) holds **one note per student per topic** (`UNIQUE (topic_node_id, author_id)`), Markdown sanitised on write, hard-deleted by its author. A note is **private among students only**: no student route reads another student's private note, and `GET /v1/topics/{id}/notes` gives a student only `shared` rows through a statement with a literal `visibility = 'shared'` filter, so no cursor can widen it. `admin` and `content_creator` read every note, private included, **read-only** — no route lets staff edit or delete someone else's note — and `tutor` sees exactly what a student sees. Student-facing routes use the **catalog's** gate (published, not archived, in the effective access set) and answer `404` on any miss, unlike comments' `403`; `DELETE …/notes/me` alone skips the gate, so a note on a lost topic can still be deleted. Moderation is **force-unshare**: `POST /v1/admin/notes/{id}/unshare` makes the note private and flags it, sticky until `DELETE /v1/admin/notes/{id}/moderation`, both callable by either staff role; the admin notes router is mounted **before** `/users` in `routes/admin/index.ts`, because the `/users/*` ADMIN-only middleware would otherwise 403 a content creator on `/users/{userId}/notes`. Concurrency is an integer **`revision`**: an author write is one conditional statement on `baseRevision` — `UPDATE … WHERE revision = ?`, or `INSERT … ON CONFLICT DO NOTHING` for `baseRevision: 0` — decided by `meta.changes` (a force-unshare also bumps it, so an open editor goes stale; clearing moderation does not), and a miss is `409 NOTE_STALE` with the stored note (or `null`) as `current` at the **top level** of the body; sharing a moderated note is `409 NOTE_MODERATED`. Listings are the API's first **cursor-paginated** ones: `routes/_shared/cursor.ts` encodes an opaque `base64url(sortKey|id)` keyset cursor and a malformed one is `400 InvalidCursor`.
 - **Student submissions** — `topic_submissions` (migration 0030) holds a student's demonstration files (one file + title + description per row, many per topic), in **its own table and under the `submissions/{authorId}/` key prefix — never `media`, never `topics/`**, so no course-media reader can surface a student upload. Four vars in every `env.*` block of `wrangler.jsonc` tune it per label and environment: `SUBMISSIONS_PER_TOPIC_MAX` (10), `SUBMISSIONS_STORAGE_PER_STUDENT_BYTES` (1 GiB), `SUBMISSIONS_VIDEO_MAX_BYTES` (250 MB) and `SUBMISSIONS_SHARING_ENABLED` (`true`); an absent var takes its default (`packages/shared/domain/submissions/limits.ts`), a present-but-invalid one makes every submission route `500 SUBMISSION_CONFIG_INVALID` (`src/core/submissions/config.ts`) — never a silent fallback. Upload is `presign → PUT → finalize`; the quota (per-topic count, per-student bytes, pending rows included, removed excluded) is checked in the **same SQL statement** as the insert (`409 SUBMISSION_QUOTA`), presign is rate-limited per user (`rl:submissions:`, 30/h), and **finalize** marks a row `ready` only when the stored object's length (and its type, when the storage reports one) matches and its first 32 bytes carry the file signature (`readHead`); otherwise object and row are deleted (`422 UPLOAD_MISMATCH`). Access follows the catalog gate with `404` on any miss, like notes; staff (`admin`, `content_creator`) read everything but get `403` on presign and on someone else's PATCH/DELETE, and an author's `DELETE` skips the topic gate so a submission on a lost topic can still be removed. **Move** (`POST /v1/me/submissions/move`, ≤ 10 ids, author-only) is metadata-only — the key has no topic id, so the object is untouched — quota-checked on the target per item, resets visibility to `private` and keeps the moderation flag. Staff force-unshare (`/v1/admin/submissions/{id}/unshare`, cleared by `DELETE …/moderation`); `admin` alone removes, which deletes the object and leaves a **tombstone** (`status = 'removed'`, `storage_key = NULL`, description cleared) visible only to its author and staff and outside every quota. The daily `scheduled()` run (next to billing) sweeps `pending` rows older than 24 h with their objects, in batches of 100, logging only counts (`src/jobs/sweep-pending-submissions.ts`). Signed GET URLs (TTL 1 h) are served with `Cache-Control: private, no-store`.

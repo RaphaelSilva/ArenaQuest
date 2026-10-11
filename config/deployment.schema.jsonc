@@ -77,7 +77,26 @@
     "pagesProject": { "check": "wrangler pages project list" },
     "d1":           { "check": "wrangler d1 list" },
     "kv":           { "check": "wrangler kv namespace list" },
-    "r2":           { "check": "wrangler r2 bucket list" }
+    "r2":           { "check": "wrangler r2 bucket list" },
+    // Off-database backups (RFC 0025). Production only: staging is disposable
+    // (RFC 0021 section 4), so a staging profile declares no backup block and
+    // the provisioner creates no backup bucket for it.
+    "backup":       { "check": "wrangler r2 bucket list", "requiredFor": ["production"] }
+  },
+  // The `backup` block of a profile environment (`environments.<env>.backup`):
+  // the bucket the backup workflow writes to and the retention values the
+  // backup scripts read. Keys are paths inside the block. `validateProfile`
+  // (scripts/label.mjs) requires the block for every env listed in
+  // cf-resources.backup.requiredFor and checks its keys for any env that
+  // declares it.  type — "string" (non-empty) | "positive-integer".
+  "backup": {
+    "bucket":                  { "required": true, "type": "string", "convention": "<label>-backups" },
+    // Lifecycle rule on the bucket: d1/<env>/daily/ objects expire after this many days.
+    "retention.dailyDays":     { "required": true, "type": "positive-integer" },
+    // Lifecycle rule on the bucket: d1/<env>/monthly/ objects expire after this many months.
+    "retention.monthlyMonths": { "required": true, "type": "positive-integer" },
+    // Read by the R2 mirror: a deleted media object is kept this many days before it is purged.
+    "retention.tombstoneDays": { "required": true, "type": "positive-integer" }
   },
   "external": {
     "google-oauth": { "confirm": "Web OAuth client created; <GOOGLE_REDIRECT_URI> is an Authorised redirect URI" },

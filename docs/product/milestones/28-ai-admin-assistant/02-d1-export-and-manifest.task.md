@@ -1,6 +1,6 @@
 # Task 02 — Backend: D1 export and backup manifest (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -57,15 +57,15 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `node scripts/backup/export-d1.mjs --label budo -e production --dry-run` prints the plan
+- [x] `node scripts/backup/export-d1.mjs --label budo -e production --dry-run` prints the plan
       (export, object key, manifest update) and performs no call.
-- [ ] A real run stores one `.sql.gz` whose SHA-256 equals the manifest's `latest.sha256`, and
+- [x] A real run stores one `.sql.gz` whose SHA-256 equals the manifest's `latest.sha256`, and
       row counts in the manifest equal `SELECT COUNT(*)` per table at export time.
-- [ ] A simulated upload failure leaves `manifest.json` byte-identical and exits non-zero.
-- [ ] `-e staging` and `-e local` exit non-zero before any wrangler invocation (asserted in tests).
-- [ ] The first run in a month writes the `monthly/` copy; a second run that month does not.
-- [ ] `node --test scripts/backup/` green; `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A simulated upload failure leaves `manifest.json` byte-identical and exits non-zero.
+- [x] `-e staging` and `-e local` exit non-zero before any wrangler invocation (asserted in tests).
+- [x] The first run in a month writes the `monthly/` copy; a second run that month does not.
+- [x] `node --test scripts/backup/` green; `make lint` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

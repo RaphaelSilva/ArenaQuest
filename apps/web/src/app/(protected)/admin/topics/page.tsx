@@ -214,6 +214,10 @@ export default function AdminTopicsPage() {
   const { isLoading: authLoading } = useAuth();
   const client = useApiClient();
   const canAccess = useHasRole(ROLES.ADMIN, ROLES.CONTENT_CREATOR);
+  // Publishing a topic is an admin act (the API's `requireRole` gate): a
+  // session without that role is never offered `published` here, mirroring
+  // the events backoffice's `PublishControls`.
+  const canPublish = useHasRole(ROLES.ADMIN);
   const dict = useDict();
   const d = dict.admin.topics;
 
@@ -488,10 +492,14 @@ export default function AdminTopicsPage() {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
+      // `status` travels only when it changed: the API refuses any body that
+      // carries `published` from a content creator, even when the topic is
+      // already published, so re-sending it would turn a rename into a 403.
+      const statusChanged = detailStatus !== selectedNode?.status;
       await client.adminTopics.update(selectedId, {
         title: detailTitle,
         content: detailContent,
-        status: detailStatus,
+        ...(statusChanged ? { status: detailStatus } : {}),
         visibility: detailVisibility,
         estimatedMinutes: detailMinutes,
         tags: detailTags.map((t) => t.name),
@@ -500,7 +508,10 @@ export default function AdminTopicsPage() {
       await refresh();
       showToast(d.toast.changesSaved, 'success');
     } catch (err) {
-      setDetailError(err instanceof Error ? err.message : d.toast.failedSave);
+      const message = err instanceof Error ? err.message : d.toast.failedSave;
+      const attemptedPublish = detailStatus === 'published' && detailStatus !== selectedNode?.status;
+      // The form values stay as typed; only the message explains the refusal.
+      setDetailError(attemptedPublish ? d.detail.publishForbidden(message) : message);
     } finally {
       setDetailSaving(false);
     }
@@ -899,9 +910,14 @@ export default function AdminTopicsPage() {
                   className="w-full rounded border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
                 >
                   <option value="draft">{d.detail.statusDraft}</option>
-                  <option value="published">{d.detail.statusPublished}</option>
+                  {(canPublish || selectedNode?.status === 'published') && (
+                    <option value="published">{d.detail.statusPublished}</option>
+                  )}
                   <option value="archived">{d.detail.statusArchived}</option>
                 </select>
+                {!canPublish && (
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{d.detail.publishAdminOnly}</p>
+                )}
               </div>
 
               <div>

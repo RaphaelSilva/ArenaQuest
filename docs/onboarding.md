@@ -579,9 +579,208 @@ in the backoffice read 0 after an import, because `fetchMediaCount` in
 `'pdf'` while the column stores full MIME strings (`'video/mp4'`). The media
 itself is correct.
 
+### The AI admin assistant (aq-mcp)
+
+`scripts/mcp/aq-mcp.mjs` is a **local MCP server** (RFC 0025) with two planes:
+the **authoring** tools (Plane A) let Claude Code author **draft** topics and
+upload local media through the public API, and the **ops** tools (Plane B, RFC
+§5) answer "is the system healthy?", "was a backup made?" and "what do I do if
+not?" in three tiers. It runs over stdio on the machine where Claude Code runs,
+one registration per label and environment, and talks to the API as a dedicated
+`content_creator` account through the same client the bulk importer uses
+(`scripts/lib/api-client.mjs`). **Claude Code is the only supported client**
+(RFC 0025, Resolved Decision 7).
+
+**Install (any machine with the repo):**
+
+```bash
+git clone <repo> ArenaQuest && cd ArenaQuest
+pnpm install --frozen-lockfile
+# A dedicated content_creator account for the assistant (create it in the backoffice).
+# Put its credentials in a .env you never commit, then export them in the shell
+# that starts Claude Code:
+export AQ_ADMIN_EMAIL=assistant@example.com
+export AQ_ADMIN_PASSWORD='…'
+# Optional: a READ-ONLY Cloudflare token for the tier-1 ops tools (see below).
+export AQ_CF_READ_TOKEN='…'
+claude mcp add aq-budo-prod -- node /abs/path/ArenaQuest/scripts/mcp/aq-mcp.mjs --label budo -e production
+claude mcp add aq-budo-staging -- node /abs/path/ArenaQuest/scripts/mcp/aq-mcp.mjs --label budo -e staging
+```
+
+Credentials come from the environment **only** — never argv, never a tool
+argument, never a log line. The server reads exactly four variables —
+`AQ_ADMIN_EMAIL`, `AQ_ADMIN_PASSWORD`, `AQ_API_BASE_URL`, `AQ_CF_READ_TOKEN` —
+and nothing else (a test wraps its environment in a `Proxy` and asserts the
+access list): `CF_API_TOKEN`, `CLOUDFLARE_API_TOKEN` and the `R2_*` pair are
+never read and never inherited by a child process. The target comes from
+`config/labels/<label>.jsonc`; `AQ_API_BASE_URL` overrides it only towards
+loopback (`make dev-api`), like the importer. Login is lazy (first tool call),
+so registering against an unreachable API still lists the tools.
+`node scripts/mcp/aq-mcp.mjs --help` prints the usage.
+
+**The seven authoring tools:**
+
+| Tool | Does | Annotation |
+|---|---|---|
+| `list_topics(parentId?)` | Topics with status, order, media count and tag names; a parent's children or the whole flat list | read |
+| `read_topic(id)` | Title, markdown, status, tags, estimated minutes, media list, children | read |
+| `topic_comments(id, since?)` | Student comments (deleted ones dropped) — **never** notes or submissions; a draft/archived topic answers an empty list with a note | read |
+| `create_topic_draft(parentId?, title, markdown, tags?, estimatedMinutes?)` | Creates the topic; no `status` input exists, the API defaults to `draft`; creates are serialised | write |
+| `update_topic_draft(id, title?, markdown?, tags?, estimatedMinutes?)` | Edits a draft; refused when the stored topic is not a `draft` | write |
+| `upload_media(topicId, path)` | Local file → type/size preflight → `.mov` converted to `.mp4` → `presign → PUT → finalize`; refused unless the topic is a draft | write |
+| `review_link(topicId)` | The backoffice URL (`/admin/topics`) with the title and status — select the topic by title there | read |
+
+Reads carry `readOnlyHint: true`, writes `destructiveHint: false`, so Claude Code
+can auto-approve reads and prompt on writes. A **refusal** (not a draft, over the
+limit, no `ffmpeg`) is a normal result with `refused: true` and a reason, not an
+error — the model reads it and tells you what to do.
+
+**The eight ops tools, in three tiers** (RFC 0025 §5). Tier 1 *diagnoses*:
+read-only facts the assistant may gather freely. Tier 2 *acts reversibly*:
+creates something, destroys nothing, and only after the operator confirms a
+printed plan. Tier 3 is *destructive*: the tool returns the exact command and
+the runbook section — **it executes nothing**; a human types the command.
+
+| Tool | Tier | Does | Annotation |
+|---|---|---|---|
+| `system_health()` | 1 | `GET /v1/admin/ops/health`: D1/KV/R2 probes with latency, newest migration, last run of every job | read |
+| `job_runs(job?, since?, limit?)` | 1 | `GET /v1/admin/ops/job-runs`: the scheduled-job ledger, newest first | read |
+| `backup_status()` | 1 | `scripts/backup/status.mjs --json` for the label's **production** data — the same report as `make backup-status-prod`; red/amber is data, not an error | read |
+| `time_travel_status()` | 1 | The `timeTravel` slice of that report (bookmark + window note); reuses a report younger than 30 s | read |
+| `infra_status(env?)` | 1 | `provision-label.mjs --check --json`: which resources exist and which secrets are set, **by name only** | read |
+| `backup_now(confirmationId?)` | 2 | Runs `scripts/backup/export-d1.mjs` for the label's production D1 (first call: the `--dry-run` plan + an id; second call: `--yes`) | action |
+| `bookmark_now(confirmationId?)` | 2 | Records a D1 Time Travel bookmark (`wrangler d1 time-travel info`) of the server's environment and returns the restore command **as text** | action |
+| `restore_instructions(scenario, bookmark?)` | 3 | The restore command and the `docs/operations/backup-restore.md` anchor for `minutes-ago` (Time Travel), `database-lost` (restore a dump) or `object-deleted` (R2 copy-back), filled for the label; spawns nothing | read |
+
+Tier 1 and tier 3 carry `readOnlyHint: true`; tier 2 carries `readOnlyHint:
+false, destructiveHint: false`. The tools **wrap** the existing scripts (they
+spawn them with `--json` and parse the output) — no tool assembles a wrangler
+command of its own except the bookmark read the deploy CLI already uses.
+
+**Two-call confirmation (tier 2).** The first call, without an id, returns the
+plan and a `confirmationId`: random, **single-use**, bound to the tool and its
+arguments, valid for **5 minutes**. The second call, carrying the id, executes.
+A reused, expired or foreign id (one issued for `bookmark_now` cannot confirm
+`backup_now`) is a refusal with `refused: true` and no process is started; ask
+for a fresh plan. Ids live in the server process's memory only. Every call,
+refusals included, lands in the audit log.
+
+**Credentials per tier.** `AQ_CF_READ_TOKEN` is the **only** Cloudflare
+credential the server loads: a token with read-only scopes (D1 read, R2 read on
+the backup bucket, Workers read — minted as described under *Minting
+`AQ_CF_READ_TOKEN`* below).
+Tier-1 children receive it as `CLOUDFLARE_API_TOKEN` through their environment
+object only (never argv, never a log line, never a tool result), on top of a
+small allowlist (`PATH`, `HOME`, `NODE_*`, `PNPM_*`, `XDG_*`, `TMPDIR`); when it
+is unset nothing fails — the tier-1 scripts fall back to your `wrangler login`
+session and the result says so in a `note`. Tier-2 children get the same
+allowlist **without any token**, so a confirmed action runs on your own
+`wrangler login`, in your own process. Tier 3 has no executor at all. A static
+guard (`scripts/mcp/no-destructive.test.mjs`) fails the suite if any code path
+under `scripts/mcp/` spawns `time-travel restore`, `d1 execute`, `deploy`,
+`delete` or `secret put`.
+
+**What it never does:** publish, archive, delete or move a topic or media;
+change a status or a visibility; run SQL; write to D1 or R2 directly; read
+private note bodies or submission files; **restore, reset or deploy** anything —
+tier 3 only prints the command. Publishing a topic is an admin act in the
+backoffice (the API refuses `status: 'published'` from a `content_creator`).
+To edit a published topic: **unpublish it in the backoffice (back to `draft`),
+let the assistant edit, publish again** (Resolved Decision 3).
+
+**Audit.** Every call appends one line — timestamp, tool, arguments minus content
+bodies (a body is recorded as its byte length), outcome, duration — to
+`.arenaquest/mcp-audit-<label>-<env>.jsonl` under the repository root
+(gitignored). Uploads keep their own resume ledger next to it
+(`.arenaquest/mcp-upload-<label>-<env>.jsonl`), and `.mov` conversions land in
+`.arenaquest/mcp-convert/<label>-<env>/`.
+
+**`ffmpeg`.** A `.mov` is remuxed or transcoded through `scripts/lib/convert.mjs`
+(the rescue CLI's ladder). A missing `ffmpeg` is *detected and reported with its
+install command* in the refusal — never installed.
+
+**Home lab.** The transport is stdio, so Claude Code and `aq-mcp` always share a
+machine. The expected production console is the home-lab server with the repo
+cloned and Claude Code started over `ssh`: only media that is *new* has to sit on
+that machine's disk; everything already deployed is read through the API. A
+notebook driving an `aq-mcp` on another host would need a remote transport
+(RFC 0025, Alternative 1 — deferred). The same machine holds the off-account backup
+copy: `make backup-pull-prod LABEL=<label>` downloads the latest dump and the mirrored
+media into `.arenaquest/backups/<label>-production/` with the read-only token alone, and
+`make backup-restore-local LABEL=<label>` replays that copy on the local replica (never
+staging or production) — see `docs/operations/backup-restore.md` §5–§6.
+
 ---
 
 ---
+
+#### Minting `AQ_CF_READ_TOKEN`
+
+The tier-1 ops tools hand this token to their `wrangler` children as
+`CLOUDFLARE_API_TOKEN` (`scripts/mcp/tools/ops.mjs`) for `whoami`, `d1 list`,
+`d1 time-travel info`, `r2 bucket list`, `r2 object get` on the backup bucket,
+`kv namespace list`, `pages project list`, `secret list` and `deployments list`.
+Those are reads, so the token carries **read permissions only** — six rows,
+nothing else:
+
+1. Dashboard → **My Profile → API Tokens → Create Token → Create Custom Token**.
+2. Name it after the machine (`arenaquest-read-<machine>`), one token per
+   machine, so a lost laptop revokes one token and nothing else.
+3. **Permissions** — every row at the *Account* level:
+
+   | Level | Scope | Permission |
+   |---|---|---|
+   | Account | D1 | Read |
+   | Account | Workers R2 Storage | Read |
+   | Account | Workers Scripts | Read |
+   | Account | Workers KV Storage | Read |
+   | Account | Cloudflare Pages | Read |
+   | Account | Account Settings | Read |
+
+   No `Edit`/`Write` row, no zone row, no user row. `Account Settings · Read`
+   is what lets `wrangler whoami` resolve the account; without it every tier-1
+   call stops at "no account found".
+4. **Account Resources** → *Include* → the one Cloudflare account. **Zone
+   Resources**: none.
+5. **Client IP Address Filtering** and **TTL**: optional. If you set an end
+   date, an expired token is a `note` in the tool result (tier 1 falls back
+   to your `wrangler login`), not a failure.
+6. *Continue to summary* → *Create Token* → copy it **once**. Store it in the
+   same untracked `.env` as `AQ_ADMIN_EMAIL` / `AQ_ADMIN_PASSWORD` — never in
+   the repo, never on a command line, never in a tool argument.
+
+**Verify** (from the repository root, with the token exported in the shell):
+
+```bash
+export AQ_CF_READ_TOKEN='…'
+CLOUDFLARE_API_TOKEN="$AQ_CF_READ_TOKEN" pnpm --filter api exec wrangler whoami    # prints the six read scopes
+CLOUDFLARE_API_TOKEN="$AQ_CF_READ_TOKEN" pnpm --filter api exec wrangler d1 list   # lists the databases
+```
+
+A `SELECT` is **expected to succeed** with this token: Cloudflare's API
+reference lists `D1 Read` among the accepted permissions of the query endpoint
+(RFC 0025, Resolved Decision 5). What must **fail** is a write — and checking
+that is the two-minute empirical confirmation that decision asks the operator
+for. Use the **staging** D1 of the label (`config/labels/<label>.jsonc` →
+`environments.staging.d1.id`; the account id is in `wrangler whoami`):
+
+```bash
+Q="https://api.cloudflare.com/client/v4/accounts/<account_id>/d1/database/<staging_database_id>/query"
+curl -sS -X POST "$Q" -H "Authorization: Bearer $AQ_CF_READ_TOKEN" \
+     -H "Content-Type: application/json" --data '{"sql":"SELECT 1"}'
+# expected: HTTP 200, "success": true
+
+curl -sS -X POST "$Q" -H "Authorization: Bearer $AQ_CF_READ_TOKEN" \
+     -H "Content-Type: application/json" --data '{"sql":"DELETE FROM job_runs WHERE 0"}'
+# expected: HTTP 403 / "success": false with an authorization error
+```
+
+`WHERE 0` matches no row, so the second call is a no-op even if it goes
+through. If it **does** go through, the token is not read-only on the query
+endpoint: revoke nothing, but record it — RFC 0025 Resolved Decision 5 flips
+to "no" and the `query` tool follow-up is dropped. Either way, nothing under
+`scripts/mcp/` runs `d1 execute` or the query endpoint today (the static
+guard), so `AQ_CF_READ_TOKEN` is never used to run SQL by any tool.
 
 ## 5. Troubleshooting
 

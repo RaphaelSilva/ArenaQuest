@@ -1,6 +1,6 @@
 # Task 07 — Backend: Admin-only topic publish gate (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -50,14 +50,14 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `content_creator`: `POST` with `status: 'published'` → `403`; `PATCH` to `published` → `403`;
+- [x] `content_creator`: `POST` with `status: 'published'` → `403`; `PATCH` to `published` → `403`;
       the topic is unchanged afterwards.
-- [ ] `content_creator`: create as `draft`, edit, and `PATCH` to `archived` still succeed.
-- [ ] `admin`: create published and `PATCH` to `published` succeed.
-- [ ] Event publish behaviour is unchanged (existing events specs green).
-- [ ] A non-JSON body still yields the validator's `400`, not a gate error.
-- [ ] `openapi.json` regenerated; `make lint` and `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `content_creator`: create as `draft`, edit, and `PATCH` to `archived` still succeed.
+- [x] `admin`: create published and `PATCH` to `published` succeed.
+- [x] Event publish behaviour is unchanged (existing events specs green).
+- [x] A non-JSON body still yields the validator's `400`, not a gate error.
+- [x] `openapi.json` regenerated; `make lint` and `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

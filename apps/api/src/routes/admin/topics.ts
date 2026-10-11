@@ -5,6 +5,7 @@ import {
   TAG_NAMES_MAX_COUNT,
 } from '@api/controllers/admin-topics.controller';
 import { AdminMediaController } from '@api/controllers/admin-media.controller';
+import { publishGate } from '@api/middleware/publish-gate';
 import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
 import type { AppContainer } from '@api/container';
 
@@ -110,7 +111,9 @@ export const createTopicRoute = createRoute({
   method: 'post',
   path: '/',
   summary: 'Create Topic Node',
-  description: 'Create a new topic node.',
+  description:
+    'Create a new topic node. `status: "published"` additionally requires the `admin` role; ' +
+    'a `draft` (the default) does not.',
   tags: ['admin:topics'],
   security: [{ bearerAuth: [] }],
   request: {
@@ -145,6 +148,9 @@ export const createTopicRoute = createRoute({
     },
     400: {
       description: 'Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters)',
+    },
+    403: {
+      description: 'Forbidden — `status: "published"` requires the admin role',
     },
     404: {
       description: 'Parent topic not found',
@@ -186,7 +192,9 @@ export const updateTopicRoute = createRoute({
   method: 'patch',
   path: '/{id}',
   summary: 'Update Topic Node',
-  description: 'Update metadata of a topic node.',
+  description:
+    'Update metadata of a topic node. `status: "published"` additionally requires the `admin` role; ' +
+    '`archived` does not.',
   tags: ['admin:topics'],
   security: [{ bearerAuth: [] }],
   request: {
@@ -223,6 +231,9 @@ export const updateTopicRoute = createRoute({
     },
     400: {
       description: 'Bad Request / Validation Failed (including `tags` with `tagIds`, or a tag name with no usable characters)',
+    },
+    403: {
+      description: 'Forbidden — `status: "published"` requires the admin role',
     },
     404: {
       description: 'Topic not found',
@@ -469,6 +480,13 @@ export function buildAdminTopicsRouter(container: AppContainer) {
   const controller = new AdminTopicsController(topics, tags);
   const mediaController = new AdminMediaController(topics, media, storage);
   const router = new OpenAPIHono();
+
+  // Admin-only on the publish transition (RFC 0025 §2, layer 3): a content
+  // creator writes drafts and may archive, but does not put a topic on the
+  // internet. Scoped to '/' (create) and '/:id' (update) so media and move
+  // paths are never read by the gate.
+  router.use('/', publishGate({ methods: ['POST'] }));
+  router.use('/:id', publishGate({ methods: ['PATCH'] }));
 
   // Topics endpoints
   router.openapi(listAllTopicsRoute, async (c) => {

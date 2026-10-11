@@ -1,7 +1,7 @@
 # RFC 0025: AI Admin Assistant: Content Authoring, Operational Queries and Backups
 
 **Date:** 2026-10-02
-**Status:** Approved
+**Status:** In Progress
 **Author:** raphaelsilva
 **Affected:**
 - `scripts/mcp/` (new — the local `aq-mcp` MCP server: content authoring and ops tools over the public API and the backup manifest)
@@ -228,7 +228,9 @@ students did nothing this month?") the assistant uses the Cloudflare
 connector's D1 query tool. That connector runs any statement with the
 operator's account, so read-only is a **rule**, not a permission — written
 down in the `ops-runbook` skill and backed by D1 Time Travel as the safety
-net. Hardening it into a permission is Open Question 5.
+net. Resolved Decision 5 hardens it into a permission: the query endpoint
+accepts a *D1 Read* token, so a `query` tool on `AQ_CF_READ_TOKEN` is filed
+as a follow-up.
 
 **3.4 The `ops-runbook` skill.** `.claude/skills/ops-runbook/SKILL.md` gives
 the assistant what it would otherwise rediscover every session: the D1 name
@@ -418,7 +420,7 @@ that runs it each morning and notifies only on an anomaly.
 
 | Risk | Mitigation |
 |---|---|
-| The D1 connector can write; "read-only" is a rule | Runbook rule + Time Travel bookmark as a safety net; Open Question 5 hardens it into a permission |
+| The D1 connector can write; "read-only" is a rule | Runbook rule + Time Travel bookmark as a safety net; Resolved Decision 5 hardens it into a permission through a follow-up `query` tool on `AQ_CF_READ_TOKEN` |
 | Content reaches the model provider | §6 policy enforced in the tool layer; private notes and files excluded; no secrets ever |
 | A prompt-injected comment or topic text steers the assistant | Writes limited to drafts; no publish, no destructive tool, no write-capable Cloudflare token in the process; every write audited |
 | `wrangler d1 export` may hold the database while it runs | Run off-peak, offset from billing; measure duration in Phase 0 and record it in the manifest |
@@ -448,8 +450,9 @@ that runs it each morning and notifies only on an anomaly.
 
 ## Resolved Decisions
 
-All decided **2026-10-11** by the **product owner** (raphaelsilva), one per
-former Open Question:
+All decided **2026-10-11**, one per former Open Question: items 1–4, 6 and 7
+by the **product owner** (raphaelsilva), item 5 by the **implementer**
+(Task 13):
 
 1. **Installation = clone the repo.** `git clone`, `pnpm install`,
    `claude mcp add … node scripts/mcp/aq-mcp.mjs --label <l> -e <env>`; one
@@ -471,7 +474,34 @@ former Open Question:
    milestone as Task 14; the status report shows the age of the last pull on
    the machine it runs on. The local replica is also the operator's way to
    test against production data before a deploy. No second cloud provider.
-5. *(still open — see below)*
+5. **Read-only SQL can be a permission — answered from Cloudflare's reference;
+   empirical confirmation is the operator's.** Cloudflare's API reference for
+   `POST /accounts/{account_id}/d1/database/{database_id}/query` — the
+   endpoint a `query` tool would call —
+   (<https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/query/>,
+   read 2026-10-11) lists under **"Accepted Permissions (at least one
+   required)"** exactly two entries: **D1 Read** and **D1 Write**. The
+   permissions reference
+   (<https://developers.cloudflare.com/fundamentals/api/reference/permissions/>,
+   same date) defines them as "Grants read access to D1" and "Grants write
+   access to D1". A token holding only *D1 Read* is therefore accepted by the
+   query endpoint, which is all a `SELECT` needs — so the answer is **yes**:
+   Plane B moves to an `aq-mcp` `query` tool on `AQ_CF_READ_TOKEN` that also
+   rejects non-`SELECT` statements at the tool boundary (two layers: the
+   token's permission and the tool's own check). **Follow-up task to be
+   filed** in the backlog; it is not built in M28, and the static guard that
+   forbids `d1 execute` under `scripts/mcp/` stays until that task redefines
+   it. Until it ships, Plane B stays on the Cloudflare connector + the
+   runbook rule + a Time Travel bookmark before any ad-hoc production
+   session. The reference does not state that a *D1 Read* token is
+   **refused** a write statement — that is the empirical check, which needs a
+   token minted in the dashboard, something this task could not do. Procedure
+   (two minutes, `docs/onboarding.md` → *Minting `AQ_CF_READ_TOKEN`*): mint
+   the read token, `POST …/query` with `{"sql":"SELECT 1"}` and expect 200,
+   then `{"sql":"DELETE FROM job_runs WHERE 0"}` against the **staging** D1
+   and expect 403. If the `DELETE` succeeds, this decision flips to **no**
+   and the follow-up is dropped. Decided 2026-10-11 by the implementer
+   (Task 13).
 6. **Private note bodies are never exposed; their existence always is.**
    Counts, authors, dates and visibility enter every report so metrics stay
    complete, and each answer involving notes carries a fixed line stating how
@@ -484,11 +514,7 @@ former Open Question:
 
 ## Open Questions
 
-5. **Read-only SQL as a permission** — can a Cloudflare API token scoped to
-   D1 read execute `SELECT` through the query endpoint? If yes, Plane B moves
-   to an `aq-mcp` `query` tool on `AQ_CF_READ_TOKEN` that also rejects
-   non-`SELECT` statements; if not, Plane B stays on the Cloudflare connector
-   with the runbook rule. *Owner: implementer, Phase 4 (Task 13).*
+None. Every question raised in drafting is recorded above under Resolved Decisions.
 
 ## References
 

@@ -1,0 +1,200 @@
+name: Backups
+
+# Off-database backups of every production label (RFC 0025 §4, M28 Task 04).
+#
+# Daily at 07:30 UTC — offset from the Worker's 06:00 UTC billing cron
+# (`apps/api/wrangler.jsonc`), so a dump never races the day's billing run —
+# each label gets a D1 export (scripts/backup/export-d1.mjs) followed by an R2
+# media mirror (scripts/backup/mirror-r2.mjs). Weekly, Sunday 09:30 UTC, the
+# restore drill (scripts/backup/drill.mjs) downloads the latest dump, verifies
+# its SHA-256, applies it to a throwaway local D1 and compares row counts with
+# the manifest, writing `drill` back. A failed export, mirror or drill fails
+# the job — that is the notification.
+#
+# Every step calls the scripts with their flags, exactly as `make
+# backup-d1-prod` / `make backup-r2-prod` do; nothing is re-implemented here.
+# Staging is never backed up (disposable, RFC 0021 §4); the scripts refuse it.
+#
+# Secrets (repository secrets, names only — see docs/operations/backup-restore.md):
+#   CF_API_TOKEN / CF_ACCOUNT_ID        wrangler (D1 export, R2 objects, manifest)
+#   R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY   the mirror's S3 client — passed to that step only
+
+on:
+  schedule:
+    - cron: '30 7 * * *'   # daily: D1 export + R2 mirror
+    - cron: '30 9 * * 0'   # weekly (Sunday): restore drill
+  workflow_dispatch:
+    inputs:
+      label:
+        description: 'Label to back up (or drill)'
+        type: choice
+        options: [all, arenaquest, spaziord, budo]
+        default: all
+      drill:
+        description: 'Run the restore drill instead of the backup'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One backup run at a time, never cancelled: an interrupted mirror resumes
+# from its checkpointed index, but a cancelled export leaves nothing useful.
+concurrency:
+  group: backups
+  cancel-in-progress: false
+
+env:
+  # A dispatch for one label narrows the matrix to that label; `all` and the
+  # schedules cover every production label. (GitHub expressions have no
+  # ternary; `cond && a || b` is the documented idiom.)
+  LABELS: ${{ (github.event_name == 'schedule' || inputs.label == 'all') && '["arenaquest", "spaziord", "budo"]' || format('["{0}"]', inputs.label) }}
+  # Appends the label's manifest state (latest dump, mirror, drill) to the job
+  # summary through the scripts' own helpers — the manifest is read once, by
+  # wrangler, and nothing is re-implemented. `node --input-type=module -e`
+  # resolves the relative imports against the checkout root.
+  SUMMARY_SCRIPT: |
+    import { appendFileSync } from 'node:fs';
+    import { backupBucketName } from './scripts/label.mjs';
+    import { loadAllProfiles } from './scripts/demo/seed-demo.mjs';
+    import { MANIFEST_KEY, parseManifest, wranglerObjectStore } from './scripts/backup/manifest.mjs';
+    const label = process.env.LABEL;
+    const bucket = backupBucketName(loadAllProfiles()[label], 'production');
+    const text = wranglerObjectStore(bucket).getText(MANIFEST_KEY);
+    const manifest = text === null ? null : parseManifest(text);
+    const lines = [`### ${label} — ${bucket}`];
+    if (!manifest) {
+      lines.push('- no manifest yet');
+    } else {
+      const latest = manifest.d1.latest;
+      const mirror = manifest.r2?.lastRun;
+      const drill = manifest.drill;
+      lines.push(latest
+        ? `- D1 latest: \`${latest.key}\` — ${latest.bytes} bytes, sha256 \`${latest.sha256.slice(0, 12)}…\`, ${Object.keys(latest.rowCounts).length} tables, exported ${latest.ts}`
+        : '- D1 latest: none');
+      lines.push(mirror
+        ? `- R2 mirror: ${mirror.at} — copied ${mirror.copied.objects}, pending ${mirror.pending.objects}, failed ${mirror.failed}, tombstoned ${mirror.tombstoned}, unchanged ${mirror.unchanged}${mirror.stoppedBy ? ` (stopped by ${mirror.stoppedBy})` : ''}`
+        : '- R2 mirror: never run');
+      const detail = drill?.error ? ` — ${drill.error}` : drill?.mismatches?.length
+        ? ` — ${drill.mismatches.map((m) => `${m.table}: expected ${m.expected ?? 'absent'}, restored ${m.actual ?? 'absent'}`).join('; ')}`
+        : '';
+      lines.push(drill ? `- Drill: ${drill.ok ? 'ok' : 'FAILED'} at ${drill.at} on \`${drill.dumpKey}\`${detail}` : '- Drill: never run');
+    }
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n\n`);
+
+jobs:
+  labels:
+    name: Resolve labels
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      labels: ${{ env.LABELS }}
+    steps:
+      - name: Echo the matrix
+        run: echo "labels=$LABELS"
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Daily cron, or a dispatch without `drill`: D1 export then R2 mirror.
+  # ────────────────────────────────────────────────────────────────────────────
+  backup:
+    name: Backup (${{ matrix.label }})
+    needs: labels
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '30 7 * * *') ||
+      (github.event_name == 'workflow_dispatch' && !inputs.drill)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        label: ${{ fromJSON(needs.labels.outputs.labels) }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      # Node 22, not the repo's 20: the scripts run the wrangler CLI, whose
+      # engines require >= 22 (same as the Demo seed check job).
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: D1 export
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: node scripts/backup/export-d1.mjs --label ${{ matrix.label }} -e production --yes
+
+      # 2700 s = 45 min of copying, inside the job's 60 min; what is left is
+      # `pending` in the manifest and resumes on the next run.
+      - name: R2 mirror
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: node scripts/backup/mirror-r2.mjs --label ${{ matrix.label }} -e production --yes --max-seconds 2700
+
+      - name: Job summary
+        if: always()
+        continue-on-error: true
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          LABEL: ${{ matrix.label }}
+        run: node --input-type=module -e "$SUMMARY_SCRIPT"
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Weekly cron, or a dispatch with `drill`: restore the latest dump locally.
+  # ────────────────────────────────────────────────────────────────────────────
+  drill:
+    name: Restore drill (${{ matrix.label }})
+    needs: labels
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '30 9 * * 0') ||
+      (github.event_name == 'workflow_dispatch' && inputs.drill)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        label: ${{ fromJSON(needs.labels.outputs.labels) }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Offline after the download: the throwaway D1 is `--local --persist-to`
+      # a temp dir, discarded with the runner. Only the manifest is written.
+      - name: Restore drill
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: node scripts/backup/drill.mjs --label ${{ matrix.label }} -e production --yes
+
+      - name: Job summary
+        if: always()
+        continue-on-error: true
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          LABEL: ${{ matrix.label }}
+        run: node --input-type=module -e "$SUMMARY_SCRIPT"

@@ -181,6 +181,64 @@ export function kvNamespaceName(label, env) {
 }
 
 /**
+ * The backup bucket an environment declares (`environments.<env>.backup.bucket`),
+ * or null. Production only by design: staging is disposable (RFC 0021 section 4)
+ * and gets no backup bucket even if a profile were to declare one.
+ */
+export function backupBucketName(profile, env) {
+  if (env !== 'production') return null;
+  return profile?.environments?.[env]?.backup?.bucket ?? null;
+}
+
+/** Resolve a dotted path ("retention.dailyDays") inside an object. */
+function valueAtPath(object, path) {
+  return path.split('.').reduce((o, key) => (o == null ? undefined : o[key]), object);
+}
+
+/**
+ * Validate the shape of a profile against the schema's `backup` section
+ * (RFC 0025): the block is required for every env in
+ * `cf-resources.backup.requiredFor` (production), optional elsewhere, and
+ * whenever present each schema key must resolve with the declared type.
+ * Throws an Error naming the offending key; returns the profile otherwise.
+ */
+export function validateProfile(profile, schema) {
+  const label = profile?.label ?? '<unknown>';
+  const requiredFor = schema?.['cf-resources']?.backup?.requiredFor ?? [];
+  const keys = schema?.backup ?? {};
+  const see = 'see config/deployment.schema.jsonc';
+
+  for (const [env, e] of Object.entries(profile?.environments ?? {})) {
+    const where = `environments.${env}.backup`;
+    const block = e?.backup;
+    if (block === undefined) {
+      if (requiredFor.includes(env)) {
+        throw new Error(`profile ${label}: ${where} is required (bucket + retention) — ${see}`);
+      }
+      continue;
+    }
+    if (!block || typeof block !== 'object' || Array.isArray(block)) {
+      throw new Error(`profile ${label}: ${where} must be an object (bucket + retention) — ${see}`);
+    }
+    for (const [path, spec] of Object.entries(keys)) {
+      const value = valueAtPath(block, path);
+      const key = `${where}.${path}`;
+      if (value === undefined || value === null || value === '') {
+        if (spec.required) throw new Error(`profile ${label}: ${key} is required — ${see}`);
+        continue;
+      }
+      if (spec.type === 'positive-integer' && !(Number.isInteger(value) && value > 0)) {
+        throw new Error(`profile ${label}: ${key} must be a positive integer, got ${JSON.stringify(value)} — ${see}`);
+      }
+      if (spec.type === 'string' && (typeof value !== 'string' || value.trim() === '')) {
+        throw new Error(`profile ${label}: ${key} must be a non-empty string, got ${JSON.stringify(value)} — ${see}`);
+      }
+    }
+  }
+  return profile;
+}
+
+/**
  * Build the resolved config map for an environment (build + api-vars),
  * combining brand values, derived anchors, non-derived profile fields, and
  * — when an env.<label> block already exists in wrangler.jsonc — its `vars`

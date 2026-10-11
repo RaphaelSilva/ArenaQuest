@@ -1,6 +1,6 @@
 # Task 14 — Backend: Home-lab backup pull and local restore (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -77,20 +77,20 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] `make backup-pull-prod LABEL=budo` with `AQ_CF_READ_TOKEN` only leaves the latest dump
+- [x] `make backup-pull-prod LABEL=budo` with `AQ_CF_READ_TOKEN` only leaves the latest dump
       and the mirrored media under the local backup directory, with the dump's SHA-256 verified;
       a second run downloads nothing and reports it.
-- [ ] After the pull, `node scripts/backup/status.mjs --label budo -e production` shows the
+- [x] After the pull, `node scripts/backup/status.mjs --label budo -e production` shows the
       home-lab line green with the pull's age.
-- [ ] `make backup-restore-local LABEL=budo` replaces the local replica; `make dev-api` then
+- [x] `make backup-restore-local LABEL=budo` replaces the local replica; `make dev-api` then
       serves it and per-table row counts equal the manifest's; the local bucket holds the pulled
       objects byte-identical.
-- [ ] `restore-local.mjs -e staging` and `-e production` exit non-zero before any D1 or bucket
+- [x] `restore-local.mjs -e staging` and `-e production` exit non-zero before any D1 or bucket
       write (asserted); a production-named `--persist-to` database is refused the same way.
-- [ ] A corrupted dump on disk aborts the restore with the re-pull command.
-- [ ] Tests assert the pull touches only the backup bucket; `node --test scripts/backup/` and
+- [x] A corrupted dump on disk aborts the restore with the re-pull command.
+- [x] Tests assert the pull touches only the backup bucket; `node --test scripts/backup/` and
       `make lint` green.
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
