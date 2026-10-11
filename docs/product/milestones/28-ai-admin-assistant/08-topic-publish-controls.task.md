@@ -1,6 +1,6 @@
 # Task 08 — Frontend: Topic publish controls follow the role (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Frontend Web
@@ -46,14 +46,14 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] Rendered with a `content_creator` session, the topic status control offers no "Published"
+- [x] Rendered with a `content_creator` session, the topic status control offers no "Published"
       option on create or edit (component test).
-- [ ] Rendered with an `admin` session, "Published" is offered and saving it calls the API with
+- [x] Rendered with an `admin` session, "Published" is offered and saving it calls the API with
       that status.
-- [ ] A mocked `403` on save shows the API's message inline and keeps the form's values.
-- [ ] Both dictionaries carry identical keys; `check-i18n-coverage.js` passes.
-- [ ] `make lint` and `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A mocked `403` on save shows the API's message inline and keeps the form's values.
+- [x] Both dictionaries carry identical keys; `check-i18n-coverage.js` passes.
+- [x] `make lint` and `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
