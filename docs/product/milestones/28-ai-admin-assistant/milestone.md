@@ -1,16 +1,17 @@
 # Milestone 28 — AI Admin Assistant
 
 **Status:** 📝 Draft
-**Scope:** `scripts/backup/` + `.github/workflows/backup.yml` + the label profile and provisioner (off-database backups of D1 and R2, restore drill, backup status), `apps/api` (`job_runs` recording, admin ops health and job-run routes, admin-only topic publish gate), `apps/web` (topic publish controls follow the gate), `scripts/lib/` + `scripts/mcp/` (shared API client, the local `aq-mcp` MCP server), `.claude/skills/ops-runbook/` and `docs/operations/`. Derived from [RFC 0025](../../RFCs/0025-ai-admin-assistant.md).
+**Scope:** `scripts/backup/` + `.github/workflows/backup.yml` + the label profile and provisioner (off-database backups of D1 and R2, restore drill, backup status, home-lab pull and local restore), `apps/api` (`job_runs` recording, admin ops health and job-run routes, admin-only topic publish gate), `apps/web` (topic publish controls follow the gate), `scripts/lib/` + `scripts/mcp/` (shared API client, the local `aq-mcp` MCP server), `.claude/skills/ops-runbook/` and `docs/operations/`. Derived from [RFC 0025](../../RFCs/0025-ai-admin-assistant.md).
 
-> **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: the new `scripts/backup/**`, `scripts/lib/**`, `scripts/mcp/**` and `.github/workflows/backup.yml`; `scripts/content/import-media.mjs` and `scripts/media/convert-skipped.mjs` **only** to import what moves to `scripts/lib/` (behaviour and CLI unchanged, their existing tests green and unedited except for import paths); `scripts/cloudflare/provision-label.mjs` for the backup bucket and a read-only `--check` mode; the `backup` block in `config/labels/*.jsonc` and the profile schema that validates it; one new migration `apps/api/migrations/00NN_create_job_runs.sql` (next free number at implementation time — `0031` is claimed by M27); `apps/api/src/index.ts` (`scheduled()` recording), `apps/api/src/core/billing/billing-service.ts` (return counts only), `apps/api/src/jobs/**`, the new `apps/api/src/routes/admin/ops.ts`, `apps/api/src/controllers/admin-ops.controller.ts`, a `D1JobRunRepository` with its port in `packages/shared/ports/`, the wiring lines in `routes/admin/index.ts` and `container.ts`, the publish gate in `apps/api/src/routes/admin/topics.ts`, `apps/api/test/**`, the regenerated `apps/api/openapi.json` and `apps/web/src/lib/api-types.gen.ts`; the topic publish controls under `apps/web/src/app/(protected)/admin/topics/**` and `apps/web/src/components/admin/topics/**` with both i18n dictionaries; the root `package.json`/lockfile for `@modelcontextprotocol/sdk` only; the new `.claude/skills/ops-runbook/**`, `docs/operations/backup-restore.md`, the `aq-mcp` section of `docs/onboarding.md`, a CLAUDE.md paragraph per new surface; the `Makefile` for new `backup-*-prod`, `backup-status-prod` and `infra-check-<env>` targets only; `.gitignore` only for `.arenaquest/` if not yet ignored; and, for the closeout, RFC 0025's `Status:` header and its README row. It is explicitly **not** an opportunity to: build a **remote MCP server** in the Worker or any OAuth flow (RFC Alternative 1); let the assistant **publish, archive, delete or move** topics; write to D1 through **SQL** from any tool; let any tool **restore, reset or deploy** — tier 3 only prints the command; back up **staging** or **KV**, or store **secret values** anywhere; add **multi-operator** access or a new role; change the public, anonymous **`/health`**; touch **`topic_notes` bodies** or **submission files** from any tool. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
+> **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: the new `scripts/backup/**`, `scripts/lib/**`, `scripts/mcp/**` and `.github/workflows/backup.yml`; `scripts/content/import-media.mjs` and `scripts/media/convert-skipped.mjs` **only** to import what moves to `scripts/lib/` (behaviour and CLI unchanged, their existing tests green and unedited except for import paths); `scripts/cloudflare/provision-label.mjs` for the backup bucket and a read-only `--check` mode; the `backup` block in `config/labels/*.jsonc` and the profile schema that validates it; one new migration `apps/api/migrations/00NN_create_job_runs.sql` (next free number at implementation time — `0031` is claimed by M27); `apps/api/src/index.ts` (`scheduled()` recording), `apps/api/src/core/billing/billing-service.ts` (return counts only), `apps/api/src/jobs/**`, the new `apps/api/src/routes/admin/ops.ts`, `apps/api/src/controllers/admin-ops.controller.ts`, a `D1JobRunRepository` with its port in `packages/shared/ports/`, the wiring lines in `routes/admin/index.ts` and `container.ts`, the publish gate in `apps/api/src/routes/admin/topics.ts`, `apps/api/test/**`, the regenerated `apps/api/openapi.json` and `apps/web/src/lib/api-types.gen.ts`; the topic publish controls under `apps/web/src/app/(protected)/admin/topics/**` and `apps/web/src/components/admin/topics/**` with both i18n dictionaries; the root `package.json`/lockfile for `@modelcontextprotocol/sdk` only; the new `.claude/skills/ops-runbook/**`, `docs/operations/backup-restore.md`, the `aq-mcp` section of `docs/onboarding.md`, a CLAUDE.md paragraph per new surface; the `Makefile` for new `backup-*-prod`, `backup-status-prod`, `backup-restore-local` and `infra-check-<env>` targets only; `.gitignore` only for `.arenaquest/` if not yet ignored; and, for the closeout, RFC 0025's `Status:` header and its README row. It is explicitly **not** an opportunity to: build a **remote MCP server** in the Worker or any OAuth flow (RFC Alternative 1); let the assistant **publish, archive, delete or move** topics; write to D1 through **SQL** from any tool; let any tool **restore, reset or deploy** — tier 3 only prints the command; back up **staging** or **KV**, or store **secret values** anywhere; add **multi-operator** access or a new role; change the public, anonymous **`/health`**; touch **`topic_notes` bodies** or **submission files** from any tool. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
 
 ---
 
 ## 1. Objectives
 
 - **Every production label has an off-database backup it can prove.** A daily gzipped D1 dump with SHA-256 and row counts, an incremental R2 mirror that keeps deleted objects for 90 days, and a weekly restore drill whose result lands in the manifest (RFC §4.1–§4.4).
-- **"Was a backup made, and what do I do if not?" has a factual answer.** `scripts/backup/status.mjs` reports dump age, size delta, drill result, mirror lag, Time Travel window and the off-account gap — each non-green line with the command that fixes it (RFC §4.5).
+- **"Was a backup made, and what do I do if not?" has a factual answer.** `scripts/backup/status.mjs` reports dump age, size delta, drill result, mirror lag, Time Travel window and the age of the last home-lab pull on this machine — each non-green line with the command that fixes it (RFC §4.5).
+- **The operator holds a copy outside Cloudflare and can replay production locally.** `backup-pull-prod` downloads the latest dump and the mirrored media from the backup bucket to the operator's disk, on demand; `backup-restore-local` turns that download into a local replica (D1 + wrangler bucket) for testing before a deploy, and refuses any target but local (RFC §4.3).
 - **A restore can be performed from the runbook alone.** `docs/operations/backup-restore.md` covers Time Travel, dump restore and R2 copy-back (RFC §4.6).
 - **Scheduled jobs leave a record.** `job_runs` gets one row per billing and sweep execution, cron or manual, including failures and empty days (RFC §3.1).
 - **Health is measured, not asserted.** `GET /v1/admin/ops/health` probes D1, KV and R2 and reports the last run of each job; `GET /v1/admin/ops/job-runs` lists runs (RFC §3.2).
@@ -27,7 +28,8 @@ Out of scope (explicit, from RFC 0025 Non-Goals):
 - **Staging and KV backups** — staging is disposable (RFC 0021 §4); KV holds rate-limit counters.
 - **Secret values** — write-only in Cloudflare; only presence by name is reported.
 - **Multi-operator access** — a future RFC if tutors or creators want the assistant.
-- **Off-account backup copy** — deferred (Decision 3); the status report flags it.
+- **A second cloud provider for backups** — not pursued (Decision 8); the home-lab pull is the off-account copy.
+- **A scheduled home-lab pull** — the Make target is on demand; any cron on the home lab is the operator's.
 - **Daily brief routine (RFC Phase 5)** — optional; a backlog item after this milestone closes.
 
 ---
@@ -40,7 +42,9 @@ Out of scope (explicit, from RFC 0025 Non-Goals):
 - The R2 mirror copies every source object whose key or ETag is missing in the backup bucket; it never deletes on the first pass; objects gone from the source are marked with their removal date and pruned after 90 days.
 - A weekly drill restores the latest dump into a throwaway local D1, compares row counts with the manifest, and records `drill: { at, ok, mismatches }`.
 - The backup bucket is declared in the label profile and created by `provision-label.mjs`; `provision-label.mjs --check` reports resource presence and secret names without writing anything.
-- `status.mjs` reports the items of §1 and prints a fix command for each non-green item; a backup without a passing drill is reported as unverified.
+- `status.mjs` reports the items of §1 and prints a fix command for each non-green item; a backup without a passing drill is reported as unverified; the home-lab line reads the local pull ledger and says "never pulled on this machine" when there is none.
+- `backup-pull-prod LABEL=x` downloads the latest D1 dump (verifying its SHA-256 against the manifest) and every mirrored R2 object missing locally, from the backup bucket only, with the read-only token; it is resumable and records the pull time in a local ledger.
+- `backup-restore-local LABEL=x` applies a pulled dump to the local D1 replica and copies the pulled media into wrangler's local bucket; it refuses `-e staging` and `-e production` before any write and asks for confirmation (`CONFIRM=1` bypasses) because it replaces the local replica.
 
 **Observability (Plane B)**
 - Each billing run and each submission sweep writes a `job_runs` row: `running` on start, then `ok` or `failed` with JSON counts or a truncated error. A failing billing run still records `failed` and the sweep still runs. A `job_runs` write failure never fails the job.
@@ -59,7 +63,7 @@ Out of scope (explicit, from RFC 0025 Non-Goals):
 - `upload_media` validates against `limits.ts`, converts `.mov` through the shared converter, uploads through `presign → PUT → finalize`, and reports a missing `ffmpeg` with its install command.
 - Ops tools: tier 1 `system_health`, `job_runs`, `backup_status`, `time_travel_status`, `infra_status`; tier 2 `backup_now`, `bookmark_now` through a two-call confirmation (single-use id, 5-minute expiry); tier 3 `restore_instructions` returns the command and runbook section only.
 - Every tool carries `readOnlyHint` / `destructiveHint` annotations; every call appends a line to `.arenaquest/mcp-audit-<label>-<env>.jsonl` without content bodies.
-- No tool returns private note bodies, submission files, password hashes, refresh tokens or secret values.
+- No tool returns private note bodies, submission files, password hashes, refresh tokens or secret values. Private notes are **counted**, never read: any tool or canned query touching notes reports the number of private notes included in its counts and excluded from its text, as a fixed line.
 
 ---
 
@@ -68,7 +72,8 @@ Out of scope (explicit, from RFC 0025 Non-Goals):
 - [ ] Running `backup.yml` by `workflow_dispatch` for every label produces a dump and a manifest entry in each production backup bucket; the SHA-256 in the manifest matches the stored object.
 - [ ] The weekly drill restores the latest dump into a throwaway D1 with zero row-count mismatches, and `drill.ok: true` appears in the manifest.
 - [ ] On a staging copy, deleting a media object and following `docs/operations/backup-restore.md` restores it byte-identical from the mirror.
-- [ ] `node scripts/backup/status.mjs --label budo -e production` prints dump age, drill, mirror lag, Time Travel window and "off-account copy: missing" with its fix line.
+- [ ] `node scripts/backup/status.mjs --label budo -e production` prints dump age, drill, mirror lag, Time Travel window and the home-lab line — "never pulled on this machine" with `make backup-pull-prod LABEL=budo` as its fix line on a clean clone.
+- [ ] On the operator's machine, `make backup-pull-prod LABEL=budo` leaves the latest dump (SHA-256 verified) and the mirrored media under the local backup directory, a second run downloads nothing new, and `make backup-restore-local LABEL=budo` starts `make dev-api` against a replica whose row counts match the manifest; `-e staging` and `-e production` are refused before any write.
 - [ ] `provision-label.mjs --check` performs no write call (asserted by its tests) and lists the backup bucket among required resources.
 - [ ] A forced billing failure in a Workers test leaves one `failed` billing row and one `ok` sweep row; a day with nothing to bill leaves an `ok` row with zero counts.
 - [ ] `GET /v1/admin/ops/health` returns `down` for a dependency whose binding throws (test double), and `401`/`403` for anonymous and student callers.
@@ -115,12 +120,13 @@ script/CI task is filed under **Backend** (the only non-web team).
 | 11 | [Backup status report](./11-backup-status-report.task.md) | 4 | Backend | ☐ Open |
 | 12 | [aq-mcp ops tools in three tiers](./12-aq-mcp-ops-tools.task.md) | 4 | Backend | ☐ Open |
 | 13 | [ops-runbook skill and read-only token procedure](./13-ops-runbook-skill.task.md) | 4 | Backend | ☐ Open |
+| 14 | [Home-lab backup pull and local restore](./14-backup-pull-and-restore-local.task.md) | 4 | Backend | ☐ Open |
 
 Dependency graph (an arrow means "must land before"):
 
 ```
 Phase 0   01 ──► 02 ──┐
-          01 ──► 03 ──┴──► 04 ──► 11 ──┐
+          01 ──► 03 ──┴──► 04 ──► 11 ──┬──► 14
 Phase 1   05 ──► 06 ───────────────────┤
 Phase 2   07 ──► 08                    ├──► 12 ──► 13
 Phase 3   07, 09 ──► 10 ───────────────┤
@@ -129,9 +135,8 @@ Phase 3   07, 09 ──► 10 ───────────────┤
 ```
 
 **Recommended execution order:** `01` → `02` → `03` → `04` → `05` → `06` → `07` → `08` → `09` →
-`10` → `11` → `12` → `13`. Three independent starts — `01` (backups), `05` (observability),
-`07`/`09` (publish gate, script library) — may run in parallel; `07` waits on the owner's
-confirmation of Decision 6.
+`10` → `11` → `12` → `13` → `14`. Three independent starts — `01` (backups), `05` (observability),
+`07`/`09` (publish gate, script library) — may run in parallel; `14` only needs `11`.
 
 Each task is intended to land as an independent PR with `make lint`,
 `make test-api`, and `make test-web` passing (and `node --test` for the
@@ -141,22 +146,21 @@ script suites it touches).
 
 ## 6. Decisions recorded (from RFC 0025)
 
-RFC 0025 has no Resolved Decisions yet. Decisions 1–4 below come from the
-design itself. Decisions 5–10 are the **recommended defaults** for its Open
-Questions, recorded here so tasks can be written; they are **pending
-confirmation by raphaelsilva** and must be confirmed (and moved into the RFC's
-"Resolved Decisions" with a date) before Phase 2 or Phase 3 starts.
+Decisions 1–4 below come from the design itself. Decisions 5–10 answer the
+RFC's Open Questions and were **confirmed by raphaelsilva on 2026-10-11**;
+they are recorded in the RFC under "Resolved Decisions" (numbered there by
+Open Question).
 
 1. **Writes go through the public API only** — no tool writes D1 through SQL; this keeps `sanitizeMarkdown`, `sort_order`, tags, limits and the R2 lifecycle in one place (RFC Alternative 2).
 2. **No generic shell or `wrangler` tool** — tools wrap the existing guarded CLIs; one release and provisioning path (RFC Alternative 3).
 3. **Tier 3 is enforced by credentials** — `aq-mcp` loads only `AQ_CF_READ_TOKEN`; tier 2 uses the operator's own `wrangler login` after confirmation; the CI write token never reaches a workstation (RFC §5).
 4. **Backups are Phase 0** — they close a data-loss risk whether or not the assistant ships (RFC §Implementation Plan).
-5. **Installation = clone the repo** *(pending)* — `claude mcp add … node scripts/mcp/aq-mcp.mjs`; no `npx` package in this milestone (RFC OQ 1).
-6. **Topic publishing becomes admin-only for every `content_creator`** *(pending — verify no real content creator publishes topics today on Budo, Spaziord or ArenaQuest)*; if one does, the gate falls back to the assistant's account only (RFC OQ 2).
-7. **Published topics are not editable by the assistant** *(pending)* — no revision model in this milestone (RFC OQ 3).
-8. **Off-account copy deferred** *(pending)* — backups go to a separate bucket in the same account; the status report flags the gap (RFC OQ 4).
-9. **Private notes are never exposed** *(pending)* — shared notes and metadata only (RFC OQ 6).
-10. **Claude Code is the supported client** *(pending)* — Claude Desktop may work over stdio but is not tested here (RFC OQ 7).
+5. **Installation = clone the repo** — `claude mcp add … node scripts/mcp/aq-mcp.mjs`, one clone per machine; no `npx` package and no follow-up for one. The operator's home-lab server is the expected console for production; stdio means Claude Code and the server share a machine (RFC Resolved Decision 1).
+6. **Topic publishing becomes admin-only for every `content_creator`** — no real content creator exists on any label today; future ones draft and an admin publishes. The per-account fallback is not built (RFC Resolved Decision 2).
+7. **Published topics are not editable by the assistant** — no revision model; the documented flow is unpublish → edit draft → republish (RFC Resolved Decision 3).
+8. **The off-account copy is the operator's home-lab disk, on demand** — Task 14 ships `backup-pull-prod` and `backup-restore-local`; the status report shows the age of the last pull on this machine; no second cloud provider (RFC Resolved Decision 4).
+9. **Private note bodies are never exposed; their counts always are** — every report involving notes states how many private notes were counted but not read (RFC Resolved Decision 6).
+10. **Claude Code is the only supported client** — Claude Desktop may launch the stdio server but is neither tested nor documented (RFC Resolved Decision 7).
 
 RFC OQ 5 (can a D1-read token run `SELECT` through the query endpoint?) is
 answered by the implementer of the Phase 4 runbook task; the answer decides

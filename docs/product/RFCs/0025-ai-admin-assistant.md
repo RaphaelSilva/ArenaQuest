@@ -1,7 +1,7 @@
 # RFC 0025: AI Admin Assistant: Content Authoring, Operational Queries and Backups
 
 **Date:** 2026-10-02
-**Status:** Draft
+**Status:** Approved
 **Author:** raphaelsilva
 **Affected:**
 - `scripts/mcp/` (new — the local `aq-mcp` MCP server: content authoring and ops tools over the public API and the backup manifest)
@@ -146,6 +146,13 @@ claude mcp add aq-budo-prod -- node /path/to/ArenaQuest/scripts/mcp/aq-mcp.mjs \
 It runs on the operator's personal computer. That is deliberate: a file
 attached to a chat is not a file on disk, and the upload lifecycle needs the
 real bytes. Tools take **local paths** (`~/Videos/boas-vindas.mov`).
+"Local" describes where the *process* runs, not what it targets: the
+operator's home-lab server, with the repo cloned and Claude Code started over
+`ssh`, is the expected console for production (`--label budo -e production`).
+Only media that is *new* has to sit on that machine's disk; everything already
+in production is read through the API. The transport is stdio, so Claude Code
+and `aq-mcp` always share a machine — a notebook driving an `aq-mcp` on the
+home lab would need a remote transport, which is Alternative 1 and deferred.
 
 **Credentials.** `AQ_ADMIN_EMAIL` / `AQ_ADMIN_PASSWORD` from the environment,
 never argv and never the chat — the importer's contract. The account is a
@@ -256,11 +263,23 @@ the source is kept, tagged with its removal date, and pruned after 90 days.
 That window is the whole point — it is what makes an accidental delete
 recoverable.
 
-**4.3 Off-account copy.** A backup in the same Cloudflare account does not
-survive the loss of that account. The design reserves a second destination
-(any S3-compatible provider, or the operator's disk through
-`make backup-pull-prod LABEL=x`); which one is Open Question 4. Phases 0–1
-ship without it; the status report flags it as missing.
+**4.3 Off-account copy — the operator's home lab, on demand.** A backup in
+the same Cloudflare account does not survive the loss of that account. The
+second destination is the operator's own disk (Resolved Decision 4):
+`make backup-pull-prod LABEL=x` downloads the latest D1 dump and every
+mirrored R2 object not yet present locally, reading **only the backup
+bucket** — never the live media bucket or the live D1 — so it needs the
+read-only token alone. There is no mandatory schedule: the operator runs it
+when they want (a home-lab cron is theirs to add), and a local ledger records
+the time of the last pull so `status.mjs` can report its age on that machine.
+The same download feeds `make backup-restore-local LABEL=x`, which applies
+the dump to the local D1 replica and copies the media into wrangler's local
+bucket (the `getPlatformProxy` path the demo seed already uses), giving a
+**production replica on the home lab** to test a migration or a content
+change before deploying. That replica holds real student data: the restore
+target accepts the local environment only, through the demo seed's
+`resolveTarget` guard, and never staging (disposable, demo-seeded by
+RFC 0021 §4) or production. A second cloud provider is not pursued.
 
 **4.4 Restore drill.** Weekly, the same workflow downloads the latest dump,
 applies it to a throwaway local D1 (the mechanism of the *Demo seed check*
@@ -271,8 +290,8 @@ been restored is not counted as a backup by the status report.
 **4.5 Status.** `scripts/backup/status.mjs --label x -e production` reads the
 manifest and `wrangler d1 time-travel info`, and returns: age of the last D1
 dump, size delta vs. the previous one, last drill result, R2 mirror lag
-(objects and bytes not yet mirrored), Time Travel window, off-account copy
-present or not. Every non-green finding comes with **the command that fixes
+(objects and bytes not yet mirrored), Time Travel window, and the age of the
+last home-lab pull on this machine (or "never pulled here"). Every non-green finding comes with **the command that fixes
 it** — the provisioner's "detect and report the command" pattern.
 
 **4.6 Restore.** `docs/operations/backup-restore.md` documents both paths —
@@ -319,7 +338,8 @@ by the tool layer (Plane A/C) and stated in the runbook (Plane B):
 | Billing aggregates, invoice status, job runs, health | Yes |
 | Student names and activity | Yes, on request; summaries refer to students by name only when asked |
 | E-mail, phone/WhatsApp | Only when the operator asks for a specific person |
-| Private student notes (`topic_notes`, `visibility = 'private'`) | **No** (Open Question 6) |
+| Private student notes (`topic_notes`, `visibility = 'private'`) — **bodies** | **No** (Resolved Decision 6) |
+| Private student notes — existence, author, date, visibility, **counts** | Yes; every answer that involves notes states how many private notes were counted but not read, so a metric never looks incomplete and a missing body never looks like a missing note |
 | Submission files | **No**; metadata only |
 | Password hashes, refresh tokens, secret values | **Never** |
 
@@ -383,10 +403,11 @@ Extract `scripts/lib/api-client.mjs` and `scripts/lib/convert.mjs`;
 `aq-mcp` with the Plane A tools, annotations and audit log; install section
 in `docs/onboarding.md`.
 
-### Phase 4 — Ops tools and runbook (~2 days)
+### Phase 4 — Ops tools and runbook (~2.5 days)
 `status.mjs`; `provision-label.mjs --check`; Plane B/C tools in `aq-mcp`
 (tiers 1–3); the `ops-runbook` skill; the read-only Cloudflare token
-procedure.
+procedure; the home-lab pull and local restore (`backup-pull-prod`,
+`backup-restore-local`, §4.3).
 
 ### Phase 5 — Daily brief (optional, ~1 day)
 An MCP prompt `daily_brief` (health, job runs, backup status, overdue
@@ -403,7 +424,7 @@ that runs it each morning and notifies only on an anomaly.
 | `wrangler d1 export` may hold the database while it runs | Run off-peak, offset from billing; measure duration in Phase 0 and record it in the manifest |
 | Backups in the same account | §4.3 off-account copy; flagged as missing until it exists |
 | Backup bucket grows unbounded | Lifecycle rules; mirror prunes source-deleted objects after 90 days |
-| Restricting topic publish breaks a real content creator's workflow | Open Question 2, checked per label before Phase 2 ships |
+| Restricting topic publish breaks a real content creator's workflow | No content creator exists on any label today (Resolved Decision 2); a future one drafts and an admin publishes — an editorial step, not a regression |
 | A second operator machine drifts (old checkout) | `aq-mcp` prints its commit and how far it is behind `origin/main` at start-up; tools rely only on the public API contract, so an old checkout degrades to missing tools, not wrong writes |
 
 ## Success Criteria
@@ -425,27 +446,49 @@ that runs it each morning and notifies only on an anomaly.
   result and, when not green, the fix command; no `aq-mcp` code path holds a
   token able to restore, reset or deploy.
 
+## Resolved Decisions
+
+All decided **2026-10-11** by the **product owner** (raphaelsilva), one per
+former Open Question:
+
+1. **Installation = clone the repo.** `git clone`, `pnpm install`,
+   `claude mcp add … node scripts/mcp/aq-mcp.mjs --label <l> -e <env>`; one
+   clone per machine, each with its own `.env` for the assistant account. No
+   `npx` package, and no follow-up for one: the operator is the only user and
+   every target machine (personal computers and a home-lab server) is theirs.
+   The home lab is the expected console for production (§2).
+2. **Topic publishing is admin-only, by role.** No real `content_creator`
+   exists on Budo, Spaziord or ArenaQuest today, so the gate breaks nobody;
+   future creators draft and an admin publishes (the events rule). A
+   per-account exception is not built; if a trusted creator ever needs to
+   self-publish, that is a small backlog item on top of the role gate.
+3. **Published topics are not editable by the assistant, and no revision
+   model is built.** The documented flow is: unpublish in the backoffice
+   (back to `draft`), let the assistant edit, publish again. The operator
+   accepts this flow; a draft-revision model is not planned.
+4. **The off-account copy is the operator's home-lab disk, on demand.**
+   `backup-pull-prod` and `backup-restore-local` (§4.3) ship in this
+   milestone as Task 14; the status report shows the age of the last pull on
+   the machine it runs on. The local replica is also the operator's way to
+   test against production data before a deploy. No second cloud provider.
+5. *(still open — see below)*
+6. **Private note bodies are never exposed; their existence always is.**
+   Counts, authors, dates and visibility enter every report so metrics stay
+   complete, and each answer involving notes carries a fixed line stating how
+   many private notes were counted but not read (§6). A per-call override is
+   not built.
+7. **Claude Code is the only supported client.** Claude Desktop can launch the
+   same stdio server but is neither tested nor documented; the `ops-runbook`
+   skill lives in `.claude/skills/`, which only Claude Code loads from the
+   repository.
+
 ## Open Questions
 
-1. **Installation on the personal machine** — clone the repo (simplest; same
-   scripts) or a packaged `npx` entry point? *Owner: raphaelsilva.*
-2. **Topic publish becomes admin-only** — does any real content creator on
-   Budo, Spaziord or ArenaQuest publish topics today? *Owner: raphaelsilva.*
-3. **Editing published topics** — v1 refuses. Should a later version create
-   a draft revision of a published topic instead? That needs a revision model
-   the API does not have. *Owner: raphaelsilva.*
-4. **Off-account backup destination** — another S3-compatible provider, or
-   the operator's disk on a schedule? *Owner: raphaelsilva.*
 5. **Read-only SQL as a permission** — can a Cloudflare API token scoped to
    D1 read execute `SELECT` through the query endpoint? If yes, Plane B moves
    to an `aq-mcp` `query` tool on `AQ_CF_READ_TOKEN` that also rejects
-   non-`SELECT` statements. *Owner: implementer, Phase 4.*
-6. **Private notes** — excluded by default. Is there a case for the operator
-   reading them through the assistant (admins can in the backoffice)?
-   *Owner: raphaelsilva.*
-7. **Claude Desktop** — `aq-mcp` is a stdio server, so it also runs in the
-   desktop app. Support it officially, or Claude Code only? *Owner:
-   raphaelsilva.*
+   non-`SELECT` statements; if not, Plane B stays on the Cloudflare connector
+   with the runbook rule. *Owner: implementer, Phase 4 (Task 13).*
 
 ## References
 

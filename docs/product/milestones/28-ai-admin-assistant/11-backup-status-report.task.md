@@ -12,7 +12,8 @@ Adds `scripts/backup/status.mjs`, the single answer to "was a backup made, and w
 not?". For one `--label` and `-e production`, it reads the backup manifest and the D1 Time Travel
 info and reports: age of the last D1 dump, size delta versus the previous one, last drill result
 and age, R2 mirror lag (objects and bytes pending, tombstones), the Time Travel window, and the
-off-account copy (reported as missing while milestone Decision 8 defers it). Each line is
+home-lab copy — the age of the last `backup-pull-prod` on this machine, read from Task 14's local
+ledger, or "never pulled on this machine" with the pull command as its fix line. Each line is
 green/amber/red against stated thresholds (dump older than 26 h, drill older than 8 days or
 failed, size drop beyond a set percentage, mirror lag above a set count), and each non-green line
 carries the **command that fixes it** — never runs it. A dump whose drill has not passed is
@@ -45,12 +46,14 @@ In:
 
 Out:
 - MCP wrapping — Task 12.
+- The pull itself and the ledger's writer — Task 14 (this task only reads the ledger's shape,
+  defined here as `{ pulledAt, dumpTs, objects }` in `.arenaquest/backup-pull-<label>-<env>.json`).
 - Any alerting channel (GitHub's failed-job notification from Task 04 is the alert).
 
 ## Acceptance Criteria
 
-- [ ] With a fresh dump and a passing drill, the D1 lines are green and the off-account line is
-      red with its explanation.
+- [ ] With a fresh dump and a passing drill, the D1 lines are green and, on a clean clone, the
+      home-lab line is amber with "never pulled on this machine" and the pull command.
 - [ ] A dump older than 26 h, a failed drill, or a missing manifest each turn red and print the
       matching fix command from the runbook.
 - [ ] A dump with no passing drill is reported as unverified.

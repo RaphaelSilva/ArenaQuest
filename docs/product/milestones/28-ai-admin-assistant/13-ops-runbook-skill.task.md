@@ -17,7 +17,10 @@ about (users, enrollments, progress, comments, billing, events, submissions meta
 activity per student over a period, comments on a topic since a date, submissions waiting), the
 computed predicates that are not columns ("past" events, effective topic access), and the rules:
 **`SELECT` only**, production only when the operator asks, never `topic_notes` bodies with
-`visibility = 'private'`, never password hashes, tokens or secret values, emails and phone numbers
+`visibility = 'private'` — but always their counts: every canned query over notes selects
+`COUNT(*)` split by `visibility`, and the rules require each answer involving notes to carry one
+fixed line, "N private notes counted, not read", so a metric is never understated and a missing
+body is never mistaken for a missing note (RFC Resolved Decision 6) — never password hashes, tokens or secret values, emails and phone numbers
 only for a named person on request; and where to look first (`aq-mcp` tools from Task 12) before
 writing SQL. The task also documents how to mint `AQ_CF_READ_TOKEN` with the minimum scopes and
 tests whether a D1-read-scoped token can run `SELECT` through the query endpoint; the answer is
@@ -58,7 +61,9 @@ Out:
 - [ ] The skill appears in Claude Code's skill list in this repo and its description triggers on
       operational questions (billing ran?, student activity, comments summary, health).
 - [ ] Every canned query runs without error against a freshly migrated and seeded local replica.
-- [ ] The rules section states `SELECT` only, the private-notes exclusion, the credentials
+- [ ] The rules section states `SELECT` only, the private-notes exclusion with its mandatory
+      "N private notes counted, not read" line (and the notes canned queries split counts by
+      visibility), the credentials
       exclusion and the "ask before production" rule verbatim.
 - [ ] `docs/onboarding.md` describes minting `AQ_CF_READ_TOKEN` with the exact scopes.
 - [ ] RFC 0025 records OQ 5's tested answer as a Resolved Decision with date and decider.
