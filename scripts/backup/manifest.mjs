@@ -15,8 +15,21 @@
  *       history: Entry[],                           // newest LAST, capped at HISTORY_MAX
  *       monthly: [{ month: 'YYYY-MM', key, ts }],   // one per calendar month, newest last
  *     },
- *     r2: null,     // Task 03 fills { lastRun: {...} }
+ *     r2: null | { lastRun: R2Run },           // Task 03: the R2 mirror's last run
  *     drill: null,  // Task 04 fills { at, ok, mismatches }
+ *   }
+ *
+ *   R2Run = {                                      // written by scripts/backup/mirror-r2.mjs
+ *     at: '2026-10-11T06:30:00.000Z',              // start of the run, ISO 8601 UTC
+ *     durationMs: 81234,
+ *     copied:  { objects: 12, bytes: 734003200 },  // copied in this run
+ *     pending: { objects: 3, bytes: 150000000 },   // still owed: budget stop + failed copies
+ *     failed: 0,                                   // copies that errored (a subset of pending)
+ *     tombstoned: 1,                               // gone from the source, kept in the mirror
+ *     pruned: 0,                                   // tombstones past retention.tombstoneDays, deleted
+ *     unchanged: 340,
+ *     sourceObjects: 353,                          // objects listed in the media bucket
+ *     stoppedBy: null | 'maxBytes' | 'maxSeconds',
  *   }
  *
  *   Entry = {
@@ -104,7 +117,47 @@ export function parseManifest(text) {
   if (!d1 || typeof d1 !== 'object' || !Array.isArray(d1.history) || !Array.isArray(d1.monthly) || !('latest' in d1)) {
     throw new Error('manifest.json: d1 must hold { latest, history: [], monthly: [] }');
   }
+  if (parsed.r2 !== null && parsed.r2 !== undefined) {
+    if (!parsed.r2 || typeof parsed.r2 !== 'object' || Array.isArray(parsed.r2) || !('lastRun' in parsed.r2)) {
+      throw new Error('manifest.json: r2 must be null or { lastRun }');
+    }
+  }
   return parsed;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PURE: r2 section (Task 03 — the mirror's last run)
+// ════════════════════════════════════════════════════════════════════════════
+
+function nonNegativeInt(value, name) {
+  if (!Number.isInteger(value) || value < 0) throw new Error(`r2 run: ${name} must be a non-negative integer`);
+}
+
+function validateCounter(value, name) {
+  if (!value || typeof value !== 'object') throw new Error(`r2 run: ${name} must be { objects, bytes }`);
+  nonNegativeInt(value.objects, `${name}.objects`);
+  nonNegativeInt(value.bytes, `${name}.bytes`);
+}
+
+export const R2_STOPPED_BY = [null, 'maxBytes', 'maxSeconds'];
+
+/** Throws unless `run` has the R2Run shape documented in the header. */
+export function validateR2Run(run) {
+  if (!run || typeof run !== 'object' || Array.isArray(run)) throw new Error('r2 run must be an object');
+  if (typeof run.at !== 'string' || Number.isNaN(new Date(run.at).getTime())) throw new Error('r2 run: at must be an ISO timestamp');
+  if (typeof run.durationMs !== 'number' || !Number.isFinite(run.durationMs) || run.durationMs < 0) {
+    throw new Error('r2 run: durationMs must be a non-negative number');
+  }
+  validateCounter(run.copied, 'copied');
+  validateCounter(run.pending, 'pending');
+  for (const name of ['failed', 'tombstoned', 'pruned', 'unchanged', 'sourceObjects']) nonNegativeInt(run[name], name);
+  if (!R2_STOPPED_BY.includes(run.stoppedBy)) throw new Error(`r2 run: stoppedBy must be one of ${R2_STOPPED_BY.map(String).join('|')}`);
+}
+
+/** A new manifest (the input is never mutated) whose `r2.lastRun` is `run`. */
+export function setR2LastRun(manifest, run) {
+  validateR2Run(run);
+  return { ...manifest, r2: { ...(manifest.r2 ?? {}), lastRun: { ...run } } };
 }
 
 /** `YYYY-MM` of a Date or ISO string, in UTC. */
