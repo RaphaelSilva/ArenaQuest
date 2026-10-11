@@ -1,6 +1,6 @@
 # Task 13 — Backend: ops-runbook skill and read-only token procedure (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [28 — AI Admin Assistant](./milestone.md)
 **RFC:** [RFC 0025](../../RFCs/0025-ai-admin-assistant.md)
 **Team:** Backend API
@@ -58,17 +58,17 @@ Out:
 
 ## Acceptance Criteria
 
-- [ ] The skill appears in Claude Code's skill list in this repo and its description triggers on
+- [x] The skill appears in Claude Code's skill list in this repo and its description triggers on
       operational questions (billing ran?, student activity, comments summary, health).
-- [ ] Every canned query runs without error against a freshly migrated and seeded local replica.
-- [ ] The rules section states `SELECT` only, the private-notes exclusion with its mandatory
+- [x] Every canned query runs without error against a freshly migrated and seeded local replica.
+- [x] The rules section states `SELECT` only, the private-notes exclusion with its mandatory
       "N private notes counted, not read" line (and the notes canned queries split counts by
       visibility), the credentials
       exclusion and the "ask before production" rule verbatim.
-- [ ] `docs/onboarding.md` describes minting `AQ_CF_READ_TOKEN` with the exact scopes.
-- [ ] RFC 0025 records OQ 5's tested answer as a Resolved Decision with date and decider.
-- [ ] `make lint` green (docs only, `make test-api` unaffected).
-- [ ] No diff outside the scope guardrail.
+- [x] `docs/onboarding.md` describes minting `AQ_CF_READ_TOKEN` with the exact scopes.
+- [x] RFC 0025 records OQ 5's tested answer as a Resolved Decision with date and decider.
+- [x] `make lint` green (docs only, `make test-api` unaffected).
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

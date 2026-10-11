@@ -15,6 +15,7 @@ source of truth; this page only summarises how they hand work to one another.
 | [`frontend-developer`](./frontend-developer/SKILL.md) | Implement `apps/web` work (usually as a subagent) |
 | [`verify-doc-status`](./verify-doc-status/SKILL.md) | Reconcile doc statuses with the implementation (`driver.mjs`); never edits code |
 | [`preview-candidate`](./preview-candidate/SKILL.md) | Deploy, smoke-test and report a candidate preview on staging (`deploy.mjs --preview`); teardown after the merge |
+| [`ops-runbook`](./ops-runbook/SKILL.md) | Answer ad-hoc operational questions with read-only SQL after the `aq-mcp` tools: D1 per label, schema map, verified canned `SELECT`s, computed predicates, data-exposure rules; never writes |
 
 ## 1. End to end: from a request to delivery
 
