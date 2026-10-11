@@ -1,7 +1,7 @@
 # RFC 0025: AI Admin Assistant: Content Authoring, Operational Queries and Backups
 
 **Date:** 2026-10-02
-**Status:** Approved
+**Status:** In Progress
 **Author:** raphaelsilva
 **Affected:**
 - `scripts/mcp/` (new — the local `aq-mcp` MCP server: content authoring and ops tools over the public API and the backup manifest)

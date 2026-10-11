@@ -1,6 +1,6 @@
 # Milestone 28 — AI Admin Assistant
 
-**Status:** 📝 Draft
+**Status:** 🚧 In Progress — all 14 tasks done on `feature/m28/candidate` (lint, API, web and script suites green); live checks pending: repository secrets `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY`, a `backup.yml` dispatch and weekly drill per label, the staging `aq-mcp` walkthrough, the read-only token and Resolved Decision 5's two-minute check
 **Scope:** `scripts/backup/` + `.github/workflows/backup.yml` + the label profile and provisioner (off-database backups of D1 and R2, restore drill, backup status, home-lab pull and local restore), `apps/api` (`job_runs` recording, admin ops health and job-run routes, admin-only topic publish gate), `apps/web` (topic publish controls follow the gate), `scripts/lib/` + `scripts/mcp/` (shared API client, the local `aq-mcp` MCP server), `.claude/skills/ops-runbook/` and `docs/operations/`. Derived from [RFC 0025](../../RFCs/0025-ai-admin-assistant.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may touch **only**: the new `scripts/backup/**`, `scripts/lib/**`, `scripts/mcp/**` and `.github/workflows/backup.yml`; `scripts/content/import-media.mjs` and `scripts/media/convert-skipped.mjs` **only** to import what moves to `scripts/lib/` (behaviour and CLI unchanged, their existing tests green and unedited except for import paths); `scripts/cloudflare/provision-label.mjs` for the backup bucket and a read-only `--check` mode; the `backup` block in `config/labels/*.jsonc` and the profile schema that validates it; one new migration `apps/api/migrations/00NN_create_job_runs.sql` (next free number at implementation time — `0031` is claimed by M27); `apps/api/src/index.ts` (`scheduled()` recording), `apps/api/src/core/billing/billing-service.ts` (return counts only), `apps/api/src/jobs/**`, the new `apps/api/src/routes/admin/ops.ts`, `apps/api/src/controllers/admin-ops.controller.ts`, a `D1JobRunRepository` with its port in `packages/shared/ports/`, the wiring lines in `routes/admin/index.ts` and `container.ts`, the publish gate in `apps/api/src/routes/admin/topics.ts`, `apps/api/test/**`, the regenerated `apps/api/openapi.json` and `apps/web/src/lib/api-types.gen.ts`; the topic publish controls under `apps/web/src/app/(protected)/admin/topics/**` and `apps/web/src/components/admin/topics/**` with both i18n dictionaries; the root `package.json`/lockfile for `@modelcontextprotocol/sdk` only; the new `.claude/skills/ops-runbook/**`, `docs/operations/backup-restore.md`, the `aq-mcp` section of `docs/onboarding.md`, a CLAUDE.md paragraph per new surface; the `Makefile` for new `backup-*-prod`, `backup-status-prod`, `backup-restore-local` and `infra-check-<env>` targets only; `.gitignore` only for `.arenaquest/` if not yet ignored; and, for the closeout, RFC 0025's `Status:` header and its README row. It is explicitly **not** an opportunity to: build a **remote MCP server** in the Worker or any OAuth flow (RFC Alternative 1); let the assistant **publish, archive, delete or move** topics; write to D1 through **SQL** from any tool; let any tool **restore, reset or deploy** — tier 3 only prints the command; back up **staging** or **KV**, or store **secret values** anywhere; add **multi-operator** access or a new role; change the public, anonymous **`/health`**; touch **`topic_notes` bodies** or **submission files** from any tool. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
@@ -170,12 +170,12 @@ whether Plane B moves into an `aq-mcp` `query` tool.
 
 ## 7. Definition of Done (milestone level)
 
-- [ ] All tasks marked Done with every acceptance box checked.
+- [x] All tasks marked Done with every acceptance box checked.
 - [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
+- [x] `make lint`, `make test-api`, and `make test-web` pass green (2026-10-11, on the candidate; `make test-scripts` 774/774).
 - [ ] Every production label shows a passing drill less than 8 days old in its manifest.
-- [ ] Decisions 5–10 confirmed by the owner and recorded as Resolved Decisions in RFC 0025.
-- [ ] Closeout note written at `./closeout-analysis.md`.
+- [x] Decisions 5–10 confirmed by the owner and recorded as Resolved Decisions in RFC 0025 (2026-10-11; Decision 5 settled by Task 13).
+- [x] Closeout note written at `./closeout-analysis.md` (local, gitignored).
 - [ ] RFC 0025 status set to `Implemented` in its header and
       `docs/product/RFCs/README.md`; deferred items (remote MCP, off-account copy, daily brief) remain backlog.
-- [ ] No diff outside the scope declared in the guardrail.
+- [x] No diff outside the scope declared in the guardrail (plus the `test-scripts` registry entries in the Makefile and the two generated API-type artifacts).
