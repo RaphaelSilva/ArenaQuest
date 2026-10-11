@@ -42,6 +42,7 @@
         secret-staging secret-prod create-google-oauth-secret \
         label-new label-scaffold label-check \
         set-new-label infra-check-staging infra-check-production \
+        backup-d1-prod \
         clean clean-cache clean-all \
         confirm-prod guard-no-dev-seed-staging guard-no-dev-seed-prod \
         db-migrations-dev db-migrations-staging db-migrations-prod db-seed-dev \
@@ -183,7 +184,9 @@ test-scripts: ## Run the operational script unit tests (node:test — no network
 		scripts/demo/extensions.test.mjs \
 		scripts/demo/ci-check.test.mjs \
 		scripts/db/reset-remote.test.mjs \
-		scripts/db/check-migrations.test.mjs
+		scripts/db/check-migrations.test.mjs \
+		scripts/backup/manifest.test.mjs \
+		scripts/backup/export-d1.test.mjs
 
 # Migration lint (RFC 0021 §2.1): base migrations are frozen, new ones additive
 # unless their header carries `-- @contract: <reason>`. Compares with BASE
@@ -370,6 +373,14 @@ db-migrate-prod: confirm-prod ## Apply D1 migrations to the REMOTE production da
 
 r2-cors-prod: confirm-prod ## Apply the profile-derived CORS rules to the production bucket
 	node scripts/cloudflare/provision-label.mjs $(DEPLOY_LABEL) --production --only cors --yes
+
+# Off-database backup (RFC 0025 §4.1): gzipped D1 dump + SHA-256 + row counts
+# into the label's backup bucket, then d1/production/manifest.json. Read-only on
+# D1 (the export and two SELECTs); the script itself never prompts — the
+# confirmation is confirm-prod, which passes --yes. Staging/local are refused.
+backup-d1-prod: confirm-prod ## Export a label's production D1 to its backup bucket (LABEL=x; DRY_RUN=1 plans only; CONFIRM=1 skips the prompt)
+	node scripts/backup/export-d1.mjs --label $(or $(LABEL),$(DEPLOY_LABEL)) -e production --yes \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run,)
 
 import-media-prod: ## Import a media tree into production (LABEL=x, SOURCE=path | DRIVE_FOLDER=id; MANIFEST=path; CLI confirms; LIMIT=n, SKIP_INVALID=1, ROOT_TOPIC=uuid, SKIPPED_REPORT=path)
 	@test -n "$(SOURCE)$(DRIVE_FOLDER)" || { printf "$(RED)  ✖  SOURCE or DRIVE_FOLDER is required — e.g. make import-media-prod SOURCE=./content$(RESET)\n"; exit 1; }
