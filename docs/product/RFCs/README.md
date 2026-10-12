@@ -16,7 +16,7 @@ it lives in the linked milestone, and is summarised in
 | [0005](./0005-enrollment-exclusions-and-visibility.md) | Enrollment strategy — topic exclusions and node visibility | ✅ Implemented | [M12](../milestones/12-enrollment-visibility/milestone.md) | 2026-05-28 |
 | [0006](./0006-white-label-branding-and-build-tooling.md) | White-label branding | ✅ Implemented | [M13](../milestones/13-white-label-branding/milestone.md) | 2026-06-19 |
 | [0007](./0007-deployment-preflight-and-config-validation.md) | Deployment preflight & configuration validation | 🚧 Partial | [M14](../milestones/14-deployment-preflight-configuration-validation/milestone.md) | 2026-06-19 |
-| [0008](./0008-user-dashboard-with-topic-recommendations-and-badge-achievem.md) | User dashboard with topic recommendations and badge achievements | 📝 Draft | — | 2026-06-20 |
+| [0008](./0008-user-dashboard-with-topic-recommendations-and-badge-achievem.md) | Configurable widget dashboard — label, group and student layouts; roadmap, continue and recommendations widgets | 📝 Proposed | [M29](../milestones/29-configurable-widget-dashboard/milestone.md) | 2026-06-20 |
 | [0009](./0009-gamification-catalog-administration.md) | Gamification catalog administration | ✅ Implemented | [M15](../milestones/15-gamification-catalog-administration/milestone.md) | 2026-06-23 |
 | [0010](./0010-player-progression-administration.md) | Player progression administration | ✅ Implemented | [M16](../milestones/16-player-progression-administration/milestone.md) | 2026-06-23 |
 | [0011](./0011-branded-deploy-cli-label-parametrized-ci-independent-release.md) | Branded deploy CLI — label-parametrized, CI-independent release | ✅ Implemented | [M17](../milestones/17-branded-deploy-cli/milestone.md) | 2026-07-23 |
