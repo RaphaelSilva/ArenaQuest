@@ -16,6 +16,9 @@ the five elements (Godai), dojo titles and Dragon Ball forms were discussed and 
 
 ## The theme
 
+The full story, the meaning of each stage and suggested level-up phrases are in
+[levels-story.md](levels-story.md) — use it when explaining the levels.
+
 A classic ninja training legend: the apprentice plants a bamboo shoot and jumps over it every
 day. The bamboo grows a little each day, and so does the jump, until the ninja clears what nobody
 else can. Bamboo also carries the spirit of taijutsu: it **bends but does not break**. It spends

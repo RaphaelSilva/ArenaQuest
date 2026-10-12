@@ -12,6 +12,7 @@ Content and gamification work done directly against the **budo production** tena
 | [missions/8th-kyu.md](missions/8th-kyu.md) | 8º Kyu mission (group-gated) |
 | [missions/7th-kyu-to-shodan.md](missions/7th-kyu-to-shodan.md) | 7º Kyu → Shodan missions (group-gated) |
 | [levels.md](levels.md) | The level curve: "the ninja's bamboo", 21 levels ending at Shodan |
+| [levels-story.md](levels-story.md) | The story behind the levels, to use when explaining them (student text in PT-BR) |
 | [scripts/](scripts/) | The scripts that created the missions |
 
 ## Running the scripts
