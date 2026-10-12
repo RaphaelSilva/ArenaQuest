@@ -1,7 +1,7 @@
 # Level curve — the ninja's bamboo
 
-**Status:** chosen 2026-10-12, applied with [`scripts/set-levels-bamboo.mjs`](scripts/set-levels-bamboo.mjs).
-Not applied until that script runs against production.
+**Status:** applied to budo production on 2026-10-12 with
+[`scripts/set-levels-bamboo.mjs`](scripts/set-levels-bamboo.mjs) (21 levels, verified in `level_definitions`).
 
 ## Why a new curve
 
