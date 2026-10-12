@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Programa - topic distribution</title>
+<style>
+:root {
+  --surface: #ffffff; --ink: #1d1b22; --ink-2: #5b5763; --ink-3: #8a8694;
+  --grid: #e6e4ea; --seq: #8423c5; --seq-2: #b07be0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #17161b; --ink: #ecebf0; --ink-2: #a9a6b3; --ink-3: #75717f;
+    --grid: #2c2a33; --seq: #b07be0; --seq-2: #8423c5;
+  }
+}
+:root[data-theme="dark"] {
+  --surface: #17161b; --ink: #ecebf0; --ink-2: #a9a6b3; --ink-3: #75717f;
+  --grid: #2c2a33; --seq: #b07be0; --seq-2: #8423c5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px 16px; background: var(--surface); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
+main { max-width: 880px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 28px 0 4px; }
+p.sub { color: var(--ink-2); margin: 0 0 12px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0; }
+.tile { border: 1px solid var(--grid); border-radius: 8px; padding: 12px; }
+.tile .n { font-size: 26px; font-weight: 600; }
+.tile .l { color: var(--ink-2); font-size: 12px; }
+svg { width: 100%; height: auto; display: block; overflow: visible; }
+text { fill: var(--ink-2); font-size: 12px; }
+text.lbl { fill: var(--ink); }
+.grid { stroke: var(--grid); stroke-width: 1; }
+.bar { fill: var(--seq); }
+.bar2 { fill: var(--seq-2); }
+.bar:hover, .bar2:hover { opacity: 0.8; }
+.note { color: var(--ink-3); font-size: 12px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Programa - what is inside</h1>
+  <p class="sub">Source: budo production topic tree, read-only. Each row is one belt grade under the Programa root.</p>
+
+  <div class="tiles">
+    <div class="tile"><div class="n">11</div><div class="l">grade groups (one mission step each)</div></div>
+    <div class="tile"><div class="n">59</div><div class="l">topics directly under grades</div></div>
+    <div class="tile"><div class="n">23</div><div class="l">sub-topics under those topics</div></div>
+    <div class="tile"><div class="n">17</div><div class="l">of the 23 sit under Shodan</div></div>
+  </div>
+
+  <h2>Topics directly under each grade</h2>
+  <p class="sub">How many topics each grade holds at its first level.</p>
+  <svg id="chart1" role="img" aria-label="Bar chart: topics per grade"></svg>
+
+  <h2>Sub-topics under each grade</h2>
+  <p class="sub">Third-level topics (e.g. year variants, extras) nested under the grade's topics.</p>
+  <svg id="chart2" role="img" aria-label="Bar chart: sub-topics per grade"></svg>
+  <p class="note">Hover a bar for its exact value.</p>
+</main>
+
+<script>
+const grades = [
+  { name: "9th Kyu", l2: 11, l3: 1 },
+  { name: "8th Kyu", l2: 11, l3: 1 },
+  { name: "7th Kyu", l2: 8,  l3: 2 },
+  { name: "6th Kyu", l2: 4,  l3: 0 },
+  { name: "5th Kyu", l2: 3,  l3: 0 },
+  { name: "4th Kyu", l2: 3,  l3: 0 },
+  { name: "3rd Kyu", l2: 5,  l3: 0 },
+  { name: "2nd Kyu", l2: 3,  l3: 0 },
+  { name: "1st Kyu", l2: 4,  l3: 2 },
+  { name: "Shodan",  l2: 7,  l3: 17 },
+];
+
+function barChart(svgId, key, cls) {
+  const svg = document.getElementById(svgId);
+  const W = 640, rowH = 30, left = 96, right = 40, top = 8;
+  const max = Math.max(...grades.map(g => g[key]));
+  const scaleMax = Math.ceil(max / 5) * 5;
+  const H = top + grades.length * rowH + 24;
+  const plotW = W - left - right;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  let out = "";
+  for (let t = 0; t <= scaleMax; t += 5) {
+    const x = left + (t / scaleMax) * plotW;
+    out += `<line class="grid" x1="${x}" x2="${x}" y1="${top}" y2="${H - 24}"/>`;
+    out += `<text x="${x}" y="${H - 8}" text-anchor="middle">${t}</text>`;
+  }
+  grades.forEach((g, i) => {
+    const y = top + i * rowH;
+    const v = g[key];
+    const w = (v / scaleMax) * plotW;
+    out += `<text class="lbl" x="${left - 10}" y="${y + rowH / 2 + 4}" text-anchor="end">${g.name}</text>`;
+    out += `<rect class="${cls}" x="${left}" y="${y + 5}" width="${Math.max(w, 2)}" height="${rowH - 10}" rx="4"><title>${g.name}: ${v}</title></rect>`;
+    out += `<text class="lbl" x="${left + w + 6}" y="${y + rowH / 2 + 4}">${v}</text>`;
+  });
+  svg.innerHTML = out;
+}
+
+barChart("chart1", "l2", "bar");
+barChart("chart2", "l3", "bar2");
+</script>
+</body>
+</html>
