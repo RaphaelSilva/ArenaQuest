@@ -48,6 +48,7 @@ Never invent topology. Compute it from the task's source folder.
   - **Backlog candidate:** candidate `feature/backlog/<topic>/<feature>/candidate` (cut from `main`); task `feature/backlog/<topic>/<feature>/<task_slug>.task` (cut from the candidate). `<feature>` is the shared stem of the tasks (for a `--team both` pair, the slug without `NN-` and without `--backend`/`--frontend`, shortened if the owner names it).
   - **When a backlog run needs a candidate:** whenever it executes **two or more backlog tasks that ship together** — a `--team both` pair, or any task whose `Depends On` names another task of the same run. Never stack one backlog task branch on another, and never deliver dependent backlog tasks as separate PRs: they go through one candidate and one PR. A single standalone backlog task keeps the no-candidate mode.
   - **Epic:** candidate `feature/epic/<epic_name>/candidate` (cut from `main`); task `feature/epic/<epic_name>/<task_slug>.task` (cut from epic candidate).
+    `<epic_name>` = the epic folder name — `<YYYY-MM-DD>-<subject>` for epics written with `write-epic` (e.g. `feature/epic/2026-09-29-e2e-test-phase/candidate`).
 - **Chained mode** (`chained`/`stacked`, milestone/epic only — backlog unsupported):
   subject branch `feature/m<N>/<subject_slug>` cut from `main` (`<subject_slug>` =
   milestone folder name minus leading `<number>-`). First task cuts from the subject;
