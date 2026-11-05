@@ -19,6 +19,8 @@ import {
   checkPresence,
   checkCoherence,
   checkPolicy,
+  siteOf,
+  checkCookieSite,
   requiredWhenActive,
   mapExitCode,
   formatChecklist,
@@ -506,4 +508,34 @@ test('backupBucketName is the declared production bucket, null for staging and f
   assert.equal(backupBucketName(withBackup(), 'production'), 'acme-backups');
   assert.equal(backupBucketName(withBackup(), 'staging'), null);
   assert.equal(backupBucketName(profile(), 'production'), null);
+});
+
+// ── session-cookie-same-site ──────────────────────────────────────────────────
+test('siteOf returns the registrable domain, treating pages.dev/workers.dev and com.br as suffixes', () => {
+  assert.equal(siteOf('https://api.taibudo.com'), 'taibudo.com');
+  assert.equal(siteOf('taibudo.com'), 'taibudo.com');
+  assert.equal(siteOf('https://api-budo.spaziord.com.br/v1'), 'spaziord.com.br');
+  assert.equal(siteOf('budo-web.pages.dev'), 'budo-web.pages.dev');
+  assert.equal(siteOf('api-staging.raphael-1d2.workers.dev'), 'raphael-1d2.workers.dev');
+  assert.equal(siteOf('http://localhost:3000'), 'localhost');
+});
+
+test('checkCookieSite passes same-site hosts whatever the SameSite mode', () => {
+  assert.equal(checkCookieSite('https://api.taibudo.com', 'https://taibudo.com', 'Strict').status, 'pass');
+  assert.equal(checkCookieSite('https://api.spaziord.com.br', 'https://app.spaziord.com.br', 'Lax').status, 'pass');
+});
+
+test('checkCookieSite fails Strict/Lax across sites and only warns for None', () => {
+  const strict = checkCookieSite('https://api-budo.spaziord.com.br', 'https://taibudo.com', 'Strict');
+  assert.equal(strict.status, 'fail');
+  assert.match(strict.reason, /spaziord\.com\.br.*taibudo\.com/);
+  assert.equal(checkCookieSite('https://api.arenaquest.app', 'https://arenaquest-web.pages.dev', 'Lax').status, 'fail');
+  assert.equal(checkCookieSite('https://api.spaziord.com.br', 'https://budo-web-staging.pages.dev', 'None').status, 'warn');
+});
+
+test('the budo production profile keeps web and API on one site', () => {
+  const profile = parseJsonc(readFileSync(join(HERE, '..', 'config/labels/budo.jsonc'), 'utf8'));
+  const e = deriveExpected(profile, 'production');
+  assert.equal(e.NEXT_PUBLIC_API_URL, 'https://api.taibudo.com');
+  assert.equal(checkCookieSite(e.NEXT_PUBLIC_API_URL, e.NEXT_PUBLIC_SITE_URL, profile.environments.production.cookieSameSite).status, 'pass');
 });

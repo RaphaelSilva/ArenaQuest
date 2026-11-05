@@ -549,3 +549,22 @@ test('run() without --preview still builds the plain deploy plan', () => {
   assert.equal(r.preview, null);
   assert.deepEqual(r.plan.map((s) => s.kind), ['build-shared', 'migrate', 'deploy-worker', 'build-web', 'deploy-pages']);
 });
+
+// ── preflight: session cookie must reach the API (session-cookie-same-site) ───
+test('preflight hard-gaps a Strict cookie when the API and web are different sites', () => {
+  const p = goodProfile();
+  p.environments.production.apiHost = 'api.acme-other.com';
+  const { expected, resolved } = resolve(p, 'production');
+  const pf = preflight(schema(), resolved, expected, 'production', { secretNames: ALL_SECRETS, label: 'acme' });
+  assert.equal(pf.exitCode, 1);
+  assert.ok(pf.failedKeys.includes('COOKIE_SAMESITE'));
+  const row = pf.results.find((r) => r.key === 'COOKIE_SAMESITE');
+  assert.match(row.detail, /acme-other\.com.*app\.acme\.app|different sites/);
+});
+
+test('preflight never gates the SameSite=None third-party case (label check warns instead)', () => {
+  const p = goodProfile();
+  const { expected, resolved } = resolve(p, 'staging'); // workers.dev API, pages.dev web, None
+  const pf = preflight(schema(), resolved, expected, 'staging', { secretNames: ALL_SECRETS, label: 'acme' });
+  assert.ok(!pf.results.some((r) => r.key === 'COOKIE_SAMESITE'));
+});
