@@ -15,12 +15,13 @@
 
 ## Summary
 
-`apps/api/src/core/decorators.ts` was deleted on 2026-05-26. Nine live
+`apps/api/src/core/decorators.ts` was deleted on 2026-05-26. Ten current
 documents — including `CLAUDE.md`, which enters every agent session's context,
-two architecture references, `FEATURES.md`, and four skill templates that
-*scaffold new task files* — still instruct the reader to validate request bodies
-with the `@ValidateBody(schema)` method decorator and the `@Body()` parameter
-decorator from that file.
+the root `README.md`, two architecture references, `FEATURES.md`, and five skill
+or template files — still instruct the reader to validate request bodies with
+the `@ValidateBody(schema)` method decorator and the `@Body()` parameter
+decorator from that file. The open Milestone 19 contract repeats the same stale
+instruction in two places.
 
 The code is correct; only the documentation is wrong. Validation moved to the
 router via `@hono/zod-openapi` and has worked that way for three and a half
@@ -64,12 +65,14 @@ validation mechanism changed.
 | 7 | `.claude/skills/write-tasks/template-backend.md` | 30 | Every backend task is scaffolded from this template |
 | 8 | `.claude/skills/write-feature/template.md` | 59 | Every milestone's §4 Specific Stack is scaffolded from this template |
 | 9 | `.agents/skills/task-writer/SKILL.md` | 106 | A ready-made acceptance criterion: "All validation uses Zod schemas via `@ValidateBody(schema)` decorator" |
+| 10 | `README.md` | 14 | Describes the current backend as using Zod-driven `@ValidateBody` / `@Body` decorators |
 
 **The propagation it caused.** Entries 7 and 8 are generators, so the drift
-reproduces itself downstream. Documents 1–4 seeded RFC 0013 §5; the milestone
-inherited it from the RFC and from template 8; tasks 03 and 05 inherited it from
-template 7. Milestone 19 alone repeats the claim eight times across five files,
-and twenty files under `docs/product/milestones/` mention it in total.
+reproduces itself downstream. Documents 1–4 and 10 seeded RFC 0013 §5; the
+milestone inherited it from the RFC and from template 8; tasks 03 and 05
+inherited it from template 7. Milestone 19 alone repeats the claim eight times
+across five files, and twenty files under `docs/product/milestones/` mention it
+in total.
 
 **Why no check caught it.** `check-rfc.mjs`, `check-feature.mjs` and
 `check-task.mjs` validate *structure* — filenames, required `##` sections,
@@ -139,7 +142,7 @@ anyone's.
 
 ## Scope
 
-### 1. Correct the nine live documents
+### 1. Correct the ten current documents
 
 Replace the decorator instruction with the actual pattern — `createRoute`
 request schemas, `c.req.valid(...)` in the handler, the router-level
@@ -163,9 +166,10 @@ Two edits are larger than a line swap:
 
 For the duplicated skill file, correct **both** copies (entries 5 and 6) —
 editing one leaves the other authoritative for whichever runtime reads it.
-For `task-writer/SKILL.md` (entry 9), correcting the line is acceptable, but
-deleting the superseded persona outright is preferable and in scope; decide it
-in the PR and say which was done.
+Correct `task-writer/SKILL.md` (entry 9) in place. Deleting or deduplicating the
+superseded persona is separate cleanup and must not be bundled into this repair.
+Correct the root `README.md` (entry 10) because it describes the current shipped
+architecture rather than historical behavior.
 
 ### 2. Correct the live Milestone 19 references
 
@@ -181,6 +185,10 @@ A dependency-free Node script that, for a fixed list of documents, extracts
 every backtick-quoted repository path and asserts it exists in the working tree.
 Non-zero exit with the file, line and missing path on failure.
 
+- Add it at `scripts/check-doc-paths.mjs`, export its pure extraction and
+  resolution functions, and guard CLI execution with `import.meta.url` so a
+  `node:test` suite at `scripts/check-doc-paths.test.mjs` can import it.
+
 - Cover at least `CLAUDE.md`, `docs/architecture/**`, `docs/product/FEATURES.md`
   and the skill templates under `.claude/skills/**` and `.agents/skills/**`.
 - Ignore what is not a repository path: URLs, npm package names, `Entities.*`
@@ -189,7 +197,9 @@ Non-zero exit with the file, line and missing path on failure.
   emitting a false positive — a noisy check gets switched off.
 - Deliberately **exclude** the historical documents named under *Out of scope*;
   they are supposed to describe files that no longer exist.
-- Wire it into `make lint` only once it runs clean, so it lands green.
+- Expose it through a local `lint-docs` Make target. Make `lint` depend on
+  `lint-docs` only once the check runs clean, and add its test file to
+  `test-scripts`, so both paths land green.
 
 Run against `main` before the fix, the check should report
 `apps/api/src/core/decorators.ts` from entries 1, 2 and 3. Include that output
@@ -245,9 +255,90 @@ fix; Scope 3 is the mechanical half, and neither substitutes for the other.
 
 ---
 
+## Execution Plan
+
+### Dependencies and priority
+
+- **Code dependency:** none. The route-level implementation is already shipped;
+  [Task 04](./04-api-controller-input-standardization.task.md) records the
+  current boundary and [Milestone 9 Task 10](../../milestones/9-api-routes-openapi/10-remove-redundant-validatebody.task.md)
+  records the historical decorator removal.
+- **Implementation references:** verify every replacement claim against
+  `apps/api/src/routes/auth/register.ts` and
+  `apps/api/src/routes/admin/billing.ts`. Both demonstrate `createRoute`,
+  `c.req.valid(...)`, `OpenAPIHono({ defaultHook })`, and typed controller input.
+- **Priority:** execute before other unplanned refactoring work. Tasks 01–06 in
+  this backlog category are Done, while this Pending task affects instructions
+  and generators used by every later backend task.
+
+### Required order
+
+1. **Baseline and classify.** Inventory `ValidateBody`, `@Body()` and
+   `core/decorators.ts` occurrences. Classify each as current guidance, the open
+   Milestone 19 contract, or frozen history. Confirm the deleted file is absent
+   and capture pre-fix checker evidence from `HEAD` or a temporary fixture; do
+   not stash/reset a shared worktree.
+2. **Correct canonical architecture first.** Rewrite
+   `controller-pattern.md` around route-level request schemas,
+   `c.req.valid(...)`, the `defaultHook` 400 envelope, and controllers limited to
+   business/domain outcomes. Realign `error-handling.md` to the same ownership
+   and repair stale Related Files paths encountered in those two current guides.
+3. **Correct current summaries and contracts.** Update `CLAUDE.md`, root
+   `README.md`, `FEATURES.md`, and the two Milestone 19 references. Preserve
+   accepted RFCs, release notes, Done task files, and old execution plans.
+4. **Correct every propagation source.** Update both backend-developer skill
+   copies, both `.claude` templates, and `task-writer/SKILL.md`. Add the
+   delete/rename documentation-search criterion to `template-backend.md`, then
+   scaffold throwaway backend-task and milestone outputs and confirm neither
+   reproduces the stale pattern.
+5. **Implement the path check.** Build `scripts/check-doc-paths.mjs` with Node
+   built-ins only. Scan `CLAUDE.md`, `README.md`, `docs/architecture/**/*.md`,
+   `docs/product/FEATURES.md`, `.claude/skills/**/*.md`, and
+   `.agents/skills/**/*.md`; explicitly exclude historical milestone, RFC, plan,
+   and release-note trees.
+6. **Make extraction deterministic.** Ignore fenced code blocks; accept only
+   root-relative repository prefixes and named root files; resolve API-scoped
+   `src/...` shorthand under `apps/api/`; strip trailing line annotations; skip
+   URLs, aliases, commands, globs, braces and placeholders. Report
+   `document:line: missing <resolved-path>` and exit `1` for misses, `0` when
+   clean, and `2` for scan/read configuration failures. Any exception must be an
+   exact, commented document/token pair — never a broad pattern.
+7. **Test before wiring.** Cover valid files/directories, missing paths,
+   API-relative paths, line suffixes, all skip classes, and unreadable/missing
+   scan targets in `scripts/check-doc-paths.test.mjs`. Run the test and checker;
+   correct any additional genuine current-doc miss rather than weakening the
+   matcher.
+8. **Integrate and close.** Add `lint-docs`, make `lint` depend on it without a
+   dependency cycle, add the new test to `test-scripts`, and run the gates below.
+   Only then reconcile this inventory, mark verified checkboxes, and set Status
+   to Done.
+
+### Verification order
+
+1. `node --test scripts/check-doc-paths.test.mjs`
+2. `make lint-docs`
+3. `node .claude/skills/write-rfc/check-rfc.mjs`
+4. `node .claude/skills/write-feature/check-feature.mjs`
+5. `node .claude/skills/write-tasks/check-task.mjs --milestone 19`
+6. `make test-scripts`
+7. `make -n lint` — confirm `lint-docs` runs once before Turborepo lint
+8. `make lint`
+9. Focused current-document occurrence search, historical-match classification,
+   `git diff --check`, and full diff-scope review
+
+### Completion evidence
+
+The executor handoff must state the changed files, zero-match result for current
+guidance, the classified historical occurrences that remain, pre-fix and
+post-fix checker results, throwaway scaffold result, all command exit results,
+and confirmation that no application/shared source changed. Missing evidence
+leaves the corresponding criterion unchecked.
+
+---
+
 ## Acceptance Criteria
 
-- [ ] `grep -rn "ValidateBody\|@Body()" CLAUDE.md docs/architecture/ docs/product/FEATURES.md .claude/skills/ .agents/skills/`
+- [ ] `grep -rn "ValidateBody\|@Body()" CLAUDE.md README.md docs/architecture/ docs/product/FEATURES.md .claude/skills/ .agents/skills/`
       returns nothing.
 - [ ] `grep -rn "ValidateBody" docs/product/milestones/19-student-billing-and-receivables/milestone.md`
       returns nothing.
@@ -260,8 +351,8 @@ fix; Scope 3 is the mechanical half, and neither substitutes for the other.
       Related Files rows agree with the body.
 - [ ] `docs/architecture/api/error-handling.md` attributes the `400` envelope to
       the router's `defaultHook` and names no deleted file.
-- [ ] Both copies of `backend-developer/SKILL.md` are corrected; the PR states
-      whether `task-writer/SKILL.md` was corrected or deleted.
+- [ ] Both copies of `backend-developer/SKILL.md`, the root `README.md`, and
+      `task-writer/SKILL.md` are corrected in place.
 - [ ] A task scaffolded fresh with `new-task.mjs --team backend` contains no
       decorator instruction, and a milestone scaffolded with `new-feature.mjs`
       contains none in §4.
@@ -269,7 +360,9 @@ fix; Scope 3 is the mechanical half, and neither substitutes for the other.
 - [ ] The new check exits non-zero on `main` naming
       `apps/api/src/core/decorators.ts`, exits zero after the fix, and that
       before/after output is in the PR description.
-- [ ] The check is wired into `make lint` and `make lint` is green.
+- [ ] `scripts/check-doc-paths.test.mjs`, `make lint-docs`, `make test-scripts`,
+      and `make lint` are green; `make -n lint` shows the document check runs
+      before Turborepo lint.
 - [ ] `node .claude/skills/write-rfc/check-rfc.mjs`,
       `check-feature.mjs` and `check-task.mjs --milestone 19` stay green.
 - [ ] No diff under `apps/api/src/`, `apps/web/src/` or `packages/`.
