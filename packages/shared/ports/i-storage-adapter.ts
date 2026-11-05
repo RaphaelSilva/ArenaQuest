@@ -50,8 +50,12 @@ export interface PresignedUrlOptions {
   expiresInSeconds?: number;
   /** Expected content type — enforced by some providers on upload URLs. */
   contentType?: StorageMediaType;
-  /** Maximum allowed upload size in bytes (upload URLs only). */
-  maxSizeBytes?: number;
+  /**
+   * Exact byte length signed into an upload URL's `Content-Length` header.
+   * A presigned PUT cannot express an upper bound; enforce size ceilings when
+   * finalizing the upload by inspecting the stored object.
+   */
+  exactSizeBytes?: number;
 }
 
 /** Represents a stored object returned by getObject / listObjects. */
@@ -135,7 +139,7 @@ export interface IStorageAdapter {
    * a file DIRECTLY to the storage bucket (bypassing the Worker entirely).
    *
    * @param key     - Destination storage key
-   * @param options - Expiry, content type, max size
+   * @param options - Expiry, content type, and exact upload size
    */
   getPresignedUploadUrl(key: string, options?: PresignedUrlOptions): Promise<string>;
 

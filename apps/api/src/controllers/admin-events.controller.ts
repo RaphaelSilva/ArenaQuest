@@ -455,23 +455,13 @@ export class AdminEventsController {
 
     const key = `events/${id}/flyer-${crypto.randomUUID()}-${sanitizeFileName(body.fileName)}`;
 
-    // Signed against the **declared** size, which the check above already
-    // bounded by the ceiling. Do not "harden" this by passing `maxBytes`:
-    // `maxSizeBytes` reaches R2 as `ContentLength`, which the presigner puts in
-    // `X-Amz-SignedHeaders` — it is a *signed header*, not an upper bound, so
-    // signing with the ceiling would pin every flyer upload to exactly
-    // 5,242,880 bytes and nothing else would be uploadable at all.
-    //
-    // The two checks are therefore independent and both real: the signature
-    // pins the PUT to exactly what the client declared, so a different payload
-    // cannot be substituted through this URL, and `finalizeFlyer` re-reads the
-    // **stored** size with `headObject` — that is what enforces the ceiling,
-    // including against anything written to the bucket out of band. The gap in
-    // the topic path is that missing finalize check, not this line.
+    // Pin the PUT to the declared length. The ceiling is a separate rule: a
+    // presigned PUT cannot express an upper bound, so `finalizeFlyer` enforces
+    // it by re-reading the stored object's size with `headObject`.
     const uploadUrl = await this.storage.getPresignedUploadUrl(key, {
       expiresInSeconds: FLYER_URL_TTL_SECONDS,
       contentType: body.contentType,
-      maxSizeBytes: body.sizeBytes,
+      exactSizeBytes: body.sizeBytes,
     });
 
     await this.events.setFlyerPending(id, {

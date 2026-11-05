@@ -437,13 +437,9 @@ describe('presignFlyer', () => {
       sizeBytes: 1024,
     });
 
-    const [, options] = storage.getPresignedUploadUrl.mock.calls[0] as [string, { maxSizeBytes: number }];
-    // `maxSizeBytes` becomes R2's `ContentLength`, which the presigner *signs*
-    // rather than treating as an upper bound. Signing with the ceiling would
-    // pin every flyer PUT to exactly 5 MB and make the endpoint unusable; the
-    // ceiling is enforced at finalize, against the bytes that actually landed.
-    expect(options.maxSizeBytes).toBe(1024);
-    expect(options.maxSizeBytes).not.toBe(CEILING);
+    const [, options] = storage.getPresignedUploadUrl.mock.calls[0] as [string, { exactSizeBytes: number }];
+    expect(options.exactSizeBytes).toBe(1024);
+    expect(options.exactSizeBytes).not.toBe(CEILING);
   });
 
   it('rejects a 6 MB JPEG with 422 FileTooLarge and reports the ceiling', async () => {

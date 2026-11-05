@@ -141,6 +141,10 @@ describe('AdminMediaController', () => {
       if (!result.ok) return;
       expect(result.data.uploadUrl).toMatch(/^https?:\/\//);
       expect(result.data.media).toBeDefined();
+      expect(storageAdapter.getPresignedUploadUrl).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ exactSizeBytes: validBody.sizeBytes }),
+      );
     });
 
     it('returns 404 when topic does not exist', async () => {

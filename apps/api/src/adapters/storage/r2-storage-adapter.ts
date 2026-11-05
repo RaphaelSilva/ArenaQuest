@@ -118,7 +118,7 @@ export class R2StorageAdapter implements IStorageAdapter {
       Bucket: this.bucketName,
       Key: key,
       ...(options?.contentType && { ContentType: options.contentType }),
-      ...(options?.maxSizeBytes !== undefined && { ContentLength: options.maxSizeBytes }),
+      ...(options?.exactSizeBytes !== undefined && { ContentLength: options.exactSizeBytes }),
     });
     return getSignedUrl(this.s3, command, { expiresIn });
   }

@@ -51,7 +51,10 @@ Inside `AdminMediaController.presignUpload`:
    Over-limit → `422 FileTooLarge` with the cap returned in `meta.maxBytes`.
 3. **Generate id and storage key.** `mediaId = crypto.randomUUID()`, then
    `storageKey = topics/${topicId}/${mediaId}-${sanitizeFileName(fileName)}`.
-4. **Mint the presigned URL.** `getPresignedUploadUrl(key, { expiresInSeconds: 3600, contentType, maxSizeBytes: sizeBytes })`.
+4. **Mint the presigned URL.** `getPresignedUploadUrl(key, { expiresInSeconds: 3600, contentType, exactSizeBytes: sizeBytes })`.
+   `exactSizeBytes` signs the declared byte count into `Content-Length`; it is
+   not a ceiling. A presigned PUT cannot express an upper bound, so upload-size
+   limits must be enforced during finalize against the stored object's size.
 5. **Insert the `pending` row** carrying `mediaId`, `storageKey`,
    `sizeBytes`, `originalName`, `type`, `uploadedById = c.get('user').sub`.
 

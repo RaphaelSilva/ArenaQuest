@@ -275,7 +275,7 @@ describe('R2StorageAdapter', () => {
       const url = await adapter.getPresignedUploadUrl('uploads/video.mp4', {
         expiresInSeconds: 600,
         contentType: 'video/mp4',
-        maxSizeBytes: 52_428_800,
+        exactSizeBytes: 52_428_800,
       });
 
       expect(typeof url).toBe('string');
@@ -283,7 +283,8 @@ describe('R2StorageAdapter', () => {
       expect(url).toContain('video.mp4');
       expect(url).toContain('X-Amz-Signature');
       expect(url).toContain('X-Amz-Expires=600');
-      // Content-Length is enforced via signed headers (AWS SDK v3 signs content-length for PUT)
+      // The exact content length is enforced via signed headers (AWS SDK v3
+      // signs content-length for PUT); it is not an upper-bound policy.
       expect(url.toLowerCase()).toContain('content-length');
     });
   });

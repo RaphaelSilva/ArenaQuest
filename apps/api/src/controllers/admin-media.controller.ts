@@ -100,7 +100,7 @@ export class AdminMediaController {
     const uploadUrl = await this.storage.getPresignedUploadUrl(storageKey, {
       expiresInSeconds: 3600,
       contentType,
-      maxSizeBytes: sizeBytes,
+      exactSizeBytes: sizeBytes,
     });
 
     const record = await this.media.create({
