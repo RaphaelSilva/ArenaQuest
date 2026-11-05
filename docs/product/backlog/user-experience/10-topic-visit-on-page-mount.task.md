@@ -1,6 +1,6 @@
 # Task 10 — Frontend: Record a topic visit when the topic page mounts
 
-**Status:** 📝 Open
+**Status:** ➡️ Moved — delivered by [Milestone 29, Task 15](../../milestones/29-configurable-widget-dashboard/15-topic-visit-on-page-mount-frontend.task.md)
 **Kind:** Feature
 **Team:** Frontend Web
 **Priority:** Medium
