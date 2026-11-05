@@ -4,16 +4,12 @@ import type { HttpTransport } from './api-client';
 /**
  * The authenticated admin client for `/v1/admin/events` (Milestone 20, Task 06).
  *
- * It mirrors `apps/api/src/routes/admin/events.ts` exactly, which means two
- * absences are deliberate and load-bearing:
+ * It mirrors `apps/api/src/routes/admin/events.ts` exactly. One absence is
+ * deliberate and load-bearing:
  *
  * - **There is no `delete`.** No `DELETE /{id}` exists; removal is
  *   `update(id, { status: 'archived' })`, which is reversible. Adding one here
  *   would only produce a control that 404s.
- * - **There is no `get(id)`.** The router exposes the list and nothing else, so
- *   {@link createAdminEventsApi.findById} pages through the list. Adding a
- *   single-event read is a backend change, not a client one.
- *
  * `update` never sends `slug` unless a caller names one: the API re-derives
  * nothing on rename, and neither does this layer.
  */
@@ -149,9 +145,6 @@ async function raise(res: Response): Promise<never> {
   );
 }
 
-/** One page of the admin list; also the paging step of {@link findById}. */
-const PAGE_SIZE = 100;
-
 export function createAdminEventsApi(http: HttpTransport) {
   const api = {
     async list(query: ListEventsQuery = {}): Promise<AdminEventList> {
@@ -165,22 +158,12 @@ export function createAdminEventsApi(http: HttpTransport) {
       return (await res.json()) as AdminEventList;
     },
 
-    /**
-     * One event by id, or `null`.
-     *
-     * The router has no `GET /{id}`, so this walks the list a page at a time.
-     * It is the edit form's loader; a board with thousands of events would want
-     * the endpoint instead, which is Task 04's to add.
-     */
+    /** One event by id, or `null` when it no longer exists. */
     async findById(id: string): Promise<AdminEvent | null> {
-      let offset = 0;
-      for (;;) {
-        const page = await api.list({ limit: PAGE_SIZE, offset });
-        const found = page.data.find((event) => event.id === id);
-        if (found) return found;
-        offset += page.data.length;
-        if (page.data.length === 0 || offset >= page.total) return null;
-      }
+      const res = await http('GET', `/admin/events/${id}`);
+      if (res.status === 404) return null;
+      if (!res.ok) return raise(res);
+      return (await res.json()) as AdminEvent;
     },
 
     async create(input: CreateEventInput): Promise<AdminEvent> {

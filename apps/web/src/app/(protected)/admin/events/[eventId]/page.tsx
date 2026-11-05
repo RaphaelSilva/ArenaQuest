@@ -16,8 +16,7 @@ export const runtime = 'edge';
 /**
  * Editing one event.
  *
- * The event is loaded through `findById`, which pages the admin list — the
- * router exposes no `GET /{id}`, and inventing one is a backend change.
+ * The event is loaded through the dedicated admin `GET /{id}` endpoint.
  *
  * `key={event.id}` on the form is deliberate: a reload after a flyer upload or
  * a status change replaces the `AdminEvent` object, and the form must keep the

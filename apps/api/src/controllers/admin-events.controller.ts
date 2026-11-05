@@ -247,6 +247,14 @@ export class AdminEventsController {
     return { ok: true, data: { data, total, limit, offset } };
   }
 
+  /** One authoring event, without public status or audience filtering. */
+  async get(id: string): Promise<ControllerResult<AdminEventDto>> {
+    const event = await this.events.findById(id);
+    if (!event) return notFound('event not found');
+
+    return { ok: true, data: await this.toDto(event) };
+  }
+
   // -- writes ----------------------------------------------------------------
 
   /**

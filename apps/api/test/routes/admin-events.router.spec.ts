@@ -227,6 +227,51 @@ describe('the publish gate', () => {
 });
 
 // ---------------------------------------------------------------------------
+// One event by id
+// ---------------------------------------------------------------------------
+
+describe('GET /{id}', () => {
+  it('returns draft, published and archived events to both authoring roles', async () => {
+    const draft = await createDraft({ title: 'Readable draft' });
+    const publishedDraft = await createDraft({ title: 'Readable published event' });
+    const archivedDraft = await createDraft({ title: 'Readable archived event' });
+
+    const publishedResponse = await req('PATCH', `/admin/events/${publishedDraft.id}`, {
+      token: adminToken,
+      body: { status: 'published' },
+    });
+    expect(publishedResponse.status).toBe(200);
+
+    const archivedResponse = await req('PATCH', `/admin/events/${archivedDraft.id}`, {
+      token: adminToken,
+      body: { status: 'archived' },
+    });
+    expect(archivedResponse.status).toBe(200);
+
+    const expected = [
+      [draft.id, 'draft'],
+      [publishedDraft.id, 'published'],
+      [archivedDraft.id, 'archived'],
+    ] as const;
+
+    for (const token of [adminToken, creatorToken]) {
+      for (const [id, status] of expected) {
+        const res = await req('GET', `/admin/events/${id}`, { token });
+        expect(res.status).toBe(200);
+        expect(await res.json<EventDto>()).toMatchObject({ id, status });
+      }
+    }
+  });
+
+  it('answers 404 for an unknown id', async () => {
+    const res = await req('GET', '/admin/events/no-such-event', { token: adminToken });
+
+    expect(res.status).toBe(404);
+    expect((await res.json<{ error: string }>()).error).toBe('NotFound');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // No hard delete
 // ---------------------------------------------------------------------------
 
@@ -537,6 +582,7 @@ describe('the flyer ceiling', () => {
 describe('a student and a tutor are refused every route', () => {
   const routes: { method: string; path: (id: string) => string; body?: unknown }[] = [
     { method: 'GET', path: () => '/admin/events' },
+    { method: 'GET', path: id => `/admin/events/${id}` },
     {
       method: 'POST',
       path: () => '/admin/events',

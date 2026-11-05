@@ -162,6 +162,24 @@ export const listAdminEventsRoute = createRoute({
   },
 });
 
+export const getAdminEventRoute = createRoute({
+  method: 'get',
+  path: '/{id}',
+  summary: 'Get one event',
+  description:
+    'Returns a draft, published or archived event without applying the public audience rule.',
+  tags: ['admin:events'],
+  security: [{ bearerAuth: [] }],
+  request: { params: EventIdParamSchema },
+  responses: {
+    200: {
+      description: 'The event',
+      content: { 'application/json': { schema: AdminEventSchema } },
+    },
+    404: { description: 'No such event' },
+  },
+});
+
 export const createAdminEventRoute = createRoute({
   method: 'post',
   path: '/',
@@ -367,6 +385,11 @@ export function buildAdminEventsRouter(container: AppContainer) {
       limit: Math.max(parseBoundedInt(query.limit, DEFAULT_LIMIT, MAX_LIMIT), 1),
       offset: parseBoundedInt(query.offset, 0, Number.MAX_SAFE_INTEGER),
     });
+    return respondWith(c, result) as never;
+  });
+
+  router.openapi(getAdminEventRoute, async (c) => {
+    const result = await controller.get(c.req.valid('param').id);
     return respondWith(c, result) as never;
   });
 
