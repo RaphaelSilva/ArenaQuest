@@ -1,0 +1,45 @@
+/**
+ * Deployment preflight manifest.
+ *
+ * This is the only declaration of required configuration keys for the
+ * standalone preflight. It contains rules, never environment values or secret
+ * values. Task 01 consumes `required`, `requiredWhen`, and `enum`; the
+ * `coheres`, `contains`, `policy`, and `manual` metadata is reserved for the
+ * coherence/policy checks added by Task 02.
+ */
+{
+  "web-build": {
+    "NEXT_PUBLIC_API_URL":           { "required": true,  "coheres": "api-origin" },
+    "NEXT_PUBLIC_SITE_URL":          { "required": true,  "coheres": "web-origin" },
+    "NEXT_PUBLIC_LANGUAGE":          { "required": false, "enum": ["pt", "en"] },
+    "NEXT_PUBLIC_BRAND_SIGLA":       { "required": true },
+    "NEXT_PUBLIC_BRAND_NAME_PREFIX": { "required": true },
+    "NEXT_PUBLIC_BRAND_NAME_ACCENT": { "required": false },
+    "NEXT_PUBLIC_BRAND_POWERED_BY":  { "required": false, "enum": ["", "true", "false"] },
+    "NEXT_PUBLIC_BRAND_ACCENT":      { "required": false },
+    "NEXT_PUBLIC_BRAND_WHATSAPP":    { "required": false }
+  },
+  "api-vars": {
+    "ALLOWED_ORIGINS":     { "required": true,  "contains": "web-origin", "policy": "no-full-wildcard-outside-local" },
+    "COOKIE_SAMESITE":     { "required": true,  "enum": ["Strict", "Lax", "None"] },
+    "R2_S3_ENDPOINT":      { "required": true,  "coheres": "r2-endpoint" },
+    "R2_PUBLIC_BASE":      { "required": false, "coheres": "r2-public-base" },
+    "R2_BUCKET_NAME":      { "required": true,  "coheres": "r2-bucket" },
+    "MAIL_DRIVER":         { "required": true,  "enum": ["", "console", "resend"] },
+    "MAIL_FROM":           { "required": true },
+    "WEB_BASE_URL":        { "required": true,  "coheres": "web-origin" },
+    "GOOGLE_CLIENT_ID":    { "required": true },
+    "GOOGLE_REDIRECT_URI": { "required": true,  "coheres": "api-origin/auth/google/callback", "manual": "register in Google OAuth" }
+  },
+  "api-secrets": {
+    "JWT_SECRET":           { "required": true },
+    "R2_ACCESS_KEY_ID":     { "required": true },
+    "R2_SECRET_ACCESS_KEY": { "required": true },
+    "GOOGLE_CLIENT_SECRET": { "required": true },
+    "RESEND_API_KEY":       { "required": false, "requiredWhen": "MAIL_DRIVER=resend" }
+  },
+  "ci-secrets": {
+    "CF_API_TOKEN": { "required": true },
+    "CF_ACCOUNT_ID": { "required": true }
+  }
+}
