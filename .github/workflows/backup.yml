@@ -104,6 +104,11 @@ jobs:
       (github.event_name == 'workflow_dispatch' && !inputs.drill)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Secrets are environment-scoped in this repository (none at repository level).
+    # `backups` has no required reviewers, unlike the deploy environments, so a
+    # scheduled run never waits for an approval. It holds CF_API_TOKEN,
+    # CF_ACCOUNT_ID, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY.
+    environment: backups
     strategy:
       fail-fast: false
       matrix:
@@ -162,6 +167,11 @@ jobs:
       (github.event_name == 'workflow_dispatch' && inputs.drill)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Secrets are environment-scoped in this repository (none at repository level).
+    # `backups` has no required reviewers, unlike the deploy environments, so a
+    # scheduled run never waits for an approval. It holds CF_API_TOKEN,
+    # CF_ACCOUNT_ID, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY.
+    environment: backups
     strategy:
       fail-fast: false
       matrix:
