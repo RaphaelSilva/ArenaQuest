@@ -1,7 +1,7 @@
 # RFC 0008: Configurable Widget Dashboard
 
 **Date:** 2026-06-20
-**Status:** Proposed
+**Status:** Approved
 **Revised:** 2026-10-12
 **Author:** raphaelsilva
 **Affected:**
