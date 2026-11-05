@@ -68,7 +68,7 @@ export function TopicHeader({ topic, trail, totalInBranch }: Props) {
         </div>
 
         {/* Right: Stats (on md+) or horizontal chips (mobile) */}
-        <div className="flex flex-col gap-3 md:flex-row md:gap-4 md:flex-shrink-0">
+        <div className="flex flex-row gap-3 md:gap-4 md:flex-shrink-0">
           <div className="flex flex-col items-center rounded-[12px] px-4 py-3" style={{ background: 'var(--aq-bg3)' }}>
             <p
               className="text-[22px] font-bold"
