@@ -16,9 +16,9 @@ returns before touching the row; the status rules do not change (a completed top
 a visit still moves a new topic to `in_progress`). The `continue` widget's data is the accessible,
 published, non-archived topic with the latest `last_visited_at`: `{ topicId, title, status }`, or an
 empty answer when the student has no visit yet or the last visited topic is no longer accessible
-(in which case the next most recent accessible one is used). Backlog `user-experience/10` (visit on
-page mount) is independent; until it ships, a visit is recorded on media interaction as today. Task
-12 renders the widget.
+(in which case the next most recent accessible one is used). [Task 15](./15-topic-visit-on-page-mount-frontend.task.md)
+(visit on page mount, absorbed from backlog `user-experience/10`) ships in the same release, so
+text-only topics count from day one. Task 12 renders the widget.
 
 ## Dependencies
 
@@ -51,8 +51,8 @@ In:
   M27 specs green).
 
 Out:
-- Web — Task 12. Visit on page mount — backlog `user-experience/10`. Media resume position — out of
-  the milestone.
+- Web — Task 12. Visit on page mount — Task 15 (same release). Media resume position — out of the
+  milestone.
 
 ## Acceptance Criteria
 

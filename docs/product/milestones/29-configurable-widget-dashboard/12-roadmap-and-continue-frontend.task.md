@@ -45,7 +45,7 @@ In:
   the topic link, and the empty state without data.
 
 Out:
-- Recommendations — Task 13. Visit on page mount — backlog `user-experience/10`.
+- Recommendations — Task 13. Visit on page mount — Task 15. Completion button — Task 16.
 
 ## Acceptance Criteria
 

@@ -276,6 +276,10 @@ into this response, so the web makes **one** call instead of four. The layout ro
   available" and a link to Settings. The config is kept, so the widget works again when access
   returns.
 - **Several instances** — e.g. one roadmap rooted at "Kihon" and one at "Kata".
+- **Where completion comes from.** Today a topic becomes `completed` only through a task-stage
+  check-in; nothing in the web calls `POST /v1/me/topics/{id}/complete`. A **Mark as completed**
+  button on leaf topics, calling that existing route with its current effects, ships with this
+  milestone so the percentages move for tenants that do not use tasks (D26, D27).
 
 ### 6. Continue widget
 
@@ -285,8 +289,9 @@ into this response, so the web makes **one** call instead of four. The layout ro
 - The widget shows the accessible, published, non-archived topic with the latest `last_visited_at`:
   title, a link to `/catalog/{id}` and its status. No visit yet → an empty state pointing to the
   catalog.
-- Depends on backlog `user-experience/10` (visit on page mount) so text-only topics count. RFC 0023,
-  if accepted, may refine the signal without changing this widget's contract.
+- Ships together with backlog `user-experience/10` (visit on page mount), absorbed into the
+  milestone, so text-only topics count from day one (D25). RFC 0023, if accepted, may refine the
+  signal without changing this widget's contract.
 
 ### 7. Recommendations widget
 
@@ -359,9 +364,10 @@ One milestone, three phases; each phase ends shippable.
 ### Phase 3 — New widgets
 
 1. Roadmap with `startTopicId`, server-side subtree progress and the unavailable state.
-2. `last_visited_at` migration and the visit change; continue widget (after backlog
-   `user-experience/10`).
-3. Recommendations widget: group-scope editor and live, access-filtered read.
+2. `last_visited_at` migration and the visit change; continue widget, released together with the
+   visit on page mount (backlog `user-experience/10`).
+3. Mark as completed button on leaf topics.
+4. Recommendations widget: group-scope editor and live, access-filtered read.
 
 ## Tradeoffs & Risks
 
@@ -395,6 +401,8 @@ One milestone, three phases; each phase ends shippable.
   archived or access is revoked, the widget shows the unavailable state without T's title, and works
   again when access returns.
 - Visiting a completed topic makes it the continue widget's topic; its status stays `completed`.
+- Opening a text-only topic page records a visit; completing a leaf topic with the button grants XP
+  once and raises its parent stage's roadmap percentage.
 - A recommendations widget with topics X (accessible) and Y (not) shows only X, with its reason.
   Editing the group default changes it for every student on the next uncached read, including those
   with a copy.
@@ -433,6 +441,14 @@ All taken by the product owner on **2026-10-12**.
 | D22 | Performance: Phase 1 measures the baseline on the demo seed, then fixes the target |
 | D23 | Each instance carries `version`; migration happens on read; an invalid instance is dropped with a log |
 | D24 | Mobile uses the same order in a single column |
+
+Added by the product owner on **2026-11-05**, while breaking the milestone into tasks:
+
+| # | Decision |
+|---|---|
+| D25 | Backlog `user-experience/10` (visit on page mount) is delivered inside the milestone, in the same release as the continue widget |
+| D26 | A **Mark as completed** button on the topic page calls the existing complete route, so leaf-based roadmap progress works without tasks |
+| D27 | Self-completion keeps the route's effects — `topic_complete` XP (100) once per topic, streak and quests; leaf topics only; no undo |
 
 ## Open Questions
 
