@@ -1,12 +1,14 @@
 # Task: Implement Admin Password Reset Capability
 
-**Status:** ✅ Done  
+**Status:** ✅ Baseline delivered (hardening tracked in Task 03)  
 **Type:** Feature  
 **Milestone:** Backlog (extends Milestone 2 & 6)  
 **Complexity:** Medium (2 sessions: backend + frontend)  
 **Priority:** Medium  
 
 **Related Story:** [01-admin-password-reset.story.md](./01-admin-password-reset.story.md)
+
+**Follow-up:** [03-admin-password-reset-contract-hardening.task.md](./03-admin-password-reset-contract-hardening.task.md)
 
 ---
 
@@ -52,8 +54,8 @@ This task maintains the cloud-agnostic architecture and builds on existing passw
 - **No Plaintext Storage:** Temporary password is shown once in API response; never stored plaintext in database.
 - **Role Validation:** Only `admin` role can call this endpoint. Non-admins receive 403 Forbidden.
 - **Self-Reset Prevention:** Admin cannot reset their own password via this endpoint (returns 422 Unprocessable Entity).
-- **Session Revocation:** All existing refresh tokens for the target user are immediately invalidated (atomic operation with password update).
-- **Audit Trail:** Every reset attempt (success or failure) is logged with: admin user ID, target user ID, timestamp, IP address, result.
+- **Session Revocation:** All existing refresh tokens for the target user are immediately invalidated. Atomicity with the password update remains a Task 03 requirement.
+- **Audit Trail:** The baseline emits a structured success line with admin user ID, target user ID, timestamp and result. Failure outcomes and request IP remain Task 03 requirements.
 
 ### Database
 - **No schema changes required.** Reuse existing `users` table and refresh token storage.
@@ -61,7 +63,7 @@ This task maintains the cloud-agnostic architecture and builds on existing passw
 
 ### Email
 - **Template:** Reuse "Password Reset" email template from Milestone 6 OR create new "Admin Reset" variant with subject: *"Your ArenaQuest password has been reset by an administrator"* and note from admin (if provided).
-- **Fallback:** If email sending fails, API returns 500 but password IS updated (not rolled back). Admin retains the temporary password to communicate manually.
+- **Fallback:** If email sending fails after the password update, the API returns `200` with `emailSent: false` and the temporary password so the admin can communicate it manually.
 
 ---
 
@@ -190,9 +192,9 @@ Response (200 OK): {
 - [x] **Backend:** Admin cannot reset own password via endpoint (422 for self-reset)
 - [x] **Backend:** Temporary password generated with sufficient entropy (16+ random bytes)
 - [x] **Backend:** Temporary password is returned in response and never stored plaintext
-- [x] **Backend:** All refresh tokens for target user are revoked atomically with password update
+- [ ] **Backend:** All refresh tokens for target user are revoked atomically with password update — transferred to Task 03
 - [x] **Backend:** Email sent to user (if requested) with password and admin note
-- [x] **Backend:** Audit log entry created for each reset attempt
+- [ ] **Backend:** Audit log entry created for each reset attempt — transferred to Task 03
 - [x] **Backend:** Error handling for invalid input, missing user, authorization failures
 - [x] **Frontend:** User Detail page has "Reset Password" button (admin only)
 - [x] **Frontend:** Confirmation modal displays with optional email and note fields
@@ -201,9 +203,34 @@ Response (200 OK): {
 - [x] **Frontend:** Page refreshes user data after reset
 - [x] **Testing:** All API tests pass (happy path, auth, validation, idempotency)
 - [x] **Testing:** All frontend tests pass (modal interactions, API calls, error handling)
-- [x] **Lint & Build:** `make lint` and `make test` pass cleanly
-- [x] **No Regressions:** Existing password reset flows (forgot-password, change-password) remain unchanged
-- [x] **Documentation:** Admin guide or CONTRIBUTING.md updated with new capability
+- [ ] **Lint & Build:** full `make lint` and `make test` not rerun during the 2026-09-23 reconciliation
+- [ ] **No Regressions:** existing password reset flows were not rerun during the 2026-09-23 reconciliation
+- [ ] **Documentation:** admin/operator guide update transferred to Task 03
+
+### Reconciliation Evidence (2026-09-23)
+
+Task 02 remains the historical baseline delivery rather than being silently
+reopened. The implementation is evidenced by `eddba11` (backend) and `3178be7`
+(web); `da3d27a` is the documentation commit that originally marked all criteria
+done. Inspection of `admin-users.controller.ts` found two contract gaps: password
+update and refresh-token deletion are sequential writes, and the audit helper is
+called only on success without request IP. Task 03 owns those gaps.
+
+Commands rerun against the current tree:
+
+```bash
+cd apps/api
+pnpm test test/controllers/admin-users.controller.spec.ts test/routes/admin-users.router.spec.ts
+# 46 passed, 1 skipped
+
+cd apps/web
+pnpm exec vitest run __tests__/components/admin/ResetPasswordModal.test.tsx
+# 16 passed
+```
+
+The first test attempt could not start because dependencies were absent. After
+`pnpm install --frozen-lockfile` at the repository root, both focused commands
+passed. Full lint/build/test and manual end-to-end verification remain unverified.
 
 ---
 

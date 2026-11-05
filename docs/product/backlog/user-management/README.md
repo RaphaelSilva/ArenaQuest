@@ -12,11 +12,12 @@ This folder contains product stories and implementation tasks for user account m
 - ✅ Role-based access control (Milestone 2)
 - ✅ Google OAuth social login (Milestone 6)
 
-## Open Backlog
+## Delivered with Open Hardening
 
 ### 1. Admin Password Reset for User Maintenance
 **Story:** [01-admin-password-reset.story.md](./01-admin-password-reset.story.md)  
-**Implementation Task:** [02-admin-password-reset-implementation.task.md](./02-admin-password-reset-implementation.task.md)
+**Baseline Implementation:** [02-admin-password-reset-implementation.task.md](./02-admin-password-reset-implementation.task.md)  
+**Hardening Follow-up:** [03-admin-password-reset-contract-hardening.task.md](./03-admin-password-reset-contract-hardening.task.md)
 
 **What:** Allow system administrators to reset user passwords for account maintenance.
 
@@ -25,27 +26,30 @@ This folder contains product stories and implementation tasks for user account m
 - Admins need maintenance capability without requiring external intervention
 - Improves user support experience and system reliability
 
-**Scope:**
-- New API endpoint: `POST /admin/users/:userId/reset-password`
-- Generates secure temporary password
-- Sends notification email to user
-- Invalidates user's active sessions
-- Audit logging for compliance
-- Frontend UI: Reset button in User Detail admin panel
+**Delivered Scope:**
+- API endpoint: `POST /v1/admin/users/:id/reset-password`
+- Secure temporary-password generation and optional notification email
+- Refresh-token revocation for the target user
+- Structured success audit line
+- Reset button and confirmation/result modal in the User Detail admin panel
 
-**Complexity:** Medium (2 development sessions: backend + frontend)  
 **Priority:** Medium  
-**Status:** Open (ready for planning)
+**Status:** Baseline implemented; contract hardening remains open
 
 **Implementation Checklist:**
-- [ ] Backend endpoint with authorization checks
-- [ ] Temporary password generation and email flow
-- [ ] Session revocation for target user
-- [ ] Audit logging
-- [ ] Frontend modal component
-- [ ] API integration tests
-- [ ] UI interaction tests
+- [x] Backend endpoint with admin authorization checks
+- [x] Temporary password generation and optional email flow
+- [x] Session revocation for target user
+- [x] Frontend modal component
+- [x] Focused API and UI automated tests
+- [ ] Atomic password update and session revocation
+- [ ] Audit every reset attempt with the contract metadata
 - [ ] End-to-end verification
+
+The baseline was introduced by commits `eddba11` (API) and `3178be7`
+(web). The original task was marked done by `da3d27a`, but a source audit found
+that the strict atomicity and audit requirements were not implemented. Those
+gaps are tracked explicitly in Task 03 rather than silently reopening Task 02.
 
 ---
 
