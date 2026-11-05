@@ -6,11 +6,12 @@ import { ROLES } from '@arenaquest/shared/constants/roles';
 import { useHasRole } from '@web/hooks/use-auth';
 import { useDelinquencyCount } from '@web/hooks/use-delinquency-count';
 import { useDict } from '@web/context/dict-context';
+import { ADMIN_NAV_ITEMS } from './admin-nav-items';
 
 type NavItem = {
   label: string;
   href: string;
-  requiredRoles?: typeof ROLES[keyof typeof ROLES][];
+  requiredRoles?: readonly (typeof ROLES)[keyof typeof ROLES][];
   /** An optional count rendered beside the label; `null` renders nothing. */
   badge?: { count: number | null; label: (total: number) => string };
 };
@@ -53,32 +54,17 @@ export function AdminSidebar() {
   // Failure-silent: `null` when it cannot load, which renders as no badge.
   const delinquencyCount = useDelinquencyCount(isAdmin);
 
-  const navItems: NavItem[] = [
-    { label: dict.layout.adminSidebar.users, href: '/admin/users', requiredRoles: [ROLES.ADMIN] },
-    { label: dict.layout.adminSidebar.topics, href: '/admin/topics', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
-    { label: dict.layout.adminSidebar.tasks, href: '/admin/tasks', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
-    // A `content_creator` authors event drafts; only an `admin` may publish
-    // one, which the form states rather than this nav hiding the whole area.
-    { label: dict.layout.adminSidebar.events, href: '/admin/events', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
-    { label: dict.layout.adminSidebar.badges, href: '/admin/badges', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
-    { label: dict.layout.adminSidebar.quests, href: '/admin/quests', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
-    { label: dict.layout.adminSidebar.missions, href: '/admin/missions', requiredRoles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
-    { label: dict.layout.adminSidebar.levels, href: '/admin/levels', requiredRoles: [ROLES.ADMIN] },
-    { label: dict.layout.adminSidebar.players, href: '/admin/players', requiredRoles: [ROLES.ADMIN] },
-    { label: dict.layout.adminSidebar.groups, href: '/admin/groups', requiredRoles: [ROLES.ADMIN] },
-    { label: dict.layout.adminSidebar.access, href: '/admin/access', requiredRoles: [ROLES.ADMIN] },
-    {
-      // ADMIN only — never CONTENT_CREATOR — matching the API's own guard on
-      // `/v1/admin/billing/*`.
-      label: dict.layout.adminSidebar.billing,
-      href: '/admin/billing',
-      requiredRoles: [ROLES.ADMIN],
-      badge: {
-        count: delinquencyCount,
-        label: dict.layout.adminSidebar.billingBadgeLabel,
-      },
-    },
-  ];
+  const navItems: NavItem[] = ADMIN_NAV_ITEMS.map((item) => ({
+    label: dict.layout.adminSidebar[item.labelKey],
+    href: item.href,
+    requiredRoles: item.requiredRoles,
+    badge: item.href === '/admin/billing'
+      ? {
+          count: delinquencyCount,
+          label: dict.layout.adminSidebar.billingBadgeLabel,
+        }
+      : undefined,
+  }));
 
   return (
     <aside className="hidden md:block w-48 border-r border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">

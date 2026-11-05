@@ -8,6 +8,7 @@ import { Logo } from '@web/components/design-system';
 import { useSidebar } from '@web/context/sidebar-context';
 import { useDict } from '@web/context/dict-context';
 import { ThemeToggle } from './theme-toggle';
+import { ADMIN_NAV_ITEMS } from './admin-nav-items';
 
 function MobileDrawer({ onClose }: { onClose: () => void }) {
   const pathname = usePathname();
@@ -26,21 +27,6 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
     { label: dict.layout.nav.settings, href: '/settings', prefix: false },
   ];
 
-  const adminLinks = [
-    { label: dict.layout.adminSidebar.users, href: '/admin/users', roles: [ROLES.ADMIN] },
-    { label: dict.layout.adminSidebar.topics, href: '/admin/topics', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
-    { label: dict.layout.adminSidebar.tasks, href: '/admin/tasks', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
-    // A `content_creator` authors and edits event drafts; only an `admin` may
-    // publish one, which the form states rather than this nav hiding the area.
-    { label: dict.layout.adminSidebar.events, href: '/admin/events', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
-    { label: dict.layout.adminSidebar.badges, href: '/admin/badges', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
-    { label: dict.layout.adminSidebar.quests, href: '/admin/quests', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
-    { label: dict.layout.adminSidebar.missions, href: '/admin/missions', roles: [ROLES.ADMIN, ROLES.CONTENT_CREATOR] },
-    { label: dict.layout.adminSidebar.levels, href: '/admin/levels', roles: [ROLES.ADMIN] },
-    { label: dict.layout.adminSidebar.players, href: '/admin/players', roles: [ROLES.ADMIN] },
-    { label: dict.layout.adminSidebar.groups, href: '/admin/groups', roles: [ROLES.ADMIN] },
-    { label: dict.layout.adminSidebar.access, href: '/admin/access', roles: [ROLES.ADMIN] },
-  ];
 
   return (
     <>
@@ -92,8 +78,10 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
                 {dict.layout.adminSidebar.title}
               </p>
               <ul className="space-y-1">
-                {adminLinks.map((link) => {
-                  const canSee = link.roles.includes(ROLES.CONTENT_CREATOR) ? canAccessAdmin : isAdmin;
+                {ADMIN_NAV_ITEMS.map((link) => {
+                  const canSee = link.requiredRoles.some((role) => role === ROLES.CONTENT_CREATOR)
+                    ? canAccessAdmin
+                    : isAdmin;
                   if (!canSee) return null;
                   const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
                   return (
@@ -107,7 +95,7 @@ function MobileDrawer({ onClose }: { onClose: () => void }) {
                             : 'text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800/50'
                         }`}
                       >
-                        {link.label}
+                        {dict.layout.adminSidebar[link.labelKey]}
                       </Link>
                     </li>
                   );
