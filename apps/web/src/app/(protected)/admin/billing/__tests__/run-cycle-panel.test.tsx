@@ -195,12 +195,19 @@ describe('RunCyclePanel — the request', () => {
     transportReturning(emptyReport());
   });
 
-  it('posts to the run endpoint with no body when no window was given', async () => {
+  it('posts an empty JSON body — never no body — when no window was given', async () => {
+    // Regression for backlog `user-experience/12`: the client always sends
+    // `Content-Type: application/json`, and a bodiless request under that
+    // header is rejected by the route as malformed JSON (400). The default
+    // path of this control is therefore `{}`, which lets the server apply its
+    // own window.
     renderPanel();
     openAndConfirm();
 
     await waitFor(() =>
-      expect(http).toHaveBeenCalledWith('POST', '/admin/billing/invoices/run', undefined),
+      expect(http).toHaveBeenCalledWith('POST', '/admin/billing/invoices/run', {
+        body: JSON.stringify({}),
+      }),
     );
   });
 

@@ -701,17 +701,21 @@ export function createAdminBillingApi(http: HttpTransport) {
       },
 
       /**
-       * Runs the billing cycle by hand. The body is optional on the server, so
-       * an absent `input` posts no body at all and the run uses its own
-       * defaults. Idempotent by construction: a second run for one period
-       * creates nothing and reports it as `absorbed`.
+       * Runs the billing cycle by hand. Both window fields are optional on the
+       * server, so an absent `input` is posted as `{}` and the run uses its own
+       * defaults. It must be a JSON body, not no body: `http()` always sends
+       * `Content-Type: application/json`, and the route's validator parses the
+       * body whenever that header is present — an empty body is "malformed
+       * JSON" (400), not "no body" (backlog `user-experience/12`). Idempotent by
+       * construction: a second run for one period creates nothing and reports
+       * it as `absorbed`.
        */
       run(input?: RunInvoiceCycleInput): Promise<BillingRunReport> {
         return send<BillingRunReport>(
           'POST',
           `${BASE}/invoices/run`,
           'BILLING_INVOICE_RUN_FAILED',
-          input,
+          input ?? {},
         );
       },
 
