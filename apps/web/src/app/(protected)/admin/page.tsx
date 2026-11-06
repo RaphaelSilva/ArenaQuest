@@ -13,7 +13,7 @@ export default function AdminDashboard() {
   const d = dict.admin.dashboard;
 
   return (
-    <div className="p-6 md:p-8 lg:p-10">
+    <div className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10">
       <div className="mb-8">
         <h1 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>
           {d.title}
