@@ -7,11 +7,13 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   type ReactNode,
 } from 'react';
 import type { Entities } from '@arenaquest/shared/types/entities';
 import { authApi } from '@web/lib/auth-api';
 import { ApiClient } from '@web/lib/api-client';
+import { openAuthBroadcast, type AuthBroadcast } from '@web/lib/auth-broadcast';
 
 // ---------------------------------------------------------------------------
 // JWT decoder — no external deps, client-side only
@@ -79,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Entities.Identity.User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Cross-tab session signal; opened in an effect below (never during SSR).
+  const broadcastRef = useRef<AuthBroadcast | null>(null);
 
   // On mount: attempt to restore session from the HttpOnly refresh-token cookie.
   useEffect(() => {
@@ -106,19 +110,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       timezone: '',
       createdAt: new Date(),
     });
+    broadcastRef.current?.post({ type: 'login' });
   }, []);
 
   const loginWithAccessToken = useCallback((token: string) => {
     setAccessToken(token);
     const claims = decodeJwtClaims(token);
     if (claims) setUser(userFromClaims(claims));
+    broadcastRef.current?.post({ type: 'login' });
   }, []);
 
-  const logout = useCallback(async () => {
-    await authApi.logout();
+  const clearSession = useCallback(() => {
     setUser(null);
     setAccessToken(null);
   }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await authApi.logout();
+    } finally {
+      clearSession();
+      broadcastRef.current?.post({ type: 'logout' });
+    }
+  }, [clearSession]);
 
   const refreshSession = useCallback(async () => {
     try {
@@ -138,9 +152,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const onSessionExpired = useCallback(() => {
-    setUser(null);
-    setAccessToken(null);
-  }, []);
+    clearSession();
+    broadcastRef.current?.post({ type: 'logout' });
+  }, [clearSession]);
+
+  // Another tab logged out → drop this tab's in-memory session at once instead
+  // of letting its access token run out its 15 minutes. Another tab logged in →
+  // pick the session up from the refresh cookie it just set (`refresh()` is
+  // serialised across tabs, so this cannot race the other tab's rotation).
+  useEffect(() => {
+    const broadcast = openAuthBroadcast((message) => {
+      if (message.type === 'logout') clearSession();
+      else void refreshSession();
+    });
+    broadcastRef.current = broadcast;
+    return () => {
+      broadcastRef.current = null;
+      broadcast.close();
+    };
+  }, [clearSession, refreshSession]);
 
   const apiClient = useMemo(
     () => new ApiClient(accessToken, refreshSession, setAccessToken, onSessionExpired),
