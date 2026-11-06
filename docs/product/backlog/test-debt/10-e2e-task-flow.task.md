@@ -4,7 +4,8 @@
 - **Status:** Pending
 - **Complexity:** Low
 - **Milestone:** 4 — Task Engine & Interconnection
-- **Dependencies:** Task 07, Task 08, Task 09 (and the M3 Playwright scaffold, Task 11)
+- **Dependencies:** Task 07, Task 08, Task 09 of Milestone 4, and this topic's [Task 11 — E2E scaffold](./11-e2e-playwright-scaffold.task.md) (which depends on Tasks 12 and 13)
+- **Delivery:** fifth in the `e2e` backlog candidate (12 → 13 → 11 → 14 → **10** → 11-progress); see [README](./README.md)
 
 ---
 
@@ -17,6 +18,7 @@ Extend the Playwright E2E suite from Milestone 3 with a new scenario covering th
 ## Architectural Context
 
 - **Framework:** Extends the existing `e2e/` workspace. No new scaffolding or CI jobs required.
+- **Projects:** The spec runs under every Playwright project (`desktop`, `mobile`, `tablet`) and navigates only through the `nav` fixture, so it carries no viewport branch (Task 14 rule).
 - **Isolation:** Each test run seeds a unique topic tree and task via API helpers to ensure determinism and parallel-safe execution.
 - **CI:** The existing `e2e.yml` GitHub Actions workflow automatically picks up new spec files.
 
