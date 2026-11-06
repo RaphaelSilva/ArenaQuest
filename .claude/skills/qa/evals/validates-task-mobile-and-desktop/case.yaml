@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: validates-task-mobile-and-desktop
+expected_outcome: |
+  The run checks .envs.test with qa-env.mjs (student role) and the two local servers before
+  opening anything, exercises /catalog at a desktop width and at the Pixel 7 width, uses
+  qa-shot.mjs or a throwaway Playwright script under tmp/qa/ for the evidence, and ends with
+  the report template: one line per criterion (M4, M6) with a desktop and a mobile verdict,
+  any defect as a [SEV-N] block with steps, expected, actual and an evidence path, accounts
+  named by role label only (never an e-mail or password), and a hand-off line. Nothing under
+  apps/ or packages/ is modified.

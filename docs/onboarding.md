@@ -43,7 +43,7 @@ cannot run until you create them.
 |---|---|---|
 | `apps/api/.dev.vars` | `.dev.vars.example` | Worker secrets and vars for `wrangler dev` |
 | `apps/web/.env.local` | `.env.example` | `NEXT_PUBLIC_API_URL` and white-label build vars |
-| `.envs.test` | `.envs.test.example` | Test accounts used by the `qa-tester` skill |
+| `.envs.test` | `.envs.test.example` | Test accounts used by the `qa` skill and the E2E suite (local only, never committed) |
 | `apps/api/.wrangler/state/v3/d1` | migrations | The local D1 (SQLite) replica |
 
 On first creation only, `setup` replaces the template's placeholder

@@ -17,12 +17,6 @@ Paths below are **relative to the repo root** (`docs/product/RFCs`, the
 scripts under `.claude/skills/write-rfc/`). Run them from the root **of the
 planning worktree** (see *Where to work*), never from the root checkout on `main`.
 
-> **The `.claude/skills/` directory is a symlink to `.agents/skills/`.** It
-> resolves fine for the Node runtime (Linux). The Windows `\\wsl.localhost`
-> bridge can't traverse the symlink — if a tool errors with `ENOTDIR` /
-> `Input/output error` on `.claude/skills/...`, use the real path
-> `.agents/skills/write-rfc/...` instead. Both point at the same files.
-
 ## Where to work: the planning worktree
 
 Planning is written in its **own git worktree and ships as its own PR**, separate
@@ -122,9 +116,6 @@ predate the full skeleton, so these don't block).
 
 ## Gotchas
 
-- **`.claude/skills` is a symlink** (→ `.agents/skills`). Native file tools
-  reaching it over the Windows bridge throw `Input/output error`; run scripts
-  through the WSL Node runtime, or edit files via `.agents/skills/write-rfc/`.
 - **Exit codes are swallowed by the `wsl.exe … bash -c '… ; echo $?'` bridge**
   — `$?` reads as 0 even when Node exited non-zero. To observe the real result
   use `&&`/`||` evaluated inside WSL:

@@ -94,3 +94,5 @@ docs/product/**/closeout-analysis.md
 
 .hermes
 .worktrees
+# QA test accounts for the qa skill (the filled file is local only; see .envs.test.example)
+.envs.test
