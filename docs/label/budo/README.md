@@ -1,7 +1,7 @@
 # Budo label — operational notes
 
 Content and gamification work done directly against the **budo production** tenant
-(`config/labels/budo.jsonc`, D1 `budo-db`, API `api-budo.spaziord.com.br`).
+(`config/labels/budo.jsonc`, D1 `budo-db`, API `api.taibudo.com`).
 
 | Document | What it holds |
 |---|---|

@@ -336,6 +336,67 @@ export function checkPolicy(allowedOrigins, env) {
 }
 
 /**
+ * Multi-label public suffixes the labels can land on. A full Public Suffix List
+ * is deliberately not vendored: this list only has to cover the suffixes our
+ * profiles use, and an unknown one falls back to "last two labels", which is the
+ * conservative answer for a `.com`/`.app` style host. `pages.dev` and
+ * `workers.dev` ARE public suffixes — every project on them is its own site.
+ */
+const MULTI_LABEL_PUBLIC_SUFFIXES = new Set([
+  'com.br', 'net.br', 'org.br', 'app.br', 'dev.br',
+  'co.uk', 'org.uk', 'com.au', 'co.jp',
+  'pages.dev', 'workers.dev',
+]);
+
+/**
+ * The browser "site" (scheme-less registrable domain) of a host or URL —
+ * `api.taibudo.com` → `taibudo.com`, `budo-web.pages.dev` → `budo-web.pages.dev`.
+ * `localhost` and IP literals are returned as-is.
+ */
+export function siteOf(hostOrUrl) {
+  const host = String(hostOrUrl || '')
+    .replace(/^[a-z]+:\/\//i, '')
+    .replace(/[/:].*$/, '')
+    .toLowerCase();
+  if (!host.includes('.') || /^\d+(\.\d+){3}$/.test(host)) return host;
+  const labels = host.split('.');
+  const lastTwo = labels.slice(-2).join('.');
+  const take = MULTI_LABEL_PUBLIC_SUFFIXES.has(lastTwo) ? 3 : 2;
+  return labels.slice(-take).join('.');
+}
+
+/**
+ * `session-cookie-same-site`: the refresh-token cookie is set by the API and
+ * must come back to it on the web app's `POST /auth/refresh`, a credentialed
+ * fetch from the web origin. A `Strict`/`Lax` cookie is neither stored nor sent
+ * on a cross-site fetch, so the web and API hosts must share one site or every
+ * reload logs the user out. `None` survives cross-site only as a third-party
+ * cookie (Safari, Brave and private windows drop it) — a warning, not a gap.
+ *
+ * Returns `{ status: 'pass' | 'warn' | 'fail', apiSite, webSite, reason? }`.
+ */
+export function checkCookieSite(apiUrl, webUrl, sameSite) {
+  const apiSite = siteOf(apiUrl);
+  const webSite = siteOf(webUrl);
+  if (!apiSite || !webSite || apiSite === webSite) return { status: 'pass', apiSite, webSite };
+  const mode = String(sameSite || '').toLowerCase();
+  if (mode === 'none') {
+    return {
+      status: 'warn',
+      apiSite,
+      webSite,
+      reason: `API (${apiSite}) and web (${webSite}) are different sites — the SameSite=None session cookie is a third-party cookie that Safari, Brave and private windows block`,
+    };
+  }
+  return {
+    status: 'fail',
+    apiSite,
+    webSite,
+    reason: `API (${apiSite}) and web (${webSite}) are different sites — a SameSite=${sameSite || 'Strict'} session cookie is never sent on the web's refresh, so every reload logs the user out`,
+  };
+}
+
+/**
  * Map a flat list of result items to a process exit code:
  *   0 — all present, coherent and policy-compliant.
  *   1 — any hard gap (missing | incoherent | policy violation).
@@ -949,6 +1010,19 @@ function cmdCheck(label, env) {
         continue;
       }
       results.push({ group: 'api-vars', key, status: 'pass', detail: 'coherent, policy ok' });
+      continue;
+    }
+    if (key === 'COOKIE_SAMESITE') {
+      const site = checkCookieSite(expected.NEXT_PUBLIC_API_URL, expected.NEXT_PUBLIC_SITE_URL, v);
+      if (site.status === 'fail') {
+        results.push({ group: 'api-vars', key, status: 'fail', detail: site.reason, fix: 'put apiHost and webOrigin on the same registrable domain (e.g. api.<site> + <site>)' });
+        continue;
+      }
+      if (site.status === 'warn') {
+        results.push({ group: 'api-vars', key, status: 'manual', detail: site.reason, fix: 'serve the API from a subdomain of the web origin' });
+        continue;
+      }
+      results.push({ group: 'api-vars', key, status: 'pass', detail: `present, same site (${site.webSite})` });
       continue;
     }
     results.push({ group: 'api-vars', key, status: 'pass', detail: spec.derivedFrom ? `coherent with ${spec.derivedFrom}` : 'present' });

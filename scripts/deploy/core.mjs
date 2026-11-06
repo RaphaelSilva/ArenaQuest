@@ -27,6 +27,7 @@ import {
   checkPresence,
   checkCoherence,
   checkPolicy,
+  checkCookieSite,
   mapExitCode,
   isActive,
   derivePreview,
@@ -284,6 +285,16 @@ export function preflight(schema, resolved, expected, env, opts = {}) {
       key: 'ALLOWED_ORIGINS',
       detail: `ALLOWED_ORIGINS policy: ${v.reason} (${v.origin})`,
     });
+  }
+
+  // policy — the session cookie must reach the API from the web origin
+  // (session-cookie-same-site). Only the fatal case gates a deploy: a
+  // Strict/Lax cookie across two sites can never be sent back. The SameSite=None
+  // third-party case is a warning surfaced by `label check`, and a candidate
+  // preview (`*.pages.dev` against `workers.dev` by construction) is exempt.
+  const site = checkCookieSite(expected.NEXT_PUBLIC_API_URL, expected.NEXT_PUBLIC_SITE_URL, resolved.COOKIE_SAMESITE);
+  if (site.status === 'fail' && !previewSecrets) {
+    results.push({ status: 'fail', group: 'policy', key: 'COOKIE_SAMESITE', detail: site.reason });
   }
 
   const exitCode = mapExitCode(results);

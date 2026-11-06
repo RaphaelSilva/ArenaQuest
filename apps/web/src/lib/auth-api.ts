@@ -42,6 +42,33 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
   return (await res.json().catch(() => ({}))) as Record<string, unknown>;
 }
 
+type RefreshResult = { accessToken: string } | null;
+
+/** Name of the cross-tab Web Lock that serialises refresh-token rotation. */
+export const REFRESH_LOCK_NAME = 'arenaquest:auth-refresh';
+
+let inFlightRefresh: Promise<RefreshResult> | null = null;
+
+async function sendRefresh(): Promise<RefreshResult> {
+  const res = await fetch(`${API_URL}${API_VERSION}/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+
+  if (!res.ok) return null;
+  return res.json();
+}
+
+/** Run `fn` under the cross-tab refresh lock when the browser offers Web Locks. */
+async function withRefreshLock(fn: () => Promise<RefreshResult>): Promise<RefreshResult> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  if (!locks?.request) return fn();
+  // The DOM lib types `request` as returning the callback's promise unwrapped
+  // one level too few; the runtime value is the callback's resolved result.
+  const result: unknown = await locks.request(REFRESH_LOCK_NAME, fn);
+  return result as RefreshResult;
+}
+
 export const authApi = {
   async login(email: string, password: string): Promise<LoginResponse> {
     let res: Response;
@@ -76,14 +103,24 @@ export const authApi = {
     });
   },
 
-  async refresh(): Promise<{ accessToken: string } | null> {
-    const res = await fetch(`${API_URL}${API_VERSION}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-    });
-
-    if (!res.ok) return null;
-    return res.json();
+  /**
+   * Rotate the refresh-token cookie and return a fresh access token.
+   *
+   * The API deletes the presented refresh token on every rotation, so two
+   * refreshes sent with the same cookie race: the loser gets a 401 and the
+   * user is sent to /login. Calls are therefore serialised twice — within the
+   * tab by sharing one in-flight promise (the mount-time restore, React's
+   * StrictMode double effect and `fetchWithAuth`'s retry all funnel here), and
+   * across tabs with a Web Lock, so a second tab's request leaves only after
+   * the first tab's `Set-Cookie` has landed and carries the new cookie.
+   */
+  refresh(): Promise<{ accessToken: string } | null> {
+    if (!inFlightRefresh) {
+      inFlightRefresh = withRefreshLock(sendRefresh).finally(() => {
+        inFlightRefresh = null;
+      });
+    }
+    return inFlightRefresh;
   },
 
   async register(input: { name: string; email: string; password: string }): Promise<{ status: 'pending_activation' }> {

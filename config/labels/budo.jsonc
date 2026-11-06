@@ -29,8 +29,8 @@
       "mail": { "driver": "console", "from": "Budo Staging <noreply@budo.app>" }
     },
     "production": {
-      "apiHost":      "api-budo.spaziord.com.br",
-      "webOrigin":    "budo.spaziord.com.br",
+      "apiHost":      "api.taibudo.com",
+      "webOrigin":    "taibudo.com",
       "worker":       "api-budo",
       "pagesProject": "budo-web",
       "d1":   { "name": "budo-db", "id": "9cadb9ea-9a8b-4f85-a1c9-5dcb7c3a0b1a" },

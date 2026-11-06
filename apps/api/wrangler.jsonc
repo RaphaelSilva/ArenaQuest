@@ -206,7 +206,7 @@
 			"vars": {
 				// Exact origin only — production forbids wildcards (deployment.schema.jsonc:
 				// "policy": "no-wildcard-in-prod-staging"). Derived from the profile's webOrigin.
-				"ALLOWED_ORIGINS": "https://budo.spaziord.com.br,https://taibudo.com",
+				"ALLOWED_ORIGINS": "https://taibudo.com",
 				"COOKIE_SAMESITE": "Strict",
 				"R2_S3_ENDPOINT": "https://1d2505ce8bda0a19b128ae074c38ee1a.r2.cloudflarestorage.com",
 				"R2_PUBLIC_BASE": "",

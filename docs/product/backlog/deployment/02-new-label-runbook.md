@@ -47,6 +47,14 @@ environment; everything cross-referencing is **derived** from them:
   `r2.bucket`, `r2.s3Endpoint`; `cookieSameSite`; `mail.driver` / `mail.from`.
 - resource ids (`d1.id`, `kv.id`) stay `<fill …>` until step 3.
 
+> **Keep `apiHost` and `webOrigin` on one site** (same registrable domain,
+> e.g. `api.taibudo.com` + `taibudo.com`). The session lives in the API's
+> `refresh_token` cookie, which the web sends back on `POST /auth/refresh`; a
+> `Strict`/`Lax` cookie never crosses sites, so a split pair logs the user out
+> on every reload. `label check` and the deploy preflight fail that case
+> (`COOKIE_SAMESITE`); `SameSite=None` across sites (the `pages.dev` stagings)
+> is only a warning, because it works solely where third-party cookies do.
+
 (See `config/labels/spaziord.jsonc` — committed as a worked sample.)
 
 ### Coherence by construction
