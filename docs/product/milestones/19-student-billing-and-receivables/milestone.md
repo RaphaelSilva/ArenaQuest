@@ -1,6 +1,6 @@
 # Milestone 19 — Student billing, contracts and receivables accounting
 
-**Status:** 🚧 In Progress
+**Status:** ✅ Implemented
 **Scope:** `packages/shared` (`types/entities.ts`, `ports/i-billing-repository.ts`, `domain/billing/`), `apps/api` (migration `0026`, `adapters/db/d1-billing-repository.ts`, `core/billing/`, `controllers/admin-billing.controller.ts` + `me-billing.controller.ts`, `routes/admin/billing.ts` + `routes/me/billing.ts`, `container.ts`, `index.ts` `scheduled` handler, `wrangler.jsonc`), `apps/web` (`admin/billing`, `settings/billing`, `lib/*-billing-api.ts`, both dictionaries). Derived from [RFC 0013](../../RFCs/0013-student-billing-contracts-and-receivables-accounting.md).
 
 > **Hard scope guardrail — read before opening any task.** This milestone may only touch the **billing bounded context** and its wiring: `packages/shared/types/entities.ts` (new `Entities.Billing` namespace + the seven new `Entities.Config` enums — no existing entity changes shape), `packages/shared/ports/i-billing-repository.ts` and `ports/index.ts`, the new pure `packages/shared/domain/billing/` (`billing-cycle.ts`, `standing-resolver.ts`, `format-money.ts`), `apps/api/migrations/0026_create_billing_tables.sql` (additive only — it alters no existing table) plus `apps/api/migrations/seed/`, `apps/api/src/adapters/db/d1-billing-repository.ts`, `apps/api/src/core/billing/{billing-service,accounting-service}.ts`, `apps/api/src/controllers/{admin-billing,me-billing}.controller.ts`, `apps/api/src/routes/admin/billing.ts` + `routes/me/billing.ts` and their mount lines, `apps/api/src/container.ts` (a new `billing` group only), the `scheduled` handler in `apps/api/src/index.ts` and `triggers.crons` in `apps/api/wrangler.jsonc`, `apps/web/src/app/(protected)/admin/billing/**` + `(protected)/settings/billing/**`, `apps/web/src/lib/{admin-billing-api,me-billing-api}.ts`, `apps/web/src/i18n/dict-en.ts` + `dict-pt.ts`, and tests for the above. **Extended 2026-09-12 for the admin write surface (tasks 09–13), by exactly three additions:** `apps/web/src/components/**` and `apps/web/src/hooks/**` — restricted to the pieces those screens introduce, which is what tasks 07–08 already did in practice — and `apps/web/src/i18n/types.ts` when a key is typed. `apps/web/src/lib/admin-users-api.ts` is **consumed unmodified** (the contract-signing picker needs the user list, which `admin/billing/page.tsx` already reads); adding to it is out of scope. Nothing in the extension reaches `apps/api/**` or `packages/**` at all. It **must not touch**: `apps/api/src/middleware/**`, `apps/api/src/routes/index.ts`, and `apps/api/src/adapters/db/d1-enrollment-repository.ts` — these three are the negative assertion of the whole RFC and a `git diff` over them must come back empty. It is explicitly **not** an opportunity to: gate, suspend, degrade or paywall access on payment in any form (RFC Non-Goal — no middleware, no `402`, no read-only mode, and not "phase 2"); declare or implement a payment-gateway port, adapter, webhook or card flow (#9); build the user anonymisation endpoint or remove `IUserRepository.delete()` (backlog, `docs/product/backlog/user-management/`); emit fiscal or tax documents; build a double-entry general ledger; implement per-topic pricing (`billing_plans.scope_topic_id` is written by the migration and read by nothing); implement proration; accrue late fees or interest automatically (`surcharge` is hand-applied only, #8); build a multi-step dunning sequence; convert between currencies; or build a currency admin screen. If a refactor opportunity is spotted outside this scope, file a separate task — do not bundle it.
@@ -22,6 +22,12 @@
 > criterion stays true — it is now insufficient, not wrong. RFC 0013 §7 was amended on
 > 2026-09-12 and tasks 09–13 close the gap; the milestone cannot be `✅ Implemented` until
 > they land, along with task 07's still-owed `[~]` responsive/keyboard verification.
+>
+> **Closed 2026-11-06.** Tasks 09–13 landed on 2026-09-12 and the `[~]` boxes were
+> discharged in a real browser during the closeout (see `closeout-analysis.md`, local,
+> and the notes on each box below). The one defect the walkthrough surfaced — *Rodar o
+> ciclo* with an empty window posting no body and failing with `400` — is fixed by
+> backlog `user-experience/12`, which this status change depends on.
 
 ---
 
@@ -105,39 +111,39 @@ Out of scope (explicit, from RFC 0013 Non-Goals):
 
 ## 3. Acceptance Criteria
 
-- [ ] `formatMoney` renders `100000` minor units as `R$ 1.000,00` (exponent 2), `JP¥ 100000` (exponent 0) and `₿ 0,00100000` (exponent 8) — the last being the case `Intl.NumberFormat` rounds to `BTC 0,00`.
-- [ ] `resolveStanding` unit tests cover every precedence branch, both grace boundaries (`dueDate + graceDays` inclusive vs. exclusive) read from the **invoice's** snapshot, a month-end `due_day`, a discount clearing a balance, a reversal moving a student from `good` back to `delinquent`, and a zero-value invoice leaving standing `good` with no payment row. They run with no Worker in the loop.
-- [ ] Applying `0026` twice is a no-op; `git diff` shows it alters no pre-existing table.
-- [ ] Inserting the same `(subscription_id, period_start)` twice raises a constraint error; a second `active` subscription for one user is rejected by `idx_subscriptions_one_active`; a second successor for one version is rejected by `idx_subscriptions_one_successor`.
-- [ ] A plan with an unknown currency code is rejected by the foreign key, and a second `active` currency by `idx_currencies_one_active`.
-- [ ] `DELETE FROM users` for a student holding any invoice is rejected by `ON DELETE RESTRICT`, while the same row updates cleanly to an anonymised name and email with every billing row intact.
-- [ ] Two amendments leave a chain of three rows sharing one `contract_group_id` with exactly one `active`; editing that plan's `amount_minor` and `grace_days` afterwards leaves every existing subscription and invoice byte-identical.
-- [ ] An admin can create a plan, sign both a standard and a negotiated contract, and issue, adjust, void, pay and reverse — entirely over the API.
-- [ ] `GET /reports/movement?month=…` reconciles to the sum of the ledger rows in that month, adjustments included; an amended student counts **once** in the active-students report.
-- [ ] A student with a cancelled contract and a later new one reports "student since" as the earlier date and "current membership since" as the later one.
-- [ ] Every billing mutation emits its `billing.*` structured audit event carrying the acting admin.
-- [ ] With a seeded student sitting `delinquent`, every pre-existing API test passes unchanged and `/v1/topics`, `/v1/me/progress` and the comments routes all return `200`.
-- [ ] The roster lists that student under `standing=delinquent`; setting a hold removes them from the list and from the reminder mail while leaving their outstanding balance in every total and in the aging report.
-- [ ] A `content_creator` and a `tutor` each receive `403` from every `/v1/admin/billing/*` route; a student receives `403` from all of them while `GET /v1/me/billing` returns their own statement.
-- [ ] Running the invoice job twice for one period issues each invoice exactly once; a free contract's period invoice is issued, lands `paid` with no payment row, and sends no mail.
-- [ ] The job writes no `invoice_adjustments` row of any kind; the student's grace-lapsed notice fires exactly once per invoice; the admin digest names only students who crossed a boundary since the previous run, so a second run the same day reports nobody.
-- [ ] `node apps/web/scripts/check-i18n-coverage.js` passes; `dict-en.ts` and `dict-pt.ts` have identical keys.
-- [ ] The student banner renders from `/v1/me/billing` with no standing rule duplicated in the client, and no route or screen is withheld behind it.
-- [ ] **No diff outside scope:** `git diff` for the whole milestone touches no file under `apps/api/src/middleware/`, does not modify `apps/api/src/routes/index.ts`, and does not modify `apps/api/src/adapters/db/d1-enrollment-repository.ts`.
-- [ ] `make lint`, `make test-api` and `make test-web` pass green.
+- [x] `formatMoney` renders `100000` minor units as `R$ 1.000,00` (exponent 2), `JP¥ 100000` (exponent 0) and `₿ 0,00100000` (exponent 8) — the last being the case `Intl.NumberFormat` rounds to `BTC 0,00`. *(2026-11-06: `format-money.spec.ts` asserts `R$ 1.000,00`, `₿ 0,00100000` and — for exponent 0 — `JP¥ 100.000`: grouping is applied at every exponent on purpose, recorded in the spec itself; the criterion's `JP¥ 100000` named the number, not the separator.)*
+- [x] `resolveStanding` unit tests cover every precedence branch, both grace boundaries (`dueDate + graceDays` inclusive vs. exclusive) read from the **invoice's** snapshot, a month-end `due_day`, a discount clearing a balance, a reversal moving a student from `good` back to `delinquent`, and a zero-value invoice leaving standing `good` with no payment row. They run with no Worker in the loop. *(2026-11-06: `standing-resolver.spec.ts` covers the precedence, both grace boundaries from the invoice snapshot, the discount, the reversal and the zero-value invoice; the month-end `due_day` arithmetic is asserted in `billing-cycle.spec.ts`, where it lives.)*
+- [x] Applying `0026` twice is a no-op; `git diff` shows it alters no pre-existing table.
+- [x] Inserting the same `(subscription_id, period_start)` twice raises a constraint error; a second `active` subscription for one user is rejected by `idx_subscriptions_one_active`; a second successor for one version is rejected by `idx_subscriptions_one_successor`.
+- [x] A plan with an unknown currency code is rejected by the foreign key, and a second `active` currency by `idx_currencies_one_active`.
+- [x] `DELETE FROM users` for a student holding any invoice is rejected by `ON DELETE RESTRICT`, while the same row updates cleanly to an anonymised name and email with every billing row intact.
+- [x] Two amendments leave a chain of three rows sharing one `contract_group_id` with exactly one `active`; editing that plan's `amount_minor` and `grace_days` afterwards leaves every existing subscription and invoice byte-identical.
+- [x] An admin can create a plan, sign both a standard and a negotiated contract, and issue, adjust, void, pay and reverse — entirely over the API.
+- [x] `GET /reports/movement?month=…` reconciles to the sum of the ledger rows in that month, adjustments included; an amended student counts **once** in the active-students report.
+- [x] A student with a cancelled contract and a later new one reports "student since" as the earlier date and "current membership since" as the later one.
+- [x] Every billing mutation emits its `billing.*` structured audit event carrying the acting admin.
+- [x] With a seeded student sitting `delinquent`, every pre-existing API test passes unchanged and `/v1/topics`, `/v1/me/progress` and the comments routes all return `200`. *(2026-11-06: `billing-no-gating.spec.ts`; `make test-api` 137 files · 2218 passed · 3 skipped. The milestone range touched two test helpers — `test/helpers/apply-migrations.ts` and `test/core/check-no-dev-seed.spec.ts`, the dev-seed guard — not a billing test.)*
+- [x] The roster lists that student under `standing=delinquent`; setting a hold removes them from the list and from the reminder mail while leaving their outstanding balance in every total and in the aging report.
+- [x] A `content_creator` and a `tutor` each receive `403` from every `/v1/admin/billing/*` route; a student receives `403` from all of them while `GET /v1/me/billing` returns their own statement.
+- [x] Running the invoice job twice for one period issues each invoice exactly once; a free contract's period invoice is issued, lands `paid` with no payment row, and sends no mail.
+- [x] The job writes no `invoice_adjustments` row of any kind; the student's grace-lapsed notice fires exactly once per invoice; the admin digest names only students who crossed a boundary since the previous run, so a second run the same day reports nobody.
+- [x] `node apps/web/scripts/check-i18n-coverage.js` passes; `dict-en.ts` and `dict-pt.ts` have identical keys.
+- [x] The student banner renders from `/v1/me/billing` with no standing rule duplicated in the client, and no route or screen is withheld behind it.
+- [x] **No diff outside scope:** `git diff` for the whole milestone touches no file under `apps/api/src/middleware/`, does not modify `apps/api/src/routes/index.ts`, and does not modify `apps/api/src/adapters/db/d1-enrollment-repository.ts`. *(2026-11-06: `git diff --stat 6d50d96..70db1c1` over the three paths is empty.)*
+- [x] `make lint`, `make test-api` and `make test-web` pass green. *(2026-11-06, on `main` at `476a96a`: lint 0 · test-api 2218 passed · test-web 1088 passed.)*
 
 **Admin write surface (added 2026-09-12 with tasks 09–13).** The criterion above — "entirely over the API" — stays true and is no longer sufficient; these measure the administrator rather than the endpoint.
 
-- [ ] An administrator completes the whole lifecycle from `/admin/billing` with **no `curl` and no bearer token pasted anywhere**: create a plan; sign one standard and one negotiated contract; pause, resume, cancel and amend a contract; issue, void, adjust and pay an invoice; reverse a payment; run the cycle by hand and read its report.
-- [ ] A student who holds **no contract** — and therefore has no roster line — is reachable by the contract-signing form, which lists students from the admin user list rather than the roster.
-- [ ] A negotiated contract's amount and its `terms_note` read back from the product afterwards, so "this student negotiated a different fee in March" is answerable without a database query.
-- [ ] The plan form offers no non-recurring option, and its copy states that a plan is re-invoiced every period — a plan created to sell a one-off seminar would be billed monthly forever, since `cycle` admits only `monthly | quarterly | yearly`.
-- [ ] Issuing an invoice names the contract and the period it writes; a second issue for the same `(subscription_id, period_start)` is reported, not silently duplicated or silently swallowed.
-- [ ] Amending renders the resulting supersede chain, so the administrator sees that history was added rather than overwritten; no screen offers an in-place edit of signed terms.
-- [ ] No screen offers Delete on a payment or an adjustment, and no screen offers any control that suspends, restricts, downgrades or paywalls a student's access.
-- [ ] `git diff` for tasks 09–13 touches **no file** under `apps/api/` or `packages/` — the entire write surface is UI over the Phase 2–4 API, and `apps/web/src/lib/admin-users-api.ts` is unmodified.
-- [ ] Every new amount renders through `format-money.ts`; `Intl.NumberFormat` appears in no new diff; `node apps/web/scripts/check-i18n-coverage.js` passes with the new keys in both dictionaries.
-- [ ] Task 07's outstanding `[~]` criterion is discharged: the console — including the new screens — is verified responsive at mobile width and keyboard-usable in a real browser.
+- [x] An administrator completes the whole lifecycle from `/admin/billing` with **no `curl` and no bearer token pasted anywhere**: create a plan; sign one standard and one negotiated contract; pause, resume, cancel and amend a contract; issue, void, adjust and pay an invoice; reverse a payment; run the cycle by hand and read its report. *(Verified in a browser 2026-11-06 — every step driven from the keyboard, see tasks 09–13. One defect surfaced on the last step: with both window dates empty the run posted no body and the API answered `400 Malformed JSON`; fixed by backlog `user-experience/12` (`feature/backlog/user-experience/12-run-cycle-empty-window-400.task`), re-verified in the browser with the fix applied — body `{}`, `200`, report rendered. This box holds only with that hotfix on `main`.)*
+- [x] A student who holds **no contract** — and therefore has no roster line — is reachable by the contract-signing form, which lists students from the admin user list rather than the roster. *(Verified in a browser 2026-11-06 — see Task 10.)*
+- [x] A negotiated contract's amount and its `terms_note` read back from the product afterwards, so "this student negotiated a different fee in March" is answerable without a database query. *(Verified in a browser 2026-11-06: `R$ 120,00` and the `terms_note` read back on the statement panel.)*
+- [x] The plan form offers no non-recurring option, and its copy states that a plan is re-invoiced every period — a plan created to sell a one-off seminar would be billed monthly forever, since `cycle` admits only `monthly | quarterly | yearly`.
+- [x] Issuing an invoice names the contract and the period it writes; a second issue for the same `(subscription_id, period_start)` is reported, not silently duplicated or silently swallowed.
+- [x] Amending renders the resulting supersede chain, so the administrator sees that history was added rather than overwritten; no screen offers an in-place edit of signed terms.
+- [x] No screen offers Delete on a payment or an adjustment, and no screen offers any control that suspends, restricts, downgrades or paywalls a student's access. *(Verified in a browser 2026-11-06: no Delete on the Ledger tab, no access control anywhere on the console.)*
+- [x] `git diff` for tasks 09–13 touches **no file** under `apps/api/` or `packages/` — the entire write surface is UI over the Phase 2–4 API, and `apps/web/src/lib/admin-users-api.ts` is unmodified. *(2026-11-06: the six task commits touch nothing there; the range also contains `f4c415b` — the dev-seed guard fix in `apps/api/scripts/` and `wrangler.jsonc` — which is not billing and not one of tasks 09–13.)*
+- [x] Every new amount renders through `format-money.ts`; `Intl.NumberFormat` appears in no new diff; `node apps/web/scripts/check-i18n-coverage.js` passes with the new keys in both dictionaries.
+- [x] Task 07's outstanding `[~]` criterion is discharged: the console — including the new screens — is verified responsive at mobile width and keyboard-usable in a real browser. *(Discharged 2026-11-06 — Task 07, and the write-surface tasks 09–13, verified in headless Chromium 151 at 390×844.)*
 
 ---
 
@@ -241,10 +247,10 @@ continue from #14 in that RFC's Open Questions section.
 
 ## 7. Definition of Done (milestone level)
 
-- [ ] All tasks marked Done with every acceptance box checked.
-- [ ] All milestone-level acceptance criteria in §3 pass.
-- [ ] `make lint`, `make test-api`, and `make test-web` pass green.
-- [ ] Rollout verified as designed: deployed with no plans and no contracts, `resolveStanding` reports `good` for every student, and no alert fires until an admin signs the first contract. Data absence is the flag; no feature flag is added.
-- [ ] Closeout note written at `./closeout-analysis.md`.
-- [ ] RFC 0013 status set to `Implemented` in its header and in `docs/product/RFCs/README.md`, with the Milestone column pointing at this folder; deferred items remain backlog.
-- [ ] No diff outside the scope declared in the guardrail — specifically, `apps/api/src/middleware/**`, `apps/api/src/routes/index.ts` and `apps/api/src/adapters/db/d1-enrollment-repository.ts` are unchanged.
+- [x] All tasks marked Done with every acceptance box checked. *(2026-11-06: the last `[~]` boxes of tasks 07 and 09–13 discharged in a browser.)*
+- [x] All milestone-level acceptance criteria in §3 pass. *(2026-11-06; the lifecycle criterion depends on backlog `user-experience/12`.)*
+- [x] `make lint`, `make test-api`, and `make test-web` pass green. *(2026-11-06 on `main` at `476a96a`: lint 0 · 2218 API tests · 1088 web tests.)*
+- [x] Rollout verified as designed: deployed with no plans and no contracts, `resolveStanding` reports `good` for every student, and no alert fires until an admin signs the first contract. Data absence is the flag; no feature flag is added. *(Confirmed by the product owner on 2026-11-06 for the `budo` production label.)*
+- [x] Closeout note written at `./closeout-analysis.md`. *(2026-11-06; local, gitignored by convention.)*
+- [x] RFC 0013 status set to `Implemented` in its header and in `docs/product/RFCs/README.md`, with the Milestone column pointing at this folder; deferred items remain backlog. *(2026-11-06.)*
+- [x] No diff outside the scope declared in the guardrail — specifically, `apps/api/src/middleware/**`, `apps/api/src/routes/index.ts` and `apps/api/src/adapters/db/d1-enrollment-repository.ts` are unchanged. *(`git diff --stat 6d50d96..70db1c1` over the three paths is empty.)*

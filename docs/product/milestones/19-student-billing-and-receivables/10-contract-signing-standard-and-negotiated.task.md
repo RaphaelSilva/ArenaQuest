@@ -162,8 +162,14 @@ Out:
       access.
 - [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [~] The form is responsive at mobile width and keyboard-usable throughout, with
-      labelled fields and field-associated validation, verified in a browser.
+- [x] The form is responsive at mobile width and keyboard-usable throughout, with
+      labelled fields and field-associated validation, verified in a browser. *Verified
+      2026-11-06 (M19 closeout, headless Chromium 151 at 390×844): both modes audited with
+      no overflow, every field labelled and `Tab`-reachable (the radio groups as one stop);
+      a negotiated contract for a user with no roster line was signed from the keyboard
+      (`POST /subscriptions` → 201, `termsSource: negotiated`, `amountMinor: 12000`) and
+      its amount and reason read back from the statement panel. Observation: `due_day`
+      starts empty and the validation asks for 1–28, where the schema default is 10.*
 - [x] `git diff` contains no file under `apps/api/` or `packages/`, and
       `apps/web/src/lib/admin-users-api.ts` and `admin-billing-api.ts` are both
       unmodified.

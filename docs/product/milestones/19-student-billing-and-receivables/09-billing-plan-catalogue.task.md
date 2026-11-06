@@ -141,8 +141,12 @@ Out:
 - [x] No control on the tab suspends, restricts, downgrades or paywalls access.
 - [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [~] The tab is responsive at mobile width and keyboard-usable throughout, verified in a
-      browser and not only under RTL.
+- [x] The tab is responsive at mobile width and keyboard-usable throughout, verified in a
+      browser and not only under RTL. *Verified 2026-11-06 (M19 closeout, headless Chromium
+      151 at 390×844): create, edit and archive were each driven from the keyboard — `Enter`
+      on the focused control opens the dialog, every field is labelled and `Tab`-reachable,
+      and the created and archived plan read back from the API. The dialog closes through
+      **Cancelar**, not on `Escape` (observation).*
 - [x] `git diff` contains no file under `apps/api/` or `packages/`, and
       `apps/web/src/lib/admin-billing-api.ts` is unmodified.
 - [x] Changed files lint clean; `make test-web` green for the affected component tests.

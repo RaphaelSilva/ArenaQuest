@@ -121,8 +121,13 @@ Out:
       component — the client renders what the API resolved.
 - [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [~] The console is responsive at mobile width and keyboard-usable throughout.
-      **Built for it, not verified in a browser.** Semantic markup, a `role="tablist"`
+- [x] The console is responsive at mobile width and keyboard-usable throughout.
+      **Verified in a browser on 2026-11-06** (M19 closeout; headless Chromium 151 via
+      Playwright at 390×844): every tab renders with no horizontal overflow, `ArrowRight`
+      / `ArrowLeft` move between the five tabs, every field carries an accessible label and
+      every interactive element is reached by `Tab`. Observation, not a defect: the modal
+      dialogs close through their **Cancelar** button but not on `Escape`.
+      **Built for it, not verified in a browser (as of 2026-09-12).** Semantic markup, a `role="tablist"`
       tab set and responsive table containers are in place and covered by RTL, but
       the live walkthrough in the Verification Plan (resize to mobile width, tab
       through the filters and actions) has not been performed - this environment has

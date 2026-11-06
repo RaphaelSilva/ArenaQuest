@@ -144,9 +144,12 @@ Out:
 - [x] Recording a payment on an open invoice issues the expected request, the payment
       renders beneath its invoice with its method and author, and the invoice's status
       reflects the server's response rather than a local recomputation.
-- [~] A payment recorded for the full balance settles the invoice, and the student's
+- [x] A payment recorded for the full balance settles the invoice, and the student's
       standing on the Students tab updates to what the API resolves — with no threshold
-      logic in the client.
+      logic in the client. *Verified 2026-11-06 in a browser (M19 closeout): an ad-hoc
+      September invoice put the student at `delinquent` on the Students tab, matching
+      `GET /students`; a full payment recorded from the Ledger tab flipped the row to
+      **Paga** and the Students tab to `good`, again matching the API.*
 - [x] Applying each of the four adjustment kinds issues the expected request, requires a
       reason, and the form states how that kind moves the balance.
 - [x] Voiding an invoice requires a reason and the invoice renders as voided afterwards.
@@ -161,16 +164,25 @@ Out:
       outside a contract's periodic billing.
 - [x] Amounts render and submit as integer minor units at exponents 2, 0 and 8 through the
       shared money formatter, and `Intl.NumberFormat` does not appear in the diff.
-- [~] The reports' totals after a payment and an adjustment reconcile with the ledger rows
-      just written.
+- [x] The reports' totals after a payment and an adjustment reconcile with the ledger rows
+      just written. *Verified 2026-11-06 in a browser (M19 closeout): after a −R$ 50,00
+      discount and a R$ 100,00 payment on the November invoice, the Reports tab rendered
+      exactly `GET /reports/movement?month=2026-11` (billed 25 000 · received 25 000 ·
+      outstanding 0), and that report equals the month's non-void invoices (30 000) plus
+      adjustments (−5 000) against payments (25 000).*
 - [x] No control gates, suspends, restricts or downgrades a student's access, and no copy
       implies it.
 - [x] The existing CSV export still reflects the current filtered view after a write,
       without issuing a new request beyond the list refresh.
 - [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [~] The four forms are responsive at mobile width and keyboard-usable throughout,
-      verified in a browser.
+- [x] The four forms are responsive at mobile width and keyboard-usable throughout,
+      verified in a browser. *Verified 2026-11-06 (M19 closeout, headless Chromium 151 at
+      390×844): issue, void, adjustment and payment — plus the reverse dialog — audited
+      with no overflow, every field labelled and `Tab`-reachable, each opened with `Enter`
+      on its focused control; a duplicate issue was reported in the server's words and a
+      void without a reason was refused. No **Delete** control exists. The dialogs close
+      through **Cancelar**, not on `Escape` (observation).*
 - [x] `git diff` contains no file under `apps/api/` or `packages/`, and
       `apps/web/src/lib/admin-billing-api.ts` is unmodified.
 - [x] Changed files lint clean; `make test-web` green for the affected component tests.

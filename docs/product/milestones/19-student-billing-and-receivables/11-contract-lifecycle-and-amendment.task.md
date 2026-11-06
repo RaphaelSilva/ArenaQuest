@@ -152,8 +152,12 @@ Out:
 - [x] Nothing on the screen implies that a paused or cancelled student loses access.
 - [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [~] The section is responsive at mobile width and keyboard-usable throughout, verified
-      in a browser.
+- [x] The section is responsive at mobile width and keyboard-usable throughout, verified
+      in a browser. *Verified 2026-11-06 (M19 closeout, headless Chromium 151 at 390×844):
+      the statement panel, the amend dialog and the cancel dialog audited with no overflow
+      and every control labelled and `Tab`-reachable; **Pausar** and **Retomar** were
+      confirmed from the keyboard and the API reported `paused` then `active`. The dialogs
+      close through **Cancelar**, not on `Escape` (observation).*
 - [x] `git diff` contains no file under `apps/api/` or `packages/`, and
       `apps/web/src/lib/admin-billing-api.ts` is unmodified.
 - [x] Changed files lint clean; `make test-web` green for the affected component tests.
