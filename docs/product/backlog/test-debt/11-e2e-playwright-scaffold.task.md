@@ -35,7 +35,7 @@ changes.
 
 - Every milestone since M3 has shipped UI that only a human has opened in a
   browser (M26 preview banner, M27 mission editor, the catalog redesign with its
-  mobile drawer). The `qa-tester` skill exists precisely because this gap is
+  mobile drawer). The `qa` skill exists precisely because this gap is
   filled by hand today.
 - The upload lifecycle (`presign → PUT → finalize`) is the one path that crosses
   browser, Worker and object store, and it is the one no suite exercises
@@ -85,7 +85,7 @@ assertions that make the shared journeys hold at 412 px.
 documented in that file's header and in `CONTRIBUTING.md`, and
 `check-no-dev-seed.ts` refuses to deploy any database that holds them, so they
 are local fixtures, not secrets: `e2e/.env.e2e` carries them and `.envs.test`
-(gitignored, used by the `qa-tester` skill) overrides them when present. Nothing
+(gitignored, used by the `qa` skill) overrides them when present. Nothing
 else reads `.envs.test`.
 
 **Fixtures** (`e2e/fixtures/`):

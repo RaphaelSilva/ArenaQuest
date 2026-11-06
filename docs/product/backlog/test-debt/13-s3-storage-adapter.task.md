@@ -40,7 +40,7 @@ the single bucket an E2E run sees.
   `422 UPLOAD_MISMATCH` locally for an upload that did land.
 - The split is also a trap for manual QA: `make dev-api` with real R2 keys in
   `.dev.vars` uploads to the real bucket and then reads Miniflare — the
-  `qa-tester` skill cannot validate finalize today without knowing this.
+  `qa` skill cannot validate finalize today without knowing this.
 - The port already exists (`packages/shared/ports/i-storage-adapter.ts`), so
   this is the adapter pattern doing what it was introduced for; no new port,
   no migration, no change to any route or controller.
