@@ -276,7 +276,7 @@ export default function AdminUsersPage() {
     setLoading(true);
     setError('');
     try {
-      const result = await client.adminUsers.list();
+      const result = await client.adminUsers.list(page, pageSize);
       setUsers(result.data);
       setTotal(result.total);
     } catch {
@@ -284,7 +284,7 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [client, d]);
+  }, [client, d, page, pageSize]);
 
   useEffect(() => {
     if (isAdmin) fetchUsers();
@@ -292,8 +292,9 @@ export default function AdminUsersPage() {
 
   async function handleCreate(data: CreateUserInput | Partial<UpdateUserInput>) {
     await client.adminUsers.create(data as CreateUserInput);
-    setPage(1);
-    await fetchUsers();
+    // Jumping back to page 1 refetches through the effect; on page 1 refetch directly.
+    if (page !== 1) setPage(1);
+    else await fetchUsers();
   }
 
   async function handleUpdate(data: CreateUserInput | Partial<UpdateUserInput>) {
@@ -312,7 +313,9 @@ export default function AdminUsersPage() {
   if (!isAdmin) return null;
 
   return (
-    <main className="p-4 md:p-6 lg:p-8">
+    // The protected/admin layouts clip at the viewport (`h-dvh overflow-hidden`), so the
+    // page owns its scroll container — without it every row past the fold is unreachable.
+    <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-[28px] font-bold text-zinc-900 dark:text-zinc-50" style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.5px' }}>{d.title}</h1>
         <Button
