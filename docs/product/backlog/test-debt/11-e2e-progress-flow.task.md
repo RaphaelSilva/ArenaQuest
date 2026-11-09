@@ -4,7 +4,8 @@
 - **Status:** Pending
 - **Complexity:** Low-Medium
 - **Milestone:** 5 — Engagement & Student Progress
-- **Dependencies:** Task 07 (fixture updates), Task 08, Task 09, Task 10
+- **Dependencies:** Task 07 (fixture updates), Task 08, Task 09, Task 10 of Milestone 5, and this topic's [Task 11 — E2E scaffold](./11-e2e-playwright-scaffold.task.md) and [Task 10](./10-e2e-task-flow.task.md)
+- **Delivery:** last in the `e2e` backlog candidate (12 → 13 → 11 → 14 → 10 → **11-progress**); see [README](./README.md)
 
 ---
 
@@ -17,6 +18,7 @@ Extend the Playwright E2E suite with a third scenario covering the complete Mile
 ## Architectural Context
 
 - **Framework:** Extends the existing `e2e/` workspace. No new runner or CI jobs required.
+- **Projects:** The spec runs under every Playwright project (`desktop`, `mobile`, `tablet`) and navigates only through the `nav` fixture, so it carries no viewport branch (Task 14 rule).
 - **Isolation:** Each test run seeds unique topics and tasks via API helpers, with a unique enrollment grant.
 - **CI:** The existing `e2e.yml` automatically picks up new spec files.
 

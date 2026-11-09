@@ -21,12 +21,6 @@ dependency-free Node scripts:
 
 Paths below are **relative to the repo root**. Run them from the repo root.
 
-> **The `.claude/skills/` directory is a symlink to `.agents/skills/`.** It
-> resolves fine for the Node runtime (Linux). The Windows `\\wsl.localhost`
-> bridge can't traverse the symlink — if a tool errors with `ENOTDIR` /
-> `Input/output error` on `.claude/skills/...`, use the real path
-> `.agents/skills/write-feature/...` instead. Both point at the same files.
-
 ## Where to work
 
 Run this skill **inside the planning worktree** — the one opened for the RFC this
@@ -60,7 +54,7 @@ validated (the checker only inspects folders whose `milestone.md` carries a
 ## Create a feature from an RFC (agent path)
 
 ```bash
-node .agents/skills/write-feature/new-feature.mjs --rfc docs/product/RFCs/0006-white-label-branding-and-build-tooling.md
+node .claude/skills/write-feature/new-feature.mjs --rfc docs/product/RFCs/0006-white-label-branding-and-build-tooling.md
 ```
 
 Prints the created path (e.g.
@@ -74,7 +68,7 @@ body explains what belongs in each. The scaffolder produces structure, not
 content: translate the RFC's Goals into §1 Objectives, its Non-Goals into the
 guardrail + Out-of-scope, its Proposed Design into §2/§4, its Resolved Decisions
 into §6. Leave §5's task table as the stub until you author the `.task.md` files
-with **`task-writer`** (`.agents/skills/task-writer/`), then fill the table,
+with **`write-tasks`** (`.claude/skills/write-tasks/`), then fill the table,
 dependency graph, and recommended order.
 
 ## Validate (agent path)
@@ -82,13 +76,13 @@ dependency graph, and recommended order.
 Check every modern milestone:
 
 ```bash
-node .agents/skills/write-feature/check-feature.mjs
+node .claude/skills/write-feature/check-feature.mjs
 ```
 
 Check the milestone you just wrote:
 
 ```bash
-node .agents/skills/write-feature/check-feature.mjs docs/product/milestones/13-white-label-branding-and-cloudflare-build-tooling/milestone.md
+node .claude/skills/write-feature/check-feature.mjs docs/product/milestones/13-white-label-branding-and-cloudflare-build-tooling/milestone.md
 ```
 
 Output: `✓` clean, `⚠` advisory (still has template stubs — exit 0), `✗` hard
@@ -105,13 +99,6 @@ should have none.
   complete (all sections present) but its content is still template stubs.
   `⚠` exit 0 is the signal "structure OK, now write the prose." Don't treat the
   warnings as failures — treat them as a to-do list, and re-run until `✓`.
-- **`.claude/skills` is a symlink** (→ `.agents/skills`). Native file tools
-  reaching it over the Windows bridge throw `Input/output error`; run scripts
-  through the WSL Node runtime, or edit files via `.agents/skills/write-feature/`.
-- **In a git worktree, `.agents/` is its own checkout, not shared with the main
-  repo.** Write the skill (and any milestone) into the worktree you're working
-  in — a file created under the main repo's `.agents` is invisible to a
-  worktree shell, and vice-versa.
 - **Exit codes are swallowed by the `wsl.exe … bash -c '… ; echo $?'` bridge**
   — `$?` can read as 0 even when Node exited non-zero. To observe the real
   result use `&&`/`||` evaluated inside WSL:
@@ -125,9 +112,9 @@ should have none.
 
 ## Files
 
-- `.agents/skills/write-feature/new-feature.mjs` — scaffolder (Node, stdlib only).
-- `.agents/skills/write-feature/check-feature.mjs` — validator (Node, stdlib only).
-- `.agents/skills/write-feature/template.md` — the canonical milestone skeleton
+- `.claude/skills/write-feature/new-feature.mjs` — scaffolder (Node, stdlib only).
+- `.claude/skills/write-feature/check-feature.mjs` — validator (Node, stdlib only).
+- `.claude/skills/write-feature/template.md` — the canonical milestone skeleton
   with per-section prose guidance; `new-feature.mjs` fills its `{{...}}`
   placeholders.
 
