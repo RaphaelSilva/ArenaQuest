@@ -32,6 +32,7 @@ it lives in the linked milestone, and is summarised in
 | [0022](./0022-mission-requirements-evidence-driven-missions-with-ordered-s.md) | Mission requirements — evidence-driven missions with ordered steps, enrollment and per-step rewards | ✅ Implemented | [M27](../milestones/27-mission-requirements/milestone.md) | 2026-10-02 |
 | [0023](./0023-media-acknowledgment-read-and-watched-marks-as-mission-evide.md) | Media acknowledgment — read and watched marks as mission evidence | 📝 Draft | — | 2026-10-11 |
 | [0025](./0025-ai-admin-assistant.md) | AI Admin Assistant: Content Authoring, Operational Queries and Backups | In Progress | [M28](../milestones/28-ai-admin-assistant/milestone.md) | 2026-10-02 |
+| [0026](./0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md) | Payment gateway: hosted checkout collection for invoices and event charges | 📝 Draft | — | 2026-11-16 |
 
 Milestones 1–7 predate this process and derive directly from
 [`../specification.md`](../specification.md).
