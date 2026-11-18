@@ -3,14 +3,14 @@
 **Date:** 2026-11-16
 **Status:** Draft
 **Author:** raphaelsilva
-**Revised:** 2026-11-17 (a tenant may enable several providers and combine their methods — §8.1, R6; the single `PAYMENTS_PROVIDER` var became the `PAYMENTS_PROVIDERS` list and the secrets became provider-prefixed)
+**Revised:** 2026-11-17 (a tenant may enable several providers and combine their methods — §8.1, R6; the single `PAYMENTS_PROVIDER` var became the `PAYMENTS_PROVIDERS` list and the secrets became provider-prefixed) · 2026-11-18 (the nine Open Questions answered by the owner — R7–R15; first adapter Mercado Pago; a *Pay* card on the student dashboard added to v1)
 **Affected:**
 - `apps/api/migrations/00NN_create_payment_gateway.sql` (new; next free number at implementation time) — `gateway_checkouts`, `gateway_events`, one system actor row in `users`, two **partial unique indexes** on the existing payment tables (`payments`, `event_charge_payments`) scoped to `method = 'gateway'`, and a rebuild of the operational `job_runs` table so its `job` CHECK admits `reconcile_payments`. No `ALTER` and no rebuild of any money table.
-- `packages/shared/ports/i-payment-gateway.ts` (new) — `IPaymentGateway`, the provider port RFC 0013 #9 deferred "until a provider is in hand". Provider-neutral in shape, modelled on the provider chosen in Open Question 1. No provider SDK type crosses it.
+- `packages/shared/ports/i-payment-gateway.ts` (new) — `IPaymentGateway`, the provider port RFC 0013 #9 deferred "until a provider is in hand". Provider-neutral in shape, modelled on Mercado Pago, the first adapter (R7). No provider SDK type crosses it.
 - `packages/shared/ports/i-gateway-repository.ts` (new) — persistence for checkouts and provider events; `i-billing-repository.ts` and `i-event-charge-repository.ts` each gain one read, `findGatewayPayment(externalReference)`, used only to answer a duplicate.
 - `packages/shared/domain/billing/receivable.ts` — unchanged in shape; `(kind, id)` becomes the key of a checkout. `packages/shared/domain/billing/gateway-money.ts` (new, pure) — decimal-string → minor-units conversion against `currencies.exponent`, and the provider-capability table (which currencies and methods each adapter may offer).
 - `packages/shared/types/entities.ts` — `Entities.Billing.GatewayCheckout`, `GatewayEvent`, and the `Entities.Config.CheckoutStatus` enum.
-- `apps/api/src/adapters/payment/<provider>-gateway-adapter.ts` (new) — a thin `fetch` client over the provider's REST API plus webhook verification with Web Crypto (HMAC-SHA256) or a constant-time token compare, whichever the provider specifies. One file per provider; a label may bind more than one (§8.1).
+- `apps/api/src/adapters/payment/<provider>-gateway-adapter.ts` (new) — a thin `fetch` client over the provider's REST API plus webhook verification with Web Crypto (HMAC-SHA256) or a constant-time token compare, whichever the provider specifies. One file per provider — the first is `mercadopago-gateway-adapter.ts` (R7); a label may bind more than one (§8.1).
 - `apps/api/src/adapters/db/d1-gateway-repository.ts` (new).
 - `apps/api/src/core/payments/gateway-service.ts` (new) — checkout creation, the landing of a confirmed payment through `BillingService.recordPayment` / `EventChargeService.recordPayment`, refunds as reversals, reconciliation. `apps/api/src/core/payments/config.ts` (new) — `PAYMENTS_PROVIDERS` parsing (the enabled providers and the methods each offers, §8.1), the key-mode-vs-environment assertion, `500 PAYMENTS_CONFIG_INVALID`. `apps/api/src/core/payments/gateway-registry.ts` (new) — the adapters enabled for this label and environment, resolved by provider name; empty when the list is `none`.
 - `apps/api/src/core/billing/billing-service.ts`, `event-charge-service.ts` — `recordPayment` and `reversePayment` keep their rules; each gains a sibling entry point that accepts the system actor and a provider reference, and refuses `method <> 'gateway'`.
@@ -20,7 +20,7 @@
 - `apps/api/src/container.ts` — a `payments: PaymentsContext` group (gateway registry, repository, service) and a per-user `checkouts` rate limiter plus an IP-keyed `webhooks` limiter in `infra.rateLimiters`.
 - `apps/api/wrangler.jsonc`, `apps/api/.dev.vars.example`, `worker-configuration.d.ts` — var `PAYMENTS_PROVIDERS` in every `env.*` block; secrets `PAYMENTS_<PROVIDER>_SECRET_KEY`, `PAYMENTS_<PROVIDER>_WEBHOOK_SECRET`, one pair per enabled provider.
 - `config/deployment.schema.jsonc`, `scripts/cloudflare/provision-label.mjs`, `scripts/label.mjs` — each provider's two secrets declared under `api-secrets` with a `requiredWhen` on the provider list, detected by name, never written (RFC 0012 contract); `infra-check` reports them with their fix command.
-- `apps/web/src/app/(protected)/settings/billing/*` (Pay button, the provider choice when a label offers more than one, return page state), `(protected)/admin/billing/*` (provider reference on the ledger, "pending online payment" on roster and statement, refund confirmation), `src/lib/me-billing-api.ts`, `admin-billing-api.ts`, `src/i18n/dict-{en,pt}.ts`.
+- `apps/web/src/app/(protected)/settings/billing/*` (Pay button, the provider choice when a label offers more than one, return page state), `(protected)/dashboard/*` (a *payment due* card with the same Pay action when a contract invoice is open — §7, R11), `(protected)/admin/billing/*` (provider reference on the ledger, "pending online payment" on roster and statement, refund confirmation), `src/lib/me-billing-api.ts`, `admin-billing-api.ts`, `src/i18n/dict-{en,pt}.ts`.
 - `docs/onboarding.md`, `docs/operations/payments.md` (new) — webhook registration per label and environment, sandbox credentials, the reconciliation runbook.
 - **Unchanged, deliberately:** every content route, `middleware/auth-guard.ts`, `d1-enrollment-repository.ts`, the catalog gate. Paying grants nothing and not paying revokes nothing (RFC 0013 #2).
 
@@ -43,8 +43,8 @@ this student pay?" is answered. Everything new is additive: one pending-checkout
 on the rail-tagged receivable `(kind, id)` from `receivable.ts`, one provider-event table for
 webhook de-duplication, one system actor row so machine-written payments satisfy
 `recorded_by NOT NULL`, and two partial unique indexes so a retried webhook cannot record the
-same money twice. The provider itself is the first Open Question; the design holds for any
-of the four candidates because the webhook is treated as a *trigger* and the payment is
+same money twice. The first adapter is Mercado Pago (R7); the design holds for any
+of the four candidates surveyed because the webhook is treated as a *trigger* and the payment is
 always **fetched back** from the provider's API before a single row is written. A tenant is
 not tied to one provider either: each label and environment lists the providers it enables
 and the methods each offers, so a dojo can combine, say, Pix through one provider with card
@@ -64,6 +64,7 @@ arriving through it.
 | A student reads "R$ 180,00 due on the 10th" on `/settings/billing` and wants to pay it right there | No. The statement is read-only (`GET /v1/me/billing`); the student pays by Pix to the instructor's own account, who later types it in. | **Yes.** *Pay* creates a checkout for the balance and sends the student to the provider's hosted page; Pix and card. |
 | A seminar fee (RFC 0015 event charge) paid online | No. RFC 0015 defers to this RFC. | **Yes.** The same *Pay*, against an event charge, through `receivable.ts`'s `(kind, id)`. |
 | A tenant wants Pix through one provider and card through another, or to add a second provider later without a migration | N/A | **Yes.** Each label and environment lists the providers it enables and the methods each offers; the student chooses on *Pay* (§8.1). |
+| A student with a monthly fee to pay lands on the dashboard, not on the statement | Only the standing notice, a line of text linking to the statement. | **Yes.** The dashboard shows a *payment due* card for each open contract invoice with the same *Pay* action (§7). |
 | The instructor wants to send a student a payment link over WhatsApp instead of their bank's Pix key | No. | **Yes.** An admin creates a checkout on the student's behalf and copies its URL; the student still pays, nothing is charged for them. |
 | The admin refunds a student who paid twice | Only by writing a reversal *and* refunding by hand in the bank. | **Yes.** Reversing a `gateway` payment asks the provider to refund first and writes the reversal when the provider accepts. |
 | A card payment is disputed weeks later | N/A — no card payments exist. | **Yes.** A lost dispute lands as a negative gateway row; an opened one raises an admin alert. |
@@ -121,7 +122,7 @@ arriving through it.
 - **Reconcile-only mode** — reading the dojo's bank statement to match Pix transfers against
   invoices (Alternative 2).
 - **Partial payments chosen by the student.** A checkout is always for the receivable's
-  full open balance; what *can* differ from that is settled in Open Question 8.
+  full open balance; what *can* differ from that is settled in R14 (§5).
 - **Splitting one receivable across methods.** Combining is about what a tenant *offers*. A
   checkout still collects the full open balance through one provider; half by Pix and half
   by card is not a case here.
@@ -135,7 +136,7 @@ arriving through it.
   owes the receivable. Anonymous purchase is not a case here (every receivable already names
   its student).
 - **A dunning sequence or new reminder e-mails.** The two existing reminders may carry a
-  *Pay* link once Phase 4 ships (Open Question 5), nothing more.
+  *Pay* link once Phase 4 ships (R11), nothing more.
 
 ## Current State (for reference)
 
@@ -150,11 +151,11 @@ actorId)` (`apps/api/src/core/billing/billing-service.ts:1037`) writes `recorded
 `EventChargeService.recordPayment` does the same for charges. Both tables declare
 `recorded_by TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT`. A webhook has no
 logged-in user. SQLite cannot drop a `NOT NULL` without rebuilding the table, and these are
-the two append-only money tables (Open Question 2).
+the two append-only money tables (R8).
 
 **Nothing is unique on `external_reference`.** Both payment tables index `invoice_id` /
 `charge_id` and have a partial unique index on `reverses_id` only. Two inserts with the same
-provider id are accepted today; a retried webhook would double-record (Open Question 3).
+provider id are accepted today; a retried webhook would double-record (R9).
 
 **Reversals copy the original reference.** `reversePayment` writes
 `externalReference: original.externalReference` (`billing-service.ts:1115`,
@@ -169,15 +170,14 @@ reaches both rails through one flow without a join across them.
 
 **`/v1/me/billing` is GET-only and self-only by construction.** `routes/me/billing.ts`
 declares no request at all; the subject is the token's `sub`. A *Pay* action needs a route
-that names a receivable, so ownership must be checked rather than assumed (Open Question 5).
+that names a receivable, so ownership must be checked rather than assumed (R11).
 
 **One anonymous surface exists, and it is a precedent.** `/v1/events` is mounted from
 `routes/index.ts:90` with the comment "Anonymous by design — mounted here rather than inside
 `buildPublicRouter`, whose routes all carry `authGuard`"; `middleware/optional-auth.ts` is the
 one middleware that never rejects; the router meters first (`KvRateLimiter`, keyed on
 `CF-Connecting-IP`, 60 rpm) and resolves identity second. A webhook differs again: it
-authenticates with a **signature**, not a token, and must reject rather than degrade (Open
-Question 6).
+authenticates with a **signature**, not a token, and must reject rather than degrade (R12).
 
 **Secrets follow RFC 0012.** `config/deployment.schema.jsonc` declares `api-secrets`;
 `RESEND_API_KEY` is `required: false, requiredWhen: "MAIL_DRIVER=resend"`;
@@ -298,7 +298,7 @@ routes and the webhook return `404`, so the feature is invisible rather than bro
 
 ```sql
 -- The system actor. Satisfies recorded_by NOT NULL REFERENCES users(id) on both payment
--- tables (Open Question 2). status 'system' is a new value in a column with no CHECK, so
+-- tables (R8). status 'system' is a new value in a column with no CHECK, so
 -- no rebuild; it is not UserStatus.ACTIVE, so auth-service.ts:44 refuses it a login. The
 -- empty password hash can never verify; the .invalid TLD can never receive mail. It holds
 -- no role row, so it passes no requireRole anywhere.
@@ -366,7 +366,7 @@ CREATE TABLE IF NOT EXISTS gateway_events (
 );
 CREATE INDEX IF NOT EXISTS idx_gateway_events_failed ON gateway_events(received_at) WHERE outcome = 'failed';
 
--- The money-level idempotency (Open Question 3). One ledger row per provider payment or
+-- The money-level idempotency (R9). One ledger row per provider payment or
 -- refund id, on each rail. The reference is written '<provider>:<id>', so ids from two
 -- providers bound to the same label can never collide (§8.1). Partial: admin-typed rows keep external_reference free-form
 -- (a receipt number may legitimately repeat), and NULL never collides.
@@ -452,7 +452,7 @@ confirmed minutes after the redirect), `paid` becomes the updated statement. A f
 `POST /v1/admin/events/{eventId}/charges/{chargeId}/checkouts`, behind the billing router's
 `requireRole(ADMIN)`, call the same service with `createdBy = admin` and `userId = the
 receivable's owner`, and take the same optional `provider`. The response is the URL the admin copies into WhatsApp. The student
-pays; nothing is charged to anyone. Open Question 5 confirms this is wanted in v1.
+pays; nothing is charged to anyone. This ships in v1 (R11).
 
 ### 4. The webhook (`POST /v1/webhooks/payments/{provider}`)
 
@@ -505,7 +505,7 @@ recordGatewayPayment(invoiceId, { amountMinor, currency, paidAt, externalReferen
 with any other method, and (c) runs the same guards — positive amount, non-void receivable,
 currency equal to the receivable's. The amount landed is **what the provider captured**, not
 the checkout's `amount_minor`: if an adjustment changed the balance between Pay and
-confirmation, the ledger must still say what was received (Open Question 8). The
+confirmation, the ledger must still say what was received (R14). The
 `REFRESH_INVOICE_STATUS` batch step flips the invoice to `paid` when the balance reaches
 zero exactly as it does for a cash payment; a `payments.gateway_landed` audit event carries
 ids only. The checkout gets `status = 'paid'`, `provider_payment_id`, and the matching
@@ -521,7 +521,8 @@ original.amountMinor, idempotencyKey = 'rev:' + original.id)` and, when the prov
 `external_reference = refundId`. A provider refusal (already refunded, funds unavailable) is
 `409 PAYMENTS_REFUND_REFUSED` and writes nothing. The refund webhook that follows finds its
 refund id already on the ledger and records `duplicate`. Full amount only through this route
-(RFC 0013's reversal is a mirror row); Open Question 8 settles partial refunds.
+(RFC 0013's reversal is a mirror row); a partial refund is made in the provider's
+dashboard and lands as below (R14).
 
 **A refund made in the provider's dashboard** (full or partial) arrives as a `refund` event.
 Fetch-to-confirm yields the payment's `refunds[]`; each refund id not yet on the ledger is
@@ -535,8 +536,11 @@ such on the ledger (`note = 'provider refund <id>'`).
 **Disputes.** `dispute: opened` → checkout `failure_detail = 'dispute opened'`, admin alert,
 **no ledger write** (the money is still ours until the provider says otherwise). `lost` →
 a negative gateway row keyed on the dispute id, like a dashboard refund. `won` → alert
-only. Whether an opened dispute also sets a `billing_standing_hold` ("stop chasing this
-one — a payment is being verified", RFC 0013's own example) is Open Question 8.
+only. On the **contract rail**, an opened dispute also sets a `billing_standing_hold` with
+reason "payment under dispute" ("stop chasing this one — a payment is being verified" is
+RFC 0013's own example of the hold), written by the system actor and released when the
+dispute closes, `won` or `lost`; an admin may lift it earlier. An event charge never gets a
+hold (RFC 0015 #9): its dispute is the alert and the exceptions row only (R14).
 
 ### 6. The daily run (`jobs/reconcile-payments.ts`)
 
@@ -591,6 +595,17 @@ is a link to a new tab, not an iframe. A
 receivable with an open checkout shows "payment in progress · expires at …" with *Open
 again*; a `paid` gateway payment shows as *Paid online* with the date. Nothing else on the
 page changes, and the standing badge still gates nothing.
+
+**Student dashboard** (`/dashboard`, R11). When the student's statement holds at least one
+open **contract invoice** with a balance, the dashboard shows a *payment due* card: amount,
+due date, and the same *Pay* action as the statement — same route, same provider choice,
+same "payment in progress" state — plus a link to `/settings/billing`. One row per open
+invoice, earliest due date first. It reads the `GET /v1/me/billing` response the standing
+notice already fetches, so no new endpoint exists for it; with no open contract invoice, or
+with no provider offering a method, the card is not rendered at all. Event charges stay on
+the statement. Like the standing notice it is a prompt, not a gate: it hides, disables and
+blocks nothing. If RFC 0008's widget dashboard lands first, the card ships as one of its
+widgets rather than a fixed block.
 
 ### 8. Configuration and secrets
 
@@ -671,7 +686,7 @@ What combining changes in the flow, and what it does not:
   provider's own session is not recalled — the port has no cancel — and lives until its
   expiry, so a student could still pay it. §5 lands that payment like any confirmed one; if
   both sessions end up paid, the receivable shows a credit, which is the overpayment case of
-  Open Question 8 and is refunded by the admin from the ledger.
+  R14 and is refunded by the admin from the ledger.
 - **Never split.** A checkout collects the full open balance through one provider.
 - **Everything downstream picks its adapter by provider**: the URL's `{provider}` for a
   delivery, `gateway_checkouts.provider` for a checkout, and the prefix of
@@ -680,7 +695,7 @@ What combining changes in the flow, and what it does not:
   admin page that shows the bound providers, or narrows the offered methods without a
   deploy, can sit on top of this list later without touching the schema.
 
-The first milestone still ships **one** real adapter (Open Question 1). The list, the
+The first milestone still ships **one** real adapter (R7). The list, the
 registry and the choice on *Pay* ship with it and are proven against two stub adapters, so a
 second provider is an adapter file, a list entry and two secrets — no migration.
 
@@ -722,8 +737,8 @@ has no role at all — it has a signature.
    2026-09-29). *Rejected for this RFC.* Each is a product its own RFC should argue for; the
    draft also fixed Stripe before Pix eligibility for Brazilian merchants was checked. Its
    mechanics that survive here — row-first checkout creation, event-id de-duplication, the
-   system actor — are credited in References. The owner decides whether the branch is
-   deleted (Open Question 1).
+   system actor — are credited in References. The branch is deleted once this RFC merges
+   (R7).
 6. **Rebuild `payments` and `event_charge_payments` to make `recorded_by` nullable.**
    *Rejected.* Two live append-only money tables on production, a twelve-step rebuild each,
    to remove a constraint whose whole point is that every ledger row names its author. A
@@ -779,7 +794,7 @@ guards ignore it); a second insert with the same gateway reference fails on each
 `CHECK`s refuse a cross-rail `*_payment_id`.
 
 ### Phase 2 — Adapter, webhook and landing (~3 d)
-The chosen provider's adapter (`fetch` client, `verifyWebhook` on raw bytes with the 5-minute
+The Mercado Pago adapter (`fetch` client, `verifyWebhook` on raw bytes with the 5-minute
 tolerance or constant-time compare, `getPayment` with decimal conversion), a second **stub**
 adapter for the tests, `GatewayService.handleEvent`, `routes/webhooks/payments.router.ts`
 with its limiter and body bound. Tests with recorded sandbox fixtures: good signature lands
@@ -799,8 +814,8 @@ refused by the provider writes nothing; the expiry sweep lands a missed payment.
 *Pay*, the provider choice when `payOptions` has more than one entry, and the return-page
 state on `/settings/billing`; provider reference and deep link on
 the ledger tab; refund confirmation; "pending online payment" on roster and statement; the
-exceptions panel; i18n in both dictionaries; the two reminder e-mails gain the *Pay* link
-when Open Question 5 says so. Playwright at 390 px for the student flow against the sandbox.
+exceptions panel; i18n in both dictionaries; the *payment due* card on the student dashboard (§7); the two
+reminder e-mails gain the *Pay* link (R11, copy only). Playwright at 390 px for the student flow against the sandbox.
 
 ### Phase 5 — Configuration, provisioning, rollout (~1 d)
 `PAYMENTS_PROVIDERS` in every `env.*` block (`none` everywhere), `.dev.vars.example`, schema
@@ -815,7 +830,7 @@ its refund.
 
 | Risk | Mitigation |
 |---|---|
-| The chosen provider cannot offer Pix to this merchant (Stripe is invite-only for Brazil-based businesses as of 2026-11-16) | Provider is Open Question 1 and the port is provider-neutral; the first adapter is the one whose Pix the tenant can actually enable, and a second adapter is a new file plus a list entry, not a schema change — and it can run beside the first (§8.1). |
+| The chosen provider cannot offer Pix to this merchant (Stripe is invite-only for Brazil-based businesses as of 2026-11-16) | The first adapter is Mercado Pago (R7), whose Checkout Pro offers Pix natively in Brazil, and the port is provider-neutral; the first adapter is the one whose Pix the tenant can actually enable, and a second adapter is a new file plus a list entry, not a schema change — and it can run beside the first (§8.1). |
 | A webhook is forged or replayed | Signature or token verified on raw bytes before anything is written; 5-minute tolerance; event-id primary key; **fetch-to-confirm** means a body carries no money facts; partial unique index on the ledger means even a logic slip cannot double-record. |
 | A payment is confirmed but the webhook never arrives (provider outage, our 5xx exhausted retries) | The daily run asks the provider about every expiring checkout and lands what it finds; `job_runs` records the count. |
 | The amount or currency captured differs from the receivable | Currency mismatch lands nothing and surfaces in the exceptions panel; an amount difference lands what was captured (truthful ledger) and the statement shows the remaining balance or the credit. |
@@ -852,7 +867,8 @@ its refund.
   `landed: 1`.
 - **S5 (Phase 4).** At 390 px a demo student on budo staging sees *Pay* on an open invoice,
   completes a simulated Pix in the sandbox, returns, sees "payment processing" then *Paid
-  online*; the admin ledger shows the row with the provider id and a working dashboard link.
+  online*; the same invoice shows on `/dashboard` as a *payment due* card with *Pay* before
+  the payment and is gone after it; the admin ledger shows the row with the provider id and a working dashboard link.
 - **S6 (Phase 5).** `make infra-check-staging LABEL=budo` lists the bound provider's
   `PAYMENTS_<PROVIDER>_SECRET_KEY` and `PAYMENTS_<PROVIDER>_WEBHOOK_SECRET` as present on budo
   staging and names none for arenaquest staging (`PAYMENTS_PROVIDERS = none`, so not required); no secret value appears in any CI
@@ -873,68 +889,9 @@ its refund.
 
 ## Open Questions
 
-Each question is numbered after the friction it resolves; the recommendation is the
-author's, and the owner's answer moves the row to Resolved Decisions with its date.
-
-1. **Provider, and charge vs reconcile-only.** Pix is the decisive criterion. As read on
-   2026-11-16: **Stripe** supports Pix on Checkout for BRL but lists Pix as *invite-only for
-   businesses based in Brazil*; **Mercado Pago** Checkout Pro offers Pix and card natively in
-   Brazil with signed notifications (QR-code notifications excepted, which fetch-to-confirm
-   covers); **Asaas** offers Pix and boleto with a token header rather than a signature;
-   **Pagar.me** is unverified. *Recommendation:* **charge** (collect through the provider),
-   never reconcile-only; first adapter **Mercado Pago**, unless the tenant already holds a
-   Stripe Pix invite — in which case Stripe, whose signing and Checkout are the most
-   thoroughly documented. The port is written so the second is an adapter file, and R6 lets it
-   run beside the first rather than replace it. Also:
-   delete the stale `claude/compassionate-rubin-11a6pn` branch once this RFC merges? —
-   *Owner.*
-2. **Actor for machine-written payments.** *Recommendation:* the per-label **system actor**
-   row (`system:payment-gateway`, `status = 'system'`, no role, empty hash, `.invalid`
-   e-mail), inserted by the migration with `INSERT OR IGNORE`; no table rebuild. — *Owner.*
-3. **Webhook idempotency.** *Recommendation:* two layers — `gateway_events` keyed on
-   `(provider, event_id)` for deliveries, and a **partial unique index on
-   `external_reference WHERE method = 'gateway'`** on each payment table for money, with
-   every gateway reversal carrying the **refund id** rather than the original's reference so
-   one index covers charges, refunds and chargebacks; references are provider-qualified
-   (`<provider>:<id>`) so it also covers several providers. — *Owner / lead architect.*
-4. **The pending-checkout table.** *Recommendation:* one additive `gateway_checkouts` keyed
-   on `receivable.ts`'s `(kind, id)`, one open row per receivable, two typed nullable FKs to
-   the rail payment tables with CHECKs, `status ∈ {open, paid, expired, cancelled, failed,
-   mismatch}`. — *Lead architect.*
-5. **The student's Pay action.** *Recommendation:* `POST /v1/me/billing/checkouts { kind, id, provider? }`
-   + `GET /v1/me/billing/checkouts/{id}`, return URLs on `/settings/billing?checkout=…&outcome=…`
-   treated as hints only. Two sub-questions: (a) include the **admin on-behalf** link routes
-   in v1 (yes — the WhatsApp payment link is the dojo's everyday case); (b) add the *Pay*
-   link to the two existing reminder e-mails (yes, Phase 4, copy only). — *Owner.*
-6. **The webhook surface.** *Recommendation:* `POST /v1/webhooks/payments/{provider}` mounted
-   from `routes/index.ts` beside `/events`, not under `routes/public/`; IP limiter 120 rpm →
-   64 KiB body bound → signature on raw bytes with a **5-minute** tolerance (also the replay
-   window) → event-id de-dup → fetch-to-confirm → land in one batch; `401` writes nothing,
-   verified-but-unusable is `200` + an exception row, our own failure is `503`. — *Lead
-   architect.*
-7. **Secrets per label and environment.** *Recommendation:* var `PAYMENTS_PROVIDERS` (default
-   `none`, otherwise the list of §8.1) plus two secrets per bound provider,
-   `PAYMENTS_<PROVIDER>_SECRET_KEY` / `PAYMENTS_<PROVIDER>_WEBHOOK_SECRET`, declared in
-   `deployment.schema.jsonc` with `requiredWhen: "PAYMENTS_PROVIDERS~=<provider>"` (adding a
-   contains operator, `~=`, to `requiredWhenActive`), detected
-   by name, never written by provisioning; sandbox keys on staging enforced by the key-mode
-   assertion; webhook URL registered by the operator per label × env. — *Owner / lead
-   architect.*
-8. **Edge money cases.** *Recommendation:* a checkout is for the full balance; the ledger
-   lands **what the provider captured**; an overpayment shows as a credit and is the admin's
-   to refund; a **currency mismatch lands nothing** (`mismatch` + alert); **partial refunds**
-   and **lost disputes** land as negative gateway rows keyed on the refund/dispute id
-   (`reverses_id = NULL`); an **opened dispute** alerts and — sub-question — sets a
-   `billing_standing_hold` with reason "payment under dispute" on the contract rail (yes:
-   it is the hold's own documented use), never on extras (RFC 0015 #9). The daily run
-   expires checkouts after fetch-to-confirm, retries failed events up to 5 times, and asserts
-   the key mode. — *Owner.*
-9. **What the admin sees.** *Recommendation:* gateway rows on the ledger with the provider id
-   and a dashboard deep link; `pendingCheckout` on roster and both statements as "pending
-   online payment"; refund confirmation on reverse; an exceptions panel for orphans,
-   mismatches, failed events and disputes, where a manual match records through the
-   ordinary admin payment form with `method = 'gateway'`. Content creators and tutors see
-   nothing (RFC 0013 #5). — *Owner.*
+None. The nine questions this RFC opened with — numbered after the friction list of the
+RFC 0013 closeout — were answered by the owner on 2026-11-18 and are recorded as R7–R15
+below, in the same order.
 
 ## Resolved Decisions
 
@@ -946,6 +903,15 @@ author's, and the owner's answer moves the row to Resolved Decisions with its da
 | R4 | **Money is integer minor units against `currencies.exponent`; BRL is the only active currency.** Provider decimals are converted at the adapter boundary, string-based. | 2026-11-06 | Product owner |
 | R5 | **Hosted checkout only; no card data on the platform; no fiscal documents; no automatic charging without the student's action.** | 2026-11-16 | Product owner (brief) |
 | R6 | **A tenant may combine payment methods across providers.** Each label and environment lists the providers it binds and the methods each offers (`PAYMENTS_PROVIDERS`, §8.1); a method belongs to one provider, a receivable has one live checkout, a checkout is never split. Configuration is the operator's, in the deployment config — no configuration screen in this RFC. | 2026-11-17 | Product owner |
+| R7 | **Charge through the provider; first adapter Mercado Pago.** ArenaQuest collects through a hosted checkout — reconcile-only stays a Non-Goal (Alternative 2). The first adapter is **Mercado Pago** Checkout Pro (Pix and card natively in Brazil, signed notifications; unsigned QR-code notifications are covered by fetch-to-confirm). The port stays provider-neutral, so a second provider is an adapter file that runs beside the first (R6). The stale branch `claude/compassionate-rubin-11a6pn` is deleted once this RFC merges. *(Open Question 1.)* | 2026-11-18 | Product owner |
+| R8 | **Machine-written payments are recorded by a per-label system actor.** One `users` row (`system:payment-gateway`, `status = 'system'`, no role, empty hash, `.invalid` e-mail), inserted by the migration with `INSERT OR IGNORE`; no money table is rebuilt. *(Open Question 2.)* | 2026-11-18 | Product owner |
+| R9 | **Idempotency in two layers.** `gateway_events` keyed on `(provider, event_id)` for deliveries, and a partial unique index on `external_reference WHERE method = 'gateway'` on each payment table for money. Every gateway reversal carries the **refund id**, not the original's reference, so one index covers charges, refunds and chargebacks; references are provider-qualified (`<provider>:<id>`). *(Open Question 3.)* | 2026-11-18 | Product owner |
+| R10 | **One `gateway_checkouts` table.** Additive, keyed on `receivable.ts`'s `(kind, id)`, one open row per receivable, two typed nullable FKs to the rail payment tables with CHECKs, `status ∈ {open, paid, expired, cancelled, failed, mismatch}`. *(Open Question 4.)* | 2026-11-18 | Product owner |
+| R11 | **The student's Pay action, and where it appears.** `POST /v1/me/billing/checkouts { kind, id, provider? }` + `GET /v1/me/billing/checkouts/{id}`; return URLs on `/settings/billing?checkout=…&outcome=…` are hints only. v1 includes (a) the **admin on-behalf** link routes, (b) the *Pay* link in the two existing reminder e-mails (copy only), and (c) — added by the owner — a ***payment due* card on the student dashboard** whenever a contract invoice is open, with the same Pay action (§7). *(Open Question 5.)* | 2026-11-18 | Product owner |
+| R12 | **The webhook surface.** `POST /v1/webhooks/payments/{provider}` mounted from `routes/index.ts` beside `/events`, not under `routes/public/`; IP limiter 120 rpm → 64 KiB body bound → signature on raw bytes with a **5-minute** tolerance (also the replay window) → event-id de-dup → fetch-to-confirm → land in one batch; `401` writes nothing, verified-but-unusable is `200` + an exception row, our own failure is `503`. *(Open Question 6.)* | 2026-11-18 | Product owner |
+| R13 | **Configuration and secrets.** Var `PAYMENTS_PROVIDERS` (default `none`, otherwise the list of §8.1) plus two secrets per bound provider, `PAYMENTS_<PROVIDER>_SECRET_KEY` / `PAYMENTS_<PROVIDER>_WEBHOOK_SECRET`, declared in `deployment.schema.jsonc` with `requiredWhen: "PAYMENTS_PROVIDERS~=<provider>"` — `requiredWhenActive` gains the contains operator `~=` — detected by name, never written by provisioning; sandbox keys on staging enforced by the key-mode assertion; the webhook URL registered by the operator per label × environment. *(Open Question 7.)* | 2026-11-18 | Product owner |
+| R14 | **Edge money cases.** A checkout is for the full balance; the ledger lands **what the provider captured**; an overpayment shows as a credit and is the admin's to refund; a **currency mismatch lands nothing** (`mismatch` + alert); **partial refunds** and **lost disputes** land as negative gateway rows keyed on the refund/dispute id (`reverses_id = NULL`); an **opened dispute** alerts and sets a `billing_standing_hold` ("payment under dispute") on the **contract rail only**, never on extras (RFC 0015 #9). The daily run expires checkouts after fetch-to-confirm, retries failed events up to 5 times, and asserts the key mode. *(Open Question 8.)* | 2026-11-18 | Product owner |
+| R15 | **What the admin sees.** Gateway rows on the ledger with the provider id and a dashboard deep link; `pendingCheckout` on roster and both statements as "pending online payment"; refund confirmation on reverse; an **exceptions panel in v1** for orphans, mismatches, failed events and disputes, where a manual match records through the ordinary admin payment form with `method = 'gateway'`. Content creators and tutors see nothing (RFC 0013 #5). *(Open Question 9.)* | 2026-11-18 | Product owner |
 
 ## References
 
@@ -987,4 +953,4 @@ author's, and the owner's answer moves the row to Resolved Decisions with its da
   [create a webhook via the API](https://docs.asaas.com/docs/create-new-webhook-via-api),
   [token requirement changelog](https://docs.asaas.com/changelog/obrigatoriedade-e-auto-geração-de-tokens-para-webhooks).
 - Memory of the closeout session: `rfc-0013-billing-closeout-and-gateway-next.md` (the
-  friction list this RFC's Open Questions follow).
+  friction list this RFC's Open Questions — now R7–R15 — followed).
