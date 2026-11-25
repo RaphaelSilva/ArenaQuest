@@ -113,8 +113,9 @@ export function RunCyclePanel({
     setError(null);
     setReport(null);
     try {
-      // An empty window posts no body at all, so the server applies its own
-      // defaults instead of being handed this browser's idea of today.
+      // An empty window is handed to the client as "no input" — it posts `{}`,
+      // so the server applies its own defaults instead of being handed this
+      // browser's idea of today.
       const data = await client.adminBilling.invoices.run(
         Object.keys(input).length > 0 ? input : undefined,
       );

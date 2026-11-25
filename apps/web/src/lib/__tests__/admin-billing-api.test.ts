@@ -77,10 +77,14 @@ describe('createAdminBillingApi — invoices', () => {
 });
 
 describe('createAdminBillingApi — the manual invoice cycle run', () => {
-  it('posts to the run endpoint with no body at all when no window is given', async () => {
+  it('posts an empty JSON body, not no body, when no window is given', async () => {
+    // Backlog `user-experience/12`: `http()` sets the JSON content type on
+    // every request, so "no body" reaches the route as malformed JSON (400).
     const { http, api } = apiWith(makeResponse({ jsonData: {} }));
     await api.invoices.run();
-    expect(http).toHaveBeenCalledWith('POST', '/admin/billing/invoices/run', undefined);
+    expect(http).toHaveBeenCalledWith('POST', '/admin/billing/invoices/run', {
+      body: JSON.stringify({}),
+    });
   });
 
   it('posts the optional window when the screen supplied one', async () => {
