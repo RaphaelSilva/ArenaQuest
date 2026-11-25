@@ -155,8 +155,15 @@ Out:
       run endpoint, and no existing method changes shape.
 - [x] No hardcoded user-facing string; the new keys exist in both `dict-en.ts` and
       `dict-pt.ts`; `node apps/web/scripts/check-i18n-coverage.js` passes.
-- [~] The control and report are responsive at mobile width and keyboard-usable, verified
-      in a browser.
+- [x] The control and report are responsive at mobile width and keyboard-usable, verified
+      in a browser. *Verified 2026-11-06 (M19 closeout, headless Chromium 151 at 390×844):
+      the confirmation dialog audited with no overflow, both date fields labelled and
+      `Tab`-reachable, submitted with `Enter`; with the window filled the run answered 200
+      and the report rendered (2 eligible, 2 absorbed). **With both dates empty — the
+      default path — the client posts no body under `Content-Type: application/json` and
+      the API answers `400 Malformed JSON`, so the screen reports a failed run.** Tracked
+      as a frontend bug in `docs/product/backlog/` (see the M19 closeout); the status of
+      this task is not changed here because the fix is a separate hotfix PR.*
 - [x] `git diff` contains no file under `apps/api/` or `packages/`.
 - [x] Changed files lint clean; `make test-web` green for the affected component tests.
 - [x] No diff outside the scope guardrail.

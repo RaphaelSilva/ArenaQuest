@@ -1,7 +1,7 @@
 # RFC 0013: Student billing, contracts and receivables accounting
 
 **Date:** 2026-09-10
-**Status:** Accepted
+**Status:** Implemented
 **Revised:** 2026-09-12
 **Author:** raphaelsilva
 **Affected:**
