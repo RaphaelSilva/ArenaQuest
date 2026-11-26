@@ -49,6 +49,7 @@ vi.mock('@web/context/auth-context', async () => {
 
 import ProtectedLayout from '../layout';
 import StudentBillingPage from '../settings/billing/page';
+import { PaymentDueCard } from '@web/components/dashboard/PaymentDueCard';
 
 const banner = dictEn.layout.standingBanner;
 
@@ -216,5 +217,89 @@ describe('Online payment withholds nothing', () => {
     expect(view.container.querySelector('fieldset[disabled]')).toBeNull();
     expect(routerMocks.replace).not.toHaveBeenCalled();
     expect(routerMocks.push).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The dashboard's *payment due* card (RFC 0026 §7, R11) is one more block. A
+ * delinquent student with the card on screen — an unpaid invoice, a second one
+ * with a checkout in progress — keeps every affordance a student in good
+ * standing has, and the card costs the shell no second statement request.
+ */
+describe('The payment due card withholds nothing', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const pay = dictEn.settings.billing.pay;
+  const card = dictEn.dashboard.paymentDue;
+
+  async function renderDashboardAt(
+    standing: Standing,
+  ): Promise<{ view: RenderResult; http: ReturnType<typeof makeStatementTransport> }> {
+    const http = makeStatementTransport(() => {
+      const base = statementWith(standing, { payOptions: ONE_PROVIDER });
+      return {
+        ...base,
+        invoices: [
+          base.invoices[0],
+          { ...base.invoices[0], id: 'inv2', dueDate: '2026-08-10', pendingCheckout: pendingCheckout() },
+        ],
+      };
+    });
+    client = { meBilling: createMeBillingApi(http) };
+    const view = render(
+      <DictProvider value={dictEn}>
+        <ProtectedLayout>
+          <Screen />
+          <PaymentDueCard />
+        </ProtectedLayout>
+      </DictProvider>,
+    );
+    await screen.findByRole('region', { name: card.title });
+    fireEvent.click(screen.getByRole('button', { name: dictEn.layout.nav.openMenu }));
+    return { view, http };
+  }
+
+  it('keeps every affordance for a delinquent student and adds only the notice', async () => {
+    const good = await renderDashboardAt('good');
+    const goodAffordances = affordances(good.view);
+    expect(goodAffordances).toContain(`button||${pay.action}`);
+    expect(goodAffordances).toContain(`button||${pay.openAgain}`);
+    expect(goodAffordances).toContain(`a|/settings/billing|${card.statementLink}`);
+    good.view.unmount();
+
+    const delinquent = await renderDashboardAt('delinquent');
+    const delinquentAffordances = affordances(delinquent.view);
+
+    for (const affordance of goodAffordances) {
+      expect(delinquentAffordances).toContain(affordance);
+    }
+    const added = delinquentAffordances.filter((a) => !goodAffordances.includes(a));
+    expect(added).toEqual(
+      [`a|/settings/billing|${banner.link}`, `button||${banner.dismiss}`].sort(),
+    );
+  });
+
+  it('leaves the dashboard content links enabled with the card present', async () => {
+    const { view } = await renderDashboardAt('delinquent');
+    expect(screen.getByRole('link', { name: 'catalog-item' })).toHaveAttribute(
+      'href',
+      '/catalog/kata',
+    );
+    expect(screen.getByRole('button', { name: 'screen-action' })).toBeEnabled();
+    expect(screen.getByLabelText('screen-field')).toBeEnabled();
+    expect(screen.getByRole('button', { name: pay.action })).toBeEnabled();
+    expect(screen.getByRole('button', { name: pay.openAgain })).toBeEnabled();
+    expect(affordances(view).some((a) => a.endsWith(':disabled'))).toBe(false);
+    expect(view.container.querySelectorAll('[aria-disabled="true"]')).toHaveLength(0);
+    expect(view.container.querySelector('fieldset[disabled]')).toBeNull();
+    expect(routerMocks.replace).not.toHaveBeenCalled();
+    expect(routerMocks.push).not.toHaveBeenCalled();
+  });
+
+  it('reads the statement once for the notice and the card together', async () => {
+    const { http } = await renderDashboardAt('delinquent');
+    expect(screen.getByRole('status', { name: banner.label })).toBeInTheDocument();
+    expect(http).toHaveBeenCalledTimes(1);
+    expect(http).toHaveBeenCalledWith('GET', '/me/billing');
   });
 });

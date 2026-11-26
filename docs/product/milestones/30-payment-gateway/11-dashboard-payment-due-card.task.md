@@ -1,6 +1,6 @@
 # Task 11 — Frontend: Payment due card on the dashboard (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Frontend Web
@@ -62,16 +62,16 @@ replaces anything else on the dashboard.
 
 ## Acceptance Criteria
 
-- [ ] A student with one open invoice and a bound provider sees the card with the right amount
+- [x] A student with one open invoice and a bound provider sees the card with the right amount
       and due date; pressing *Pay* behaves exactly as on the statement.
-- [ ] A student with no open invoice, or under `payOptions: []`, sees the dashboard exactly as today.
-- [ ] Loading the dashboard issues a single `GET /v1/me/billing`.
-- [ ] At 390 px the card fits without horizontal scroll.
-- [ ] `no-withholding.test.tsx` passes: the dashboard's content links stay enabled for a
+- [x] A student with no open invoice, or under `payOptions: []`, sees the dashboard exactly as today.
+- [x] Loading the dashboard issues a single `GET /v1/me/billing`.
+- [x] At 390 px the card fits without horizontal scroll.
+- [x] `no-withholding.test.tsx` passes: the dashboard's content links stay enabled for a
       `delinquent` student with the card present.
-- [ ] `check-i18n-coverage.js` green; `dict-en.ts` and `dict-pt.ts` have identical keys.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `check-i18n-coverage.js` green; `dict-en.ts` and `dict-pt.ts` have identical keys.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
