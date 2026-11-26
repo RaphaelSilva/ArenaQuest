@@ -272,6 +272,51 @@ describe('/v1/admin/billing — the whole lifecycle over HTTP', () => {
     expect(lateMoney.status).toBe(409);
   });
 
+  it('gateway payments: 400 on a malformed reference, 409 PAYMENT_REFERENCE_EXISTS on a duplicate', async () => {
+    const userId = `billing-gateway-${crypto.randomUUID()}`;
+    await env.DB
+      .prepare('INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)')
+      .bind(userId, 'Gateway Student', `${userId}@billing.test`, 'hash')
+      .run();
+    const plan = await createPlan();
+    const contract = await jsonOf<Subscription>(
+      await billing('POST', '/subscriptions', { userId, planId: plan.id, dueDay: 10, startDate: '2026-01-01' }),
+      201,
+    );
+    const invoice = await jsonOf<Invoice>(
+      await billing('POST', '/invoices', { subscriptionId: contract.id, referenceDate: '2026-05-05' }),
+      201,
+    );
+    const path = `/invoices/${invoice.id}/payments`;
+    const reference = `mercadopago:${crypto.randomUUID()}`;
+
+    // Not `<known provider>:<id>` — including no reference at all.
+    for (const externalReference of [undefined, null, 'receipt 12', 'paypal:1', 'mercadopago:']) {
+      const res = await billing('POST', path, { amountMinor: 5000, method: 'gateway', externalReference });
+      expect(res.status).toBe(400);
+    }
+
+    const first = await jsonOf<Payment & { method: string; externalReference: string; recordedBy: string }>(
+      await billing('POST', path, { amountMinor: 5000, method: 'gateway', externalReference: reference }),
+      201,
+    );
+    expect(first).toMatchObject({ method: 'gateway', externalReference: reference, recordedBy: ADMIN_ID });
+
+    const duplicate = await billing('POST', path, { amountMinor: 5000, method: 'gateway', externalReference: reference });
+    expect(duplicate.status).toBe(409);
+    expect(await duplicate.json()).toMatchObject({ error: 'PAYMENT_REFERENCE_EXISTS', paymentId: first.id });
+
+    // One row landed; a free-form reference on another method may still repeat.
+    const rows = await env.DB
+      .prepare('SELECT COUNT(*) AS n FROM payments WHERE invoice_id = ?')
+      .bind(invoice.id)
+      .first<{ n: number }>();
+    expect(rows?.n).toBe(1);
+    for (let i = 0; i < 2; i += 1) {
+      await jsonOf(await billing('POST', path, { amountMinor: 100, method: 'pix', externalReference: reference }), 201);
+    }
+  });
+
   it('pauses, resumes, cancels and refuses a terms change through PATCH', async () => {
     const plan = await createPlan();
     const contract = await jsonOf<Subscription>(

@@ -9,6 +9,7 @@ import { billingRunDeps } from '@api/core/billing/billing-service';
 import { recordJobRun, billingOutcome } from '@api/jobs/record-job-run';
 import { Entities } from '@arenaquest/shared/types/entities';
 import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
+import { PaymentConflictBody } from '@api/openapi/components';
 import { runMissionHook } from '@api/core/missions/hook';
 import type { AppContainer } from '@api/container';
 
@@ -496,6 +497,26 @@ const ERROR_RESPONSES = {
   409: { description: 'Conflict' },
 };
 
+/**
+ * The two payment routes: with `method: 'gateway'` the reference must read
+ * `<provider>:<id>` (`400`) and may sit on the ledger once (`409
+ * PAYMENT_REFERENCE_EXISTS`, RFC 0026 §5).
+ */
+const PAYMENT_RESPONSES = {
+  ...ERROR_RESPONSES,
+  400: {
+    description:
+      'Validation failed — including a `gateway` payment whose externalReference is not `<provider>:<id>`',
+  },
+  409: json(
+    'Conflict — `PAYMENT_REFERENCE_EXISTS` when a gateway payment with this reference is already on the ledger (`paymentId` names it); otherwise a void receivable',
+    PaymentConflictBody,
+  ),
+};
+
+const PAYMENT_BODY_DESCRIPTION =
+  'With `method: "gateway"` the `externalReference` is required, must read `<provider>:<id>` for a known provider, and is unique on the ledger.';
+
 // ---------------------------------------------------------------------------
 // Bodies
 // ---------------------------------------------------------------------------
@@ -793,8 +814,9 @@ export const recordPaymentRoute = createRoute({
   method: 'post',
   path: '/invoices/{id}/payments',
   summary: 'Record a Payment',
+  description: PAYMENT_BODY_DESCRIPTION,
   request: { params: IdParamSchema, ...body(RecordPaymentBodySchema) },
-  responses: { 201: json('Payment recorded', PaymentSchema), ...ERROR_RESPONSES },
+  responses: { 201: json('Payment recorded', PaymentSchema), ...PAYMENT_RESPONSES },
 });
 
 export const reversePaymentRoute = createRoute({
@@ -1111,8 +1133,9 @@ export const recordChargePaymentRoute = createRoute({
   method: 'post',
   path: '/charges/{id}/payments',
   summary: 'Record an Event Charge Payment',
+  description: PAYMENT_BODY_DESCRIPTION,
   request: { params: IdParamSchema, ...body(RecordPaymentBodySchema) },
-  responses: { 201: json('Payment recorded', ChargePaymentSchema), ...ERROR_RESPONSES },
+  responses: { 201: json('Payment recorded', ChargePaymentSchema), ...PAYMENT_RESPONSES },
 });
 
 export const reverseChargePaymentRoute = createRoute({

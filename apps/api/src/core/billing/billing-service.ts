@@ -26,7 +26,17 @@ import {
   type StandingInvoice,
 } from '@arenaquest/shared/domain/billing/standing-resolver';
 import { fromInvoice, resolveRailStanding } from '@arenaquest/shared/domain/billing/receivable';
-import { resolveExtrasRail, type ExtrasRailSummary } from '@api/core/billing/event-charge-service';
+import { splitGatewayReference } from '@arenaquest/shared/domain/billing/gateway-money';
+import {
+  gatewayPaidDay,
+  isUniqueFailure,
+  paymentReferenceExists,
+  resolveExtrasRail,
+  PAYMENT_REFERENCE_EXISTS,
+  type ExtrasRailSummary,
+  type GatewayRefundKind,
+} from '@api/core/billing/event-charge-service';
+import { SYSTEM_PAYMENT_ACTOR_ID } from '@api/adapters/db/d1-gateway-repository';
 import type { ControllerResult } from '@api/core/result';
 
 /**
@@ -46,9 +56,13 @@ import type { ControllerResult } from '@api/core/result';
  * 3. **No automatic money.** The service accrues nothing — no interest, no
  *    percentage late fee, no daily incidence. `surcharge` is only ever written
  *    from an explicit admin request (RFC 0013 #8).
- * 4. **No access effect and no gateway.** Nothing here reads or writes an
- *    enrollment grant, and `method: 'gateway'` is an accepted input value and
- *    nothing more (RFC 0013 #9).
+ * 4. **No access effect and no provider.** Nothing here reads or writes an
+ *    enrollment grant, and nothing here calls a payment provider. A
+ *    provider-confirmed movement reaches the ledger only through the gateway
+ *    entry points (`recordGatewayPayment`, `reverseGatewayPayment`,
+ *    `recordGatewayRefund`; RFC 0026 §5), which fix `method = 'gateway'` and
+ *    the `<provider>:<id>` reference, write through the same repository
+ *    statement an admin payment uses and are idempotent on the reference.
  *
  * Every mutation records the acting admin on the row (`signedBy`,
  * `recordedBy`, `appliedBy`) and emits one structured `billing.*` event, in the
@@ -65,7 +79,11 @@ const {
   BillingStanding,
   ChargeStatus,
   UserStatus,
+  PaymentMethod,
 } = Entities.Config;
+
+export { PAYMENT_REFERENCE_EXISTS };
+export type { GatewayRefundKind };
 
 /** The only date shape that crosses this module's boundary. */
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -154,6 +172,49 @@ export interface RecordPaymentCommand {
 export interface ReversePaymentCommand {
   reason: string;
   paidAt?: string;
+}
+
+/** A provider-confirmed payment, as the provider captured it (RFC 0026 §5). */
+export interface RecordGatewayPaymentCommand {
+  /** Strictly positive: what the provider captured, not what the checkout asked for. */
+  amountMinor: number;
+  /** Must equal the invoice's currency; anything else lands nothing. */
+  currency: string;
+  /** `YYYY-MM-DD` or an ISO timestamp; stored as its UTC day, like an admin payment. */
+  paidAt: string;
+  /** `<provider>:<provider payment id>`. */
+  externalReference: string;
+}
+
+/** The refund of a gateway row this ledger knows — the full amount, linked by `reversesId`. */
+export interface ReverseGatewayPaymentCommand {
+  /** `<provider>:<refund id>` — the refund's own id, never the original's reference. */
+  externalReference: string;
+  /** `YYYY-MM-DD` or an ISO timestamp. */
+  paidAt: string;
+  /** Defaults to `provider refund <refund id>`. */
+  note?: string;
+  /** Defaults to the system actor; the admin refund route names the admin. */
+  recordedBy?: string;
+}
+
+/** Money that left at the provider with no local original to link (dashboard refund, lost dispute). */
+export interface RecordGatewayRefundCommand {
+  /** Strictly positive magnitude; the row is written negative. */
+  amountMinor: number;
+  currency: string;
+  /** `YYYY-MM-DD` or an ISO timestamp. */
+  paidAt: string;
+  /** `<provider>:<refund or dispute id>`. */
+  externalReference: string;
+  /** Defaults to `refund`. */
+  kind?: GatewayRefundKind;
+}
+
+/** The landed row, and whether this call wrote it or found it already there. */
+export interface GatewayPaymentResult {
+  payment: PaymentRecord;
+  created: boolean;
 }
 
 /**
@@ -1039,8 +1100,32 @@ export class BillingService {
     command: RecordPaymentCommand,
     actorId: string,
   ): Promise<ControllerResult<PaymentRecord>> {
+    return this.writePayment(invoiceId, command, actorId);
+  }
+
+  /**
+   * The one place a positive payment row is written on this rail — the admin
+   * form and `recordGatewayPayment` (`landed`) both end here, so the guards
+   * and the status refresh cannot drift apart.
+   *
+   * A `gateway` row is keyed on its reference: it must read `<known
+   * provider>:<id>` (`400`), and one already on the ledger is `409
+   * PAYMENT_REFERENCE_EXISTS` — checked before the insert and again when the
+   * partial unique index refuses a concurrent twin.
+   */
+  private async writePayment(
+    invoiceId: string,
+    command: RecordPaymentCommand,
+    actorId: string,
+    landed = false,
+  ): Promise<ControllerResult<PaymentRecord>> {
     if (command.amountMinor <= 0) {
       return badRequest('a payment amount must be positive; undo a payment with a reversal');
+    }
+    const viaGateway = command.method === PaymentMethod.GATEWAY;
+    const reference = command.externalReference ?? null;
+    if (viaGateway && !splitGatewayReference(reference)) {
+      return badRequest('a gateway payment needs an externalReference of the form "<provider>:<id>"');
     }
 
     const invoice = await this.repo.getInvoice(invoiceId);
@@ -1055,26 +1140,50 @@ export class BillingService {
       );
     }
 
-    const payment = await this.repo.recordPayment({
-      invoiceId,
-      amountMinor: command.amountMinor,
-      currency: invoice.currency,
-      method: command.method,
-      paidAt: command.paidAt ?? today(),
-      externalReference: command.externalReference ?? null,
-      note: command.note ?? '',
-      reversesId: null,
-      recordedBy: actorId,
-    });
+    if (viaGateway && reference !== null) {
+      const existing = await this.repo.findGatewayPayment(reference);
+      if (existing) return paymentReferenceExists(existing.id);
+    }
 
-    this.audit('billing.record_payment', actorId, {
-      userId: invoice.userId,
-      invoiceId,
-      paymentId: payment.id,
-      amountMinor: payment.amountMinor,
-      currency: payment.currency,
-      method: payment.method,
-    });
+    let payment: PaymentRecord;
+    try {
+      payment = await this.repo.recordPayment({
+        invoiceId,
+        amountMinor: command.amountMinor,
+        currency: invoice.currency,
+        method: command.method,
+        paidAt: command.paidAt ?? today(),
+        externalReference: reference,
+        note: command.note ?? '',
+        reversesId: null,
+        recordedBy: actorId,
+      });
+    } catch (error) {
+      if (viaGateway && reference !== null && isUniqueFailure(error)) {
+        const winner = await this.repo.findGatewayPayment(reference);
+        if (winner) return paymentReferenceExists(winner.id);
+      }
+      throw error;
+    }
+
+    if (landed) {
+      // A landed gateway payment is audited by ids only (RFC 0026 §5).
+      this.audit('payments.gateway_landed', actorId, {
+        rail: 'contract',
+        userId: invoice.userId,
+        invoiceId,
+        paymentId: payment.id,
+      });
+    } else {
+      this.audit('billing.record_payment', actorId, {
+        userId: invoice.userId,
+        invoiceId,
+        paymentId: payment.id,
+        amountMinor: payment.amountMinor,
+        currency: payment.currency,
+        method: payment.method,
+      });
+    }
 
     return { ok: true, data: payment };
   }
@@ -1127,6 +1236,190 @@ export class BillingService {
     });
 
     return { ok: true, data: reversal };
+  }
+
+  // -------------------------------------------------------------------------
+  // Gateway entry points (RFC 0026 §5) — idempotent on the reference
+  // -------------------------------------------------------------------------
+
+  /**
+   * Lands a provider-confirmed payment: an ordinary payment row with `method =
+   * 'gateway'`, recorded by the system actor. A reference already on the
+   * ledger returns that row with `created: false` and writes nothing —
+   * whatever the invoice's state has become since. An overpayment is a credit,
+   * exactly as it is for an admin payment.
+   */
+  async recordGatewayPayment(
+    invoiceId: string,
+    command: RecordGatewayPaymentCommand,
+  ): Promise<ControllerResult<GatewayPaymentResult>> {
+    if (!splitGatewayReference(command.externalReference)) {
+      return badRequest('a gateway payment needs an externalReference of the form "<provider>:<id>"');
+    }
+    const paidAt = gatewayPaidDay(command.paidAt);
+    if (!paidAt) return badRequest('paidAt must be a YYYY-MM-DD date or an ISO timestamp');
+
+    const existing = await this.repo.findGatewayPayment(command.externalReference);
+    if (existing) return { ok: true, data: { payment: existing, created: false } };
+
+    const written = await this.writePayment(
+      invoiceId,
+      {
+        amountMinor: command.amountMinor,
+        currency: command.currency,
+        method: PaymentMethod.GATEWAY,
+        paidAt,
+        externalReference: command.externalReference,
+      },
+      SYSTEM_PAYMENT_ACTOR_ID,
+      true,
+    );
+    if (written.ok) return { ok: true, data: { payment: written.data, created: true } };
+    if (written.error !== PAYMENT_REFERENCE_EXISTS) return written;
+
+    // A concurrent call won the insert: its row is the answer.
+    const winner = await this.repo.findGatewayPayment(command.externalReference);
+    if (!winner) return written;
+    return { ok: true, data: { payment: winner, created: false } };
+  }
+
+  /**
+   * Reverses a gateway row this ledger knows, in full: the mirror amount,
+   * `reversesId` set, and the provider's **refund id** as the row's own
+   * reference — never the original's, which the partial unique index would
+   * refuse. A refund id already on the ledger (this call's twin, or the
+   * provider's notification landing it first with no link) is returned with
+   * `created: false`.
+   */
+  async reverseGatewayPayment(
+    paymentId: string,
+    command: ReverseGatewayPaymentCommand,
+  ): Promise<ControllerResult<GatewayPaymentResult>> {
+    const refund = splitGatewayReference(command.externalReference);
+    if (!refund) {
+      return badRequest('a gateway reversal needs an externalReference of the form "<provider>:<refund id>"');
+    }
+    const paidAt = gatewayPaidDay(command.paidAt);
+    if (!paidAt) return badRequest('paidAt must be a YYYY-MM-DD date or an ISO timestamp');
+
+    const original = await this.repo.getPayment(paymentId);
+    if (!original) return notFound('payment not found');
+    if (original.method !== PaymentMethod.GATEWAY) {
+      return conflict('only a gateway payment is reversed through the gateway');
+    }
+    if (original.reversesId !== null || original.amountMinor <= 0) {
+      return conflict('a reversal cannot itself be reversed');
+    }
+    if (original.externalReference === command.externalReference) {
+      return badRequest("a reversal carries the refund id, never the original payment's reference");
+    }
+    if (splitGatewayReference(original.externalReference)?.provider !== refund.provider) {
+      return badRequest('the refund belongs to another provider than the payment it reverses');
+    }
+
+    const existing = await this.repo.findGatewayPayment(command.externalReference);
+    if (existing) return { ok: true, data: { payment: existing, created: false } };
+
+    const ledger = await this.repo.listLedger({ invoiceId: original.invoiceId });
+    const alreadyReversed = ledger.some(
+      (entry) => entry.entry === 'payment' && entry.payment.reversesId === paymentId,
+    );
+    if (alreadyReversed) return conflict('the payment has already been reversed');
+
+    const recordedBy = command.recordedBy ?? SYSTEM_PAYMENT_ACTOR_ID;
+    let reversal: PaymentRecord;
+    try {
+      reversal = await this.repo.recordPayment({
+        invoiceId: original.invoiceId,
+        amountMinor: -original.amountMinor,
+        currency: original.currency,
+        method: PaymentMethod.GATEWAY,
+        paidAt,
+        externalReference: command.externalReference,
+        note: isBlank(command.note) ? `provider refund ${refund.id}` : command.note!.trim(),
+        reversesId: original.id,
+        recordedBy,
+      });
+    } catch (error) {
+      if (!isUniqueFailure(error)) throw error;
+      const winner = await this.repo.findGatewayPayment(command.externalReference);
+      if (winner) return { ok: true, data: { payment: winner, created: false } };
+      // Not the reference: `idx_payments_one_reversal` fired.
+      return conflict('the payment has already been reversed');
+    }
+
+    this.audit('payments.gateway_reversed', recordedBy, {
+      rail: 'contract',
+      invoiceId: original.invoiceId,
+      paymentId: reversal.id,
+      reversesId: original.id,
+    });
+
+    return { ok: true, data: { payment: reversal, created: true } };
+  }
+
+  /**
+   * Books money that left at the provider with no local original to link — a
+   * refund made in the provider's dashboard (full or partial) or a lost
+   * dispute: a **negative** gateway row, `reversesId` null, keyed on the
+   * provider's refund or dispute id and named in the note. Like an admin
+   * reversal, it does not ask whether the invoice is void.
+   */
+  async recordGatewayRefund(
+    invoiceId: string,
+    command: RecordGatewayRefundCommand,
+  ): Promise<ControllerResult<GatewayPaymentResult>> {
+    const reference = splitGatewayReference(command.externalReference);
+    if (!reference) {
+      return badRequest('a gateway refund needs an externalReference of the form "<provider>:<id>"');
+    }
+    if (!Number.isInteger(command.amountMinor) || command.amountMinor <= 0) {
+      return badRequest('a refund amount is a positive count of minor units; it is written negative');
+    }
+    const paidAt = gatewayPaidDay(command.paidAt);
+    if (!paidAt) return badRequest('paidAt must be a YYYY-MM-DD date or an ISO timestamp');
+
+    const existing = await this.repo.findGatewayPayment(command.externalReference);
+    if (existing) return { ok: true, data: { payment: existing, created: false } };
+
+    const invoice = await this.repo.getInvoice(invoiceId);
+    if (!invoice) return notFound('invoice not found');
+    if (command.currency !== invoice.currency) {
+      return badRequest(
+        `the refund currency "${command.currency}" differs from the invoice currency "${invoice.currency}"`,
+      );
+    }
+
+    const kind: GatewayRefundKind = command.kind ?? 'refund';
+    let refund: PaymentRecord;
+    try {
+      refund = await this.repo.recordPayment({
+        invoiceId,
+        amountMinor: -command.amountMinor,
+        currency: invoice.currency,
+        method: PaymentMethod.GATEWAY,
+        paidAt,
+        externalReference: command.externalReference,
+        note: `provider ${kind} ${reference.id}`,
+        reversesId: null,
+        recordedBy: SYSTEM_PAYMENT_ACTOR_ID,
+      });
+    } catch (error) {
+      if (!isUniqueFailure(error)) throw error;
+      const winner = await this.repo.findGatewayPayment(command.externalReference);
+      if (!winner) throw error;
+      return { ok: true, data: { payment: winner, created: false } };
+    }
+
+    this.audit('payments.gateway_refund_landed', SYSTEM_PAYMENT_ACTOR_ID, {
+      rail: 'contract',
+      kind,
+      userId: invoice.userId,
+      invoiceId,
+      paymentId: refund.id,
+    });
+
+    return { ok: true, data: { payment: refund, created: true } };
   }
 
   // -------------------------------------------------------------------------

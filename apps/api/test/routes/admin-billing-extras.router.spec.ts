@@ -217,6 +217,39 @@ describe('/v1/admin/billing extras rail', () => {
     expect((await billing('GET', `/events/nope/audience-check?userIds=${BUYER_A}`)).status).toBe(404);
   });
 
+  it('gateway payments: 400 on a malformed reference, 409 PAYMENT_REFERENCE_EXISTS on a duplicate', async () => {
+    await billing('PUT', `/event-prices/${PUBLISHED}`, { amountMinor: 8000 });
+    await billing('POST', '/charges', { eventId: PUBLISHED, userIds: [BUYER_B] });
+    const charges = await jsonOf<Charge[]>(
+      await billing('GET', `/charges?eventId=${PUBLISHED}&userId=${BUYER_B}`),
+      200,
+    );
+    const charge = charges.find((c) => c.status !== 'void')!;
+    const path = `/charges/${charge.id}/payments`;
+    const reference = `mercadopago:${crypto.randomUUID()}`;
+
+    for (const externalReference of [undefined, null, 'receipt 12', 'paypal:1', 'mercadopago:']) {
+      const res = await billing('POST', path, { amountMinor: 100, method: 'gateway', externalReference });
+      expect(res.status).toBe(400);
+    }
+
+    const first = await jsonOf<Payment & { method: string; externalReference: string }>(
+      await billing('POST', path, { amountMinor: 100, method: 'gateway', externalReference: reference }),
+      201,
+    );
+    expect(first).toMatchObject({ method: 'gateway', externalReference: reference });
+
+    const duplicate = await billing('POST', path, { amountMinor: 100, method: 'gateway', externalReference: reference });
+    expect(duplicate.status).toBe(409);
+    expect(await duplicate.json()).toMatchObject({ error: 'PAYMENT_REFERENCE_EXISTS', paymentId: first.id });
+
+    const rows = await env.DB
+      .prepare("SELECT COUNT(*) AS n FROM event_charge_payments WHERE external_reference = ?")
+      .bind(reference)
+      .first<{ n: number }>();
+    expect(rows?.n).toBe(1);
+  });
+
   it('returns 401 without a token', async () => {
     const request = new IncomingRequest(`http://example.com${v1('/admin/billing/charges')}`);
     const ctx = createExecutionContext();

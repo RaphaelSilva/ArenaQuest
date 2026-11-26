@@ -1,6 +1,6 @@
 # Task 04 — Backend: Gateway ledger entry points (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Backend API
@@ -72,15 +72,15 @@ instead of an unhandled constraint error. Task 06 lands payments through these a
 
 ## Acceptance Criteria
 
-- [ ] A gateway payment written through the entry point is indistinguishable in the statement and
+- [x] A gateway payment written through the entry point is indistinguishable in the statement and
       the reports from an admin payment of the same amount, apart from method, recorder and reference.
-- [ ] Calling an entry point twice with one reference yields one row and the same returned id.
-- [ ] A reversal's reference is the refund id, never the original's reference.
-- [ ] A currency other than the receivable's is refused with no row written.
-- [ ] An admin gateway payment with a duplicate reference answers `409 PAYMENT_REFERENCE_EXISTS`
+- [x] Calling an entry point twice with one reference yields one row and the same returned id.
+- [x] A reversal's reference is the refund id, never the original's reference.
+- [x] A currency other than the receivable's is refused with no row written.
+- [x] An admin gateway payment with a duplicate reference answers `409 PAYMENT_REFERENCE_EXISTS`
       on both rails; `apps/api/openapi.json` documents it.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
