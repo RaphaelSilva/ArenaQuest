@@ -47,6 +47,13 @@ import {
   type SubmissionConfigResult,
   type SubmissionEnv,
 } from '@api/core/submissions/config';
+import type { PaymentsConfigResult, PaymentsEnv } from '@api/core/payments/config';
+import {
+  buildPaymentsWiring,
+  PRODUCTION_GATEWAY_FACTORIES,
+  type GatewayRegistry,
+  type PaymentGatewayFactoryMap,
+} from '@api/core/payments/gateway-registry';
 import { BillingService } from '@api/core/billing/billing-service';
 import { AccountingService } from '@api/core/billing/accounting-service';
 import { EventChargeService } from '@api/core/billing/event-charge-service';
@@ -229,6 +236,28 @@ export interface InfraContext {
   jobRuns: IJobRunRepository;
 }
 
+/** Payment gateway (RFC 0026 section 9). The repository and the service join in later tasks. */
+export interface PaymentsContext {
+  /**
+   * The checked `PAYMENTS_PROVIDERS` / `PAYMENTS_KEY_MODE` — the *result*, not a
+   * config, so a bad list surfaces as `500 PAYMENTS_CONFIG_INVALID` on the
+   * payment routes instead of failing every request at container build time.
+   * The key-mode assertion is already applied.
+   */
+  config: PaymentsConfigResult;
+  /** The adapters bound for this label and environment; empty under `none` and under an invalid list. */
+  gateways: GatewayRegistry;
+}
+
+/** What a caller may replace when building the container. */
+export interface BuildContainerOptions {
+  /**
+   * The payment adapters this Worker can build. Defaults to the production
+   * map; a test passes its own to bind stub adapters under real provider names.
+   */
+  paymentGatewayFactories?: PaymentGatewayFactoryMap;
+}
+
 export interface ControllersContext {
   passwordController: PasswordController;
   accountController: AccountController;
@@ -245,6 +274,7 @@ export interface AppContainer {
   gamification: GamificationContext;
   billing: BillingContext;
   events: EventsContext;
+  payments: PaymentsContext;
   infra: InfraContext;
   controllers: ControllersContext;
 }
@@ -293,7 +323,7 @@ function buildMissionContextResolver(
   };
 }
 
-export function buildContainer(env: Env): AppContainer {
+export function buildContainer(env: Env, options: BuildContainerOptions = {}): AppContainer {
   // Infra: auth adapter
   const auth = new JwtAuthAdapter({
     secret: env.JWT_SECRET,
@@ -392,6 +422,13 @@ export function buildContainer(env: Env): AppContainer {
   // their ports, and the active currency through the billing port; it writes
   // only to its own ledger.
   const eventChargeService = new EventChargeService(eventChargeRepo, eventRepo, userGroups, billingRepo);
+
+  // Payment gateway (RFC 0026 §8.1): the provider list, checked, and the
+  // adapters it binds. Never throws — a bad list is a recorded state.
+  const payments = buildPaymentsWiring(
+    env as unknown as PaymentsEnv,
+    options.paymentGatewayFactories ?? PRODUCTION_GATEWAY_FACTORIES,
+  );
 
   // Infra: job runs
   const jobRuns = new D1JobRunRepository(env.DB);
@@ -503,6 +540,7 @@ export function buildContainer(env: Env): AppContainer {
     },
     billing: { billingRepo, billingService, accountingService, eventChargeRepo, eventChargeService },
     events: { eventRepo, storage, users, userGroups },
+    payments: { config: payments.config, gateways: payments.gateways },
     infra: {
       auth,
       mailer,
