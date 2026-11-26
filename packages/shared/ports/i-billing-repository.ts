@@ -334,6 +334,12 @@ export interface IBillingRepository {
   // Ledger — append-only on both tables.
   recordPayment(input: RecordPaymentInput): Promise<PaymentRecord>;
   getPayment(id: string): Promise<PaymentRecord | null>;
+  /**
+   * The gateway row (`method = 'gateway'`) carrying this provider-qualified
+   * reference (`<provider>:<id>`), or `null`. At most one exists — the answer to
+   * "did this provider payment or refund already land?" (RFC 0026 section 9).
+   */
+  findGatewayPayment(externalReference: string): Promise<PaymentRecord | null>;
   applyAdjustment(input: ApplyAdjustmentInput): Promise<InvoiceAdjustmentRecord>;
   listLedger(filter: LedgerFilter): Promise<LedgerEntryRecord[]>;
 

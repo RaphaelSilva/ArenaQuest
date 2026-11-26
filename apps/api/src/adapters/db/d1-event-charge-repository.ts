@@ -450,6 +450,11 @@ export class D1EventChargeRepository implements IEventChargeRepository {
     return row ? rowToPayment(row) : null;
   }
 
+  /** Declared by the port in M30 Task 01; the lookup itself lands with the gateway schema (Task 03). */
+  async findGatewayPayment(): Promise<EventChargePaymentRecord | null> {
+    throw new Error('D1EventChargeRepository: findGatewayPayment is not implemented yet');
+  }
+
   async applyAdjustment(input: ApplyChargeAdjustmentInput): Promise<EventChargeAdjustmentRecord> {
     const id = crypto.randomUUID();
 

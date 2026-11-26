@@ -385,6 +385,12 @@ export class FakeBillingRepository implements IBillingRepository {
     return this.payments.find((p) => p.id === id) ?? null;
   }
 
+  async findGatewayPayment(externalReference: string): Promise<PaymentRecord | null> {
+    return (
+      this.payments.find((p) => p.method === 'gateway' && p.externalReference === externalReference) ?? null
+    );
+  }
+
   async applyAdjustment(input: ApplyAdjustmentInput): Promise<InvoiceAdjustmentRecord> {
     const adjustment: InvoiceAdjustmentRecord = {
       id: nextId('adj'),

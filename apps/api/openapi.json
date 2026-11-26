@@ -10631,7 +10631,8 @@
             "schema": {
               "enum": [
                 "billing",
-                "sweep_submissions"
+                "sweep_submissions",
+                "reconcile_payments"
               ],
               "example": "billing",
               "type": "string"

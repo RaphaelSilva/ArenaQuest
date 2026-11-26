@@ -848,6 +848,11 @@ export class D1BillingRepository implements IBillingRepository {
     return row ? rowToPayment(row) : null;
   }
 
+  /** Declared by the port in M30 Task 01; the lookup itself lands with the gateway schema (Task 03). */
+  async findGatewayPayment(): Promise<PaymentRecord | null> {
+    throw new Error('D1BillingRepository: findGatewayPayment is not implemented yet');
+  }
+
   async applyAdjustment(input: ApplyAdjustmentInput): Promise<InvoiceAdjustmentRecord> {
     const id = crypto.randomUUID();
 
