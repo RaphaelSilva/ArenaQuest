@@ -49,3 +49,22 @@ GOOGLE_REDIRECT_URI=http://localhost:8787/auth/google/callback
 # SUBMISSIONS_STORAGE_PER_STUDENT_BYTES=1073741824
 # SUBMISSIONS_VIDEO_MAX_BYTES=262144000
 # SUBMISSIONS_SHARING_ENABLED=true
+
+# Payment gateway (RFC 0026 section 8.1). Both optional.
+# PAYMENTS_PROVIDERS is `none` (also what an absent var means) or a
+# comma-separated list of `provider:method+method` entries — lower case, over
+# stripe | mercadopago | asaas | pagarme and pix | card | boleto:
+#   mercadopago:pix+card            one provider, two methods
+#   mercadopago:pix,stripe:card     Pix through one provider, card through another
+#   mercadopago:pix+card,asaas:     asaas retired: still bound, offers nothing new
+# A list that breaks a rule (unknown or repeated provider, unknown method, a
+# method offered by two providers or one the provider cannot settle, a provider
+# with no adapter or with either secret missing) makes the payment routes
+# answer 500 PAYMENTS_CONFIG_INVALID — never a silent `none`.
+# PAYMENTS_KEY_MODE is `test` (the default) or `live` and must match the mode
+# every bound provider's secret key declares by its prefix.
+# PAYMENTS_PROVIDERS=none
+# PAYMENTS_KEY_MODE=test
+# Each bound provider needs both secrets (sandbox values locally):
+# PAYMENTS_MERCADOPAGO_SECRET_KEY=
+# PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET=

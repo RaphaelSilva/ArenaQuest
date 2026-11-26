@@ -46,7 +46,13 @@
 		"MAIL_DRIVER": "resend",
 		"MAIL_FROM": "ArenaQuest <noreply@arenaquest.app>",
 		"WEB_BASE_URL": "https://arenaquest-web.pages.dev",
-		"GOOGLE_REDIRECT_URI": "https://api.arenaquest.app/auth/google/callback"
+		"GOOGLE_REDIRECT_URI": "https://api.arenaquest.app/auth/google/callback",
+		// Payment gateway (RFC 0026 section 8.1). `none`, or a comma-separated list of
+		// `provider:method+method` entries; a list that breaks a rule is
+		// 500 PAYMENTS_CONFIG_INVALID on the payment routes, never a silent `none`.
+		// PAYMENTS_KEY_MODE (`test` | `live`) must match every bound provider's secret key.
+		"PAYMENTS_PROVIDERS": "none",
+		"PAYMENTS_KEY_MODE": "test"
 	},
 	/**
 	 * D1 Databases
@@ -133,7 +139,13 @@
 				"SUBMISSIONS_PER_TOPIC_MAX": "10",
 				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
 				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
-				"SUBMISSIONS_SHARING_ENABLED": "true"
+				"SUBMISSIONS_SHARING_ENABLED": "true",
+				// Payment gateway (RFC 0026 section 8.1). `none`, or a comma-separated list of
+				// `provider:method+method` entries; a list that breaks a rule is
+				// 500 PAYMENTS_CONFIG_INVALID on the payment routes, never a silent `none`.
+				// PAYMENTS_KEY_MODE (`test` | `live`) must match every bound provider's secret key.
+				"PAYMENTS_PROVIDERS": "none",
+				"PAYMENTS_KEY_MODE": "test"
 			},
 			"observability": {
 				"enabled": true,
@@ -225,7 +237,13 @@
 				"SUBMISSIONS_PER_TOPIC_MAX": "10",
 				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
 				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
-				"SUBMISSIONS_SHARING_ENABLED": "true"
+				"SUBMISSIONS_SHARING_ENABLED": "true",
+				// Payment gateway (RFC 0026 section 8.1). `none`, or a comma-separated list of
+				// `provider:method+method` entries; a list that breaks a rule is
+				// 500 PAYMENTS_CONFIG_INVALID on the payment routes, never a silent `none`.
+				// PAYMENTS_KEY_MODE (`test` | `live`) must match every bound provider's secret key.
+				"PAYMENTS_PROVIDERS": "none",
+				"PAYMENTS_KEY_MODE": "live"
 			},
 			"observability": {
 				"enabled": true,
@@ -274,7 +292,13 @@
 				"SUBMISSIONS_PER_TOPIC_MAX": "10",
 				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
 				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
-				"SUBMISSIONS_SHARING_ENABLED": "true"
+				"SUBMISSIONS_SHARING_ENABLED": "true",
+				// Payment gateway (RFC 0026 section 8.1). `none`, or a comma-separated list of
+				// `provider:method+method` entries; a list that breaks a rule is
+				// 500 PAYMENTS_CONFIG_INVALID on the payment routes, never a silent `none`.
+				// PAYMENTS_KEY_MODE (`test` | `live`) must match every bound provider's secret key.
+				"PAYMENTS_PROVIDERS": "none",
+				"PAYMENTS_KEY_MODE": "test"
 			},
 			"observability": {
 				"enabled": true,
@@ -364,7 +388,13 @@
 				"SUBMISSIONS_PER_TOPIC_MAX": "10",
 				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
 				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
-				"SUBMISSIONS_SHARING_ENABLED": "true"
+				"SUBMISSIONS_SHARING_ENABLED": "true",
+				// Payment gateway (RFC 0026 section 8.1). `none`, or a comma-separated list of
+				// `provider:method+method` entries; a list that breaks a rule is
+				// 500 PAYMENTS_CONFIG_INVALID on the payment routes, never a silent `none`.
+				// PAYMENTS_KEY_MODE (`test` | `live`) must match every bound provider's secret key.
+				"PAYMENTS_PROVIDERS": "none",
+				"PAYMENTS_KEY_MODE": "live"
 			},
 			"observability": {
 				"enabled": true,
@@ -415,7 +445,13 @@
 				"SUBMISSIONS_PER_TOPIC_MAX": "10",
 				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
 				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
-				"SUBMISSIONS_SHARING_ENABLED": "true"
+				"SUBMISSIONS_SHARING_ENABLED": "true",
+				// Payment gateway (RFC 0026 section 8.1). `none`, or a comma-separated list of
+				// `provider:method+method` entries; a list that breaks a rule is
+				// 500 PAYMENTS_CONFIG_INVALID on the payment routes, never a silent `none`.
+				// PAYMENTS_KEY_MODE (`test` | `live`) must match every bound provider's secret key.
+				"PAYMENTS_PROVIDERS": "none",
+				"PAYMENTS_KEY_MODE": "test"
 			},
 			"observability": {
 				"enabled": true,
@@ -503,7 +539,13 @@
 				"SUBMISSIONS_PER_TOPIC_MAX": "10",
 				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
 				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
-				"SUBMISSIONS_SHARING_ENABLED": "true"
+				"SUBMISSIONS_SHARING_ENABLED": "true",
+				// Payment gateway (RFC 0026 section 8.1). `none`, or a comma-separated list of
+				// `provider:method+method` entries; a list that breaks a rule is
+				// 500 PAYMENTS_CONFIG_INVALID on the payment routes, never a silent `none`.
+				// PAYMENTS_KEY_MODE (`test` | `live`) must match every bound provider's secret key.
+				"PAYMENTS_PROVIDERS": "none",
+				"PAYMENTS_KEY_MODE": "live"
 			},
 			"observability": {
 				"enabled": true,
@@ -555,7 +597,13 @@
 				"SUBMISSIONS_PER_TOPIC_MAX": "10",
 				"SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": "1073741824",
 				"SUBMISSIONS_VIDEO_MAX_BYTES": "262144000",
-				"SUBMISSIONS_SHARING_ENABLED": "true"
+				"SUBMISSIONS_SHARING_ENABLED": "true",
+				// Payment gateway (RFC 0026 section 8.1). `none`, or a comma-separated list of
+				// `provider:method+method` entries; a list that breaks a rule is
+				// 500 PAYMENTS_CONFIG_INVALID on the payment routes, never a silent `none`.
+				// PAYMENTS_KEY_MODE (`test` | `live`) must match every bound provider's secret key.
+				"PAYMENTS_PROVIDERS": "none",
+				"PAYMENTS_KEY_MODE": "test"
 			},
 			"observability": {
 				"enabled": true,
