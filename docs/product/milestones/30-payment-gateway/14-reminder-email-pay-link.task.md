@@ -1,6 +1,6 @@
 # Task 14 — Backend: Pay link in the reminder e-mails (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Backend API
@@ -58,13 +58,13 @@ byte-for-byte what it is today.
 
 ## Acceptance Criteria
 
-- [ ] With a bound provider, all four reminders contain exactly one link to `/settings/billing`
+- [x] With a bound provider, all four reminders contain exactly one link to `/settings/billing`
       on the label's web origin, and no provider hostname.
-- [ ] With `PAYMENTS_PROVIDERS = none`, each reminder equals today's output character for character.
-- [ ] A billing run with an invalid provider list completes and sends reminders without the line.
-- [ ] No reminder test observes a provider call or a new `gateway_checkouts` row.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] With `PAYMENTS_PROVIDERS = none`, each reminder equals today's output character for character.
+- [x] A billing run with an invalid provider list completes and sends reminders without the line.
+- [x] No reminder test observes a provider call or a new `gateway_checkouts` row.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -26,7 +26,7 @@ import {
   type StandingInvoice,
 } from '@arenaquest/shared/domain/billing/standing-resolver';
 import { fromInvoice, resolveRailStanding } from '@arenaquest/shared/domain/billing/receivable';
-import { splitGatewayReference } from '@arenaquest/shared/domain/billing/gateway-money';
+import { providerMethodsForCurrency, splitGatewayReference } from '@arenaquest/shared/domain/billing/gateway-money';
 import {
   gatewayPaidDay,
   isUniqueFailure,
@@ -703,14 +703,84 @@ function formatAmount(amountMinor: number, currency: CurrencyRecord | null): str
   return `${sign}${symbol}${(Math.abs(amountMinor) / 10 ** exponent).toFixed(exponent)}`;
 }
 
+/**
+ * Answers the URL of the student's statement page when a receivable in
+ * `currency` can be paid online, and `null` when it cannot (RFC 0026 §7).
+ *
+ * It reads configuration only — never a provider, never the database — and the
+ * URL it returns is the statement itself: no checkout id, no token, no amount
+ * and no receivable id. A checkout is created when the logged-in student
+ * presses *Pay*, so no e-mail ever carries a link that pays an invoice.
+ */
+export type PayLinkResolver = (currency: string) => string | null;
+
+/** The default: a label with no online payment — the reminders stay as they were. */
+const NO_PAY_LINK: PayLinkResolver = () => null;
+
+/** The slice of a registry pay option the link is decided from. */
+export interface PayLinkOption {
+  provider: string;
+  methods: ReadonlyArray<string>;
+}
+
+/**
+ * Builds the resolver out of the label's pay options and its web origin.
+ *
+ * The link exists when at least one option offers a method that settles the
+ * receivable's currency. An empty registry — `PAYMENTS_PROVIDERS = none`, an
+ * invalid list (milestone 30 decision 24) or only retired providers — yields
+ * no option and therefore no link. The service also treats a resolver that
+ * throws as "no link": a reminder line is never worth a failed billing run.
+ */
+export function statementPayLink(
+  payOptions: () => ReadonlyArray<PayLinkOption>,
+  webBaseUrl: string,
+): PayLinkResolver {
+  const url = `${webBaseUrl.replace(/\/+$/, '')}/settings/billing`;
+  return (currency) => {
+    const payable = payOptions().some(({ provider, methods }) => {
+      const settles: ReadonlyArray<string> = providerMethodsForCurrency(provider, currency);
+      return methods.some((method) => settles.includes(method));
+    });
+    return payable ? url : null;
+  };
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * The one line a reminder gains when the label offers online payment. It
+ * invites and nothing more: not paying loses the student nothing.
+ */
+interface PayLine {
+  text: string;
+  html: string;
+}
+
+function payLine(url: string): PayLine {
+  return {
+    text: `You can pay online from your statement: ${url}`,
+    html: `You can pay online from <a href="${escapeHtml(url).replace(/"/g, '&quot;')}">your statement</a>.`,
+  };
+}
+
+/**
+ * A reminder's body with the pay line, when there is one, set just before its
+ * closing sentence. Without one the lines are returned untouched.
+ */
+function withPayLine(lines: string[], pay: PayLine | null): string[] {
+  return pay ? [...lines.slice(0, -1), pay.text, lines[lines.length - 1]] : lines;
+}
+
 /** The plain-text half of a message, mirrored into minimal HTML. */
-function asHtml(lines: string[]): string {
-  const escape = (line: string): string =>
-    line
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  return `<p>${lines.map(escape).join('<br />')}</p>`;
+function asHtml(lines: string[], pay: PayLine | null = null): string {
+  const render = (line: string): string => (pay && line === pay.text ? pay.html : escapeHtml(line));
+  return `<p>${lines.map(render).join('<br />')}</p>`;
 }
 
 export class BillingService {
@@ -728,6 +798,12 @@ export class BillingService {
      * `IEventChargeRepository`.
      */
     private readonly charges: ChargeReader = NO_CHARGES,
+    /**
+     * Only the reminder builders ask (RFC 0026 §7). Defaults to "no link", so
+     * every existing caller sends the reminders it always sent; the container
+     * passes the resolver built from the label's pay options.
+     */
+    private readonly payLink: PayLinkResolver = NO_PAY_LINK,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -2177,6 +2253,19 @@ export class BillingService {
     }
   }
 
+  /**
+   * The pay line for a receivable in `currency`, or `null`. Configuration
+   * only; a resolver that throws costs the line, never the run.
+   */
+  private payLineFor(currency: string): PayLine | null {
+    try {
+      const url = this.payLink(currency);
+      return url ? payLine(url) : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** The student's notice. Two of them exist and there is no third. */
   private reminderMessage(
     kind: ContractReminderKind,
@@ -2185,7 +2274,8 @@ export class BillingService {
     currency: CurrencyRecord | null,
   ): MailMessage {
     const amount = formatAmount(invoice.balanceMinor, currency);
-    const lines =
+    const pay = this.payLineFor(invoice.currency);
+    const body =
       kind === 'due_date'
         ? [
             `Hello ${recipient.name},`,
@@ -2199,6 +2289,7 @@ export class BillingService {
             `Your membership invoice of ${amount}, due on ${invoice.dueDate}, is now past its grace period.`,
             'Please get in touch so we can settle it together.',
           ];
+    const lines = withPayLine(body, pay);
 
     return {
       to: recipient.email,
@@ -2207,7 +2298,7 @@ export class BillingService {
           ? `Your membership invoice is due today (${invoice.dueDate})`
           : `Your membership invoice is overdue (due ${invoice.dueDate})`,
       text: lines.join('\n'),
-      html: asHtml(lines),
+      html: asHtml(lines, pay),
     };
   }
 
@@ -2224,7 +2315,8 @@ export class BillingService {
   ): MailMessage {
     const amount = formatAmount(charge.balanceMinor, currency);
     const event = charge.description;
-    const lines =
+    const pay = this.payLineFor(charge.currency);
+    const body =
       kind === 'extras_due_date'
         ? [
             `Hello ${recipient.name},`,
@@ -2238,6 +2330,7 @@ export class BillingService {
             `Your charge of ${amount} for ${event}, due on ${charge.dueDate}, is now past its grace period.`,
             'Please get in touch so we can settle it together.',
           ];
+    const lines = withPayLine(body, pay);
 
     return {
       to: recipient.email,
@@ -2246,7 +2339,7 @@ export class BillingService {
           ? `Your charge for ${event} is due today (${charge.dueDate})`
           : `Your charge for ${event} is overdue (due ${charge.dueDate})`,
       text: lines.join('\n'),
-      html: asHtml(lines),
+      html: asHtml(lines, pay),
     };
   }
 

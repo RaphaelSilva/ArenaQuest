@@ -56,7 +56,7 @@ import {
   type PaymentGatewayFactoryMap,
 } from '@api/core/payments/gateway-registry';
 import { GatewayService } from '@api/core/payments/gateway-service';
-import { BillingService } from '@api/core/billing/billing-service';
+import { BillingService, statementPayLink } from '@api/core/billing/billing-service';
 import { AccountingService } from '@api/core/billing/accounting-service';
 import { EventChargeService } from '@api/core/billing/event-charge-service';
 import { buildRegistrationMailHandler } from '@api/core/registration/registration-mail-handler';
@@ -415,6 +415,13 @@ export function buildContainer(env: Env, options: BuildContainerOptions = {}): A
     { sharingEnabled: submissionConfig.ok ? submissionConfig.config.sharingEnabled : false },
   );
 
+  // Payment gateway (RFC 0026 §8.1): the provider list, checked, and the
+  // adapters it binds. Never throws — a bad list is a recorded state.
+  const payments = buildPaymentsWiring(
+    env as unknown as PaymentsEnv,
+    options.paymentGatewayFactories ?? PRODUCTION_GATEWAY_FACTORIES,
+  );
+
   // Billing repo + service
   const billingRepo = new D1BillingRepository(env.DB);
   // Extras rail (RFC 0015). Per request like every adapter, next to its sibling.
@@ -423,20 +430,21 @@ export function buildContainer(env: Env, options: BuildContainerOptions = {}): A
   // unknown student with a 404 rather than letting the hold table's foreign key
   // surface as a 500.
   const userExists = (userId: string) => users.findById(userId).then((user) => user !== null);
-  const billingService = new BillingService(billingRepo, userExists, eventChargeRepo);
+  // The reminders gain a link to the statement page only when the label's pay
+  // options settle the receivable's currency (RFC 0026 §7) — configuration,
+  // never a provider call; an invalid list is an empty registry, so no link.
+  const billingService = new BillingService(
+    billingRepo,
+    userExists,
+    eventChargeRepo,
+    statementPayLink(() => payments.gateways.payOptions, env.WEB_BASE_URL || 'http://localhost:3000'),
+  );
   // Events repo (RFC 0014). The audience rule lives inside it and nowhere else.
   const eventRepo = new D1EventRepository(env.DB);
 
   // The statement 404s an unknown student, which is all billing needs from
   // identity — a probe rather than the repository, as `StreakEngine` does. The
   // extras ledger and the event titles are read-only inputs (RFC 0015 §7).
-  // Payment gateway (RFC 0026 §8.1): the provider list, checked, and the
-  // adapters it binds. Never throws — a bad list is a recorded state.
-  const payments = buildPaymentsWiring(
-    env as unknown as PaymentsEnv,
-    options.paymentGatewayFactories ?? PRODUCTION_GATEWAY_FACTORIES,
-  );
-
   // The gateway's own two tables (checkouts and webhook events) — never money.
   const gatewayRepo: IGatewayRepository = new D1GatewayRepository(env.DB);
 

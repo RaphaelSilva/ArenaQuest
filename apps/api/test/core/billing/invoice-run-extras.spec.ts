@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   BillingService,
+  statementPayLink,
   type BillingDirectory,
   type BillingRecipient,
   type BillingRunDeps,
@@ -18,6 +19,12 @@ import type {
   MailMessage,
 } from '@arenaquest/shared/ports';
 import type { ControllerResult } from '@api/core/result';
+import { buildPaymentsWiring } from '@api/core/payments/gateway-registry';
+import {
+  StubGatewayAdapter,
+  stubGatewayFactories,
+  stubPaymentsEnv,
+} from '../../adapters/payment/stub-gateway-adapter';
 
 /**
  * The daily run on the extras rail (RFC 0015 §5, M22 Task 06).
@@ -39,6 +46,52 @@ const EVENT_TITLE = 'Seminário de Março';
 const CHARGE_DUE = '2026-03-10';
 const CHARGE_GRACE = 3;
 const CHARGE_LAPSES = '2026-03-14';
+
+/**
+ * The two extras notices as they were sent before the pay link existed
+ * (captured from the builders at 9e4c25f, before M30 Task 14). A label with
+ * `PAYMENTS_PROVIDERS = none` must keep sending exactly these, character for
+ * character.
+ */
+const TODAYS_NOTICES: MailMessage[] = [
+  {
+    to: 'buyer-1@dojo.test',
+    subject: 'Your charge for Seminário de Março is due today (2026-03-10)',
+    text:
+      'Hello Student buyer-1,\n' +
+      '\n' +
+      'Your charge of R$150.00 for Seminário de Março is due today, 2026-03-10.\n' +
+      'If you have already paid, please ignore this message.',
+    html:
+      '<p>Hello Student buyer-1,<br /><br />' +
+      'Your charge of R$150.00 for Seminário de Março is due today, 2026-03-10.<br />' +
+      'If you have already paid, please ignore this message.</p>',
+  },
+  {
+    to: 'buyer-1@dojo.test',
+    subject: 'Your charge for Seminário de Março is overdue (due 2026-03-10)',
+    text:
+      'Hello Student buyer-1,\n' +
+      '\n' +
+      'Your charge of R$150.00 for Seminário de Março, due on 2026-03-10, is now past its grace period.\n' +
+      'Please get in touch so we can settle it together.',
+    html:
+      '<p>Hello Student buyer-1,<br /><br />' +
+      'Your charge of R$150.00 for Seminário de Março, due on 2026-03-10, is now past its grace period.<br />' +
+      'Please get in touch so we can settle it together.</p>',
+  },
+];
+
+/** The label's web origin, with the trailing slash an operator may leave on it. */
+const WEB_BASE_URL = 'https://dojo.example/';
+const STATEMENT_URL = 'https://dojo.example/settings/billing';
+const PAY_TEXT = `You can pay online from your statement: ${STATEMENT_URL}`;
+const PAY_HTML = `You can pay online from <a href="${STATEMENT_URL}">your statement</a>.`;
+
+/** How many times `needle` occurs in `text`. */
+function occurrences(text: string, needle: string): number {
+  return text.split(needle).length - 1;
+}
 
 function ok<T>(result: ControllerResult<T>): T {
   if (!result.ok) throw new Error(`expected ok, got ${result.status} ${result.error}`);
@@ -279,6 +332,117 @@ describe('BillingService.runBillingCycle — the extras rail', () => {
       expect(report.extrasReminders[0]).toMatchObject({ sent: false });
       expect(report.reminderCounts.extras).toEqual({ sent: 0, suppressed: 0, undeliverable: 1 });
       expect(events().some((event) => event.event === 'billing.extras_reminder_undeliverable')).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // The pay link (RFC 0026 §7, M30 Task 14) — one line, only when payable online
+  // -------------------------------------------------------------------------
+
+  describe('the pay link', () => {
+    /** Walks March and returns the buyer's two extras notices. */
+    async function twoNotices(currency = 'BRL'): Promise<MailMessage[]> {
+      enlist(BUYER);
+      charges.add(BUYER).currency = currency;
+      await runDaily('2026-03-01', '2026-03-31');
+      return mailer.to(`${BUYER}@dojo.test`);
+    }
+
+    it('sends both notices exactly as before when the label offers no online payment', async () => {
+      expect(await twoNotices()).toEqual(TODAYS_NOTICES);
+    });
+
+    /**
+     * Rebuilds the service the way the container does: the resolver over a
+     * registry parsed from `env`, with a stub adapter behind every provider.
+     */
+    function offerPayments(env: Record<string, string>): StubGatewayAdapter {
+      const stub = new StubGatewayAdapter('mercadopago');
+      const { config, gateways } = buildPaymentsWiring(env, stubGatewayFactories(stub));
+      configOk = config.ok;
+      service = new BillingService(repo, async () => true, charges, statementPayLink(() => gateways.payOptions, WEB_BASE_URL));
+      return stub;
+    }
+    let configOk = true;
+
+    it('adds one line and one link to the statement page when a provider offers a method', async () => {
+      const stub = offerPayments(stubPaymentsEnv('mercadopago:pix+card'));
+      expect(configOk).toBe(true);
+
+      const notices = await twoNotices();
+      expect(notices).toHaveLength(2);
+
+      notices.forEach((message, index) => {
+        const before = TODAYS_NOTICES[index];
+        expect(message.subject).toBe(before.subject);
+
+        // The line sits just before the closing sentence; nothing else moved.
+        const lines = message.text.split('\n');
+        expect(lines.filter((line) => line !== PAY_TEXT).join('\n')).toBe(before.text);
+        expect(lines[lines.length - 2]).toBe(PAY_TEXT);
+        expect(message.html).toBe(before.html.replace(/(<br \/>)(?!.*<br \/>)/, `$1${PAY_HTML}$1`));
+
+        // Exactly one link, to the statement itself: no query, no id, no provider.
+        expect(occurrences(message.text, 'https://')).toBe(1);
+        expect(occurrences(message.text, STATEMENT_URL)).toBe(1);
+        expect(occurrences(message.html, 'href=')).toBe(1);
+        expect(message.html).toContain(`href="${STATEMENT_URL}"`);
+        for (const part of [message.text, message.html]) {
+          expect(part).not.toContain('?');
+          expect(part.toLowerCase()).not.toContain('mercadopago');
+          expect(part).not.toContain('.invalid');
+        }
+      });
+
+      // Building a reminder asks no provider anything and opens no checkout.
+      expect(stub.calls).toEqual([]);
+      expect(stub.factoryInputs).toEqual([]);
+    });
+
+    it('is byte-for-byte the old message with PAYMENTS_PROVIDERS = none', async () => {
+      const stub = offerPayments(stubPaymentsEnv('none'));
+      expect(configOk).toBe(true);
+
+      expect(await twoNotices()).toEqual(TODAYS_NOTICES);
+      expect(stub.calls).toEqual([]);
+    });
+
+    it('completes the run and sends the old message under an invalid provider list', async () => {
+      // A listed provider without its secrets: `missing_secret`, an empty registry.
+      const stub = offerPayments({ PAYMENTS_PROVIDERS: 'mercadopago:pix' });
+      expect(configOk).toBe(false);
+
+      expect(await twoNotices()).toEqual(TODAYS_NOTICES);
+      expect(stub.calls).toEqual([]);
+    });
+
+    it('adds no line when the bound provider offers no method', async () => {
+      // A retired entry: still bound for refunds, offers nothing to pay with.
+      const stub = offerPayments(stubPaymentsEnv('mercadopago:'));
+      expect(configOk).toBe(true);
+
+      expect(await twoNotices()).toEqual(TODAYS_NOTICES);
+      expect(stub.calls).toEqual([]);
+    });
+
+    it('adds no line when no offered method settles the charge currency', async () => {
+      offerPayments(stubPaymentsEnv('mercadopago:pix+card'));
+
+      // Mercado Pago settles BRL only; the fake ledger has no USD symbol, hence "150.00".
+      const notices = await twoNotices('USD');
+      expect(notices).toHaveLength(2);
+      for (const message of notices) {
+        expect(message.text).not.toContain('settings/billing');
+        expect(message.html).not.toContain('href=');
+      }
+    });
+
+    it('drops the line, not the run, when the resolver throws', async () => {
+      service = new BillingService(repo, async () => true, charges, () => {
+        throw new Error('pay options unavailable');
+      });
+
+      expect(await twoNotices()).toEqual(TODAYS_NOTICES);
     });
   });
 
