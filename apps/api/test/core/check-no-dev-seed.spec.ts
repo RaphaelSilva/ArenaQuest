@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,11 +13,13 @@ import {
   buildSeedWhereClause,
   extractSeedUsersFromSql,
   isFreshDatabaseError,
+  isSystemActorRow,
   matchesDemoRow,
   matchesSeedRow,
   parseArgs,
   readSeedSqlFiles,
   runGuard,
+  SYSTEM_ACTOR_IDS,
   type GuardArgs,
   type WranglerResult,
 } from '../../scripts/check-no-dev-seed';
@@ -395,5 +397,59 @@ describe('runGuard', () => {
     const outcome = runGuard(args('production'), fakeWrangler({ status: 1, stdout: '', stderr: 'Authentication failed' }).run);
     expect(outcome.code).toBe(2);
     expect(outcome.stderr).toContain('Authentication failed');
+  });
+});
+
+describe('system actor (RFC 0026 R8, migration 0033)', () => {
+  const MIGRATION_0033 = readFileSync(
+    path.resolve(SEED_DIR, '../0033_create_payment_gateway.sql'),
+    'utf8',
+  );
+  const SYSTEM_ACTOR = { id: 'system:payment-gateway', email: 'payment-gateway@system.invalid', password_hash: '' };
+
+  it('names exactly the actor the migration inserts, and no seed file inserts it', () => {
+    const inserted = extractSeedUsersFromSql(MIGRATION_0033.replace(/, ''/, ", '-'"));
+    expect(inserted.map((row) => row.id)).toEqual([...SYSTEM_ACTOR_IDS]);
+    expect(inserted[0].email).toBe(SYSTEM_ACTOR.email);
+    expect(MIGRATION_0033).toContain(`VALUES ('${SYSTEM_ACTOR.id}', 'Payment gateway', '${SYSTEM_ACTOR.email}', '', 'system')`);
+
+    const matcher = buildSeedMatcher(readSeedSqlFiles(SEED_DIR));
+    expect(matcher.seedIds).not.toContain(SYSTEM_ACTOR.id);
+    expect(matchesSeedRow(SYSTEM_ACTOR, matcher)).toBe(false);
+    expect(matchesDemoRow(SYSTEM_ACTOR, buildDemoMatcher())).toBe(false);
+  });
+
+  it('passes on a database holding the system actor, in both modes', () => {
+    for (const target of ['production', 'staging'] as const) {
+      const outcome = runGuard(args(target), fakeWrangler(rowsResult([SYSTEM_ACTOR, REAL_USER])).run);
+      expect(outcome.code).toBe(0);
+      expect(outcome.stderr).toBe('');
+    }
+  });
+
+  it('never reports the system actor, even if a matcher were to select it', () => {
+    const matchers = {
+      seed: { seedIds: [SYSTEM_ACTOR.id, SEED_ADMIN.id], hashPrefixes: [], likePatterns: [] },
+      demo: { demoIds: [SYSTEM_ACTOR.id], emailSuffix: '.demo.invalid' },
+    };
+    expect(runGuard(args('production'), fakeWrangler(rowsResult([SYSTEM_ACTOR])).run, matchers).code).toBe(0);
+
+    // It hides nothing else: a dev-seed row beside it still blocks.
+    const outcome = runGuard(args('production'), fakeWrangler(rowsResult([SYSTEM_ACTOR, SEED_ADMIN])).run, matchers);
+    expect(outcome.code).toBe(1);
+    expect(outcome.stderr).toContain(SEED_ADMIN.email);
+    expect(outcome.stderr).not.toContain(SYSTEM_ACTOR.email);
+  });
+
+  it('exempts only the exact id with an empty password hash', () => {
+    expect(isSystemActorRow(SYSTEM_ACTOR)).toBe(true);
+    expect(isSystemActorRow({ id: 'system:other', password_hash: '' })).toBe(false);
+    expect(isSystemActorRow({ ...SYSTEM_ACTOR, password_hash: SEED_ADMIN.password_hash })).toBe(false);
+
+    // A row squatting on the id with a dev-seed hash is judged like any account.
+    const squatter = { ...SYSTEM_ACTOR, password_hash: SEED_ADMIN.password_hash };
+    const outcome = runGuard(args('production'), fakeWrangler(rowsResult([squatter])).run);
+    expect(outcome.code).toBe(1);
+    expect(outcome.stderr).toContain('dev-seed password hash found');
   });
 });

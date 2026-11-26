@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { D1UserRepository } from '@api/adapters/db/d1-user-repository';
+import { SYSTEM_PAYMENT_ACTOR_ID } from '@api/adapters/db/d1-gateway-repository';
 import { Entities } from '@arenaquest/shared/types/entities';
 import { applyMigrations } from '../helpers/apply-migrations';
 
@@ -124,5 +125,80 @@ describe('D1UserRepository', () => {
     // Re-activating the inactive admin should raise it back.
     await repo.update(inactiveAdmin.id, { status: Entities.Config.UserStatus.ACTIVE });
     expect(await repo.countActiveAdmins()).toBe(before + 1);
+  });
+
+  // -------------------------------------------------------------------------
+  // The system actor (RFC 0026 R8, migration 0033) is not a person
+  // -------------------------------------------------------------------------
+
+  describe('system actor', () => {
+    const SYSTEM_EMAIL = 'payment-gateway@system.invalid';
+
+    async function rawRow() {
+      return env.DB
+        .prepare('SELECT id, name, email, password_hash, status FROM users WHERE id = ?')
+        .bind(SYSTEM_PAYMENT_ACTOR_ID)
+        .first();
+    }
+
+    it('is not found by id, not listed and not counted', async () => {
+      expect(await rawRow()).not.toBeNull();
+      expect(await repo.findById(SYSTEM_PAYMENT_ACTOR_ID)).toBeNull();
+
+      const raw = await env.DB.prepare('SELECT COUNT(*) AS n FROM users').first<{ n: number }>();
+      const total = await repo.count();
+      expect(total).toBe((raw?.n ?? 0) - 1);
+
+      const all = await repo.list({ limit: 1000, offset: 0 });
+      expect(all).toHaveLength(total);
+      expect(all.some((u) => u.id === SYSTEM_PAYMENT_ACTOR_ID)).toBe(false);
+    });
+
+    it('keeps its reserved address taken: findByEmail still returns the record', async () => {
+      const record = await repo.findByEmail(SYSTEM_EMAIL);
+      expect(record).toMatchObject({
+        id: SYSTEM_PAYMENT_ACTOR_ID,
+        status: Entities.Config.UserStatus.SYSTEM,
+        passwordHash: '',
+        roles: [],
+      });
+    });
+
+    it('is never counted as an active admin, even with an admin role row', async () => {
+      const before = await repo.countActiveAdmins();
+      await env.DB
+        .prepare(
+          `INSERT OR IGNORE INTO user_roles (user_id, role_id)
+           SELECT ?, id FROM roles WHERE name = 'admin'`,
+        )
+        .bind(SYSTEM_PAYMENT_ACTOR_ID)
+        .run();
+      try {
+        expect(await repo.countActiveAdmins()).toBe(before);
+      } finally {
+        await env.DB.prepare('DELETE FROM user_roles WHERE user_id = ?').bind(SYSTEM_PAYMENT_ACTOR_ID).run();
+      }
+    });
+
+    it('cannot be changed, re-roled, re-keyed or deleted through the repository', async () => {
+      const before = await rawRow();
+
+      await expect(
+        repo.update(SYSTEM_PAYMENT_ACTOR_ID, {
+          name: 'Renamed',
+          status: Entities.Config.UserStatus.ACTIVE,
+          roleNames: ['admin'],
+        }),
+      ).rejects.toThrow(/user not found/);
+      await repo.updatePasswordHash(SYSTEM_PAYMENT_ACTOR_ID, 'pbkdf2:100000:aabbcc:ddeeff');
+      await repo.delete(SYSTEM_PAYMENT_ACTOR_ID);
+
+      expect(await rawRow()).toEqual(before);
+      const roles = await env.DB
+        .prepare('SELECT COUNT(*) AS n FROM user_roles WHERE user_id = ?')
+        .bind(SYSTEM_PAYMENT_ACTOR_ID)
+        .first<{ n: number }>();
+      expect(roles?.n).toBe(0);
+    });
   });
 });

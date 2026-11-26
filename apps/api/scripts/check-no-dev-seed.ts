@@ -12,6 +12,9 @@
  *     (RFC 0021 §3.6). Enforced for production targets only: staging is
  *     allowed to carry the demo.
  *
+ * A migration-inserted system actor (`system:payment-gateway`, RFC 0026) is on
+ * every database and is never reported — see `isSystemActorRow`.
+ *
  * Usage:
  *   tsx scripts/check-no-dev-seed.ts --db <database-name> [--env <wrangler-env>]
  *       [--target production|staging] [--local]
@@ -268,6 +271,23 @@ export function buildGuardQuery(seed: SeedMatcher, demo: DemoMatcher | null): st
 }
 
 // ---------------------------------------------------------------------------
+// System actors — rows a migration inserts on every database, production
+// included (RFC 0026 R8: migration 0033's `system:payment-gateway`, the
+// `recorded_by` of a machine-written payment). They are neither dev seed nor
+// demo, so the guard never reports them, whatever a matcher would say. The
+// exemption is deliberately narrow: the exact id AND an empty password hash,
+// which can never verify. A row squatting on the id with a real hash is not a
+// system actor and is judged like any other account.
+// ---------------------------------------------------------------------------
+
+export const SYSTEM_ACTOR_IDS: readonly string[] = ['system:payment-gateway'];
+
+/** True for a migration-inserted system actor that cannot log in. */
+export function isSystemActorRow(row: { id: string; password_hash: string }): boolean {
+  return SYSTEM_ACTOR_IDS.includes(row.id) && row.password_hash === '';
+}
+
+// ---------------------------------------------------------------------------
 // Argument parsing (no external deps)
 // ---------------------------------------------------------------------------
 
@@ -421,7 +441,7 @@ export function runGuard(
   try {
     // wrangler --json returns an array of result sets; each has a `results` array.
     const parsed = JSON.parse(result.stdout) as Array<{ results: Array<UserRow> }>;
-    candidates = parsed.flatMap(r => r.results ?? []);
+    candidates = parsed.flatMap(r => r.results ?? []).filter(r => !isSystemActorRow(r));
   } catch {
     return {
       code: 2,
