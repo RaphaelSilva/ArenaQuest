@@ -4230,7 +4230,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    job?: "billing" | "sweep_submissions";
+                    job?: "billing" | "sweep_submissions" | "reconcile_payments";
                     since?: string;
                     limit?: number;
                 };
