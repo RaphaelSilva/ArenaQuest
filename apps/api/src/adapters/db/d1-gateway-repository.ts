@@ -220,6 +220,13 @@ export class D1GatewayRepository implements IGatewayRepository {
     return row ? rowToCheckout(row) : null;
   }
 
+  async listOpenCheckouts(): Promise<GatewayCheckoutRecord[]> {
+    const { results } = await this.db
+      .prepare(`SELECT * FROM gateway_checkouts WHERE status = 'open' ORDER BY created_at, id`)
+      .all<CheckoutRow>();
+    return results.map(rowToCheckout);
+  }
+
   async updateCheckout(
     id: string,
     patch: UpdateGatewayCheckoutInput,

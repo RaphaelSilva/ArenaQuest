@@ -1,4 +1,5 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import type { MiddlewareHandler } from 'hono';
 import { requireRole } from '@api/middleware/require-role';
 import { ROLES } from '@arenaquest/shared/constants/roles';
 import {
@@ -9,7 +10,18 @@ import { billingRunDeps } from '@api/core/billing/billing-service';
 import { recordJobRun, billingOutcome } from '@api/jobs/record-job-run';
 import { Entities } from '@arenaquest/shared/types/entities';
 import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
-import { PaymentConflictBody, PayOptionSchema, PendingCheckoutSchema } from '@api/openapi/components';
+import {
+  CheckoutSessionSchema,
+  CreateCheckoutOnBehalfBodySchema,
+  ErrorBody,
+  PaymentConflictBody,
+  PayOptionSchema,
+  PendingCheckoutSchema,
+  PendingCheckoutsSummarySchema,
+  RefundConflictBody,
+  RefundUnrecordedBody,
+  ValidationErrorBody,
+} from '@api/openapi/components';
 import { runMissionHook } from '@api/core/missions/hook';
 import type { AppContainer } from '@api/container';
 
@@ -126,6 +138,21 @@ const PaymentSchema = z
     recordedAt: z.string(),
   })
   .openapi('BillingPayment');
+
+/**
+ * `201` of the two record-payment routes: the row, plus the receivable's
+ * hosted checkout still in progress so the form can warn (RFC 0026 §7).
+ */
+const RECORDED_PENDING_CHECKOUT = PendingCheckoutSchema.nullable().openapi({
+  description:
+    'The hosted checkout still in progress on this receivable, or `null`. The payment was recorded ' +
+    'either way; a non-null value means the student holds a live link and may pay again online — the ' +
+    'reconcile run expires it on its own.',
+});
+
+const RecordedPaymentSchema = PaymentSchema.extend({
+  pendingCheckout: RECORDED_PENDING_CHECKOUT,
+}).openapi('BillingRecordedPayment');
 
 const IdParamSchema = z.object({
   id: z.string().openapi({ param: { name: 'id', in: 'path' }, example: 'plan-id' }),
@@ -281,6 +308,19 @@ const ChargePaymentSchema = z
   })
   .openapi('BillingEventChargePayment');
 
+const RecordedChargePaymentSchema = ChargePaymentSchema.extend({
+  pendingCheckout: RECORDED_PENDING_CHECKOUT,
+}).openapi('BillingRecordedEventChargePayment');
+
+/** One row of the admin charge list: the charge, its balance and its payment in progress. */
+const EventChargeListItemSchema = EventChargeWithBalanceSchema.extend({
+  pendingCheckout: PendingCheckoutSchema.nullable().openapi({
+    description:
+      'The live hosted checkout of this charge — open, with a provider session and not yet expired — ' +
+      'or `null`. Always `null` for a charge that is not `open`.',
+  }),
+}).openapi('BillingEventChargeListItem');
+
 const EventChargeDetailSchema = EventChargeWithBalanceSchema.extend({
   adjustments: z.array(ChargeAdjustmentSchema),
   payments: z.array(ChargePaymentSchema),
@@ -394,6 +434,8 @@ const RosterEntrySchema = z
     extras: RosterExtrasSchema.nullable(),
     /** The stored row, expired or not; `contract.standing === 'exempt'` says whether it bites. */
     hold: HoldSchema.nullable(),
+    /** "Pending online payment": the student's hosted checkouts in progress, both rails. */
+    pendingCheckouts: PendingCheckoutsSummarySchema,
   })
   .openapi('BillingRosterEntry');
 
@@ -530,7 +572,64 @@ const PAYMENT_RESPONSES = {
 };
 
 const PAYMENT_BODY_DESCRIPTION =
-  'With `method: "gateway"` the `externalReference` is required, must read `<provider>:<id>` for a known provider, and is unique on the ledger.';
+  'With `method: "gateway"` the `externalReference` is required, must read `<provider>:<id>` for a known provider, and is unique on the ledger. ' +
+  'Recording a payment on a receivable with a hosted checkout in progress is allowed (the student may have paid at the door): the answer carries that checkout as `pendingCheckout` so the form can warn.';
+
+/**
+ * The two reverse routes. A row whose `method` is anything but `gateway` is
+ * RFC 0013's reversal, unchanged (`201`, no provider call). A `gateway` row is
+ * a refund (RFC 0026 §5) and answers `200`.
+ */
+const REVERSE_DESCRIPTION =
+  'Appends the mirror-image row; the original is never updated or deleted. A reversal cannot be reversed, and a payment is reversed at most once. ' +
+  '**A payment whose `method` is `gateway` is refunded at its provider first** (full amount only), in this order: the provider named by the reference prefix must still be bound (`409 PAYMENTS_PROVIDER_NOT_ENABLED`) → the payment is read from the provider → a full refund it already holds is recorded under that refund id, or the row already carrying it is returned (`200`, nothing refunded again) → otherwise the refund is requested under an idempotency key derived from the payment row → a refusal is `409 PAYMENTS_REFUND_REFUSED` and **nothing is written** → accepted and written is `200` → accepted but not written is `503 PAYMENTS_REFUND_UNRECORDED`, and the same request repeated completes it. ' +
+  'The reversal row carries `method: "gateway"`, `reversesId` and `externalReference: "<provider>:<refund id>"`. Repeating the request answers `200` with the same row. Every other method never calls a provider.';
+
+const jsonError = (description: string) => json(description, ErrorBody);
+
+const REVERSE_RESPONSES = {
+  ...ERROR_RESPONSES,
+  409: json(
+    'Conflict. For a gateway payment: `PAYMENTS_PROVIDER_NOT_ENABLED` or `PAYMENTS_REFUND_REFUSED` — nothing was written',
+    RefundConflictBody,
+  ),
+  500: jsonError('`PAYMENTS_CONFIG_INVALID`: the provider list or its secrets are invalid (gateway payments only)'),
+  502: jsonError(
+    '`PAYMENTS_PROVIDER_ERROR`: the provider could not be asked about the payment; no refund was requested and nothing was written',
+  ),
+  503: json(
+    '`PAYMENTS_REFUND_UNRECORDED`: the provider returned the money and the reversal was not written; repeat the request',
+    RefundUnrecordedBody,
+  ),
+};
+
+/**
+ * The two on-behalf checkout routes (RFC 0026 §3; milestone 30 decision 22 for
+ * the charge path).
+ */
+const ON_BEHALF_DESCRIPTION =
+  'Opens the hosted checkout for the **full open balance** of a student\'s receivable, or hands back the one already open, and answers the URL the admin hands over. ' +
+  'Same rules as `POST /v1/me/billing/checkouts`: one live checkout per receivable (`200` with the same session while more than five minutes remain, replaced otherwise; another provider cancels the first). ' +
+  'The student is the receivable\'s own — the request names none — and the admin is recorded as `createdBy`. Nothing is charged to anyone until the student pays, and the student\'s hourly limit is not consumed. ' +
+  'Refusals, in order: `403` → `500 PAYMENTS_CONFIG_INVALID` / `404` (no provider on this label) → `400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `502 PAYMENTS_PROVIDER_ERROR`. Sent with `Cache-Control: private, no-store`.';
+
+const ON_BEHALF_RESPONSES = {
+  200: json('The receivable already had an open checkout; this is it', CheckoutSessionSchema),
+  201: json('A new hosted checkout was opened', CheckoutSessionSchema),
+  400: json(
+    'Invalid body, or `PAYMENT_PROVIDER_REQUIRED`: several providers offer a method and none was named, or the one named offers no method on this label',
+    z.union([ErrorBody, ValidationErrorBody]),
+  ),
+  403: { description: 'Forbidden — admin only' },
+  404: jsonError(
+    'The receivable does not exist. Also the answer of a label with no payment provider (`PAYMENTS_PROVIDERS = none`): the route does not exist there',
+  ),
+  409: jsonError(
+    '`RECEIVABLE_NOT_PAYABLE`: void, settled or with no balance. `PAYMENTS_UNSUPPORTED_CURRENCY`: the provider cannot settle the receivable\'s currency. `CHECKOUT_IN_PROGRESS`: a concurrent request is opening this receivable\'s checkout — ask again',
+  ),
+  500: jsonError('`PAYMENTS_CONFIG_INVALID`: the provider list or its secrets are invalid'),
+  502: jsonError('`PAYMENTS_PROVIDER_ERROR`: the provider did not open the session; nothing is left open'),
+};
 
 // ---------------------------------------------------------------------------
 // Bodies
@@ -666,6 +765,9 @@ const SetHoldBodySchema = z
 // ---------------------------------------------------------------------------
 
 const common = { tags: ['admin:billing'], security: [{ bearerAuth: [] }] };
+
+/** The `method` of a ledger row a provider collected — and of its reversal. */
+const GATEWAY_METHOD = Entities.Config.PaymentMethod.GATEWAY;
 
 export const listPlansRoute = createRoute({
   ...common,
@@ -831,7 +933,7 @@ export const recordPaymentRoute = createRoute({
   summary: 'Record a Payment',
   description: PAYMENT_BODY_DESCRIPTION,
   request: { params: IdParamSchema, ...body(RecordPaymentBodySchema) },
-  responses: { 201: json('Payment recorded', PaymentSchema), ...PAYMENT_RESPONSES },
+  responses: { 201: json('Payment recorded', RecordedPaymentSchema), ...PAYMENT_RESPONSES },
 });
 
 export const reversePaymentRoute = createRoute({
@@ -839,9 +941,26 @@ export const reversePaymentRoute = createRoute({
   method: 'post',
   path: '/payments/{id}/reverse',
   summary: 'Reverse a Payment',
-  description: 'Appends the mirror-image row; the original is never updated or deleted.',
+  description: REVERSE_DESCRIPTION,
   request: { params: IdParamSchema, ...body(ReversePaymentBodySchema) },
-  responses: { 201: json('Reversal recorded', PaymentSchema), ...ERROR_RESPONSES },
+  responses: {
+    200: json('Gateway payment refunded at its provider; the reversal is on the ledger', PaymentSchema),
+    201: json('Reversal recorded (any method but `gateway`)', PaymentSchema),
+    ...REVERSE_RESPONSES,
+  },
+});
+
+export const createInvoiceCheckoutRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/invoices/{id}/checkouts',
+  summary: 'Open a Checkout for a Student\'s Invoice',
+  description: ON_BEHALF_DESCRIPTION,
+  request: {
+    params: IdParamSchema,
+    body: { content: { 'application/json': { schema: CreateCheckoutOnBehalfBodySchema } }, required: true },
+  },
+  responses: ON_BEHALF_RESPONSES,
 });
 
 // ---------------------------------------------------------------------------
@@ -922,7 +1041,7 @@ export const studentRosterRoute = createRoute({
   path: '/students',
   summary: 'The Student Billing Roster',
   description:
-    "Every user with a contract or any event charge, with two standings resolved side by side and never merged: `contract` (from contract invoices only — outstanding balance, oldest overdue date, next due date, negotiated terms; null when there is no contract) and `extras` (from event charges only — outstanding balance, oldest overdue date, open and overdue charge counts; null when never charged). There is no top-level standing or total. `contractStanding` and `extrasStanding` filter independently; `standing` is kept as an alias of `contractStanding`. `contractStanding=exempt` is the held filter — a hold applies to the contract rail only. Reporting only: nothing here gates a student's access.",
+    "Every user with a contract or any event charge, with two standings resolved side by side and never merged: `contract` (from contract invoices only — outstanding balance, oldest overdue date, next due date, negotiated terms; null when there is no contract) and `extras` (from event charges only — outstanding balance, oldest overdue date, open and overdue charge counts; null when never charged). There is no top-level standing or total. `pendingCheckouts` is the line's \"pending online payment\": how many of the student's open receivables, on both rails, have a hosted checkout in progress, and when the first expires. `contractStanding` and `extrasStanding` filter independently; `standing` is kept as an alias of `contractStanding`. `contractStanding=exempt` is the held filter — a hold applies to the contract rail only. Reporting only: nothing here gates a student's access.",
   request: {
     query: z.object({
       contractStanding: StandingSchema.optional().openapi({
@@ -1093,7 +1212,10 @@ export const listEventChargesRoute = createRoute({
     }),
   },
   responses: {
-    200: json('Charges with their balances', z.array(EventChargeWithBalanceSchema)),
+    200: json(
+      'Charges with their balances and their payment in progress',
+      z.array(EventChargeListItemSchema),
+    ),
     ...ERROR_RESPONSES,
   },
 });
@@ -1150,7 +1272,20 @@ export const recordChargePaymentRoute = createRoute({
   summary: 'Record an Event Charge Payment',
   description: PAYMENT_BODY_DESCRIPTION,
   request: { params: IdParamSchema, ...body(RecordPaymentBodySchema) },
-  responses: { 201: json('Payment recorded', ChargePaymentSchema), ...PAYMENT_RESPONSES },
+  responses: { 201: json('Payment recorded', RecordedChargePaymentSchema), ...PAYMENT_RESPONSES },
+});
+
+export const createChargeCheckoutRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/charges/{id}/checkouts',
+  summary: 'Open a Checkout for a Student\'s Event Charge',
+  description: ON_BEHALF_DESCRIPTION,
+  request: {
+    params: IdParamSchema,
+    body: { content: { 'application/json': { schema: CreateCheckoutOnBehalfBodySchema } }, required: true },
+  },
+  responses: ON_BEHALF_RESPONSES,
 });
 
 export const reverseChargePaymentRoute = createRoute({
@@ -1158,10 +1293,13 @@ export const reverseChargePaymentRoute = createRoute({
   method: 'post',
   path: '/charge-payments/{id}/reverse',
   summary: 'Reverse an Event Charge Payment',
-  description:
-    'Appends the mirror-image row. A reversal cannot be reversed, and a payment is reversed at most once.',
+  description: REVERSE_DESCRIPTION,
   request: { params: IdParamSchema, ...body(ReversePaymentBodySchema) },
-  responses: { 201: json('Reversal recorded', ChargePaymentSchema), ...ERROR_RESPONSES },
+  responses: {
+    200: json('Gateway payment refunded at its provider; the reversal is on the ledger', ChargePaymentSchema),
+    201: json('Reversal recorded (any method but `gateway`)', ChargePaymentSchema),
+    ...REVERSE_RESPONSES,
+  },
 });
 
 export const eventChargeSummaryRoute = createRoute({
@@ -1204,8 +1342,12 @@ export function buildAdminBillingRouter(container: AppContainer) {
     // The same two ports `runScheduledBilling` hands the cron, assembled the
     // same way, so the manual twin and the cron mail through one code path.
     billingRunDeps(container.infra.mailer, container.identity.users),
+    container.payments.gatewayService,
   );
-  const extras = new AdminEventChargeController(container.billing.eventChargeService);
+  const extras = new AdminEventChargeController(
+    container.billing.eventChargeService,
+    container.payments.gatewayService,
+  );
 
   const router = new OpenAPIHono({
     defaultHook: (result, c) => {
@@ -1220,6 +1362,24 @@ export function buildAdminBillingRouter(container: AppContainer) {
   // this guard would hand every content creator the money. A tutor is
   // deliberately given nothing here (RFC 0013 §5).
   router.use('*', requireRole(ROLES.ADMIN));
+
+  // The on-behalf checkout routes exist only where a provider is bound. Asked
+  // after the role guard and before the body is validated, so a label under
+  // `none` answers `404` to any body and an invalid provider list is a loud
+  // `500` — the student routes' own order (RFC 0026 §3).
+  const privateNoStore: MiddlewareHandler = async (c, next) => {
+    await next();
+    c.header('Cache-Control', 'private, no-store');
+  };
+  const checkoutGate: MiddlewareHandler = async (c, next) => {
+    const closed = controller.checkoutGate();
+    if (closed && !closed.ok) return c.json({ error: closed.error }, closed.status as 404 | 500);
+    return next();
+  };
+  for (const path of ['/invoices/:id/checkouts', '/charges/:id/checkouts']) {
+    router.use(path, privateNoStore);
+    router.use(path, checkoutGate);
+  }
 
   router.openapi(listPlansRoute, async (c) => {
     const q = c.req.valid('query');
@@ -1319,7 +1479,16 @@ export function buildAdminBillingRouter(container: AppContainer) {
   router.openapi(reversePaymentRoute, async (c) => {
     const { id } = c.req.valid('param');
     const result = await controller.reversePayment(id, c.req.valid('json'), c.get('user').sub);
+    // A refund answers `200` however often it is asked; a mirror row is `201`.
+    if (result.ok && result.data.method === GATEWAY_METHOD) return c.json(result.data, 200);
     return respondCreated(c, result);
+  });
+
+  router.openapi(createInvoiceCheckoutRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await controller.createCheckout(id, c.req.valid('json'), c.get('user').sub);
+    if (result.ok) return c.json(result.data.checkout, result.data.created ? 201 : 200);
+    return respondWith(c, result);
   });
 
   // Reports. Read-only: none of the three writes a row, and none repairs a
@@ -1433,7 +1602,15 @@ export function buildAdminBillingRouter(container: AppContainer) {
     const { id } = c.req.valid('param');
     const result = await extras.reversePayment(id, c.req.valid('json'), c.get('user').sub);
     if (result.ok) await runMissionHook(container, { kind: 'event_charge_by_id', chargeId: result.data.chargeId });
+    if (result.ok && result.data.method === GATEWAY_METHOD) return c.json(result.data, 200);
     return respondCreated(c, result);
+  });
+
+  router.openapi(createChargeCheckoutRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const result = await extras.createCheckout(id, c.req.valid('json'), c.get('user').sub);
+    if (result.ok) return c.json(result.data.checkout, result.data.created ? 201 : 200);
+    return respondWith(c, result);
   });
 
   router.openapi(eventChargeSummaryRoute, async (c) => {

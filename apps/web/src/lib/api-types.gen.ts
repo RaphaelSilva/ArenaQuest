@@ -343,7 +343,7 @@ export interface paths {
         put?: never;
         /**
          * Reverse an Event Charge Payment
-         * @description Appends the mirror-image row. A reversal cannot be reversed, and a payment is reversed at most once.
+         * @description Appends the mirror-image row; the original is never updated or deleted. A reversal cannot be reversed, and a payment is reversed at most once. **A payment whose `method` is `gateway` is refunded at its provider first** (full amount only), in this order: the provider named by the reference prefix must still be bound (`409 PAYMENTS_PROVIDER_NOT_ENABLED`) → the payment is read from the provider → a full refund it already holds is recorded under that refund id, or the row already carrying it is returned (`200`, nothing refunded again) → otherwise the refund is requested under an idempotency key derived from the payment row → a refusal is `409 PAYMENTS_REFUND_REFUSED` and **nothing is written** → accepted and written is `200` → accepted but not written is `503 PAYMENTS_REFUND_UNRECORDED`, and the same request repeated completes it. The reversal row carries `method: "gateway"`, `reversesId` and `externalReference: "<provider>:<refund id>"`. Repeating the request answers `200` with the same row. Every other method never calls a provider.
          */
         post: {
             parameters: {
@@ -360,7 +360,16 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Reversal recorded */
+                /** @description Gateway payment refunded at its provider; the reversal is on the ledger */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingEventChargePayment"];
+                    };
+                };
+                /** @description Reversal recorded (any method but `gateway`) */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -390,12 +399,45 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Conflict */
+                /** @description Conflict. For a gateway payment: `PAYMENTS_PROVIDER_NOT_ENABLED` or `PAYMENTS_REFUND_REFUSED` — nothing was written */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["RefundConflictBody"];
+                    };
+                };
+                /** @description `PAYMENTS_CONFIG_INVALID`: the provider list or its secrets are invalid (gateway payments only) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_PROVIDER_ERROR`: the provider could not be asked about the payment; no refund was requested and nothing was written */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_REFUND_UNRECORDED`: the provider returned the money and the reversal was not written; repeat the request */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RefundUnrecordedBody"];
+                    };
                 };
             };
         };
@@ -426,13 +468,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Charges with their balances */
+                /** @description Charges with their balances and their payment in progress */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["BillingEventChargeWithBalance"][];
+                        "application/json": components["schemas"]["BillingEventChargeListItem"][];
                     };
                 };
                 /** @description Validation failed */
@@ -676,6 +718,122 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/billing/charges/{id}/checkouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open a Checkout for a Student's Event Charge
+         * @description Opens the hosted checkout for the **full open balance** of a student's receivable, or hands back the one already open, and answers the URL the admin hands over. Same rules as `POST /v1/me/billing/checkouts`: one live checkout per receivable (`200` with the same session while more than five minutes remain, replaced otherwise; another provider cancels the first). The student is the receivable's own — the request names none — and the admin is recorded as `createdBy`. Nothing is charged to anyone until the student pays, and the student's hourly limit is not consumed. Refusals, in order: `403` → `500 PAYMENTS_CONFIG_INVALID` / `404` (no provider on this label) → `400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `502 PAYMENTS_PROVIDER_ERROR`. Sent with `Cache-Control: private, no-store`.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateCheckoutOnBehalfBody"];
+                };
+            };
+            responses: {
+                /** @description The receivable already had an open checkout; this is it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CheckoutSession"];
+                    };
+                };
+                /** @description A new hosted checkout was opened */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CheckoutSession"];
+                    };
+                };
+                /** @description Invalid body, or `PAYMENT_PROVIDER_REQUIRED`: several providers offer a method and none was named, or the one named offers no method on this label */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": (components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        }) | components["schemas"]["ValidationErrorBody"];
+                    };
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The receivable does not exist. Also the answer of a label with no payment provider (`PAYMENTS_PROVIDERS = none`): the route does not exist there */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `RECEIVABLE_NOT_PAYABLE`: void, settled or with no balance. `PAYMENTS_UNSUPPORTED_CURRENCY`: the provider cannot settle the receivable's currency. `CHECKOUT_IN_PROGRESS`: a concurrent request is opening this receivable's checkout — ask again */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_CONFIG_INVALID`: the provider list or its secrets are invalid */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_PROVIDER_ERROR`: the provider did not open the session; nothing is left open */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/billing/charges/{id}/payments": {
         parameters: {
             query?: never;
@@ -687,7 +845,7 @@ export interface paths {
         put?: never;
         /**
          * Record an Event Charge Payment
-         * @description With `method: "gateway"` the `externalReference` is required, must read `<provider>:<id>` for a known provider, and is unique on the ledger.
+         * @description With `method: "gateway"` the `externalReference` is required, must read `<provider>:<id>` for a known provider, and is unique on the ledger. Recording a payment on a receivable with a hosted checkout in progress is allowed (the student may have paid at the door): the answer carries that checkout as `pendingCheckout` so the form can warn.
          */
         post: {
             parameters: {
@@ -710,7 +868,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["BillingEventChargePayment"];
+                        "application/json": components["schemas"]["BillingRecordedEventChargePayment"];
                     };
                 };
                 /** @description Validation failed — including a `gateway` payment whose externalReference is not `<provider>:<id>` */
@@ -1534,6 +1692,122 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/billing/invoices/{id}/checkouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open a Checkout for a Student's Invoice
+         * @description Opens the hosted checkout for the **full open balance** of a student's receivable, or hands back the one already open, and answers the URL the admin hands over. Same rules as `POST /v1/me/billing/checkouts`: one live checkout per receivable (`200` with the same session while more than five minutes remain, replaced otherwise; another provider cancels the first). The student is the receivable's own — the request names none — and the admin is recorded as `createdBy`. Nothing is charged to anyone until the student pays, and the student's hourly limit is not consumed. Refusals, in order: `403` → `500 PAYMENTS_CONFIG_INVALID` / `404` (no provider on this label) → `400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `502 PAYMENTS_PROVIDER_ERROR`. Sent with `Cache-Control: private, no-store`.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateCheckoutOnBehalfBody"];
+                };
+            };
+            responses: {
+                /** @description The receivable already had an open checkout; this is it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CheckoutSession"];
+                    };
+                };
+                /** @description A new hosted checkout was opened */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CheckoutSession"];
+                    };
+                };
+                /** @description Invalid body, or `PAYMENT_PROVIDER_REQUIRED`: several providers offer a method and none was named, or the one named offers no method on this label */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": (components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        }) | components["schemas"]["ValidationErrorBody"];
+                    };
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The receivable does not exist. Also the answer of a label with no payment provider (`PAYMENTS_PROVIDERS = none`): the route does not exist there */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `RECEIVABLE_NOT_PAYABLE`: void, settled or with no balance. `PAYMENTS_UNSUPPORTED_CURRENCY`: the provider cannot settle the receivable's currency. `CHECKOUT_IN_PROGRESS`: a concurrent request is opening this receivable's checkout — ask again */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_CONFIG_INVALID`: the provider list or its secrets are invalid */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_PROVIDER_ERROR`: the provider did not open the session; nothing is left open */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/billing/invoices/{id}/payments": {
         parameters: {
             query?: never;
@@ -1545,7 +1819,7 @@ export interface paths {
         put?: never;
         /**
          * Record a Payment
-         * @description With `method: "gateway"` the `externalReference` is required, must read `<provider>:<id>` for a known provider, and is unique on the ledger.
+         * @description With `method: "gateway"` the `externalReference` is required, must read `<provider>:<id>` for a known provider, and is unique on the ledger. Recording a payment on a receivable with a hosted checkout in progress is allowed (the student may have paid at the door): the answer carries that checkout as `pendingCheckout` so the form can warn.
          */
         post: {
             parameters: {
@@ -1568,7 +1842,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["BillingPayment"];
+                        "application/json": components["schemas"]["BillingRecordedPayment"];
                     };
                 };
                 /** @description Validation failed — including a `gateway` payment whose externalReference is not `<provider>:<id>` */
@@ -1693,7 +1967,7 @@ export interface paths {
         put?: never;
         /**
          * Reverse a Payment
-         * @description Appends the mirror-image row; the original is never updated or deleted.
+         * @description Appends the mirror-image row; the original is never updated or deleted. A reversal cannot be reversed, and a payment is reversed at most once. **A payment whose `method` is `gateway` is refunded at its provider first** (full amount only), in this order: the provider named by the reference prefix must still be bound (`409 PAYMENTS_PROVIDER_NOT_ENABLED`) → the payment is read from the provider → a full refund it already holds is recorded under that refund id, or the row already carrying it is returned (`200`, nothing refunded again) → otherwise the refund is requested under an idempotency key derived from the payment row → a refusal is `409 PAYMENTS_REFUND_REFUSED` and **nothing is written** → accepted and written is `200` → accepted but not written is `503 PAYMENTS_REFUND_UNRECORDED`, and the same request repeated completes it. The reversal row carries `method: "gateway"`, `reversesId` and `externalReference: "<provider>:<refund id>"`. Repeating the request answers `200` with the same row. Every other method never calls a provider.
          */
         post: {
             parameters: {
@@ -1710,7 +1984,16 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Reversal recorded */
+                /** @description Gateway payment refunded at its provider; the reversal is on the ledger */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BillingPayment"];
+                    };
+                };
+                /** @description Reversal recorded (any method but `gateway`) */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -1740,12 +2023,45 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Conflict */
+                /** @description Conflict. For a gateway payment: `PAYMENTS_PROVIDER_NOT_ENABLED` or `PAYMENTS_REFUND_REFUSED` — nothing was written */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["RefundConflictBody"];
+                    };
+                };
+                /** @description `PAYMENTS_CONFIG_INVALID`: the provider list or its secrets are invalid (gateway payments only) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_PROVIDER_ERROR`: the provider could not be asked about the payment; no refund was requested and nothing was written */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_REFUND_UNRECORDED`: the provider returned the money and the reversal was not written; repeat the request */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RefundUnrecordedBody"];
+                    };
                 };
             };
         };
@@ -2084,7 +2400,7 @@ export interface paths {
         };
         /**
          * The Student Billing Roster
-         * @description Every user with a contract or any event charge, with two standings resolved side by side and never merged: `contract` (from contract invoices only — outstanding balance, oldest overdue date, next due date, negotiated terms; null when there is no contract) and `extras` (from event charges only — outstanding balance, oldest overdue date, open and overdue charge counts; null when never charged). There is no top-level standing or total. `contractStanding` and `extrasStanding` filter independently; `standing` is kept as an alias of `contractStanding`. `contractStanding=exempt` is the held filter — a hold applies to the contract rail only. Reporting only: nothing here gates a student's access.
+         * @description Every user with a contract or any event charge, with two standings resolved side by side and never merged: `contract` (from contract invoices only — outstanding balance, oldest overdue date, next due date, negotiated terms; null when there is no contract) and `extras` (from event charges only — outstanding balance, oldest overdue date, open and overdue charge counts; null when never charged). There is no top-level standing or total. `pendingCheckouts` is the line's "pending online payment": how many of the student's open receivables, on both rails, have a hosted checkout in progress, and when the first expires. `contractStanding` and `extrasStanding` filter independently; `standing` is kept as an alias of `contractStanding`. `contractStanding=exempt` is the held filter — a hold applies to the contract rail only. Reporting only: nothing here gates a student's access.
          */
         get: {
             parameters: {
@@ -11306,6 +11622,9 @@ export interface components {
             adjustments: components["schemas"]["BillingEventChargeAdjustment"][];
             payments: components["schemas"]["BillingEventChargePayment"][];
         };
+        BillingEventChargeListItem: components["schemas"]["BillingEventChargeWithBalance"] & {
+            pendingCheckout: components["schemas"]["PendingCheckout"] & unknown;
+        };
         BillingEventChargePayment: {
             /** @example 15000 */
             amountMinor: number;
@@ -11466,6 +11785,12 @@ export interface components {
             scopeTopicId: string | null;
             updatedAt: string;
         };
+        BillingRecordedEventChargePayment: components["schemas"]["BillingEventChargePayment"] & {
+            pendingCheckout: components["schemas"]["PendingCheckout"];
+        };
+        BillingRecordedPayment: components["schemas"]["BillingPayment"] & {
+            pendingCheckout: components["schemas"]["PendingCheckout"];
+        };
         BillingReportCurrency: {
             /** @example BRL */
             code: string;
@@ -11500,6 +11825,7 @@ export interface components {
             currency: string;
             extras: components["schemas"]["BillingRosterExtras"];
             hold: components["schemas"]["BillingStandingHold"];
+            pendingCheckouts: components["schemas"]["PendingCheckoutsSummary"];
             userId: string;
         };
         BillingRosterExtras: {
@@ -11646,7 +11972,7 @@ export interface components {
             eventStartsAt: string | null;
             /** @example Seminário de Inverno */
             eventTitle: string;
-            pendingCheckout: components["schemas"]["PendingCheckout"];
+            pendingCheckout: components["schemas"]["PendingCheckout"] & unknown;
         };
         BillingStatementContractGroup: {
             contractGroupId: string;
@@ -11673,7 +11999,7 @@ export interface components {
         BillingStatementInvoice: components["schemas"]["BillingInvoiceWithBalance"] & {
             adjustments: components["schemas"]["BillingInvoiceAdjustment"][];
             payments: components["schemas"]["BillingPayment"][];
-            pendingCheckout: components["schemas"]["PendingCheckout"];
+            pendingCheckout: components["schemas"]["PendingCheckout"] & unknown;
         };
         BillingStudentStatement: {
             contractGroups: components["schemas"]["BillingStatementContractGroup"][];
@@ -11918,6 +12244,13 @@ export interface components {
             kind: "invoice" | "event_charge";
             /**
              * @description Required when several providers offer a method (see `payOptions`); one that offers nothing on this label is `400 PAYMENT_PROVIDER_REQUIRED`.
+             * @example mercadopago
+             */
+            provider?: string;
+        };
+        CreateCheckoutOnBehalfBody: {
+            /**
+             * @description Required when several providers offer a method (see the statement's `payOptions`); one that offers nothing on this label is `400 PAYMENT_PROVIDER_REQUIRED`.
              * @example mercadopago
              */
             provider?: string;
@@ -12833,7 +13166,7 @@ export interface components {
              */
             outcome: "applied" | "duplicate" | "ignored" | "orphan" | "mismatch";
         };
-        /** @description The live hosted checkout of this receivable — open, with a provider session and not yet expired — or `null`. A receivable has at most one. */
+        /** @description The hosted checkout still in progress on this receivable, or `null`. The payment was recorded either way; a non-null value means the student holds a live link and may pay again online — the reconcile run expires it on its own. */
         PendingCheckout: {
             checkoutId: string;
             /** @example 2026-11-26T14:03:00.000Z */
@@ -12848,6 +13181,15 @@ export interface components {
              */
             provider: "stripe" | "mercadopago" | "asaas" | "pagarme";
         } | null;
+        PendingCheckoutsSummary: {
+            /** @example 1 */
+            count: number;
+            /**
+             * @description When the first of them expires; `null` when `count` is 0.
+             * @example 2026-11-27T14:03:00.000Z
+             */
+            earliestExpiresAt: string | null;
+        };
         PlayerProgression: {
             badges: {
                 badgeId: string;
@@ -12918,6 +13260,23 @@ export interface components {
             note?: string;
             /** @example 2026-01-01 */
             paidAt?: string;
+        };
+        RefundConflictBody: {
+            /**
+             * @description `PAYMENTS_PROVIDER_NOT_ENABLED`: the payment's provider is not bound on this label any more. `PAYMENTS_REFUND_REFUSED`: the provider did not return the money, does not know the payment, or already holds a partial refund of it. `Conflict`: the row is itself a reversal, or was already reversed. In every case nothing was written.
+             * @example PAYMENTS_REFUND_REFUSED
+             */
+            error: string;
+            message?: string;
+        };
+        RefundUnrecordedBody: {
+            /** @enum {string} */
+            error: "PAYMENTS_REFUND_UNRECORDED";
+            /**
+             * @description The provider's refund id. The refund **happened**; repeat the same request to record it — it cannot refund twice.
+             * @example 1234567890
+             */
+            refundId: string;
         };
         RegisterRequest: {
             /**

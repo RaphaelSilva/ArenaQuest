@@ -38,6 +38,7 @@ import {
 } from '@api/core/billing/event-charge-service';
 import { SYSTEM_PAYMENT_ACTOR_ID } from '@api/adapters/db/d1-gateway-repository';
 import type { ControllerResult } from '@api/core/result';
+import type { LiveCheckout } from '@api/core/payments/gateway-service';
 
 /**
  * BillingService — the rules the schema cannot state (RFC 0013 §4).
@@ -279,7 +280,31 @@ export interface RosterEntry {
   contract: RosterContractBlock | null;
   extras: RosterExtrasBlock | null;
   hold: BillingStandingHoldRecord | null;
+  /** "Pending online payment" (RFC 0026 §7): the student's payments in progress, both rails. */
+  pendingCheckouts: RosterPendingCheckouts;
 }
+
+/**
+ * How many of a student's **open** receivables — contract invoices and event
+ * charges together — have a hosted checkout in progress, and when the first
+ * of them expires. A count of links, never of money: nothing here is added to
+ * a balance, and nothing gates on it.
+ */
+export interface RosterPendingCheckouts {
+  count: number;
+  /** ISO timestamp; `null` when `count` is 0. */
+  earliestExpiresAt: string | null;
+}
+
+/**
+ * Every payment in progress, in one read (`GatewayService.listLiveCheckouts`).
+ * Injected per call rather than held: the gateway is built on top of this
+ * service, so the service cannot be built on top of the gateway.
+ */
+export type LiveCheckoutReader = () => Promise<ReadonlyArray<LiveCheckout>>;
+
+/** No gateway: what a label under `none`, and a caller that does not ask, read. */
+const NO_LIVE_CHECKOUTS: LiveCheckoutReader = async () => [];
 
 export interface RosterFilter {
   /** Contract rail. `exempt` is the held filter: a hold is the only way to reach it. */
@@ -959,6 +984,13 @@ export class BillingService {
     return { ok: true, data: invoice };
   }
 
+  /** One ledger row, whatever its sign — what the admin's reversal branches on. */
+  async getPayment(id: string): Promise<ControllerResult<PaymentRecord>> {
+    const payment = await this.repo.getPayment(id);
+    if (!payment) return notFound('payment not found');
+    return { ok: true, data: payment };
+  }
+
   /**
    * Issues one invoice by hand, snapshotting the **contract's** terms — never
    * the plan's, which may have moved since the signature.
@@ -1215,6 +1247,12 @@ export class BillingService {
 
     const original = await this.repo.getPayment(paymentId);
     if (!original) return notFound('payment not found');
+    if (original.method === PaymentMethod.GATEWAY) {
+      // The mirror row would copy the original's reference, which the ledger
+      // admits once; and the money is at a provider, which must return it
+      // first (`GatewayService.refundInvoicePayment`, RFC 0026 §5).
+      return conflict('a gateway payment is reversed by refunding it at its provider');
+    }
     if (original.reversesId !== null) {
       return conflict('a reversal cannot itself be reversed');
     }
@@ -1481,8 +1519,16 @@ export class BillingService {
    * The two rails never meet: invoices go to `resolveRailStanding('contract')`
    * with the hold, charges go to `resolveExtrasRail` without it, and the
    * iteration is over the union of **user ids**, never of receivables.
+   *
+   * `liveCheckouts` is a fifth set-based read — every payment in progress, at
+   * once — joined in memory like the other four. A checkout counts only while
+   * its receivable is still `open`, the statement's own rule, so a roster line
+   * and the student's statement never disagree about what is pending.
    */
-  async listStudentRoster(filter: RosterFilter = {}): Promise<ControllerResult<RosterEntry[]>> {
+  async listStudentRoster(
+    filter: RosterFilter = {},
+    liveCheckouts: LiveCheckoutReader = NO_LIVE_CHECKOUTS,
+  ): Promise<ControllerResult<RosterEntry[]>> {
     const asOf = filter.asOf ?? today();
 
     if (
@@ -1494,12 +1540,35 @@ export class BillingService {
     }
     const contractStanding = filter.contractStanding ?? filter.standing;
 
-    const [subscriptions, invoices, charges, holds] = await Promise.all([
+    const [subscriptions, invoices, charges, holds, live] = await Promise.all([
       this.repo.listSubscriptions({}),
       this.repo.listInvoices({}),
       this.charges.listCharges({}),
       this.repo.listHolds(),
+      liveCheckouts(),
     ]);
+
+    // Receivables a checkout can still be collecting: `open` on either rail.
+    const openReceivables = new Set<string>();
+    for (const invoice of invoices) {
+      if (invoice.status === InvoiceStatus.OPEN) openReceivables.add(`invoice:${invoice.id}`);
+    }
+    for (const charge of charges) {
+      if (charge.status === ChargeStatus.OPEN) openReceivables.add(`event_charge:${charge.id}`);
+    }
+    const pendingByUser = new Map<string, RosterPendingCheckouts>();
+    for (const checkout of live) {
+      if (!openReceivables.has(`${checkout.receivableKind}:${checkout.receivableId}`)) continue;
+      const known = pendingByUser.get(checkout.userId) ?? { count: 0, earliestExpiresAt: null };
+      const expiresAt = checkout.pending.expiresAt;
+      pendingByUser.set(checkout.userId, {
+        count: known.count + 1,
+        earliestExpiresAt:
+          known.earliestExpiresAt === null || Date.parse(expiresAt) < Date.parse(known.earliestExpiresAt)
+            ? expiresAt
+            : known.earliestExpiresAt,
+      });
+    }
 
     const invoicesByUser = new Map<string, InvoiceWithBalanceRecord[]>();
     for (const invoice of unvoided(invoices)) push(invoicesByUser, invoice.userId, invoice);
@@ -1551,7 +1620,15 @@ export class BillingService {
       // No hold here, ever: a contract hold is not an arrangement about an extra.
       const extras = userCharges ? resolveExtrasRail(userCharges, asOf) : null;
 
-      entries.push({ userId, asOf, currency, contract, extras, hold });
+      entries.push({
+        userId,
+        asOf,
+        currency,
+        contract,
+        extras,
+        hold,
+        pendingCheckouts: pendingByUser.get(userId) ?? { count: 0, earliestExpiresAt: null },
+      });
     }
 
     const filtered = entries.filter(

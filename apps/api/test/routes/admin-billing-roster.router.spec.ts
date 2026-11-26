@@ -1,9 +1,12 @@
 import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { applyMigrations } from '../helpers/apply-migrations';
 import { v1 } from '../helpers/v1';
+import { buildPaymentsTestApp, type PaymentsTestApp } from '../adapters/payment/payments-test-app';
+import { StubGatewayAdapter } from '../adapters/payment/stub-gateway-adapter';
+import { seedGatewayWorld } from '../db/gateway-fixtures';
 
 /**
  * The two-rail roster over HTTP (RFC 0015 §4): `GET /v1/admin/billing/students`
@@ -29,7 +32,13 @@ function daysAgo(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
 }
 
-async function billing(method: string, path: string, body?: unknown): Promise<Response> {
+async function billing(
+  method: string,
+  path: string,
+  body?: unknown,
+  /** The same Worker app with stub payment adapters bound; without it the real Worker (`none`) answers. */
+  app?: PaymentsTestApp,
+): Promise<Response> {
   const headers: Record<string, string> = { Authorization: `Bearer ${adminToken}` };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const request = new IncomingRequest(`http://example.com${v1(`/admin/billing${path}`)}`, {
@@ -38,7 +47,7 @@ async function billing(method: string, path: string, body?: unknown): Promise<Re
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const ctx = createExecutionContext();
-  const res = await worker.fetch(request, env as AppEnv, ctx);
+  const res = app ? await app.fetch(request, ctx) : await worker.fetch(request, env as AppEnv, ctx);
   await waitOnExecutionContext(ctx);
   return res;
 }
@@ -62,6 +71,7 @@ interface RosterEntry {
   contract: (Rail & { id: string; groupId: string; status: string }) | null;
   extras: (Rail & { openCharges: number; overdueCharges: number }) | null;
   hold: { reason: string } | null;
+  pendingCheckouts: { count: number; earliestExpiresAt: string | null };
 }
 
 const roster = async (query = ''): Promise<RosterEntry[]> =>
@@ -245,5 +255,64 @@ describe('GET /v1/admin/billing/students — two rails', () => {
 
     await billing('DELETE', `/holds/${LATE}`);
     await billing('DELETE', `/holds/${PAID_UP}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Pending online payment" on a roster line (RFC 0026 §7)
+// ---------------------------------------------------------------------------
+
+describe('GET /v1/admin/billing/students — pendingCheckouts', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('reads zero for every student with no checkout in progress', async () => {
+    for (const entry of await roster()) {
+      expect(entry.pendingCheckouts).toEqual({ count: 0, earliestExpiresAt: null });
+    }
+  });
+
+  it('counts the student\'s live checkouts across both rails, with the earliest expiry', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    const mp = new StubGatewayAdapter('mercadopago');
+    const app = buildPaymentsTestApp(env as Env, 'mercadopago:pix+card', [mp]);
+    const world = await seedGatewayWorld();
+    const line = async (): Promise<RosterEntry> =>
+      (await jsonOf<RosterEntry[]>(await billing('GET', '/students', undefined, app), 200)).find(
+        (entry) => entry.userId === world.studentId,
+      )!;
+
+    expect((await line()).pendingCheckouts).toEqual({ count: 0, earliestExpiresAt: null });
+
+    const invoiceCheckout = await jsonOf<{ expiresAt: string }>(
+      await billing('POST', `/invoices/${world.invoiceId}/checkouts`, {}, app),
+      201,
+    );
+    expect((await line()).pendingCheckouts).toEqual({ count: 1, earliestExpiresAt: invoiceCheckout.expiresAt });
+
+    // The charge's hosted page expires first: the provider granted one hour.
+    const soon = new Date(Date.now() + 3_600_000).toISOString();
+    mp.setCheckoutResult({ expiresAt: soon });
+    await jsonOf(await billing('POST', `/charges/${world.chargeId}/checkouts`, {}, app), 201);
+    expect((await line()).pendingCheckouts).toEqual({ count: 2, earliestExpiresAt: soon });
+
+    // Nobody else's line moved, and the rails' own numbers are untouched.
+    const others = (await jsonOf<RosterEntry[]>(await billing('GET', '/students', undefined, app), 200)).filter(
+      (entry) => entry.userId !== world.studentId,
+    );
+    expect(others.every((entry) => entry.pendingCheckouts.count === 0)).toBe(true);
+    expect((await line()).contract!.outstandingMinor).toBe(15000);
+
+    // Cash at the door settles the charge: its checkout stops counting,
+    // exactly as the statement stops listing it.
+    await jsonOf(await billing('POST', `/charges/${world.chargeId}/payments`, { amountMinor: 8000, method: 'cash' }, app), 201);
+    expect((await line()).pendingCheckouts).toEqual({ count: 1, earliestExpiresAt: invoiceCheckout.expiresAt });
+
+    // A checkout whose provider session never arrived, or past its expiry, is not a payment in progress.
+    await env.DB.prepare("UPDATE gateway_checkouts SET expires_at = '2020-01-01T00:00:00.000Z' WHERE receivable_id = ?")
+      .bind(world.invoiceId)
+      .run();
+    expect((await line()).pendingCheckouts).toEqual({ count: 0, earliestExpiresAt: null });
   });
 });

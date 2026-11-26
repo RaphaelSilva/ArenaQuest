@@ -113,3 +113,71 @@ export const CheckoutStatusSchema = z
     closedAt: z.string().nullable(),
   })
   .openapi('CheckoutStatus');
+
+// ---------------------------------------------------------------------------
+// The admin's side (RFC 0026 §3, §5, §7)
+// ---------------------------------------------------------------------------
+
+/**
+ * Body of the two on-behalf checkout routes. The receivable is the path's and
+ * its student is read from it; the body only says how to pay.
+ */
+export const CreateCheckoutOnBehalfBodySchema = z
+  .object({
+    provider: z
+      .string()
+      .min(1)
+      .max(40)
+      .optional()
+      .openapi({
+        description:
+          'Required when several providers offer a method (see the statement\'s `payOptions`); one ' +
+          'that offers nothing on this label is `400 PAYMENT_PROVIDER_REQUIRED`.',
+        example: 'mercadopago',
+      }),
+  })
+  .strict()
+  .openapi('CreateCheckoutOnBehalfBody');
+
+/**
+ * "Pending online payment" on one roster line: how many of the student's open
+ * receivables — contract invoices and event charges together — have a hosted
+ * checkout in progress. A count of links, never an amount.
+ */
+export const PendingCheckoutsSummarySchema = z
+  .object({
+    count: z.number().int().min(0).openapi({ example: 1 }),
+    earliestExpiresAt: z.string().nullable().openapi({
+      description: 'When the first of them expires; `null` when `count` is 0.',
+      example: '2026-11-27T14:03:00.000Z',
+    }),
+  })
+  .openapi('PendingCheckoutsSummary');
+
+/** `409` of the two reverse routes when the row is a gateway payment. */
+export const RefundConflictBody = z
+  .object({
+    error: z.string().openapi({
+      description:
+        '`PAYMENTS_PROVIDER_NOT_ENABLED`: the payment\'s provider is not bound on this label any more. ' +
+        '`PAYMENTS_REFUND_REFUSED`: the provider did not return the money, does not know the payment, or ' +
+        'already holds a partial refund of it. `Conflict`: the row is itself a reversal, or was already ' +
+        'reversed. In every case nothing was written.',
+      example: 'PAYMENTS_REFUND_REFUSED',
+    }),
+    message: z.string().optional(),
+  })
+  .openapi('RefundConflictBody');
+
+/** `503` of the two reverse routes: the money was returned and the ledger does not say so yet. */
+export const RefundUnrecordedBody = z
+  .object({
+    error: z.literal('PAYMENTS_REFUND_UNRECORDED'),
+    refundId: z.string().openapi({
+      description:
+        'The provider\'s refund id. The refund **happened**; repeat the same request to record it — it ' +
+        'cannot refund twice.',
+      example: '1234567890',
+    }),
+  })
+  .openapi('RefundUnrecordedBody');

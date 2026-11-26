@@ -1,9 +1,12 @@
 import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { applyMigrations } from '../helpers/apply-migrations';
 import { v1 } from '../helpers/v1';
+import { buildPaymentsTestApp, type PaymentsTestApp } from '../adapters/payment/payments-test-app';
+import { StubGatewayAdapter, stubPayment } from '../adapters/payment/stub-gateway-adapter';
+import { insertInvoicePayment, seedGatewayWorld, type GatewayWorld } from '../db/gateway-fixtures';
 
 /**
  * `/v1/admin/billing` over HTTP.
@@ -55,6 +58,8 @@ async function billing(
   path: string,
   body?: unknown,
   token = adminToken,
+  /** The same Worker app with stub payment adapters bound; without it the real Worker (`none`) answers. */
+  app?: PaymentsTestApp,
 ): Promise<Response> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -67,7 +72,7 @@ async function billing(
   });
 
   const ctx = createExecutionContext();
-  const res = await worker.fetch(request, env as AppEnv, ctx);
+  const res = app ? await app.fetch(request, ctx) : await worker.fetch(request, env as AppEnv, ctx);
   await waitOnExecutionContext(ctx);
   return res;
 }
@@ -513,6 +518,9 @@ const ROUTES: Array<{ method: string; path: string; body?: unknown }> = [
   // across every student at once, so it is the last one that should be
   // reachable by a content_creator.
   { method: 'POST', path: '/invoices/run', body: {} },
+  // M30 Task 08: a checkout on a student's behalf hands out a link that
+  // collects money, so it is the admin's alone.
+  { method: 'POST', path: '/invoices/some-id/checkouts', body: {} },
 ];
 
 describe('/v1/admin/billing — ADMIN-only on every route', () => {
@@ -619,5 +627,326 @@ describe('/v1/admin/billing/invoices/run — the extras rail in the report', () 
       'suppressed',
       'undeliverable',
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The payment gateway, admin side (RFC 0026 §3, §5, §7) — contract rail
+// ---------------------------------------------------------------------------
+
+describe('/v1/admin/billing — checkouts on behalf and gateway refunds', () => {
+  type Session = { checkoutId: string; provider: string; url: string; expiresAt: string; amountMinor: number; status: string };
+  type LedgerRow = {
+    id: string;
+    amountMinor: number;
+    method: string;
+    externalReference: string | null;
+    reversesId: string | null;
+    recordedBy: string;
+    note: string;
+  };
+
+  let mp: StubGatewayAdapter;
+  let app: PaymentsTestApp;
+  let world: GatewayWorld;
+
+  const viaApp = (method: string, path: string, body?: unknown, token = adminToken) =>
+    billing(method, path, body, token, app);
+
+  /** The invoice's whole ledger, exactly as stored — for "byte-for-byte unchanged". */
+  async function ledger(): Promise<string> {
+    const { results } = await env.DB
+      .prepare('SELECT * FROM payments WHERE invoice_id = ? ORDER BY id')
+      .bind(world.invoiceId)
+      .all();
+    return JSON.stringify(results);
+  }
+
+  async function reversalsOf(paymentId: string): Promise<Array<{ id: string; external_reference: string }>> {
+    const { results } = await env.DB
+      .prepare('SELECT id, external_reference FROM payments WHERE reverses_id = ?')
+      .bind(paymentId)
+      .all<{ id: string; external_reference: string }>();
+    return results;
+  }
+
+  /** A landed gateway payment of the invoice, known to the provider under the same id. */
+  async function landed(): Promise<{ id: string; providerId: string }> {
+    const providerId = `pay-${crypto.randomUUID()}`;
+    const id = await insertInvoicePayment(world, { method: 'gateway', externalReference: `mercadopago:${providerId}` });
+    mp.setPayment(stubPayment({ id: providerId, amountMinor: 15000 }));
+    return { id, providerId };
+  }
+
+  const reverse = (paymentId: string, token = adminToken) =>
+    viaApp('POST', `/payments/${paymentId}/reverse`, { reason: 'Asked for it back.' }, token);
+
+  beforeEach(async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mp = new StubGatewayAdapter('mercadopago');
+    app = buildPaymentsTestApp(env as Env, 'mercadopago:pix+card', [mp]);
+    world = await seedGatewayWorld();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('POST /invoices/{id}/checkouts', () => {
+    it('opens the checkout for the invoice\'s student, records the admin as its creator, and hands it back on a second call', async () => {
+      const res = await viaApp('POST', `/invoices/${world.invoiceId}/checkouts`, {});
+      const session = await jsonOf<Session>(res, 201);
+
+      expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+      expect(session).toMatchObject({
+        provider: 'mercadopago',
+        url: `https://pay.mercadopago.invalid/checkout/${session.checkoutId}`,
+        amountMinor: 15000,
+        status: 'open',
+      });
+      const row = await env.DB
+        .prepare('SELECT user_id, created_by, receivable_kind, receivable_id FROM gateway_checkouts WHERE id = ?')
+        .bind(session.checkoutId)
+        .first();
+      expect(row).toEqual({
+        user_id: world.studentId,
+        created_by: ADMIN_ID,
+        receivable_kind: 'invoice',
+        receivable_id: world.invoiceId,
+      });
+      // The hosted page is opened for the student, not the admin.
+      expect(mp.callsTo('createCheckout')[0].req.payer.id).toBe(world.studentId);
+
+      const again = await jsonOf<Session>(
+        await viaApp('POST', `/invoices/${world.invoiceId}/checkouts`, { provider: 'mercadopago' }),
+        200,
+      );
+      expect(again.checkoutId).toBe(session.checkoutId);
+      expect(mp.callsTo('createCheckout')).toHaveLength(1);
+
+      // The student's hourly budget was never touched.
+      const budget = await env.RATE_LIMIT_KV.list({ prefix: 'rl:checkouts:' });
+      expect(budget.keys.filter((key) => key.name.includes(world.studentId))).toEqual([]);
+
+      // The admin statement lists it under the invoice.
+      const statement = await jsonOf<{ invoices: Array<{ id: string; pendingCheckout: { createdBy: string } | null }> }>(
+        await viaApp('GET', `/students/${world.studentId}/statement`),
+        200,
+      );
+      expect(statement.invoices.find((invoice) => invoice.id === world.invoiceId)?.pendingCheckout).toMatchObject({
+        checkoutId: session.checkoutId,
+        createdBy: ADMIN_ID,
+      });
+    });
+
+    it('refuses in the student route\'s order: 400 body, 400 provider, 404 invoice, 409 not payable, 502 provider', async () => {
+      const path = `/invoices/${world.invoiceId}/checkouts`;
+      expect((await viaApp('POST', path, { userId: world.studentId })).status).toBe(400);
+
+      const unknown = await viaApp('POST', path, { provider: 'stripe' });
+      expect(unknown.status).toBe(400);
+      expect(await unknown.json()).toEqual({ error: 'PAYMENT_PROVIDER_REQUIRED' });
+
+      expect((await viaApp('POST', '/invoices/nope/checkouts', {})).status).toBe(404);
+      // An event charge id is not an invoice.
+      expect((await viaApp('POST', `/invoices/${world.chargeId}/checkouts`, {})).status).toBe(404);
+
+      mp.setCheckoutResult(new Error('boom'));
+      const failed = await viaApp('POST', path, {});
+      expect(failed.status).toBe(502);
+      expect(await failed.json()).toEqual({ error: 'PAYMENTS_PROVIDER_ERROR' });
+      mp.setCheckoutResult(null);
+
+      await jsonOf(await viaApp('POST', `/invoices/${world.invoiceId}/void`, { reason: 'mistake' }), 200);
+      const voided = await viaApp('POST', path, {});
+      expect(voided.status).toBe(409);
+      expect(await voided.json()).toEqual({ error: 'RECEIVABLE_NOT_PAYABLE' });
+    });
+
+    it('does not exist on a label with no provider (404), and is loud on an invalid list (500)', async () => {
+      const none = await billing('POST', `/invoices/${world.invoiceId}/checkouts`, { nonsense: true });
+      expect(none.status).toBe(404);
+
+      const invalid = buildPaymentsTestApp(env as Env, 'mercadopago:pix,mercadopago:card', [mp]);
+      const res = await billing('POST', `/invoices/${world.invoiceId}/checkouts`, {}, adminToken, invalid);
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({ error: 'PAYMENTS_CONFIG_INVALID' });
+    });
+
+    it('403s a content_creator and a tutor before the gate, with a provider bound', async () => {
+      for (const token of [creatorToken, tutorToken, studentToken]) {
+        expect((await viaApp('POST', `/invoices/${world.invoiceId}/checkouts`, {}, token)).status).toBe(403);
+      }
+      expect(mp.calls).toHaveLength(0);
+    });
+  });
+
+  describe('POST /payments/{id}/reverse on a gateway payment', () => {
+    it('refunds at the provider, then writes one reversal whose reference is the refund id (200)', async () => {
+      const { id, providerId } = await landed();
+
+      const reversal = await jsonOf<LedgerRow>(await reverse(id), 200);
+
+      expect(mp.calls.map((call) => call.method)).toEqual(['getPayment', 'refund']);
+      expect(mp.callsTo('refund')[0]).toMatchObject({ paymentId: providerId, amountMinor: 15000, idempotencyKey: `rev:${id}` });
+      expect(reversal).toMatchObject({
+        amountMinor: -15000,
+        method: 'gateway',
+        reversesId: id,
+        externalReference: 'mercadopago:mercadopago-refund-1',
+        recordedBy: ADMIN_ID,
+        note: 'Asked for it back.',
+      });
+      expect(await reversalsOf(id)).toEqual([{ id: reversal.id, external_reference: 'mercadopago:mercadopago-refund-1' }]);
+    });
+
+    it('answers 200 twice for the same payment and leaves one reversal row', async () => {
+      const { id } = await landed();
+
+      const first = await jsonOf<LedgerRow>(await reverse(id), 200);
+      const second = await jsonOf<LedgerRow>(await reverse(id), 200);
+
+      expect(second.id).toBe(first.id);
+      expect(await reversalsOf(id)).toHaveLength(1);
+      expect(mp.callsTo('refund')).toHaveLength(1);
+    });
+
+    it('leaves the ledger byte-for-byte unchanged when the provider refuses (409)', async () => {
+      const { id } = await landed();
+      const before = await ledger();
+      mp.failRefunds(new Error('funds unavailable'));
+
+      const res = await reverse(id);
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: 'PAYMENTS_REFUND_REFUSED' });
+      expect(await ledger()).toBe(before);
+    });
+
+    it('records a refund already made at the provider without asking for another (200, one row)', async () => {
+      const { id, providerId } = await landed();
+      mp.setPayment(
+        stubPayment({
+          id: providerId,
+          amountMinor: 15000,
+          status: 'refunded',
+          refunds: [{ id: 'dash-1', amountMinor: 15000, createdAt: '2026-01-25T18:30:00.000Z' }],
+        }),
+      );
+
+      const reversal = await jsonOf<LedgerRow & { paidAt: string }>(await reverse(id), 200);
+
+      expect(mp.callsTo('refund')).toHaveLength(0);
+      expect(reversal).toMatchObject({ reversesId: id, externalReference: 'mercadopago:dash-1', paidAt: '2026-01-25' });
+      expect(await reversalsOf(id)).toHaveLength(1);
+    });
+
+    it('says an unrecorded refund out loud (503), and the same request then completes it', async () => {
+      const { id } = await landed();
+      const before = await ledger();
+      // The store refuses the reversal insert, as an outage between the two steps would.
+      await env.DB
+        .prepare(
+          `CREATE TRIGGER fail_reversal BEFORE INSERT ON payments WHEN NEW.reverses_id IS NOT NULL
+           BEGIN SELECT RAISE(ABORT, 'store unavailable'); END`,
+        )
+        .run();
+      let lost: Response;
+      try {
+        lost = await reverse(id);
+      } finally {
+        await env.DB.prepare('DROP TRIGGER fail_reversal').run();
+      }
+
+      expect(lost.status).toBe(503);
+      expect(await lost.json()).toEqual({ error: 'PAYMENTS_REFUND_UNRECORDED', refundId: 'mercadopago-refund-1' });
+      expect(await ledger()).toBe(before);
+
+      const reversal = await jsonOf<LedgerRow>(await reverse(id), 200);
+
+      expect(reversal).toMatchObject({ reversesId: id, externalReference: 'mercadopago:mercadopago-refund-1' });
+      expect(mp.callsTo('refund')).toHaveLength(1);
+      expect(await reversalsOf(id)).toHaveLength(1);
+    });
+
+    it('409s PAYMENTS_PROVIDER_NOT_ENABLED when the provider is no longer bound, writing nothing', async () => {
+      const { id } = await landed();
+      const before = await ledger();
+
+      // The real Worker: `PAYMENTS_PROVIDERS = none`.
+      const res = await billing('POST', `/payments/${id}/reverse`, { reason: 'x' });
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: 'PAYMENTS_PROVIDER_NOT_ENABLED' });
+      expect(await ledger()).toBe(before);
+      expect(mp.calls).toHaveLength(0);
+    });
+
+    it('still demands a reason, and 404s an unknown payment', async () => {
+      const { id } = await landed();
+      expect((await viaApp('POST', `/payments/${id}/reverse`, { reason: ' ' })).status).toBe(400);
+      expect((await viaApp('POST', '/payments/nope/reverse', { reason: 'x' })).status).toBe(404);
+      expect(mp.calls).toHaveLength(0);
+    });
+
+    it('403s a content_creator and a tutor, with no provider call', async () => {
+      const { id } = await landed();
+      for (const token of [creatorToken, tutorToken]) {
+        expect((await reverse(id, token)).status).toBe(403);
+      }
+      expect(mp.calls).toHaveLength(0);
+    });
+  });
+
+  describe('every other method', () => {
+    it('reverses a cash payment exactly as before: 201, the mirror row, and no provider call', async () => {
+      const cash = await jsonOf<LedgerRow>(
+        await viaApp('POST', `/invoices/${world.invoiceId}/payments`, {
+          amountMinor: 5000,
+          method: 'cash',
+          externalReference: 'receipt 12',
+        }),
+        201,
+      );
+
+      const reversal = await jsonOf<LedgerRow>(await reverse(cash.id), 201);
+
+      expect(reversal).toMatchObject({
+        amountMinor: -5000,
+        method: 'cash',
+        reversesId: cash.id,
+        externalReference: 'receipt 12',
+      });
+      expect((await reverse(cash.id)).status).toBe(409);
+      expect(mp.calls).toHaveLength(0);
+    });
+
+    it('records a cash payment on an invoice with an open checkout, and says the checkout is open', async () => {
+      const path = `/invoices/${world.invoiceId}/payments`;
+      const without = await jsonOf<LedgerRow & { pendingCheckout: unknown }>(
+        await viaApp('POST', path, { amountMinor: 1000, method: 'cash' }),
+        201,
+      );
+      expect(without.pendingCheckout).toBeNull();
+
+      const session = await jsonOf<Session>(await viaApp('POST', `/invoices/${world.invoiceId}/checkouts`, {}), 201);
+      const paid = await jsonOf<LedgerRow & { pendingCheckout: Record<string, unknown> | null }>(
+        await viaApp('POST', path, { amountMinor: 14000, method: 'cash' }),
+        201,
+      );
+
+      expect(paid).toMatchObject({ amountMinor: 14000, method: 'cash' });
+      expect(paid.pendingCheckout).toEqual({
+        checkoutId: session.checkoutId,
+        provider: 'mercadopago',
+        createdAt: expect.any(String),
+        expiresAt: session.expiresAt,
+        createdBy: ADMIN_ID,
+      });
+      // The checkout is left for the reconcile run; recording cash closes nothing.
+      const row = await env.DB.prepare('SELECT status FROM gateway_checkouts WHERE id = ?').bind(session.checkoutId).first();
+      expect(row).toEqual({ status: 'open' });
+    });
   });
 });
