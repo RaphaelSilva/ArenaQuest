@@ -63,10 +63,17 @@ export function LedgerTab({
   currency,
   nameOf,
   students,
+  initialUserId,
 }: {
   currency: BillingReportCurrency | null;
   nameOf: (userId: string) => string;
   students: readonly { id: string; name: string }[];
+  /**
+   * Opens the tab already filtered to one student — how the payment
+   * exceptions tab points at the entry whose reversal is a dispute's refund.
+   * Read once, when the tab mounts.
+   */
+  initialUserId?: string;
 }) {
   const dict = useDict();
   const d = dict.admin.billing.ledger;
@@ -80,8 +87,12 @@ export function LedgerTab({
 
   // The draft the filter controls write to, and the committed query the fetch
   // effect depends on — so typing a date does not fire a request per keystroke.
-  const [draft, setDraft] = useState<InvoiceQuery>({});
-  const [query, setQuery] = useState<InvoiceQuery>({});
+  const [draft, setDraft] = useState<InvoiceQuery>(() =>
+    initialUserId ? { userId: initialUserId } : {},
+  );
+  const [query, setQuery] = useState<InvoiceQuery>(() =>
+    initialUserId ? { userId: initialUserId } : {},
+  );
 
   const [rows, setRows] = useState<BillingInvoiceWithBalance[]>([]);
   const [loading, setLoading] = useState(true);

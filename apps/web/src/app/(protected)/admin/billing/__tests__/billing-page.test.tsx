@@ -19,6 +19,7 @@ let client: {
 };
 
 let search = '';
+let exceptions: unknown[] = [];
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace }),
@@ -63,8 +64,10 @@ describe('AdminBillingPage', () => {
     vi.clearAllMocks();
     isAdmin = true;
     search = '';
+    exceptions = [];
     http = makeTransport((_method, path) => {
       if (path.includes('/reports/aging')) return agingReport;
+      if (path.endsWith('/payments/exceptions')) return { exceptions };
       return [];
     });
     client = {
@@ -172,5 +175,41 @@ describe('AdminBillingPage', () => {
     isAdmin = false;
     renderPage();
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/dashboard'));
+  });
+
+  it('offers the payment exceptions tab with no badge while the list is empty', async () => {
+    renderPage();
+    const tab = await screen.findByRole('tab', { name: d.tabs.exceptions });
+    await waitFor(() =>
+      expect(http).toHaveBeenCalledWith('GET', '/admin/billing/payments/exceptions'),
+    );
+    expect(screen.queryByTestId('exceptions-badge')).not.toBeInTheDocument();
+
+    fireEvent.click(tab);
+    expect(await screen.findByText(d.gateway.exceptions.empty.title)).toBeInTheDocument();
+    expect(screen.queryByTestId('exceptions-badge')).not.toBeInTheDocument();
+  });
+
+  it('badges the tab with the number of open exceptions before it is opened', async () => {
+    exceptions = [{ ref: 'event:stripe:evt_1' }, { ref: 'event:stripe:evt_2' }];
+    renderPage();
+    const badge = await screen.findByTestId('exceptions-badge');
+    expect(badge).toHaveTextContent('2');
+    expect(badge).toHaveAttribute('aria-label', d.gateway.exceptions.countLabel(2));
+    // Still on the students tab: the badge is how the admin learns to look.
+    expect(screen.getByRole('tab', { name: d.tabs.students })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  it('offers a non-admin no payment exceptions tab and reads no exception for them', async () => {
+    isAdmin = false;
+    exceptions = [{ ref: 'event:stripe:evt_1' }];
+    renderPage();
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/dashboard'));
+    expect(screen.queryByRole('tab', { name: d.tabs.exceptions })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('exceptions-badge')).not.toBeInTheDocument();
+    expect(http).not.toHaveBeenCalledWith('GET', '/admin/billing/payments/exceptions');
   });
 });

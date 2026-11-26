@@ -28,6 +28,20 @@ export type PendingCheckout = NonNullable<Schemas['PendingCheckout']>;
 export type PendingCheckoutsSummary = Schemas['PendingCheckoutsSummary'];
 /** A hosted checkout as created — the only shape that carries the URL. */
 export type CheckoutSession = Schemas['CheckoutSession'];
+/**
+ * One row of the payment exceptions list (RFC 0026 §7): something the gateway
+ * could not settle by itself. An orphan has no `receivable`, so no amount.
+ */
+export type PaymentException = Schemas['PaymentException'];
+export type PaymentExceptionKind = PaymentException['kind'];
+/** What an exception's checkout was collecting; `null` when no checkout is known. */
+export type PaymentExceptionReceivable = NonNullable<PaymentException['receivable']>;
+/** `ref` is opaque: it is sent back exactly as the list gave it. */
+export type DismissPaymentExceptionInput = Schemas['DismissPaymentExceptionBody'];
+export type DismissedPaymentException = Schemas['DismissedPaymentException'];
+/** A manual reconcile run. `status: 'failed'` arrives as a `200` — read it. */
+export type ReconcilePaymentsRun = Schemas['ReconcilePaymentsRun'];
+export type ReconcilePaymentsSummary = Schemas['ReconcilePaymentsSummary'];
 
 export type BillingCycle = 'monthly' | 'quarterly' | 'yearly';
 export type TermsSource = 'standard' | 'negotiated';
@@ -681,6 +695,32 @@ const CHECKOUT_ERROR_KINDS: Record<string, OnBehalfCheckoutErrorKind> = {
   NotFound: 'not_found',
 };
 
+/** Why the exceptions list could not be read. */
+export type PaymentExceptionsErrorKind =
+  /** `403` — the caller is not an admin. Not a failure: there is nothing to show. */
+  | 'forbidden'
+  | 'unknown';
+
+/** Why an exception could not be dismissed. */
+export type DismissExceptionErrorKind =
+  /** `404 NotFound` — the ref is no longer on the list (already dismissed, or settled). */
+  | 'gone'
+  /** `400 ValidationError` — a blank or over-long note, or a malformed ref. */
+  | 'invalid'
+  /** `403`. */
+  | 'forbidden'
+  | 'unknown';
+
+/** Why a manual reconcile run did not answer with a run. */
+export type ReconcileErrorKind =
+  /** `404 NotFound` — no provider is bound on this label; nothing ran, nothing was recorded. */
+  | 'off'
+  /** `500 PAYMENTS_CONFIG_INVALID` — nothing was asked of a provider; the failed run is recorded. */
+  | 'configuration'
+  /** `403`. */
+  | 'forbidden'
+  | 'unknown';
+
 /** The `409` a gateway payment answers when its reference already landed. */
 export const PAYMENT_REFERENCE_EXISTS = 'PAYMENT_REFERENCE_EXISTS';
 
@@ -725,6 +765,32 @@ export class AdminBillingApiError extends Error {
   /** The refusal of an on-behalf checkout, as the link dialog distinguishes it. */
   get checkoutKind(): OnBehalfCheckoutErrorKind {
     return CHECKOUT_ERROR_KINDS[this.code] ?? 'unknown';
+  }
+
+  /** `403`: the route is `admin` only and the caller is not one. */
+  get isForbidden(): boolean {
+    return this.status === 403;
+  }
+
+  /** The refusal of the exceptions list, as the panel distinguishes it. */
+  get exceptionsKind(): PaymentExceptionsErrorKind {
+    return this.isForbidden ? 'forbidden' : 'unknown';
+  }
+
+  /** The refusal of a dismissal, as the dismiss dialog distinguishes it. */
+  get dismissKind(): DismissExceptionErrorKind {
+    if (this.isForbidden) return 'forbidden';
+    if (this.status === 404) return 'gone';
+    if (this.status === 400) return 'invalid';
+    return 'unknown';
+  }
+
+  /** The refusal of a manual reconcile run, as the panel distinguishes it. */
+  get reconcileKind(): ReconcileErrorKind {
+    if (this.isForbidden) return 'forbidden';
+    if (this.status === 404) return 'off';
+    if (this.code === 'PAYMENTS_CONFIG_INVALID') return 'configuration';
+    return 'unknown';
   }
 
   /**
@@ -967,6 +1033,55 @@ export function createAdminBillingApi(http: HttpTransport, options: AdminBilling
           `${BASE}/payments/${id}/reverse`,
           'BILLING_PAYMENT_REVERSE_FAILED',
           input,
+        );
+      },
+    },
+
+    /**
+     * What the payment gateway leaves for an admin (RFC 0026 §7): the
+     * exceptions list, its dismissal and the manual reconcile run. Kept apart
+     * from `payments`, whose only operation on a ledger row is its reversal.
+     */
+    gateway: {
+      /**
+       * Everything the gateway could not settle by itself (RFC 0026 §7), oldest
+       * first, dismissed rows excluded. Read from the database only, so it
+       * answers on a label with no provider and under an invalid configuration.
+       */
+      async listExceptions(): Promise<PaymentException[]> {
+        const body = await get<Schemas['PaymentExceptionList']>(
+          `${BASE}/payments/exceptions`,
+          'BILLING_PAYMENT_EXCEPTIONS_FAILED',
+        );
+        return Array.isArray(body.exceptions) ? body.exceptions : [];
+      },
+
+      /**
+       * Hides one exception behind a required note (milestone decision 20).
+       * It changes no status and writes no ledger row. The body is strict:
+       * `ref` exactly as the list gave it, and the trimmed note.
+       */
+      dismissException(input: DismissPaymentExceptionInput): Promise<DismissedPaymentException> {
+        return send<DismissedPaymentException>(
+          'POST',
+          `${BASE}/payments/exceptions/dismiss`,
+          'BILLING_PAYMENT_EXCEPTION_DISMISS_FAILED',
+          { ref: input.ref, note: input.note.trim() },
+        );
+      },
+
+      /**
+       * Runs the hourly reconcile job now. The answer is a `200` even when the
+       * run failed — `status` says which — so a caller must read it rather than
+       * trust the absence of a throw. Posted as `{}` for the reason
+       * `invoices.run` is: the transport always declares a JSON body.
+       */
+      reconcile(): Promise<ReconcilePaymentsRun> {
+        return send<ReconcilePaymentsRun>(
+          'POST',
+          `${BASE}/payments/reconcile`,
+          'BILLING_PAYMENTS_RECONCILE_FAILED',
+          {},
         );
       },
     },

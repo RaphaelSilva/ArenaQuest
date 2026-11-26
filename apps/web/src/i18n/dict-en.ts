@@ -1242,6 +1242,7 @@ export const dictEn = {
         students: 'Students',
         ledger: 'Ledger',
         extras: 'Extras',
+        exceptions: 'Payment exceptions',
         reports: 'Reports',
         plans: 'Plans',
       },
@@ -1484,6 +1485,209 @@ export const dictEn = {
             `This receivable has an open online checkout (expires ${expiresAt}), so the student may still pay through it. You can record this payment anyway; the checkout expires on its own.`,
           recordedWithOpenCheckout: (expiresAt: string) =>
             `Payment recorded. An online checkout is still open until ${expiresAt}; it expires on its own.`,
+        },
+        exceptions: {
+          heading: 'Payment exceptions',
+          intro:
+            'Everything the payment provider reported that could not be settled by itself, oldest first. An empty list is the normal state. Each row leaves the list in one of three ways: match it by hand, refund it, or dismiss it with a note.',
+          noGateNote:
+            'Nothing here changes what a student can see. An exception is about money that is not yet explained on the ledger, and nothing else.',
+          countLabel: (count: number) => (count === 1 ? '1 open' : `${count} open`),
+          listLabel: 'Open payment exceptions',
+          loading: 'Loading the payment exceptions…',
+          loadError: 'The payment exceptions could not be loaded.',
+          reload: 'Reload',
+          empty: {
+            title: 'No payment exceptions',
+            body: 'Every payment the provider reported is on the ledger or was dismissed. There is nothing to do here.',
+          },
+          kind: {
+            orphan: 'Orphan payment',
+            mismatch: 'Mismatch',
+            failed: 'Processing failed',
+            received: 'Not processed',
+            dispute: 'Dispute',
+          },
+          explanation: {
+            orphan:
+              'The provider received a payment that names no checkout created here, so it is on no invoice or charge. Find who paid and match it by hand, or refund it at the provider.',
+            mismatch:
+              'A payment arrived for this checkout but does not fit it — a different currency, or a receivable that could no longer take it. Nothing was recorded on the ledger.',
+            failed:
+              'The notification could not be processed. It is retried by itself every hour for 72 hours; act only if it keeps failing.',
+            received:
+              'The notification arrived more than an hour ago and was never finished. The next reconcile run tries it again.',
+            dispute:
+              'The payer contested this payment with the provider (a chargeback). The payment is on the ledger; the provider decides the dispute, and a lost one comes back as a refund.',
+          },
+          fields: {
+            provider: 'Provider',
+            payment: 'Provider payment',
+            event: 'Notification id',
+            eventType: 'Notification type',
+            checkout: 'Checkout',
+            age: 'Age',
+            attempts: 'Attempts',
+            student: 'Student',
+            receivable: 'Receivable',
+            amount: 'Amount',
+            detail: 'What was recorded',
+          },
+          paymentIdUnknown: 'The provider payment id is not known.',
+          noDashboardLink: (provider: string) =>
+            `No direct link exists for ${provider}: look the id up in its dashboard.`,
+          receivableKind: {
+            invoice: (reference: string) => `Invoice ${reference}`,
+            event_charge: (reference: string) => `Event charge ${reference}`,
+          },
+          amountAsked: (amount: string) => `${amount} — what the checkout asked for`,
+          amountUnknown: 'Not known here. The provider dashboard shows what was paid.',
+          studentUnknown: 'Not known',
+          age: {
+            justNow: 'less than a minute',
+            minutes: (count: number) => (count === 1 ? '1 minute' : `${count} minutes`),
+            hours: (count: number) => (count === 1 ? '1 hour' : `${count} hours`),
+            days: (count: number) => (count === 1 ? '1 day' : `${count} days`),
+          },
+          ageLine: (age: string, when: string) => `${age} · since ${when}`,
+          attempts: (count: number) => (count === 1 ? '1 attempt' : `${count} attempts`),
+          sameCheckout:
+            'Another row on this list is about the same checkout. Dismissing one leaves the other.',
+          actionsLabel: (kind: string) => `Actions for this ${kind}`,
+          actions: {
+            match: 'Match by hand',
+            refund: 'Refund',
+            dismiss: 'Dismiss',
+          },
+          dismiss: {
+            dialogTitle: 'Dismiss a payment exception',
+            explainer:
+              'Dismissing takes the row off this list and records who did it, when and why. It changes no payment, no invoice and no charge.',
+            target: (kind: string, provider: string) => `${kind} · ${provider}`,
+            noteLabel: 'Why it is being dismissed',
+            notePlaceholder: 'e.g. Refunded at the provider on 12 Nov; nothing was owed.',
+            noteRequired: 'Write a note: an exception cannot be dismissed without one.',
+            noteTooLong: (max: number) => `The note can have at most ${max} characters.`,
+            counter: (length: number, max: number) => `${length}/${max}`,
+            submit: 'Dismiss',
+            cancel: 'Cancel',
+            success: 'Exception dismissed. It is off the list.',
+            gone: 'That exception was no longer on the list: it was already dismissed or settled.',
+            errors: {
+              invalid: 'The note was refused. It needs 1 to 500 characters.',
+              forbidden: 'Only an administrator can dismiss a payment exception.',
+              unknown: 'The exception could not be dismissed. Nothing changed.',
+            },
+          },
+          match: {
+            dialogTitle: 'Match a payment by hand',
+            explainer:
+              'Pick who paid and what it pays. The payment form then opens with the method Online and the provider reference filled in; recording it dismisses this exception.',
+            studentHeading: 'Student',
+            searchLabel: 'Search by name or email',
+            searchPlaceholder: 'Name or email',
+            studentEmpty: 'No student matches the search.',
+            studentMore: (count: number) => `${count} more — refine the search.`,
+            pickStudent: (name: string) => `Choose ${name}`,
+            studentFromCheckout: 'The student of the checkout this payment came through.',
+            changeStudent: 'Choose another student',
+            receivableHeading: 'Open receivables',
+            loadingStatement: 'Loading the student statement…',
+            statementError: 'The student statement could not be loaded.',
+            noOpenReceivable:
+              'This student has no open invoice or charge to take the payment. Choose another student, or refund the payment at the provider.',
+            invoiceOption: (reference: string, dueDate: string) =>
+              `Invoice ${reference} · due ${dueDate}`,
+            chargeOption: (title: string, dueDate: string) => `${title} · due ${dueDate}`,
+            balance: (amount: string) => `Balance ${amount}`,
+            fromCheckout: 'the checkout was for this one',
+            pickReceivable: (label: string) => `Record the payment on ${label}`,
+            amountHint:
+              'The amount is not filled in: enter what the provider dashboard shows was paid.',
+            cancel: 'Cancel',
+            finishing: 'Payment recorded. Dismissing the exception…',
+            success: (reference: string) =>
+              `Payment ${reference} recorded and the exception dismissed.`,
+            successNotDismissed: (reference: string) =>
+              `Payment ${reference} was recorded, but the exception could not be dismissed. Dismiss it by hand.`,
+            note: (payment: string, reference: string) =>
+              `Matched by hand: recorded as payment ${payment} (${reference}).`,
+            already: {
+              title: 'This payment is already on the ledger',
+              body: (payment: string) =>
+                `The provider reference already belongs to ledger payment ${payment}, so nothing was recorded. The money is accounted for; this exception only needs to leave the list.`,
+              dismiss: 'Dismiss the exception',
+              keep: 'Keep it on the list',
+              note: (payment: string) =>
+                `Already on the ledger as payment ${payment}; nothing more to record.`,
+              success: 'The payment was already on the ledger. Exception dismissed.',
+            },
+          },
+          refund: {
+            dialogTitle: 'Refund',
+            close: 'Close',
+            atProvider: {
+              explainer:
+                'This payment is on no invoice or charge, so the ledger owes nothing back. The refund is made in the provider dashboard, not here.',
+              noPaymentId:
+                'The provider payment id is not known for this row. Find the payment in the provider dashboard by its notification id.',
+              afterHint:
+                'Once refunded there, dismiss this row with a note. The provider may report the refund as another row here; dismiss that one too.',
+              dismissNow: 'Dismiss this row',
+            },
+            onLedger: {
+              explainer:
+                'This payment is on the ledger. It is refunded from its ledger entry — the ordinary reversal, which asks the provider to return the money and writes the reversal when the provider accepts.',
+              target: (student: string, receivable: string) => `${student} · ${receivable}`,
+              openLedger: 'Open the entry in the ledger',
+              openExtras: 'Open the charge in Extras',
+              resolveError: 'The charge could not be found. Open the Extras tab and look for it there.',
+            },
+          },
+          reconcile: {
+            heading: 'Reconcile',
+            explainer:
+              'Asks the provider about every checkout that is still waiting and retries the notifications that did not finish — what runs by itself every hour.',
+            button: 'Run reconcile now',
+            running: 'Reconciling…',
+            ok: 'Reconcile finished.',
+            failed: (reason: string) => `Reconcile failed: ${reason}`,
+            failedNoReason: 'Reconcile failed. The run is recorded with its reason.',
+            off: 'Online payments are off on this label, so there is nothing to reconcile. Nothing ran.',
+            configuration:
+              'Online payments are misconfigured on this label. Nothing was asked of a provider; the failed run is recorded.',
+            unknown: 'Reconcile could not be run.',
+            summaryLabel: 'Result of the reconcile run',
+            headline: {
+              confirmed: 'Checkouts confirmed',
+              landed: 'Payments landed',
+              expired: 'Checkouts expired',
+              deferred: 'Left for the next run',
+              retried: 'Notifications retried',
+              stale: 'Exceptions older than 7 days',
+              unreachable: 'Unreachable',
+            },
+            allCounts: 'All counts',
+            counts: {
+              checkoutsDue: 'Checkouts due',
+              checkoutsAsked: 'Checkouts asked at the provider',
+              landed: 'Payments landed',
+              expired: 'Checkouts expired',
+              stillOpen: 'Checkouts still open',
+              abandoned: 'Checkouts abandoned (no provider session)',
+              unreachable: 'Checkouts on a provider no longer bound',
+              mismatched: 'Checkouts with a mismatch',
+              checkoutErrors: 'Checkouts the provider could not answer for',
+              checkoutsDeferred: 'Checkouts left for the next run',
+              eventsDue: 'Notifications due',
+              eventsRetried: 'Notifications retried',
+              eventsSettled: 'Notifications settled',
+              eventsFailed: 'Notifications that failed again',
+              eventsDeferred: 'Notifications left for the next run',
+              staleOrphans: 'Orphans older than 7 days',
+              staleMismatches: 'Mismatches older than 7 days',
+            },
+          },
         },
       },
       ledger: {
