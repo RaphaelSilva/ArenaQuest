@@ -450,9 +450,20 @@ export class D1EventChargeRepository implements IEventChargeRepository {
     return row ? rowToPayment(row) : null;
   }
 
-  /** Declared by the port in M30 Task 01; the lookup itself lands with the gateway schema (Task 03). */
-  async findGatewayPayment(): Promise<EventChargePaymentRecord | null> {
-    throw new Error('D1EventChargeRepository: findGatewayPayment is not implemented yet');
+  /**
+   * The ledger row carrying a gateway reference (`<provider>:<id>`). At most
+   * one exists: `idx_event_charge_payments_gateway_reference` (migration 0033) is unique on
+   * `external_reference WHERE method = 'gateway'`. An admin-typed row with the
+   * same text is not a gateway row and is never returned.
+   */
+  async findGatewayPayment(externalReference: string): Promise<EventChargePaymentRecord | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT * FROM event_charge_payments WHERE external_reference = ? AND method = 'gateway'`,
+      )
+      .bind(externalReference)
+      .first<EventChargePaymentRow>();
+    return row ? rowToPayment(row) : null;
   }
 
   async applyAdjustment(input: ApplyChargeAdjustmentInput): Promise<EventChargeAdjustmentRecord> {

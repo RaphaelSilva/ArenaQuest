@@ -681,3 +681,109 @@ describe('POST /admin/users/:id/reset-password', () => {
     expect(new Date(result.resetAt).toString()).not.toBe('Invalid Date');
   });
 });
+
+// ---------------------------------------------------------------------------
+// The payment gateway's system actor (RFC 0026 R8, migration 0033)
+// ---------------------------------------------------------------------------
+
+describe('System actor is off every admin user surface', () => {
+  const SYSTEM_ACTOR_ID = 'system:payment-gateway';
+  const ADMIN_ROLE_ID = 'bace0701-15e3-5144-97c5-47487d543032';
+
+  async function systemActorRow() {
+    return env.DB
+      .prepare('SELECT id, name, email, password_hash, status FROM users WHERE id = ?')
+      .bind(SYSTEM_ACTOR_ID)
+      .first<{ id: string; name: string; email: string; password_hash: string; status: string }>();
+  }
+
+  const PRISTINE = {
+    id: SYSTEM_ACTOR_ID,
+    name: 'Payment gateway',
+    email: 'payment-gateway@system.invalid',
+    password_hash: '',
+    status: 'system',
+  };
+
+  it('exists in the database, as the migration wrote it', async () => {
+    expect(await systemActorRow()).toEqual(PRISTINE);
+  });
+
+  it('is absent from GET /admin/users and from its total', async () => {
+    const human = await env.DB
+      .prepare("SELECT COUNT(*) AS n FROM users WHERE status <> 'system'")
+      .first<{ n: number }>();
+
+    const listed: Array<{ id: string; status: string }> = [];
+    let total = -1;
+    for (let offset = 0; ; offset += 100) {
+      const res = await req('GET', `/admin/users?limit=100&offset=${offset}`, { token: adminToken });
+      expect(res.status).toBe(200);
+      const body = await res.json<{ data: Array<{ id: string; status: string }>; total: number }>();
+      total = body.total;
+      listed.push(...body.data);
+      if (body.data.length < 100) break;
+    }
+
+    expect(total).toBe(human?.n);
+    expect(listed).toHaveLength(total);
+    expect(listed.some((u) => u.id === SYSTEM_ACTOR_ID)).toBe(false);
+    expect(listed.some((u) => u.status === 'system')).toBe(false);
+  });
+
+  it('cannot be read, edited, deactivated, re-roled, deleted or given a password by any route', async () => {
+    const path = `/admin/users/${encodeURIComponent(SYSTEM_ACTOR_ID)}`;
+
+    expect((await req('GET', path, { token: adminToken })).status).toBe(404);
+    expect((await req('PATCH', path, { token: adminToken, body: { name: 'Renamed' } })).status).toBe(404);
+    expect((await req('PATCH', path, { token: adminToken, body: { status: 'active' } })).status).toBe(404);
+    expect((await req('PATCH', path, { token: adminToken, body: { status: 'inactive' } })).status).toBe(404);
+    expect((await req('PATCH', path, { token: adminToken, body: { roles: ['admin'] } })).status).toBe(404);
+    expect((await req('DELETE', path, { token: adminToken })).status).toBe(404);
+    expect(
+      (await req('POST', `${path}/reset-password`, { token: adminToken, body: { sendEmail: false } })).status,
+    ).toBe(404);
+
+    expect(await systemActorRow()).toEqual(PRISTINE);
+    const roles = await env.DB
+      .prepare('SELECT COUNT(*) AS n FROM user_roles WHERE user_id = ?')
+      .bind(SYSTEM_ACTOR_ID)
+      .first<{ n: number }>();
+    expect(roles?.n).toBe(0);
+  });
+
+  it('is not counted by the last-admin guard, even holding an admin role row', async () => {
+    // Worst case: a stray role row. The actor is still not an *active* admin.
+    await env.DB.prepare('DELETE FROM user_roles WHERE role_id = ?').bind(ADMIN_ROLE_ID).run();
+    await env.DB
+      .prepare('INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)')
+      .bind(SYSTEM_ACTOR_ID, ADMIN_ROLE_ID)
+      .run();
+
+    try {
+      const created = await req('POST', '/admin/users', {
+        token: adminToken,
+        body: { name: 'Last Human Admin', email: 'sys-last-human@example.com', password: 'password123', roles: ['admin'] },
+      });
+      expect(created.status).toBe(201);
+      const { id } = await created.json<{ id: string }>();
+
+      const deactivate = await req('PATCH', `/admin/users/${id}`, { token: adminToken, body: { status: 'inactive' } });
+      expect(deactivate.status).toBe(409);
+      expect((await deactivate.json<{ error: string }>()).error).toBe('WOULD_LOCK_OUT_ADMINS');
+
+      const demote = await req('PATCH', `/admin/users/${id}`, { token: adminToken, body: { roles: ['student'] } });
+      expect(demote.status).toBe(409);
+      expect((await demote.json<{ error: string }>()).error).toBe('WOULD_LOCK_OUT_ADMINS');
+
+      const remove = await req('DELETE', `/admin/users/${id}`, { token: adminToken });
+      expect(remove.status).toBe(409);
+      expect((await remove.json<{ error: string }>()).error).toBe('WOULD_LOCK_OUT_ADMINS');
+
+      const row = await env.DB.prepare('SELECT status FROM users WHERE id = ?').bind(id).first<{ status: string }>();
+      expect(row?.status).toBe('active');
+    } finally {
+      await env.DB.prepare('DELETE FROM user_roles WHERE user_id = ?').bind(SYSTEM_ACTOR_ID).run();
+    }
+  });
+});

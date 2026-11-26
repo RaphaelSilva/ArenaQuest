@@ -4,6 +4,7 @@ import worker, { type AppEnv } from '../../src/index';
 import { applyMigrations } from '../helpers/apply-migrations';
 import { v1 } from '../helpers/v1';
 import { JwtAuthAdapter } from '@api/adapters/auth';
+import { sha256Hex } from '@api/adapters/db/hash';
 
 // ---------------------------------------------------------------------------
 // DB setup — runs once before all tests
@@ -235,3 +236,76 @@ describe('POST /auth/login rate limiting (S-04)', () => {
   });
 });
 
+
+// ---------------------------------------------------------------------------
+// The payment gateway's system actor (RFC 0026 R8, migration 0033)
+// ---------------------------------------------------------------------------
+
+describe('System actor cannot log in', () => {
+  const SYSTEM_ACTOR_ID = 'system:payment-gateway';
+  const SYSTEM_ACTOR_EMAIL = 'payment-gateway@system.invalid';
+
+  async function unknownAccountAnswer(ip: string) {
+    const res = await request('/auth/login', {
+      body: { email: 'nobody-at-all@example.com', password: 'whatever-123' },
+      ip,
+    });
+    return { status: res.status, body: await res.json(), cookie: res.headers.get('Set-Cookie') };
+  }
+
+  it('answers a login with its address exactly like an unknown account', async () => {
+    const unknown = await unknownAccountAnswer('203.0.113.60');
+    expect(unknown.status).toBe(401);
+
+    for (const password of ['whatever-123', ' ', 'pbkdf2:1:00:00']) {
+      const res = await request('/auth/login', {
+        body: { email: SYSTEM_ACTOR_EMAIL, password },
+        ip: '203.0.113.61',
+      });
+      expect(res.status).toBe(unknown.status);
+      expect(await res.json()).toEqual(unknown.body);
+      expect(res.headers.get('Set-Cookie')).toBe(unknown.cookie);
+    }
+  });
+
+  it('is still refused if its row ever carried a verifiable password hash', async () => {
+    const adapter = new JwtAuthAdapter({
+      secret: env.JWT_SECRET,
+      accessTokenExpiresInSeconds: 900,
+      pbkdf2Iterations: 1,
+    });
+    const passwordHash = await adapter.hashPassword('known-password-123');
+    await env.DB
+      .prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+      .bind(passwordHash, SYSTEM_ACTOR_ID)
+      .run();
+
+    try {
+      const unknown = await unknownAccountAnswer('203.0.113.62');
+      const res = await request('/auth/login', {
+        body: { email: SYSTEM_ACTOR_EMAIL, password: 'known-password-123' },
+        ip: '203.0.113.63',
+      });
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual(unknown.body);
+      expect(res.headers.get('Set-Cookie')).toBeNull();
+    } finally {
+      await env.DB.prepare("UPDATE users SET password_hash = '' WHERE id = ?").bind(SYSTEM_ACTOR_ID).run();
+    }
+  });
+
+  it('cannot turn a refresh token into a session', async () => {
+    const token = 'system-actor-refresh-token';
+    await env.DB
+      .prepare('INSERT INTO refresh_tokens (token, user_id, expires_at) VALUES (?, ?, ?)')
+      .bind(await sha256Hex(token), SYSTEM_ACTOR_ID, new Date(Date.now() + 86_400_000).toISOString())
+      .run();
+
+    try {
+      const res = await request('/auth/refresh', { cookie: `refresh_token=${token}` });
+      expect(res.status).toBe(401);
+    } finally {
+      await env.DB.prepare('DELETE FROM refresh_tokens WHERE user_id = ?').bind(SYSTEM_ACTOR_ID).run();
+    }
+  });
+});

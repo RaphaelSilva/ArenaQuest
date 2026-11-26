@@ -7,6 +7,16 @@ import type {
 } from '@arenaquest/shared/ports';
 import type { Entities } from '@arenaquest/shared/types/entities';
 
+/**
+ * A `status = 'system'` row is a machine actor (RFC 0026 R8: the payment
+ * gateway's `recorded_by`), not a person. This adapter keeps it off every human
+ * surface: it is not listed, not counted, not found by id, and no write here
+ * can change, re-role, re-key or delete it. `findByEmail` still returns it so
+ * that its reserved address can never be registered; its status and its empty
+ * password hash refuse the login.
+ */
+const NOT_SYSTEM = `status <> 'system'`;
+
 type UserRow = {
   id: string;
   name: string;
@@ -61,6 +71,8 @@ export class D1UserRepository implements IUserRepository {
 
   /** Replace a user's roles with the given role names. Clears all roles if empty array. */
   private async assignRoles(userId: string, roleNames: string[]): Promise<void> {
+    if (await this.isSystemActor(userId)) return;
+
     await this.db.prepare('DELETE FROM user_roles WHERE user_id = ?').bind(userId).run();
 
     if (roleNames.length === 0) return;
@@ -79,9 +91,21 @@ export class D1UserRepository implements IUserRepository {
     }
   }
 
+  private async isSystemActor(userId: string): Promise<boolean> {
+    const row = await this.db
+      .prepare(`SELECT 1 AS hit FROM users WHERE id = ? AND NOT (${NOT_SYSTEM})`)
+      .bind(userId)
+      .first<{ hit: number }>();
+    return row !== null;
+  }
+
+  /** `null` for a system actor: no caller of this port may act on one as a user. */
   async findById(id: string): Promise<Entities.Identity.User | null> {
     const row = await this.db
-      .prepare('SELECT id, name, email, password_hash, status, created_at, timezone FROM users WHERE id = ?')
+      .prepare(
+        `SELECT id, name, email, password_hash, status, created_at, timezone
+           FROM users WHERE id = ? AND ${NOT_SYSTEM}`,
+      )
       .bind(id)
       .first<UserRow>();
 
@@ -131,7 +155,7 @@ export class D1UserRepository implements IUserRepository {
     if (fields.length > 0) {
       values.push(id);
       await this.db
-        .prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`)
+        .prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ? AND ${NOT_SYSTEM}`)
         .bind(...values)
         .run();
     }
@@ -146,7 +170,7 @@ export class D1UserRepository implements IUserRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await this.db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
+    await this.db.prepare(`DELETE FROM users WHERE id = ? AND ${NOT_SYSTEM}`).bind(id).run();
   }
 
   async list(opts?: { limit?: number; offset?: number }): Promise<Entities.Identity.User[]> {
@@ -155,7 +179,8 @@ export class D1UserRepository implements IUserRepository {
 
     const { results } = await this.db
       .prepare(
-        'SELECT id, name, email, password_hash, status, created_at, timezone FROM users LIMIT ? OFFSET ?',
+        `SELECT id, name, email, password_hash, status, created_at, timezone
+           FROM users WHERE ${NOT_SYSTEM} LIMIT ? OFFSET ?`,
       )
       .bind(limit, offset)
       .all<UserRow>();
@@ -170,14 +195,14 @@ export class D1UserRepository implements IUserRepository {
 
   async count(): Promise<number> {
     const { results } = await this.db
-      .prepare('SELECT COUNT(*) as cnt FROM users')
+      .prepare(`SELECT COUNT(*) as cnt FROM users WHERE ${NOT_SYSTEM}`)
       .all<{ cnt: number }>();
     return Number(results[0]?.cnt ?? 0);
   }
 
   async updatePasswordHash(id: string, hash: string): Promise<void> {
     await this.db
-      .prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+      .prepare(`UPDATE users SET password_hash = ? WHERE id = ? AND ${NOT_SYSTEM}`)
       .bind(hash, id)
       .run();
   }

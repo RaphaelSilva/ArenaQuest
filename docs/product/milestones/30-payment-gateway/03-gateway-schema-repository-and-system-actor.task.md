@@ -1,6 +1,6 @@
 # Task 03 — Backend: Gateway schema, repository and system actor (Phase 1)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Backend API
@@ -81,15 +81,15 @@ checkout and an event idempotently; nothing writes to them yet.
 
 ## Acceptance Criteria
 
-- [ ] `make db-migrate-local` applies cleanly on a fresh replica and on one already holding
+- [x] `make db-migrate-local` applies cleanly on a fresh replica and on one already holding
       billing data and `job_runs` rows; the row counts of `job_runs` are unchanged.
-- [ ] Two inserts with the same `<provider>:<id>` reference and `method = 'gateway'` fail on
+- [x] Two inserts with the same `<provider>:<id>` reference and `method = 'gateway'` fail on
       `payments` and on `event_charge_payments`; the same reference with another method passes.
-- [ ] The system actor cannot log in, is absent from `GET /v1/admin/users`, and deleting or
+- [x] The system actor cannot log in, is absent from `GET /v1/admin/users`, and deleting or
       deactivating the last human admin is still refused with it present.
-- [ ] The production deploy guard passes on a database that holds the system actor.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] The production deploy guard passes on a database that holds the system actor.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

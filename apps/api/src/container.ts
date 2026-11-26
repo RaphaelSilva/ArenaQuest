@@ -25,6 +25,7 @@ import { D1SubmissionRepository } from '@api/adapters/db/d1-submission-repositor
 import { D1JobRunRepository } from '@api/adapters/db/d1-job-run-repository';
 import { D1BillingRepository } from '@api/adapters/db/d1-billing-repository';
 import { D1EventChargeRepository } from '@api/adapters/db/d1-event-charge-repository';
+import { D1GatewayRepository } from '@api/adapters/db/d1-gateway-repository';
 import { D1EventRepository } from '@api/adapters/db/d1-event-repository';
 import { D1StorageReferenceRepository } from '@api/adapters/db/d1-storage-reference-repository';
 import { R2StorageAdapter } from '@api/adapters/storage/r2-storage-adapter';
@@ -95,6 +96,7 @@ import type {
   IMailer,
   IBillingRepository,
   IEventChargeRepository,
+  IGatewayRepository,
   IEventRepository,
   IJobRunRepository,
 } from '@arenaquest/shared/ports';
@@ -236,7 +238,7 @@ export interface InfraContext {
   jobRuns: IJobRunRepository;
 }
 
-/** Payment gateway (RFC 0026 section 9). The repository and the service join in later tasks. */
+/** Payment gateway (RFC 0026 section 9). The service joins in a later task. */
 export interface PaymentsContext {
   /**
    * The checked `PAYMENTS_PROVIDERS` / `PAYMENTS_KEY_MODE` — the *result*, not a
@@ -247,6 +249,8 @@ export interface PaymentsContext {
   config: PaymentsConfigResult;
   /** The adapters bound for this label and environment; empty under `none` and under an invalid list. */
   gateways: GatewayRegistry;
+  /** `gateway_checkouts` and `gateway_events`; built per request like every adapter. */
+  gatewayRepo: IGatewayRepository;
 }
 
 /** What a caller may replace when building the container. */
@@ -430,6 +434,9 @@ export function buildContainer(env: Env, options: BuildContainerOptions = {}): A
     options.paymentGatewayFactories ?? PRODUCTION_GATEWAY_FACTORIES,
   );
 
+  // The gateway's own two tables (checkouts and webhook events) — never money.
+  const gatewayRepo: IGatewayRepository = new D1GatewayRepository(env.DB);
+
   // Infra: job runs
   const jobRuns = new D1JobRunRepository(env.DB);
 
@@ -540,7 +547,7 @@ export function buildContainer(env: Env, options: BuildContainerOptions = {}): A
     },
     billing: { billingRepo, billingService, accountingService, eventChargeRepo, eventChargeService },
     events: { eventRepo, storage, users, userGroups },
-    payments: { config: payments.config, gateways: payments.gateways },
+    payments: { config: payments.config, gateways: payments.gateways, gatewayRepo },
     infra: {
       auth,
       mailer,
