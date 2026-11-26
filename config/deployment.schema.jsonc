@@ -13,7 +13,11 @@
  *
  * Field meanings:
  *   required      — must resolve non-empty for the label to be complete.
- *   requiredWhen  — conditionally required, e.g. "MAIL_DRIVER=resend".
+ *   requiredWhen  — conditionally required. "MAIL_DRIVER=resend" is active
+ *                   when the var equals the value; "PAYMENTS_PROVIDERS~=stripe"
+ *                   when the var is a provider list that names `stripe`.
+ *                   Evaluated against the environment's resolved vars (the
+ *                   profile plus the committed env.<label> Worker block).
  *   derivedFrom   — coherence anchor ("apiHost" | "webOrigin"); the value
  *                   is re-derived from the profile and diffed on check.
  *   from          — non-anchor source ("brand" | "r2").
@@ -60,7 +64,16 @@
     "SUBMISSIONS_PER_TOPIC_MAX":             { "required": false },
     "SUBMISSIONS_STORAGE_PER_STUDENT_BYTES": { "required": false },
     "SUBMISSIONS_VIDEO_MAX_BYTES":           { "required": false },
-    "SUBMISSIONS_SHARING_ENABLED":           { "required": false, "enum": ["true", "false"] }
+    "SUBMISSIONS_SHARING_ENABLED":           { "required": false, "enum": ["true", "false"] },
+    // Payment gateway (RFC 0026 section 8). Optional: an absent PAYMENTS_PROVIDERS
+    // means `none`, an absent PAYMENTS_KEY_MODE means `test`. The list is `none`
+    // or comma-separated `provider:method+method` entries; the schema has no
+    // rule for that grammar, so it is guarded at runtime by
+    // apps/api/src/core/payments/config.ts (a list that breaks a rule, or a key
+    // whose mode disagrees with PAYMENTS_KEY_MODE = 500 PAYMENTS_CONFIG_INVALID).
+    // Neither var has a profile source: both live in the env.<label> Worker block.
+    "PAYMENTS_PROVIDERS":                    { "required": false },
+    "PAYMENTS_KEY_MODE":                     { "required": false, "enum": ["test", "live"] }
   },
   "api-secrets": {
     "JWT_SECRET":           { "required": true },
@@ -70,7 +83,23 @@
     // Gated by the mail driver: required only when MAIL_DRIVER=resend
     // (resolves the RFC's `required:true` + `requiredWhen` ambiguity to the
     // intended conditional gate).
-    "RESEND_API_KEY":       { "required": false, "requiredWhen": "MAIL_DRIVER=resend" }
+    "RESEND_API_KEY":       { "required": false, "requiredWhen": "MAIL_DRIVER=resend" },
+    // Payment providers (RFC 0026 section 8, R13). One pair per provider the
+    // platform knows — the same four as PAYMENT_PROVIDER_NAMES in
+    // packages/shared/ports/i-payment-gateway.ts (a test fails when the two
+    // drift). A pair is required only while PAYMENTS_PROVIDERS names its
+    // provider, a retired entry (`asaas:`) included. Externally valued: detected
+    // by name and reported with the create-secrets.sh command, never generated
+    // or written by provisioning. The Worker refuses a bound provider with
+    // either secret absent (apps/api/src/core/payments/config.ts, rule 4).
+    "PAYMENTS_STRIPE_SECRET_KEY":          { "required": false, "requiredWhen": "PAYMENTS_PROVIDERS~=stripe" },
+    "PAYMENTS_STRIPE_WEBHOOK_SECRET":      { "required": false, "requiredWhen": "PAYMENTS_PROVIDERS~=stripe" },
+    "PAYMENTS_MERCADOPAGO_SECRET_KEY":     { "required": false, "requiredWhen": "PAYMENTS_PROVIDERS~=mercadopago" },
+    "PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET": { "required": false, "requiredWhen": "PAYMENTS_PROVIDERS~=mercadopago" },
+    "PAYMENTS_ASAAS_SECRET_KEY":           { "required": false, "requiredWhen": "PAYMENTS_PROVIDERS~=asaas" },
+    "PAYMENTS_ASAAS_WEBHOOK_SECRET":       { "required": false, "requiredWhen": "PAYMENTS_PROVIDERS~=asaas" },
+    "PAYMENTS_PAGARME_SECRET_KEY":         { "required": false, "requiredWhen": "PAYMENTS_PROVIDERS~=pagarme" },
+    "PAYMENTS_PAGARME_WEBHOOK_SECRET":     { "required": false, "requiredWhen": "PAYMENTS_PROVIDERS~=pagarme" }
   },
   "cf-resources": {
     "worker":       { "check": "wrangler deployments / name" },
@@ -101,6 +130,13 @@
   "external": {
     "google-oauth": { "confirm": "Web OAuth client created; <GOOGLE_REDIRECT_URI> is an Authorised redirect URI" },
     "dns":          { "confirm": "Custom domains for <apiHost> and <webOrigin> resolve / are attached" },
-    "resend":       { "confirm": "Sender domain of <MAIL_FROM> verified in Resend", "requiredWhen": "MAIL_DRIVER=resend" }
+    "resend":       { "confirm": "Sender domain of <MAIL_FROM> verified in Resend", "requiredWhen": "MAIL_DRIVER=resend" },
+    // Webhook registration (RFC 0026 section 8): an operator step in each bound
+    // provider's dashboard, per label and environment. Nothing here can see the
+    // provider's side, so it is a confirmation, never a probe.
+    "payments-webhook-stripe":      { "confirm": "Webhook registered in the Stripe dashboard: https://<apiHost>/v1/webhooks/payments/stripe", "requiredWhen": "PAYMENTS_PROVIDERS~=stripe" },
+    "payments-webhook-mercadopago": { "confirm": "Webhook registered in the Mercado Pago dashboard: https://<apiHost>/v1/webhooks/payments/mercadopago", "requiredWhen": "PAYMENTS_PROVIDERS~=mercadopago" },
+    "payments-webhook-asaas":       { "confirm": "Webhook registered in the Asaas dashboard: https://<apiHost>/v1/webhooks/payments/asaas", "requiredWhen": "PAYMENTS_PROVIDERS~=asaas" },
+    "payments-webhook-pagarme":     { "confirm": "Webhook registered in the Pagar.me dashboard: https://<apiHost>/v1/webhooks/payments/pagarme", "requiredWhen": "PAYMENTS_PROVIDERS~=pagarme" }
   }
 }

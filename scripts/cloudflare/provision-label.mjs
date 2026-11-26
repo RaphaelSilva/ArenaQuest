@@ -30,7 +30,10 @@
  * Secret hygiene: JWT_SECRET is generated here and handed to wrangler over
  * stdin. Secret VALUES are never logged, never placed in argv, and never
  * written to disk. Externally-valued secrets (R2_*, GOOGLE_CLIENT_SECRET,
- * RESEND_API_KEY) are only ever *detected* by name and reported.
+ * RESEND_API_KEY, and the `PAYMENTS_<PROVIDER>_SECRET_KEY` /
+ * `PAYMENTS_<PROVIDER>_WEBHOOK_SECRET` pair of every provider the env's
+ * PAYMENTS_PROVIDERS names — RFC 0026 section 8) are only ever *detected* by
+ * name and reported. JWT_SECRET stays the only secret this script generates.
  *
  * Workers Previews (RFC 0021): for a STAGING env the `secrets` group also
  * covers the Preview base config (`wrangler preview base-config secret …
@@ -65,7 +68,11 @@ import {
   renderCorsFile,
   workersDevHost,
   kvNamespaceName,
-  requiredWhenActive,
+  isActive,
+  resolveEnvVars,
+  externalConfirmations,
+  readWranglerEnvBlock,
+  PAYMENT_WEBHOOK_CONFIRMATION_PREFIX,
   backupBucketName,
   validateProfile,
   formatChecklist,
@@ -362,16 +369,48 @@ function describeLifecycleRule(rule) {
 
 /**
  * Names of the externally-valued secrets an env needs (schema `api-secrets`
- * minus JWT_SECRET, which provisioning generates). RESEND_API_KEY counts only
- * when the env's MAIL_DRIVER is resend. Pure: the schema is passed in.
+ * minus JWT_SECRET, which provisioning generates). A conditional secret counts
+ * only while its `requiredWhen` holds against the env's RESOLVED vars — the
+ * profile plus `wranglerVars`, the `vars` of the committed Worker block:
+ * RESEND_API_KEY when MAIL_DRIVER is resend, and the two
+ * `PAYMENTS_<PROVIDER>_*` secrets of every provider PAYMENTS_PROVIDERS names
+ * (RFC 0026 section 8). With no block (`null`) the profile alone decides, so
+ * no payment secret is named. Pure: schema and vars are passed in.
  */
-export function externalSecretNames(schema, profile, env) {
+export function externalSecretNames(schema, profile, env, wranglerVars = null) {
   const section = schema?.['api-secrets'] || {};
-  const mailDriver = profile.environments[env].mail?.driver;
+  const resolved = resolveEnvVars(profile, env, wranglerVars);
   return Object.entries(section)
     .filter(([name]) => name !== 'JWT_SECRET')
-    .filter(([, spec]) => spec.required || requiredWhenActive(spec.requiredWhen, { MAIL_DRIVER: mailDriver }))
+    .filter(([, spec]) => isActive(spec, resolved))
     .map(([name]) => name);
+}
+
+/**
+ * The committed vars `requiredWhen` conditions are evaluated against, read from
+ * apps/api/wrangler.jsonc: `worker` is `env.<wEnv>.vars`, `preview` is
+ * `env.<wEnv>.previews.vars` (staging only). Either is null when absent. A
+ * preview block carries no PAYMENTS_PROVIDERS by design (RFC 0026 section 8),
+ * so no payment secret is ever expected on the Preview base config.
+ * Read-only; `path` is injectable for tests.
+ */
+export function committedEnvVars(label, env, path = PATHS.wrangler) {
+  const block = readWranglerEnvBlock(label, env, path);
+  return { worker: block?.vars ?? null, preview: block?.previews?.vars ?? null };
+}
+
+/**
+ * The webhook-registration reminders of an env: one `{ key, detail }` per
+ * provider PAYMENTS_PROVIDERS names, the detail carrying the URL to register
+ * in that provider's dashboard (`https://<apiHost>/v1/webhooks/payments/<provider>`).
+ * Empty for a label on `none`. Nothing can probe the provider's side, so these
+ * are statements for the operator, never a present/missing verdict. Pure.
+ */
+export function paymentWebhookReminders(schema, profile, env, wranglerVars = null) {
+  const resolved = resolveEnvVars(profile, env, wranglerVars);
+  return externalConfirmations(schema, profile, env, resolved)
+    .filter((c) => c.key.startsWith(PAYMENT_WEBHOOK_CONFIRMATION_PREFIX))
+    .map(({ key, detail }) => ({ key, detail }));
 }
 
 /**
@@ -403,8 +442,10 @@ export function previewSecretFixCommand(name, wranglerEnv) {
  * create command when the resource already exists.
  */
 export function buildProvisionPlan(profile, env, options = {}) {
-  const { withDomain = false, only = 'all', schema = null } = options;
+  const { withDomain = false, only = 'all', schema = null, vars = null } = options;
   const label = profile.label;
+  const externalNames = schema ? externalSecretNames(schema, profile, env, vars?.worker ?? null) : [];
+  const previewExternalNames = schema ? externalSecretNames(schema, profile, env, vars?.preview ?? null) : [];
   const e = profile.environments[env];
   const wEnv = wranglerEnvName(label, env);
   const origins = deriveCorsRules(profile, env)[0].allowed.origins;
@@ -507,8 +548,12 @@ export function buildProvisionPlan(profile, env, options = {}) {
           ? ['Preview base config: its own JWT_SECRET, same contract (generated, stdin, set only when absent).']
           : []),
         ...(schema
-          ? [`External secrets reported by name, never written: ${externalSecretNames(schema, profile, env).join(', ')}` +
-            (env === 'staging' ? ' (on the Worker and on the Preview base config).' : '.')]
+          ? [`External secrets reported by name, never written: ${externalNames.join(', ')}` +
+            (env !== 'staging'
+              ? '.'
+              : externalNames.join() === previewExternalNames.join()
+                ? ' (on the Worker and on the Preview base config).'
+                : ` (on the Worker; on the Preview base config only: ${previewExternalNames.join(', ')}).`)]
           : []),
       ].join('\n'),
     },
@@ -1029,7 +1074,8 @@ function reportExternalPreviewSecrets(profile, env, wranglerEnv) {
     log.warn(`Could not list Preview base-config secrets for env.${wranglerEnv} — external secret status unknown.`);
     return;
   }
-  for (const name of externalSecretNames(schema, profile, env)) {
+  const vars = committedEnvVars(profile.label, env).preview;
+  for (const name of externalSecretNames(schema, profile, env, vars)) {
     if (names.includes(name)) {
       log.ok(`${name} set on the Preview base config of env.${wranglerEnv}`);
     } else {
@@ -1059,7 +1105,8 @@ function reportExternalSecrets(profile, env, wranglerEnv) {
     return;
   }
 
-  for (const name of externalSecretNames(schema, profile, env)) {
+  const vars = committedEnvVars(profile.label, env).worker;
+  for (const name of externalSecretNames(schema, profile, env, vars)) {
     if (names.includes(name)) {
       log.ok(`${name} set for env.${wranglerEnv}`);
     } else {
@@ -1169,16 +1216,23 @@ const isCreateCommand = (argv) => argv.includes('create');
  * The one probe the plan does not carry is the Worker's, whose step IS the
  * deploy: `wrangler deployments list --env <wEnv>` stands in (read-only).
  *
+ * `vars` is `{ worker, preview }` — the committed vars of the env's Worker
+ * block and of its previews block (committedEnvVars). They decide which
+ * conditional secrets are expected: a provider named by PAYMENTS_PROVIDERS adds
+ * its two secrets to the Worker's list, and never to the Preview base config's.
+ *
  * Returns { label, env, resources: [{ id, kind, name, probe }], secrets:
- * { worker: [names], preview: [names] }, probes: { worker, preview }, fixes }.
+ * { worker: [names], preview: [names] }, probes: { worker, preview }, fixes,
+ * reminders: [{ key, detail }] }.
  * Every argv under `resources[].probe` and `probes` is a list; `fixes` are
- * rendered strings and never executed.
+ * rendered strings and never executed; `reminders` are the webhook URLs to
+ * register at each bound provider, which nothing here can verify.
  */
-export function buildCheckPlan(profile, env, schema) {
+export function buildCheckPlan(profile, env, schema, vars = null) {
   const label = profile.label;
   const e = profile.environments[env];
   const wEnv = wranglerEnvName(label, env);
-  const plan = buildProvisionPlan(profile, env, { schema });
+  const plan = buildProvisionPlan(profile, env, { schema, vars });
   const step = (id) => plan.find((s) => s.id === id);
 
   const resources = [];
@@ -1202,26 +1256,28 @@ export function buildCheckPlan(profile, env, schema) {
   });
   fixes.worker = renderCommand(step('worker').commands[0]);
 
-  const names = ['JWT_SECRET', ...externalSecretNames(schema, profile, env)];
+  const names = ['JWT_SECRET', ...externalSecretNames(schema, profile, env, vars?.worker ?? null)];
+  const previewNames = ['JWT_SECRET', ...externalSecretNames(schema, profile, env, vars?.preview ?? null)];
   const secretCommands = step('secrets').commands.filter(isListCommand);
   const probes = {
     worker: secretCommands.find((argv) => !argv.includes('preview')),
     preview: secretCommands.find((argv) => argv.includes('preview')) ?? null,
   };
-  const secrets = { worker: names, preview: probes.preview ? names : [] };
+  const secrets = { worker: names, preview: probes.preview ? previewNames : [] };
   const provisionSecrets = `make set-new-label LABEL=${label} ONLY=secrets${env === 'production' ? ' PRODUCTION=1' : ''}`;
   for (const name of names) {
     fixes[name] = name === 'JWT_SECRET'
       ? provisionSecrets
       : `bash ${PATHS.createSecrets} ${name} --env ${wEnv}`;
-    if (probes.preview) {
-      fixes[`preview:${name}`] = name === 'JWT_SECRET'
-        ? provisionSecrets
-        : previewSecretFixCommand(name, wEnv);
-    }
   }
+  for (const name of secrets.preview) {
+    fixes[`preview:${name}`] = name === 'JWT_SECRET'
+      ? provisionSecrets
+      : previewSecretFixCommand(name, wEnv);
+  }
+  const reminders = paymentWebhookReminders(schema, profile, env, vars?.worker ?? null);
 
-  return { label, env, resources, secrets, probes, fixes };
+  return { label, env, resources, secrets, probes, fixes, reminders };
 }
 
 /** Every argv a --check run may execute — the surface the read-only test pins. */
@@ -1266,8 +1322,8 @@ function secretNamesFrom(result) {
  * a failed list is never read as absent, the same rule secretAction applies.
  * Secret values are never captured: `list` prints names only.
  */
-export function runCheck(profile, env, schema, { run = runCommand } = {}) {
-  const plan = buildCheckPlan(profile, env, schema);
+export function runCheck(profile, env, schema, { run = runCommand, vars = null } = {}) {
+  const plan = buildCheckPlan(profile, env, schema, vars);
   const probe = (argv) => run(argv, { allowFailure: true });
 
   const resources = plan.resources.map((r) => {
@@ -1286,7 +1342,20 @@ export function runCheck(profile, env, schema, { run = runCommand } = {}) {
   report('worker', plan.secrets.worker, secretNamesFrom(probe(plan.probes.worker)));
   if (plan.probes.preview) report('preview', plan.secrets.preview, secretNamesFrom(probe(plan.probes.preview)));
 
-  return { label: plan.label, env, resources, secrets };
+  return { label: plan.label, env, resources, secrets, reminders: plan.reminders };
+}
+
+/**
+ * The lines printed under the checklist for a report's webhook reminders —
+ * outside the checklist on purpose: a reminder is not a present/missing
+ * verdict and must not change the exit code. Empty for a label on `none`.
+ */
+export function formatReminders(report) {
+  if (!report.reminders?.length) return [];
+  return [
+    'Not verifiable from here — confirm at each bound provider:',
+    ...report.reminders.map((r) => `  - ${r.detail}`),
+  ];
 }
 
 const PRESENCE_STATUS = { true: 'pass', false: 'fail', null: 'skip' };
@@ -1357,13 +1426,16 @@ function printManualFollowups(profile, environments) {
     if (!e.customDomain) log.hint(`Attach DNS/custom domains for ${e.apiHost} and ${e.webOrigin}`);
     else log.hint(`Attach the Pages custom domain for ${e.webOrigin} (separate from the Worker domain)`);
     if (e.mail?.driver === 'resend') log.hint(`Verify the Resend sender domain used by ${e.mail.from}`);
+    const vars = committedEnvVars(profile.label, env).worker;
+    for (const { detail } of paymentWebhookReminders(loadSchema(), profile, env, vars)) log.hint(detail);
   }
 }
 
 function printPlan(profile, env, options) {
   log.info(`${env} plan`);
   const schema = loadSchema();
-  for (const step of buildProvisionPlan(profile, env, { ...options, schema })) {
+  const vars = committedEnvVars(profile.label, env);
+  for (const step of buildProvisionPlan(profile, env, { ...options, schema, vars })) {
     log.ok(step.title);
     for (const argv of step.commands) log.cmd(renderCommand(argv));
     if (step.note) for (const line of step.note.split('\n')) log.hint(line);
@@ -1426,11 +1498,15 @@ export async function main(argv = process.argv.slice(2)) {
     const env = args.env ?? 'staging';
     const run = (argv, opts) => runCommand(argv, { ...opts, quiet: args.json });
     if (!args.json) log.heading(`Check ${args.label} → ${env}  (read-only)`);
-    const report = runCheck(state.profile, env, loadSchema(), { run });
+    const vars = committedEnvVars(args.label, env);
+    const report = runCheck(state.profile, env, loadSchema(), { run, vars });
     const results = checkResults(report);
     const code = mapExitCode(results);
     if (args.json) console.log(JSON.stringify({ ...report, exitCode: code }, null, 2));
-    else console.log(formatChecklist(args.label, env, state.profile.displayName, results));
+    else {
+      console.log(formatChecklist(args.label, env, state.profile.displayName, results));
+      for (const line of formatReminders(report)) console.log(line);
+    }
     return code;
   }
 
