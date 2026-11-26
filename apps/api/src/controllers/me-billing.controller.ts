@@ -1,6 +1,12 @@
 import type { ControllerResult } from '@api/core/result';
 import type { BillingService } from '@api/core/billing/billing-service';
 import type { AccountingService, StudentStatement } from '@api/core/billing/accounting-service';
+import type {
+  CheckoutSession,
+  CheckoutStatusView,
+  CreateCheckoutInput,
+  GatewayService,
+} from '@api/core/payments/gateway-service';
 import type { Entities } from '@arenaquest/shared/types/entities';
 
 /**
@@ -43,12 +49,62 @@ export interface MyBillingStatement extends StudentStatement {
   asOf: string;
 }
 
+/** The receivable a caller wants to pay: a kind, an id, and optionally how. Never a user. */
+export type MyCheckoutRequest = CreateCheckoutInput;
+
+/** A hosted session, and whether this call opened it (`201`) or it was already open (`200`). */
+export interface MyCheckoutAnswer {
+  checkout: CheckoutSession;
+  created: boolean;
+}
+
+/** The slice of the gateway a student reaches: their own checkouts, nothing else. */
+export type MyCheckouts = Pick<GatewayService, 'checkoutGate' | 'createCheckout' | 'getCheckoutStatus'>;
+
+const NOT_FOUND: ControllerResult<never> = { ok: false, status: 404, error: 'NotFound' };
+
 export class MeBillingController {
   constructor(
     private readonly billing: BillingService,
     /** Read-only; the statement is the same one the admin sees for this student. */
     private readonly accounting: AccountingService,
+    /** Absent on a wiring without a gateway: the checkout routes then answer `404`. */
+    private readonly checkouts?: MyCheckouts,
   ) {}
+
+  /**
+   * Whether the checkout routes exist on this label: `null` when they do,
+   * otherwise the `404` (no provider) or `500 PAYMENTS_CONFIG_INVALID` every
+   * request to them gets — before its body is even looked at.
+   */
+  checkoutGate(): ControllerResult<never> | null {
+    return this.checkouts ? this.checkouts.checkoutGate() : NOT_FOUND;
+  }
+
+  /**
+   * Opens — or hands back — the caller's one live hosted checkout for a
+   * receivable **of their own** (RFC 0026 §3).
+   *
+   * `callerId` is the token's `sub` and is both the owner the receivable must
+   * have and the creator recorded on the row. The request names a receivable,
+   * never a user, so there is nothing to compare a "requested user" against:
+   * a receivable owed by anyone else is `404`, as a missing one is.
+   */
+  async createMyCheckout(
+    callerId: string,
+    request: MyCheckoutRequest,
+  ): Promise<ControllerResult<MyCheckoutAnswer>> {
+    if (!this.checkouts) return NOT_FOUND;
+    const result = await this.checkouts.createCheckout(request, { userId: callerId, createdBy: callerId });
+    if (!result.ok) return result;
+    return { ok: true, data: { checkout: result.data.checkout, created: !result.data.reused } };
+  }
+
+  /** One checkout of the caller's own, as its row stands; the provider is never asked. */
+  async getMyCheckout(callerId: string, checkoutId: string): Promise<ControllerResult<CheckoutStatusView>> {
+    if (!this.checkouts) return NOT_FOUND;
+    return this.checkouts.getCheckoutStatus(checkoutId, callerId);
+  }
 
   /**
    * The caller's own statement.

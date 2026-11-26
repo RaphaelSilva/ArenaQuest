@@ -225,6 +225,11 @@ export interface InfraContext {
     events: IRateLimiter;
     /** The payment webhook (RFC 0026 §4), keyed on `CF-Connecting-IP`: 120 a minute. */
     webhooks: IRateLimiter;
+    /**
+     * Checkout creation (RFC 0026 §3), keyed on the student's user id: 10 an
+     * hour. The same instance `GatewayService.createCheckout` draws on.
+     */
+    checkouts: IRateLimiter;
   };
   cors: {
     allowedOrigins?: string;
@@ -425,13 +430,6 @@ export function buildContainer(env: Env, options: BuildContainerOptions = {}): A
   // The statement 404s an unknown student, which is all billing needs from
   // identity — a probe rather than the repository, as `StreakEngine` does. The
   // extras ledger and the event titles are read-only inputs (RFC 0015 §7).
-  const accountingService = new AccountingService(billingRepo, userExists, eventChargeRepo, eventRepo);
-
-  // Extras rail service. It reads the event and its audience grants through
-  // their ports, and the active currency through the billing port; it writes
-  // only to its own ledger.
-  const eventChargeService = new EventChargeService(eventChargeRepo, eventRepo, userGroups, billingRepo);
-
   // Payment gateway (RFC 0026 §8.1): the provider list, checked, and the
   // adapters it binds. Never throws — a bad list is a recorded state.
   const payments = buildPaymentsWiring(
@@ -441,11 +439,46 @@ export function buildContainer(env: Env, options: BuildContainerOptions = {}): A
 
   // The gateway's own two tables (checkouts and webhook events) — never money.
   const gatewayRepo: IGatewayRepository = new D1GatewayRepository(env.DB);
+
+  // The statement also reads the label's pay options and each open
+  // receivable's live checkout (RFC 0026 §7) — configuration and the database,
+  // never a provider.
+  const accountingService = new AccountingService(billingRepo, userExists, eventChargeRepo, eventRepo, {
+    payOptions: () => payments.gateways.payOptions,
+    findOpenCheckout: (kind, id) => gatewayRepo.findOpenCheckout(kind, id),
+  });
+
+  // Extras rail service. It reads the event and its audience grants through
+  // their ports, and the active currency through the billing port; it writes
+  // only to its own ledger.
+  const eventChargeService = new EventChargeService(eventChargeRepo, eventRepo, userGroups, billingRepo);
+
+  // Checkout creation (RFC 0026 §3 step 7): keyed by the student's id, 10 an
+  // hour. It counts sessions opened at a provider — handing back an open
+  // checkout is free — so a create-and-abandon loop is what it stops.
+  const checkoutsLimiter = new KvRateLimiter(env.RATE_LIMIT_KV, {
+    windowMs: 60 * 60_000,
+    maxAttempts: 10,
+    lockoutMs: 60 * 60_000,
+    prefix: 'rl:checkouts:',
+  });
+
   const gatewayService = new GatewayService({
     gateways: payments.gateways,
     gatewayRepo,
     billing: billingService,
     charges: eventChargeService,
+    checkout: {
+      config: payments.config,
+      registry: payments.gateways,
+      // `findById` hides the system actor, so nothing is ever charged "to" it.
+      payer: async (userId) => {
+        const user = await users.findById(userId);
+        return user ? { id: user.id, name: user.name, email: user.email } : null;
+      },
+      webBaseUrl: env.WEB_BASE_URL || 'http://localhost:3000',
+      limiter: checkoutsLimiter,
+    },
   });
 
   // Infra: job runs
@@ -572,7 +605,7 @@ export function buildContainer(env: Env, options: BuildContainerOptions = {}): A
     infra: {
       auth,
       mailer,
-      rateLimiters: { login: loginLimiter, register: registerLimiter, activate: activateLimiter, forgotPassword: forgotPasswordLimiter, events: eventsLimiter, webhooks: webhooksLimiter },
+      rateLimiters: { login: loginLimiter, register: registerLimiter, activate: activateLimiter, forgotPassword: forgotPasswordLimiter, events: eventsLimiter, webhooks: webhooksLimiter, checkouts: checkoutsLimiter },
       cors: {
         allowedOrigins: env.ALLOWED_ORIGINS,
         // Enforce strict validation when ALLOWED_ORIGINS is configured; fall

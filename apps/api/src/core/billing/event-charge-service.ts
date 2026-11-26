@@ -394,6 +394,16 @@ export class EventChargeService {
     return { ok: true, data: await this.repo.listCharges(filter) };
   }
 
+  /**
+   * One charge with its balance and nothing else — what a checkout is opened
+   * against (RFC 0026 §3). `getChargeDetail` also reads the whole ledger.
+   */
+  async getCharge(id: string): Promise<ControllerResult<EventChargeWithBalanceRecord>> {
+    const charge = await this.repo.getCharge(id);
+    if (!charge) return notFound('charge not found');
+    return { ok: true, data: charge };
+  }
+
   async getChargeDetail(id: string): Promise<ControllerResult<EventChargeDetail>> {
     const charge = await this.repo.getCharge(id);
     if (!charge) return notFound('charge not found');

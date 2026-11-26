@@ -1,6 +1,6 @@
 # Task 07 — Backend: Student checkout routes and pay options (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Backend API
@@ -79,15 +79,15 @@ written before the provider is called, a stored expiry never later than 24 hours
 
 ## Acceptance Criteria
 
-- [ ] A student with one open invoice gets a hosted URL; calling again returns the same checkout.
-- [ ] No request to either route can read or create a checkout for another user (`404`).
-- [ ] At most one `open` checkout exists per receivable after any sequence of calls, including
+- [x] A student with one open invoice gets a hosted URL; calling again returns the same checkout.
+- [x] No request to either route can read or create a checkout for another user (`404`).
+- [x] At most one `open` checkout exists per receivable after any sequence of calls, including
       across two providers.
-- [ ] `GET /v1/me/billing/checkouts/{id}` issues no provider call (asserted on the stub).
-- [ ] `GET /v1/me/billing` answers `200` under `none`, under a valid list and under an invalid one.
-- [ ] `apps/api/openapi.json` documents both routes, `payOptions` and `pendingCheckout`.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `GET /v1/me/billing/checkouts/{id}` issues no provider call (asserted on the stub).
+- [x] `GET /v1/me/billing` answers `200` under `none`, under a valid list and under an invalid one.
+- [x] `apps/api/openapi.json` documents both routes, `payOptions` and `pendingCheckout`.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

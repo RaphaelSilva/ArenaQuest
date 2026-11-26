@@ -149,7 +149,7 @@ source. Task 14 is the one backend task of Phase 4 (reminder e-mail copy).
 | 04 | [Gateway ledger entry points](./04-gateway-ledger-entry-points.task.md) | 1 | Backend | ✅ Done |
 | 05 | [Mercado Pago adapter](./05-mercadopago-adapter.task.md) | 2 | Backend | ☐ Open |
 | 06 | [Webhook route and payment landing](./06-webhook-route-and-payment-landing.task.md) | 2 | Backend | ✅ Done |
-| 07 | [Student checkout routes and pay options](./07-student-checkout-routes.task.md) | 3 | Backend | ☐ Open |
+| 07 | [Student checkout routes and pay options](./07-student-checkout-routes.task.md) | 3 | Backend | ✅ Done |
 | 08 | [Admin on-behalf checkouts and gateway refunds](./08-admin-checkouts-and-gateway-refunds.task.md) | 3 | Backend | ☐ Open |
 | 09 | [Reconcile run, cron dispatch and exceptions routes](./09-reconcile-run-and-exceptions-routes.task.md) | 3 | Backend | ☐ Open |
 | 10 | [Pay on the student statement](./10-student-statement-pay.task.md) | 4 | Frontend | ☐ Open |
