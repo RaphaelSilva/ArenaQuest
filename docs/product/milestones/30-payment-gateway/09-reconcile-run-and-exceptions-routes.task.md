@@ -1,6 +1,6 @@
 # Task 09 — Backend: Reconcile run, cron dispatch and exceptions routes (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Backend API
@@ -83,17 +83,17 @@ at most about an hour, and whatever could not be settled is a visible row.
 
 ## Acceptance Criteria
 
-- [ ] A checkout paid at the provider with no delivery received is `paid`, with its ledger row,
+- [x] A checkout paid at the provider with no delivery received is `paid`, with its ledger row,
       after one run.
-- [ ] No run issues more than 35 provider calls (asserted on the stub's call log).
-- [ ] The daily jobs do not run on `17 * * * *`, and this job does not run on `0 6 * * *`.
-- [ ] `none` leaves `job_runs` untouched; a valid list records exactly one row per run.
-- [ ] A live key under key mode `test` makes the run `failed` with `PAYMENTS_CONFIG_INVALID`.
-- [ ] A dismissed exception is absent from the list and from the stale count, and its row keeps
+- [x] No run issues more than 35 provider calls (asserted on the stub's call log).
+- [x] The daily jobs do not run on `17 * * * *`, and this job does not run on `0 6 * * *`.
+- [x] `none` leaves `job_runs` untouched; a valid list records exactly one row per run.
+- [x] A live key under key mode `test` makes the run `failed` with `PAYMENTS_CONFIG_INVALID`.
+- [x] A dismissed exception is absent from the list and from the stale count, and its row keeps
       its original outcome.
-- [ ] The PR description records the Cron Trigger allowance check and its result.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] The PR description records the Cron Trigger allowance check and its result.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

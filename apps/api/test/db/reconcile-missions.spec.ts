@@ -142,7 +142,7 @@ async function snapshot() {
 }
 
 async function runScheduled(workerEnv: AppEnv = env as AppEnv) {
-  const controller = createScheduledController({ scheduledTime: Date.now(), cron: '0 3 * * *' });
+  const controller = createScheduledController({ scheduledTime: Date.now(), cron: '0 6 * * *' });
   const ctx = createExecutionContext();
   try {
     await worker.scheduled(controller, workerEnv, ctx);

@@ -5,7 +5,7 @@ import { JwtAuthAdapter } from '@api/adapters/auth';
 import { applyMigrations } from '../helpers/apply-migrations';
 import { v1 } from '../helpers/v1';
 import { buildPaymentsTestApp, type PaymentsTestApp } from '../adapters/payment/payments-test-app';
-import { StubGatewayAdapter, stubPayment } from '../adapters/payment/stub-gateway-adapter';
+import { StubGatewayAdapter, stubPayment, stubSecretKey } from '../adapters/payment/stub-gateway-adapter';
 import { insertInvoicePayment, seedGatewayWorld, type GatewayWorld } from '../db/gateway-fixtures';
 
 /**
@@ -521,6 +521,11 @@ const ROUTES: Array<{ method: string; path: string; body?: unknown }> = [
   // M30 Task 08: a checkout on a student's behalf hands out a link that
   // collects money, so it is the admin's alone.
   { method: 'POST', path: '/invoices/some-id/checkouts', body: {} },
+  // M30 Task 09: the reconcile run asks providers and lands money; the
+  // exceptions list names students and what they paid.
+  { method: 'POST', path: '/payments/reconcile' },
+  { method: 'GET', path: '/payments/exceptions' },
+  { method: 'POST', path: '/payments/exceptions/dismiss', body: {} },
 ];
 
 describe('/v1/admin/billing — ADMIN-only on every route', () => {
@@ -947,6 +952,533 @@ describe('/v1/admin/billing — checkouts on behalf and gateway refunds', () => 
       // The checkout is left for the reconcile run; recording cash closes nothing.
       const row = await env.DB.prepare('SELECT status FROM gateway_checkouts WHERE id = ?').bind(session.checkoutId).first();
       expect(row).toEqual({ status: 'open' });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// M30 Task 09 — the reconcile run and the exceptions list, on a real D1
+// ---------------------------------------------------------------------------
+
+describe('/v1/admin/billing/payments — reconcile and exceptions', () => {
+  type Summary = Record<string, number>;
+  type Run = { status: 'ok' | 'failed'; error: string | null; summary: Summary };
+  type Exception = {
+    ref: string;
+    kind: string;
+    source: string;
+    provider: string;
+    eventId: string | null;
+    eventType: string | null;
+    providerPaymentId: string | null;
+    checkoutId: string | null;
+    attempts: number | null;
+    detail: string | null;
+    occurredAt: string;
+    receivable: { kind: string; id: string; userId: string; studentName: string | null; amountMinor: number; currency: string } | null;
+  };
+  type CheckoutRow = {
+    status: string;
+    provider_payment_id: string | null;
+    invoice_payment_id: string | null;
+    last_checked_at: string | null;
+    closed_at: string | null;
+    failure_detail: string | null;
+    dismissed_at: string | null;
+    dismissed_by: string | null;
+    dismiss_note: string | null;
+  };
+  type EventRow = {
+    outcome: string;
+    attempts: number;
+    error: string | null;
+    checkout_id: string | null;
+    dismissed_at: string | null;
+    dismissed_by: string | null;
+    dismiss_note: string | null;
+  };
+
+  let mp: StubGatewayAdapter;
+  let app: PaymentsTestApp;
+  let world: GatewayWorld;
+
+  const viaApp = (method: string, path: string, body?: unknown, token = adminToken) =>
+    billing(method, path, body, token, app);
+  const reconcile = async (): Promise<Run> => jsonOf<Run>(await viaApp('POST', '/payments/reconcile'), 200);
+  const exceptions = async (): Promise<Exception[]> =>
+    (await jsonOf<{ exceptions: Exception[] }>(await viaApp('GET', '/payments/exceptions'), 200)).exceptions;
+  const dismiss = (ref: unknown, note: unknown, token = adminToken) =>
+    viaApp('POST', '/payments/exceptions/dismiss', { ref, note }, token);
+
+  const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+  const ahead = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+
+  /** A checkout row written straight to the table, so its age can be chosen. */
+  async function insertCheckout(overrides: {
+    id?: string;
+    provider?: string;
+    receivableId?: string;
+    status?: string;
+    session?: string | null;
+    createdAt?: string;
+    expiresAt?: string;
+    closedAt?: string | null;
+    lastCheckedAt?: string | null;
+    failureDetail?: string | null;
+    providerPaymentId?: string | null;
+    updatedAt?: string;
+  } = {}): Promise<{ id: string; session: string | null }> {
+    const id = overrides.id ?? crypto.randomUUID();
+    const session = overrides.session === undefined ? `session-${id}` : overrides.session;
+    const createdAt = overrides.createdAt ?? ago(40);
+    await env.DB
+      .prepare(
+        `INSERT INTO gateway_checkouts
+           (id, provider, receivable_kind, receivable_id, user_id, created_by, amount_minor, currency, status,
+            provider_session_id, provider_payment_id, checkout_url, expires_at, created_at, updated_at, closed_at,
+            last_checked_at, failure_detail)
+         VALUES (?, ?, 'invoice', ?, ?, ?, 15000, 'BRL', ?, ?, ?, 'https://pay.invalid/x', ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        id,
+        overrides.provider ?? 'mercadopago',
+        overrides.receivableId ?? world.invoiceId,
+        world.studentId,
+        world.studentId,
+        overrides.status ?? 'open',
+        session,
+        overrides.providerPaymentId ?? null,
+        overrides.expiresAt ?? ahead(600),
+        createdAt,
+        overrides.updatedAt ?? createdAt,
+        overrides.closedAt ?? null,
+        overrides.lastCheckedAt ?? null,
+        overrides.failureDetail ?? null,
+      )
+      .run();
+    return { id, session };
+  }
+
+  async function insertEvent(overrides: {
+    eventId?: string;
+    provider?: string;
+    type?: string;
+    outcome?: string;
+    providerPaymentId?: string | null;
+    checkoutId?: string | null;
+    receivedAt?: string;
+    attempts?: number;
+    error?: string | null;
+  } = {}): Promise<string> {
+    const eventId = overrides.eventId ?? `evt-${crypto.randomUUID()}`;
+    await env.DB
+      .prepare(
+        `INSERT INTO gateway_events (provider, event_id, type, provider_payment_id, checkout_id, received_at, outcome, attempts, error)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        overrides.provider ?? 'mercadopago',
+        eventId,
+        overrides.type ?? 'payment',
+        overrides.providerPaymentId === undefined ? `pay-${eventId}` : overrides.providerPaymentId,
+        overrides.checkoutId ?? null,
+        overrides.receivedAt ?? ago(20),
+        overrides.outcome ?? 'failed',
+        overrides.attempts ?? 1,
+        overrides.error ?? null,
+      )
+      .run();
+    return eventId;
+  }
+
+  const checkoutRow = (id: string) =>
+    env.DB.prepare('SELECT * FROM gateway_checkouts WHERE id = ?').bind(id).first<CheckoutRow>();
+  const eventRow = (eventId: string) =>
+    env.DB.prepare('SELECT * FROM gateway_events WHERE event_id = ?').bind(eventId).first<EventRow>();
+  async function gatewayLedger(): Promise<Array<{ id: string; amount_minor: number; external_reference: string; recorded_by: string }>> {
+    const { results } = await env.DB
+      .prepare(`SELECT id, amount_minor, external_reference, recorded_by FROM payments WHERE invoice_id = ? AND method = 'gateway'`)
+      .bind(world.invoiceId)
+      .all<{ id: string; amount_minor: number; external_reference: string; recorded_by: string }>();
+    return results;
+  }
+  async function jobRuns(): Promise<Array<{ job: string; trigger: string; status: string; actor_id: string | null; summary: string | null; error: string | null }>> {
+    const { results } = await env.DB
+      .prepare('SELECT job, trigger, status, actor_id, summary, error FROM job_runs ORDER BY started_at, id')
+      .all<{ job: string; trigger: string; status: string; actor_id: string | null; summary: string | null; error: string | null }>();
+    return results;
+  }
+
+  beforeEach(async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    // The work lists are global: start every case from empty gateway tables.
+    await env.DB.exec('DELETE FROM gateway_events');
+    await env.DB.exec('DELETE FROM gateway_checkouts');
+    await env.DB.exec('DELETE FROM job_runs');
+    mp = new StubGatewayAdapter('mercadopago');
+    app = buildPaymentsTestApp(env as Env, 'mercadopago:pix+card', [mp]);
+    world = await seedGatewayWorld();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('POST /payments/reconcile', () => {
+    it('lands a payment whose webhook never arrived, while its checkout is still unexpired', async () => {
+      const { id, session } = await insertCheckout();
+      mp.setPayment(stubPayment({ id: 'pay-missed', amountMinor: 15000, checkoutId: id }), session!);
+
+      const res = await viaApp('POST', '/payments/reconcile');
+      const run = await jsonOf<Run>(res, 200);
+
+      expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+      expect(run).toMatchObject({ status: 'ok', error: null });
+      expect(run.summary).toMatchObject({ checkoutsDue: 1, checkoutsAsked: 1, landed: 1, checkoutsDeferred: 0 });
+      expect(mp.calls).toEqual([{ method: 'findPaymentsForCheckout', sessionId: session }]);
+
+      const ledger = await gatewayLedger();
+      expect(ledger).toEqual([
+        { id: expect.any(String), amount_minor: 15000, external_reference: 'mercadopago:pay-missed', recorded_by: 'system:payment-gateway' },
+      ]);
+      expect(await checkoutRow(id)).toMatchObject({
+        status: 'paid',
+        provider_payment_id: 'pay-missed',
+        invoice_payment_id: ledger[0].id,
+        last_checked_at: expect.any(String),
+      });
+      // No delivery was ever received: the run writes no gateway_events row.
+      expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM gateway_events').first()).toEqual({ n: 0 });
+
+      const runs = await jobRuns();
+      expect(runs).toHaveLength(1);
+      expect(runs[0]).toMatchObject({ job: 'reconcile_payments', trigger: 'manual', status: 'ok', actor_id: ADMIN_ID, error: null });
+      expect(JSON.parse(runs[0].summary ?? 'null')).toEqual(run.summary);
+
+      // A second run finds the payment already on the ledger and changes nothing.
+      const again = await reconcile();
+      expect(again.summary).toMatchObject({ checkoutsDue: 0, landed: 0 });
+      expect(await gatewayLedger()).toHaveLength(1);
+    });
+
+    it('with 30 due asks about 25, defers 5, and the next run takes those 5 first', async () => {
+      const sessions: string[] = [];
+      for (let i = 0; i < 30; i++) {
+        // Distinct receivables (one open checkout each), oldest first.
+        const { session } = await insertCheckout({ receivableId: `inv-${i}`, createdAt: ago(200 - i) });
+        sessions.push(session!);
+      }
+
+      const first = await reconcile();
+
+      expect(first.summary).toMatchObject({ checkoutsDue: 30, checkoutsAsked: 25, stillOpen: 25, checkoutsDeferred: 5 });
+      expect(mp.callsTo('findPaymentsForCheckout').map((call) => call.sessionId)).toEqual(sessions.slice(0, 25));
+      expect(mp.calls.length).toBeLessThanOrEqual(35);
+
+      mp.calls.length = 0;
+      const second = await reconcile();
+
+      const asked = mp.callsTo('findPaymentsForCheckout').map((call) => call.sessionId);
+      expect(asked.slice(0, 5)).toEqual(sessions.slice(25));
+      expect(asked.slice(5)).toEqual(sessions.slice(0, 20));
+      expect(second.summary).toMatchObject({ checkoutsDue: 30, checkoutsAsked: 25, checkoutsDeferred: 5 });
+      expect(mp.calls.length).toBeLessThanOrEqual(35);
+    });
+
+    it('expires an open checkout past its expiry when the provider holds nothing, and does not ask again', async () => {
+      const { id } = await insertCheckout({ createdAt: ago(1500), expiresAt: ago(60) });
+
+      const run = await reconcile();
+
+      expect(run.summary).toMatchObject({ checkoutsAsked: 1, expired: 1 });
+      expect(await checkoutRow(id)).toMatchObject({ status: 'expired', closed_at: expect.any(String), last_checked_at: expect.any(String) });
+
+      mp.calls.length = 0;
+      expect((await reconcile()).summary).toMatchObject({ checkoutsDue: 0, checkoutsAsked: 0 });
+      expect(mp.calls).toEqual([]);
+    });
+
+    it('lands a late payment on a checkout that was closed without being asked', async () => {
+      const closed = await insertCheckout({ status: 'cancelled', createdAt: ago(120), closedAt: ago(90) });
+      mp.setPayment(stubPayment({ id: 'pay-late', amountMinor: 15000, checkoutId: closed.id }), closed.session!);
+      const quiet = await insertCheckout({ status: 'expired', receivableId: 'inv-quiet', createdAt: ago(120), closedAt: ago(90) });
+
+      const run = await reconcile();
+
+      expect(run.summary).toMatchObject({ checkoutsDue: 2, checkoutsAsked: 2, landed: 1, expired: 0 });
+      expect(await checkoutRow(closed.id)).toMatchObject({ status: 'paid', provider_payment_id: 'pay-late' });
+      expect(await gatewayLedger()).toEqual([expect.objectContaining({ external_reference: 'mercadopago:pay-late' })]);
+      // The quiet one got its single final ask and keeps its status.
+      expect(await checkoutRow(quiet.id)).toMatchObject({ status: 'expired', last_checked_at: expect.any(String) });
+      expect((await reconcile()).summary.checkoutsDue).toBe(0);
+    });
+
+    it('expires a checkout whose provider is no longer bound without asking, and fails the run', async () => {
+      const gone = await insertCheckout({ provider: 'stripe' });
+
+      const run = await reconcile();
+
+      expect(run.status).toBe('failed');
+      expect(run.error).toMatch(/no longer bound/);
+      expect(run.summary).toMatchObject({ unreachable: 1, checkoutsAsked: 0 });
+      expect(mp.calls).toEqual([]);
+      expect(await checkoutRow(gone.id)).toMatchObject({ status: 'expired', failure_detail: 'provider no longer bound' });
+      expect(await jobRuns()).toEqual([
+        expect.objectContaining({ job: 'reconcile_payments', trigger: 'manual', status: 'failed', error: run.error }),
+      ]);
+
+      // Counted once: the next run is clean.
+      expect(await reconcile()).toMatchObject({ status: 'ok', summary: { unreachable: 0, checkoutsDue: 0 } });
+    });
+
+    it('closes an open checkout that never got its session as failed, with no provider call', async () => {
+      const lost = await insertCheckout({ session: null, createdAt: ago(45) });
+
+      const run = await reconcile();
+
+      expect(run).toMatchObject({ status: 'ok', summary: { abandoned: 1, checkoutsAsked: 0 } });
+      expect(mp.calls).toEqual([]);
+      expect(await checkoutRow(lost.id)).toMatchObject({ status: 'failed', failure_detail: 'no provider session after 30 minutes' });
+    });
+
+    it('retries an event that failed once: it ends applied with attempts = 2', async () => {
+      const { id } = await insertCheckout({ createdAt: ago(10) });
+      mp.setPayment(stubPayment({ id: 'pay-retry', amountMinor: 15000, checkoutId: id }));
+      const eventId = await insertEvent({ providerPaymentId: 'pay-retry', error: 'processing failed (Error)' });
+
+      const run = await reconcile();
+
+      expect(run.summary).toMatchObject({ eventsDue: 1, eventsRetried: 1, eventsSettled: 1, eventsFailed: 0 });
+      expect(mp.callsTo('getPayment')).toEqual([{ method: 'getPayment', paymentId: 'pay-retry' }]);
+      expect(await eventRow(eventId)).toMatchObject({ outcome: 'applied', attempts: 2, error: null, checkout_id: id });
+      expect(await checkoutRow(id)).toMatchObject({ status: 'paid' });
+      expect(await gatewayLedger()).toHaveLength(1);
+    });
+
+    it('leaves an event the provider still cannot answer as failed, and counts it', async () => {
+      const eventId = await insertEvent({});
+      mp.failLookups(new Error('provider 503'));
+
+      const run = await reconcile();
+
+      expect(run.summary).toMatchObject({ eventsRetried: 1, eventsFailed: 1, eventsSettled: 0 });
+      expect(await eventRow(eventId)).toMatchObject({ outcome: 'failed', attempts: 2 });
+    });
+
+    it('a live key under key mode test is 500 PAYMENTS_CONFIG_INVALID, a failed run, and touches nothing', async () => {
+      const { id } = await insertCheckout();
+      const wrong = buildPaymentsTestApp(env as Env, 'mercadopago:pix+card', [mp], {
+        PAYMENTS_MERCADOPAGO_SECRET_KEY: stubSecretKey('mercadopago', 'live'),
+      });
+
+      const res = await billing('POST', '/payments/reconcile', undefined, adminToken, wrong);
+
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({ error: 'PAYMENTS_CONFIG_INVALID' });
+      const runs = await jobRuns();
+      expect(runs).toHaveLength(1);
+      expect(runs[0]).toMatchObject({ job: 'reconcile_payments', status: 'failed' });
+      expect(runs[0].error).toMatch(/^PAYMENTS_CONFIG_INVALID: key_mode_mismatch/);
+      expect(runs[0].error).not.toContain(stubSecretKey('mercadopago', 'live'));
+      expect(mp.calls).toEqual([]);
+      expect(await checkoutRow(id)).toMatchObject({ status: 'open', last_checked_at: null });
+    });
+
+    it('on a label with no provider it is 404 and writes no job_runs row', async () => {
+      await insertCheckout();
+
+      const res = await billing('POST', '/payments/reconcile');
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: 'NotFound' });
+      expect(await jobRuns()).toEqual([]);
+    });
+
+    it('403s a content_creator and a tutor, with no provider call and no run', async () => {
+      await insertCheckout();
+      for (const token of [creatorToken, tutorToken]) {
+        expect((await viaApp('POST', '/payments/reconcile', undefined, token)).status).toBe(403);
+      }
+      expect(mp.calls).toEqual([]);
+      expect(await jobRuns()).toEqual([]);
+    });
+  });
+
+  describe('GET /payments/exceptions', () => {
+    it('lists orphan, mismatch, failed, stale received and disputed rows, oldest first, without calling a provider', async () => {
+      const mismatched = await insertCheckout({
+        status: 'mismatch',
+        providerPaymentId: 'pay-mm',
+        failureDetail: 'payment not landed: the receivable is void',
+        closedAt: ago(300),
+        updatedAt: ago(300),
+      });
+      const disputed = await insertCheckout({
+        status: 'paid',
+        receivableId: 'inv-disputed',
+        providerPaymentId: 'pay-disp',
+        failureDetail: 'dispute opened',
+        closedAt: ago(500),
+        updatedAt: ago(100),
+      });
+      const orphan = await insertEvent({ outcome: 'orphan', providerPaymentId: 'pay-orphan', receivedAt: ago(400) });
+      const failed = await insertEvent({ outcome: 'failed', attempts: 3, error: 'processing failed (TypeError)', receivedAt: ago(200) });
+      const stuck = await insertEvent({ outcome: 'received', receivedAt: ago(90) });
+      // Not exceptions: a fresh `received`, and settled outcomes.
+      await insertEvent({ outcome: 'received', receivedAt: ago(5) });
+      await insertEvent({ outcome: 'applied', receivedAt: ago(600) });
+      await insertEvent({ outcome: 'duplicate', receivedAt: ago(600) });
+      await insertEvent({ outcome: 'ignored', receivedAt: ago(600) });
+
+      const res = await viaApp('GET', '/payments/exceptions');
+      const { exceptions: list } = await jsonOf<{ exceptions: Exception[] }>(res, 200);
+
+      expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+      expect(mp.calls).toEqual([]);
+      expect(list.map((row) => [row.kind, row.source, row.ref])).toEqual([
+        ['orphan', 'event', `event:mercadopago:${orphan}`],
+        ['mismatch', 'checkout', `checkout:${mismatched.id}`],
+        ['failed', 'event', `event:mercadopago:${failed}`],
+        ['dispute', 'checkout', `checkout:${disputed.id}`],
+        ['received', 'event', `event:mercadopago:${stuck}`],
+      ]);
+
+      expect(list[0]).toEqual({
+        ref: `event:mercadopago:${orphan}`,
+        kind: 'orphan',
+        source: 'event',
+        provider: 'mercadopago',
+        eventId: orphan,
+        eventType: 'payment',
+        providerPaymentId: 'pay-orphan',
+        checkoutId: null,
+        attempts: 1,
+        detail: null,
+        occurredAt: expect.any(String),
+        receivable: null,
+      });
+      expect(list[1]).toEqual({
+        ref: `checkout:${mismatched.id}`,
+        kind: 'mismatch',
+        source: 'checkout',
+        provider: 'mercadopago',
+        eventId: null,
+        eventType: null,
+        providerPaymentId: 'pay-mm',
+        checkoutId: mismatched.id,
+        attempts: null,
+        detail: 'payment not landed: the receivable is void',
+        occurredAt: expect.any(String),
+        receivable: {
+          kind: 'invoice',
+          id: world.invoiceId,
+          userId: world.studentId,
+          studentName: 'Student',
+          amountMinor: 15000,
+          currency: 'BRL',
+        },
+      });
+      expect(list[2]).toMatchObject({ attempts: 3, detail: 'processing failed (TypeError)' });
+      expect(list[3]).toMatchObject({ detail: 'dispute opened', providerPaymentId: 'pay-disp' });
+    });
+
+    it('answers on a label with no provider too — it only reads the database', async () => {
+      const orphan = await insertEvent({ outcome: 'orphan', receivedAt: ago(400) });
+
+      const res = await billing('GET', '/payments/exceptions');
+      const { exceptions: list } = await jsonOf<{ exceptions: Exception[] }>(res, 200);
+
+      expect(list.map((row) => row.ref)).toEqual([`event:mercadopago:${orphan}`]);
+    });
+  });
+
+  describe('POST /payments/exceptions/dismiss', () => {
+    it('stores who, when and the note, removes the row from the list, and changes nothing else', async () => {
+      const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const orphan = await insertEvent({ outcome: 'orphan', receivedAt: ago(400) });
+      const other = await insertEvent({ outcome: 'orphan', receivedAt: ago(300) });
+      const ref = `event:mercadopago:${orphan}`;
+      const ledgerBefore = await env.DB.prepare('SELECT COUNT(*) AS n FROM payments').first();
+
+      const res = await dismiss(ref, '  Matched by hand to the November invoice.  ');
+      const body = await jsonOf<{ ref: string; dismissedBy: string; dismissedAt: string }>(res, 200);
+
+      expect(body).toEqual({ ref, dismissedBy: ADMIN_ID, dismissedAt: expect.any(String) });
+      expect((await exceptions()).map((row) => row.ref)).toEqual([`event:mercadopago:${other}`]);
+      expect(await eventRow(orphan)).toMatchObject({
+        outcome: 'orphan',
+        attempts: 1,
+        dismissed_by: ADMIN_ID,
+        dismissed_at: expect.any(String),
+        dismiss_note: 'Matched by hand to the November invoice.',
+      });
+      expect(await env.DB.prepare('SELECT COUNT(*) AS n FROM payments').first()).toEqual(ledgerBefore);
+      expect(mp.calls).toEqual([]);
+
+      const audit = info.mock.calls.map((call) => JSON.parse(String(call[0]))).filter((e) => e.event === 'payments.exception_dismissed');
+      expect(audit).toEqual([{ event: 'payments.exception_dismissed', actor: ADMIN_ID, ref, at: body.dismissedAt }]);
+
+      // Already dismissed: it is no longer on the list, so there is nothing to dismiss.
+      expect((await dismiss(ref, 'again')).status).toBe(404);
+    });
+
+    it('dismisses a checkout row and keeps its status', async () => {
+      const mismatched = await insertCheckout({ status: 'mismatch', failureDetail: 'currency mismatch', closedAt: ago(50) });
+
+      await jsonOf(await dismiss(`checkout:${mismatched.id}`, 'Refunded at the provider.'), 200);
+
+      expect(await exceptions()).toEqual([]);
+      expect(await checkoutRow(mismatched.id)).toMatchObject({
+        status: 'mismatch',
+        failure_detail: 'currency mismatch',
+        dismissed_by: ADMIN_ID,
+        dismiss_note: 'Refunded at the provider.',
+      });
+    });
+
+    it('takes a dismissed row out of the reconcile run\'s stale count', async () => {
+      const stale = await insertEvent({ outcome: 'orphan', receivedAt: ago(8 * 24 * 60) });
+      await insertEvent({ outcome: 'mismatch', receivedAt: ago(9 * 24 * 60) });
+      await insertEvent({ outcome: 'orphan', receivedAt: ago(6 * 24 * 60) });
+
+      expect((await reconcile()).summary).toMatchObject({ staleOrphans: 1, staleMismatches: 1 });
+
+      await jsonOf(await dismiss(`event:mercadopago:${stale}`, 'Known test payment.'), 200);
+
+      expect((await reconcile()).summary).toMatchObject({ staleOrphans: 0, staleMismatches: 1 });
+      expect(await eventRow(stale)).toMatchObject({ outcome: 'orphan' });
+    });
+
+    it('400s a blank or over-long note, an unknown key and a malformed ref; 404s a ref that is not on the list', async () => {
+      const orphan = await insertEvent({ outcome: 'orphan', receivedAt: ago(400) });
+      const applied = await insertEvent({ outcome: 'applied', receivedAt: ago(400) });
+      const ref = `event:mercadopago:${orphan}`;
+
+      expect((await dismiss(ref, '')).status).toBe(400);
+      expect((await dismiss(ref, '   ')).status).toBe(400);
+      expect((await dismiss(ref, 'x'.repeat(501))).status).toBe(400);
+      expect((await dismiss(ref, undefined)).status).toBe(400);
+      expect((await viaApp('POST', '/payments/exceptions/dismiss', { ref, note: 'ok', status: 'applied' })).status).toBe(400);
+      expect((await dismiss('not-a-ref', 'ok')).status).toBe(400);
+      expect((await dismiss('event:paypal:1', 'ok')).status).toBe(400);
+
+      expect((await dismiss('event:mercadopago:nope', 'ok')).status).toBe(404);
+      expect((await dismiss('checkout:nope', 'ok')).status).toBe(404);
+      // A settled event exists but is not an exception: it cannot be dismissed.
+      expect((await dismiss(`event:mercadopago:${applied}`, 'ok')).status).toBe(404);
+      expect(await eventRow(applied)).toMatchObject({ dismissed_at: null });
+
+      expect((await dismiss(ref, 'x'.repeat(500))).status).toBe(200);
+    });
+
+    it('403s a content_creator and a tutor and dismisses nothing', async () => {
+      const orphan = await insertEvent({ outcome: 'orphan', receivedAt: ago(400) });
+      for (const token of [creatorToken, tutorToken]) {
+        expect((await dismiss(`event:mercadopago:${orphan}`, 'ok', token)).status).toBe(403);
+        expect((await viaApp('GET', '/payments/exceptions', undefined, token)).status).toBe(403);
+      }
+      expect(await eventRow(orphan)).toMatchObject({ dismissed_at: null });
     });
   });
 });

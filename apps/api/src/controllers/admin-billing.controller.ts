@@ -40,8 +40,12 @@ import {
 import {
   PAYMENTS_PROVIDER_NOT_ENABLED,
   type CheckoutSession,
+  type DismissedException,
   type GatewayService,
+  type PaymentExceptionView,
 } from '@api/core/payments/gateway-service';
+import { PAYMENTS_CONFIG_INVALID } from '@api/core/payments/config';
+import type { ReconcilePaymentsReport, ReconcilePaymentsSummary } from '@api/jobs/reconcile-payments';
 import type { ReceivableKind } from '@arenaquest/shared/domain/billing/receivable';
 
 /**
@@ -269,7 +273,30 @@ export type AdminPayments = Pick<
   | 'refundChargePayment'
   | 'listLiveCheckouts'
   | 'findLiveCheckout'
+  | 'listExceptions'
+  | 'dismissException'
 >;
+
+/**
+ * The reconcile run, as the manual route starts it: the same job the hourly
+ * trigger runs, recorded with `trigger = 'manual'` and the admin as its actor.
+ */
+export type PaymentsReconcileRunner = (actorId: string) => Promise<ReconcilePaymentsReport>;
+
+/** What the manual reconcile answers: the run's verdict and its counts. */
+export interface PaymentsReconcileRun {
+  status: 'ok' | 'failed';
+  error: string | null;
+  summary: ReconcilePaymentsSummary;
+}
+
+/** Decision 20: `{ ref, note }`, the note 1–500 characters and not blank. */
+const DismissExceptionSchema = z
+  .object({
+    ref: z.string().min(1).max(300),
+    note: z.string().trim().min(1).max(500),
+  })
+  .strict();
 
 /** A hosted session, and whether this call opened it (`201`) or it was already open (`200`). */
 export interface OnBehalfCheckoutAnswer {
@@ -361,7 +388,43 @@ export class AdminBillingController {
     private readonly runDeps: BillingRunDeps = silentBillingRunDeps(),
     /** The payment gateway; absent on a wiring without one. */
     private readonly payments?: AdminPayments,
+    /** The payment reconcile run; absent on a wiring without a gateway. */
+    private readonly reconcile?: PaymentsReconcileRunner,
   ) {}
+
+  // Payment reconcile and exceptions (RFC 0026 §6, §7) --------------------
+
+  /**
+   * The manual twin of the hourly payment reconcile: the same job, the same
+   * caps. A label with no provider bound has nothing to reconcile (`404`, and
+   * no run is recorded); an invalid provider list or key mode is `500
+   * PAYMENTS_CONFIG_INVALID` (the failed run **is** recorded). A run that ran
+   * is `200` even when it failed — the verdict is in the body.
+   */
+  async reconcilePayments(actorId: string): Promise<ControllerResult<PaymentsReconcileRun>> {
+    if (!this.reconcile) return NOT_FOUND;
+    const report = await this.reconcile(actorId);
+    if (!report.ran) return NOT_FOUND;
+    if (report.configInvalid) return { ok: false, status: 500, error: PAYMENTS_CONFIG_INVALID };
+    return { ok: true, data: { status: report.status, error: report.error, summary: report.summary } };
+  }
+
+  /**
+   * The exceptions list, oldest first. Database only — it never calls a
+   * provider, so it answers under `none` and under an invalid configuration
+   * too: rows left by a provider that was since unbound still need an admin.
+   */
+  async listPaymentExceptions(): Promise<ControllerResult<{ exceptions: PaymentExceptionView[] }>> {
+    return { ok: true, data: { exceptions: this.payments ? await this.payments.listExceptions() : [] } };
+  }
+
+  /** Dismisses one listed exception with a note (decision 20). Changes no status, no outcome, no ledger row. */
+  async dismissPaymentException(body: unknown, actorId: string): Promise<ControllerResult<DismissedException>> {
+    const parsed = DismissExceptionSchema.safeParse(body ?? {});
+    if (!parsed.success) return invalid(parsed.error);
+    if (!this.payments) return NOT_FOUND;
+    return this.payments.dismissException(parsed.data.ref, parsed.data.note, actorId);
+  }
 
   // Plans ---------------------------------------------------------------
 

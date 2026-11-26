@@ -46,7 +46,7 @@ const exists = async (id: string) =>
   (await env.DB.prepare('SELECT id FROM topic_submissions WHERE id = ?').bind(id).first()) !== null;
 
 async function runScheduled(workerEnv: AppEnv = env as AppEnv) {
-  const controller = createScheduledController({ scheduledTime: Date.now(), cron: '0 3 * * *' });
+  const controller = createScheduledController({ scheduledTime: Date.now(), cron: '0 6 * * *' });
   const ctx = createExecutionContext();
   await worker.scheduled(controller, workerEnv, ctx);
   await waitOnExecutionContext(ctx);

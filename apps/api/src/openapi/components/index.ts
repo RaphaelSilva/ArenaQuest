@@ -11,4 +11,10 @@ export {
   PendingCheckoutsSummarySchema,
   RefundConflictBody,
   RefundUnrecordedBody,
+  ReconcilePaymentsSummarySchema,
+  ReconcilePaymentsRunSchema,
+  PaymentExceptionSchema,
+  PaymentExceptionListSchema,
+  DismissPaymentExceptionBodySchema,
+  DismissedPaymentExceptionSchema,
 } from '@api/openapi/components/payments';

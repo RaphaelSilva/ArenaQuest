@@ -8,12 +8,17 @@ import {
 } from '@api/controllers/admin-billing.controller';
 import { billingRunDeps } from '@api/core/billing/billing-service';
 import { recordJobRun, billingOutcome } from '@api/jobs/record-job-run';
+import { runReconcilePayments } from '@api/jobs/reconcile-payments';
 import { Entities } from '@arenaquest/shared/types/entities';
 import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
 import {
   CheckoutSessionSchema,
   CreateCheckoutOnBehalfBodySchema,
+  DismissedPaymentExceptionSchema,
+  DismissPaymentExceptionBodySchema,
   ErrorBody,
+  PaymentExceptionListSchema,
+  ReconcilePaymentsRunSchema,
   PaymentConflictBody,
   PayOptionSchema,
   PendingCheckoutSchema,
@@ -1332,6 +1337,58 @@ export const eventAudienceCheckRoute = createRoute({
 });
 
 // ---------------------------------------------------------------------------
+// Payment reconcile and exceptions (RFC 0026 §6, §7)
+// ---------------------------------------------------------------------------
+
+export const reconcilePaymentsRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/payments/reconcile',
+  summary: 'Run the Payment Reconcile',
+  description:
+    'Runs the hourly reconcile job on demand, with the same caps: at most 25 checkouts are asked about at their provider and 10 unsettled events retried; the rest is counted as deferred and taken first by the next run. ' +
+    'A payment the provider holds whose notification never arrived lands exactly as a webhook would land it. The run is recorded as a `reconcile_payments` job run with `trigger: manual`. ' +
+    '`200` even when the run failed — read `status`. `404` on a label with no payment provider (nothing is recorded).',
+  responses: {
+    200: json('The run and its counts', ReconcilePaymentsRunSchema),
+    403: { description: 'Forbidden — admin only' },
+    404: jsonError('No payment provider is bound on this label'),
+    500: jsonError('`PAYMENTS_CONFIG_INVALID`: the provider list, a secret or the key mode is invalid; the failed run is recorded'),
+  },
+});
+
+export const listPaymentExceptionsRoute = createRoute({
+  ...common,
+  method: 'get',
+  path: '/payments/exceptions',
+  summary: 'List Payment Exceptions',
+  description:
+    'What the gateway could not settle on its own, oldest first: `orphan`, `mismatch` and `failed` events, events left `received` for over an hour, checkouts in `mismatch` and checkouts under dispute. Dismissed rows are excluded. ' +
+    'Reads the database only — no provider is called — so it also answers on a label whose provider was unbound.',
+  responses: {
+    200: json('The exceptions', PaymentExceptionListSchema),
+    403: { description: 'Forbidden — admin only' },
+  },
+});
+
+export const dismissPaymentExceptionRoute = createRoute({
+  ...common,
+  method: 'post',
+  path: '/payments/exceptions/dismiss',
+  summary: 'Dismiss a Payment Exception',
+  description:
+    'Records who dismissed the row, when and why, and removes it from the list and from the reconcile run\'s stale count. It changes no status, no outcome and writes no ledger row. ' +
+    '`404` when the `ref` names nothing currently on the list (unknown, or already dismissed).',
+  request: body(DismissPaymentExceptionBodySchema),
+  responses: {
+    200: json('Dismissed', DismissedPaymentExceptionSchema),
+    400: { description: 'Validation failed — a malformed `ref`, or a note that is blank or longer than 500 characters' },
+    403: { description: 'Forbidden — admin only' },
+    404: jsonError('The `ref` names nothing on the exceptions list'),
+  },
+});
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -1343,6 +1400,19 @@ export function buildAdminBillingRouter(container: AppContainer) {
     // same way, so the manual twin and the cron mail through one code path.
     billingRunDeps(container.infra.mailer, container.identity.users),
     container.payments.gatewayService,
+    // The job the hourly trigger runs (`src/index.ts`), recorded as a manual
+    // run with the admin as its actor — never a second implementation.
+    (actorId) =>
+      runReconcilePayments(
+        {
+          config: container.payments.config,
+          gateways: container.payments.gateways,
+          gatewayRepo: container.payments.gatewayRepo,
+          gatewayService: container.payments.gatewayService,
+          jobRuns: container.infra.jobRuns,
+        },
+        { trigger: Entities.Config.JobTrigger.MANUAL, actorId },
+      ),
   );
   const extras = new AdminEventChargeController(
     container.billing.eventChargeService,
@@ -1380,6 +1450,27 @@ export function buildAdminBillingRouter(container: AppContainer) {
     router.use(path, privateNoStore);
     router.use(path, checkoutGate);
   }
+  router.use('/payments/reconcile', privateNoStore);
+  router.use('/payments/exceptions', privateNoStore);
+  router.use('/payments/exceptions/*', privateNoStore);
+
+  router.openapi(reconcilePaymentsRoute, async (c) => {
+    const result = await controller.reconcilePayments(c.get('user').sub);
+    if (!result.ok) return c.json({ error: result.error }, result.status as 404 | 500);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(listPaymentExceptionsRoute, async (c) => {
+    const result = await controller.listPaymentExceptions();
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
+
+  router.openapi(dismissPaymentExceptionRoute, async (c) => {
+    const result = await controller.dismissPaymentException(c.req.valid('json'), c.get('user').sub);
+    if (!result.ok) return respondWith(c, result);
+    return c.json(result.data, 200);
+  });
 
   router.openapi(listPlansRoute, async (c) => {
     const q = c.req.valid('query');
