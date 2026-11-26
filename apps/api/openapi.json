@@ -2776,6 +2776,49 @@
         ],
         "type": "object"
       },
+      "DismissPaymentExceptionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "description": "Why it is being dismissed — 1 to 500 characters, not blank.",
+            "example": "Matched by hand to the November invoice.",
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ref": {
+            "example": "event:mercadopago:123456789",
+            "maxLength": 300,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "note"
+        ],
+        "type": "object"
+      },
+      "DismissedPaymentException": {
+        "properties": {
+          "dismissedAt": {
+            "example": "2026-11-26T15:00:00.000Z",
+            "type": "string"
+          },
+          "dismissedBy": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "dismissedBy",
+          "dismissedAt"
+        ],
+        "type": "object"
+      },
       "EditSubmissionBody": {
         "properties": {
           "description": {
@@ -3062,7 +3105,8 @@
           "job": {
             "enum": [
               "billing",
-              "sweep_submissions"
+              "sweep_submissions",
+              "reconcile_payments"
             ],
             "example": "billing",
             "type": "string"
@@ -3139,7 +3183,8 @@
           "job": {
             "enum": [
               "billing",
-              "sweep_submissions"
+              "sweep_submissions",
+              "reconcile_payments"
             ],
             "example": "billing",
             "type": "string"
@@ -4980,6 +5025,169 @@
         ],
         "type": "object"
       },
+      "PaymentException": {
+        "properties": {
+          "attempts": {
+            "description": "Processing attempts of an event; `null` for a checkout row.",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "checkoutId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "detail": {
+            "description": "The stored failure, mismatch or dispute description. Never a provider message.",
+            "example": "payment not landed: the receivable is void",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eventId": {
+            "description": "The provider's notification id; `null` for a checkout row.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eventType": {
+            "example": "payment",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`orphan`: a provider payment that names no checkout of ours. `mismatch`: a payment that does not fit its checkout — nothing landed. `failed`: processing failed and is retried for 72 hours. `received`: left unprocessed for over an hour. `dispute`: a chargeback on a landed payment (`detail` reads `dispute opened|won|lost`).",
+            "enum": [
+              "orphan",
+              "mismatch",
+              "failed",
+              "received",
+              "dispute"
+            ],
+            "example": "orphan",
+            "type": "string"
+          },
+          "occurredAt": {
+            "description": "When the event was received, or the checkout last changed. The list is ordered by it, oldest first.",
+            "example": "2026-11-26T14:03:00.000Z",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "stripe",
+              "mercadopago",
+              "asaas",
+              "pagarme"
+            ],
+            "example": "mercadopago",
+            "type": "string"
+          },
+          "providerPaymentId": {
+            "description": "The provider's payment id (bare), when known — what the dashboard link and *match by hand* use.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "receivable": {
+            "description": "What the checkout was collecting; `null` when no checkout is known.",
+            "properties": {
+              "amountMinor": {
+                "description": "What the checkout asked for — not necessarily what the provider captured.",
+                "example": 15000,
+                "type": "integer"
+              },
+              "currency": {
+                "example": "BRL",
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "invoice",
+                  "event_charge"
+                ],
+                "example": "invoice",
+                "type": "string"
+              },
+              "studentName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "userId": {
+                "description": "The student who owes it.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "userId",
+              "studentName",
+              "amountMinor",
+              "currency"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "ref": {
+            "description": "Stable handle for dismissal: `event:<provider>:<eventId>` or `checkout:<checkoutId>`. Opaque to the client — send it back as is.",
+            "example": "event:mercadopago:123456789",
+            "type": "string"
+          },
+          "source": {
+            "description": "Which record the row stands for.",
+            "enum": [
+              "event",
+              "checkout"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "kind",
+          "source",
+          "provider",
+          "eventId",
+          "eventType",
+          "providerPaymentId",
+          "checkoutId",
+          "attempts",
+          "detail",
+          "occurredAt",
+          "receivable"
+        ],
+        "type": "object"
+      },
+      "PaymentExceptionList": {
+        "properties": {
+          "exceptions": {
+            "description": "Oldest first; dismissed rows excluded.",
+            "items": {
+              "$ref": "#/components/schemas/PaymentException"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "exceptions"
+        ],
+        "type": "object"
+      },
       "PaymentsWebhookAck": {
         "properties": {
           "outcome": {
@@ -5224,6 +5432,162 @@
           "submission",
           "uploadUrl",
           "expiresAt"
+        ],
+        "type": "object"
+      },
+      "ReconcilePaymentsRun": {
+        "properties": {
+          "error": {
+            "description": "Why the run failed; `null` on `ok`.",
+            "example": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`failed` when a checkout sat on a provider that is no longer bound (`unreachable > 0`).",
+            "enum": [
+              "ok",
+              "failed"
+            ],
+            "example": "ok",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ReconcilePaymentsSummary"
+          }
+        },
+        "required": [
+          "status",
+          "error",
+          "summary"
+        ],
+        "type": "object"
+      },
+      "ReconcilePaymentsSummary": {
+        "properties": {
+          "abandoned": {
+            "description": "Open with no provider session for over 30 minutes: closed `failed`, no provider call.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "checkoutErrors": {
+            "description": "The provider could not be asked; tried again next run.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "checkoutsAsked": {
+            "description": "Provider searches made — at most 25 per run.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "checkoutsDeferred": {
+            "description": "Due and left for the next run.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "checkoutsDue": {
+            "description": "Checkouts due when the run started.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "eventsDeferred": {
+            "description": "Due and left for the next run.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "eventsDue": {
+            "description": "Unsettled events due when the run started.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "eventsFailed": {
+            "description": "Of those, how many failed again.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "eventsRetried": {
+            "description": "Events processed again — at most 10 per run.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "eventsSettled": {
+            "description": "Of those, how many reached a final outcome.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "expired": {
+            "description": "Checkouts closed `expired` after the provider reported nothing paid.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "landed": {
+            "description": "Payments the provider held whose checkout is now `paid`.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "mismatched": {
+            "description": "A payment was found that does not fit its checkout; see the exceptions list.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "staleMismatches": {
+            "description": "`mismatch` events and checkouts older than 7 days, not dismissed.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "staleOrphans": {
+            "description": "`orphan` events older than 7 days, not dismissed.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "stillOpen": {
+            "description": "Asked, nothing paid yet, not yet expired.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "unreachable": {
+            "description": "On a provider that is no longer bound: expired without being asked. Non-zero fails the run.",
+            "example": 0,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "checkoutsDue",
+          "checkoutsAsked",
+          "landed",
+          "expired",
+          "stillOpen",
+          "abandoned",
+          "unreachable",
+          "mismatched",
+          "checkoutErrors",
+          "checkoutsDeferred",
+          "eventsDue",
+          "eventsRetried",
+          "eventsSettled",
+          "eventsFailed",
+          "eventsDeferred",
+          "staleOrphans",
+          "staleMismatches"
         ],
         "type": "object"
       },
@@ -8722,6 +9086,156 @@
           }
         ],
         "summary": "Void an Invoice",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/payments/exceptions": {
+      "get": {
+        "description": "What the gateway could not settle on its own, oldest first: `orphan`, `mismatch` and `failed` events, events left `received` for over an hour, checkouts in `mismatch` and checkouts under dispute. Dismissed rows are excluded. Reads the database only — no provider is called — so it also answers on a label whose provider was unbound.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentExceptionList"
+                }
+              }
+            },
+            "description": "The exceptions"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List Payment Exceptions",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/payments/exceptions/dismiss": {
+      "post": {
+        "description": "Records who dismissed the row, when and why, and removes it from the list and from the reconcile run's stale count. It changes no status, no outcome and writes no ledger row. `404` when the `ref` names nothing currently on the list (unknown, or already dismissed).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissPaymentExceptionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DismissedPaymentException"
+                }
+              }
+            },
+            "description": "Dismissed"
+          },
+          "400": {
+            "description": "Validation failed — a malformed `ref`, or a note that is blank or longer than 500 characters"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "The `ref` names nothing on the exceptions list"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Dismiss a Payment Exception",
+        "tags": [
+          "admin:billing"
+        ]
+      }
+    },
+    "/v1/admin/billing/payments/reconcile": {
+      "post": {
+        "description": "Runs the hourly reconcile job on demand, with the same caps: at most 25 checkouts are asked about at their provider and 10 unsettled events retried; the rest is counted as deferred and taken first by the next run. A payment the provider holds whose notification never arrived lands exactly as a webhook would land it. The run is recorded as a `reconcile_payments` job run with `trigger: manual`. `200` even when the run failed — read `status`. `404` on a label with no payment provider (nothing is recorded).",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcilePaymentsRun"
+                }
+              }
+            },
+            "description": "The run and its counts"
+          },
+          "403": {
+            "description": "Forbidden — admin only"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "No payment provider is bound on this label"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`PAYMENTS_CONFIG_INVALID`: the provider list, a secret or the key mode is invalid; the failed run is recorded"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Run the Payment Reconcile",
         "tags": [
           "admin:billing"
         ]

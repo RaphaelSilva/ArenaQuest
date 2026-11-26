@@ -24,10 +24,17 @@
 	 * `triggers: inheritable(...)`), so this single top-level block covers every
 	 * `env.*` below and none of them repeats it. An environment that should NOT
 	 * bill would have to opt out with its own `"triggers": { "crons": [] }`.
+	 *
+	 * The hourly payment reconcile (RFC 0026 §6) at minute 17: its own
+	 * invocation, dispatched on `controller.cron` in `src/index.ts`, where both
+	 * expressions are named constants a test compares with this block. It fires
+	 * on every label; with `PAYMENTS_PROVIDERS = none` it returns before its
+	 * first query and records nothing.
 	 */
 	"triggers": {
 		"crons": [
-			"0 6 * * *"
+			"0 6 * * *",
+			"17 * * * *"
 		]
 	},
 	"compatibility_flags": [

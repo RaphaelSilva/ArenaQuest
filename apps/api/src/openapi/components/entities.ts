@@ -785,7 +785,7 @@ export const MissionCheckResultSchema = z.object({
 
 export const JobRunSchema = z.object({
   id: z.string().openapi({ example: 'a1b2c3d4-e5f6-7890-1234-567890abcdef' }),
-  job: z.enum(['billing', 'sweep_submissions']).openapi({ example: 'billing' }),
+  job: z.enum(['billing', 'sweep_submissions', 'reconcile_payments']).openapi({ example: 'billing' }),
   trigger: z.enum(['cron', 'manual']).openapi({ example: 'cron' }),
   status: z.enum(['running', 'ok', 'failed']).openapi({ example: 'ok' }),
   actorId: z.string().nullable().openapi({ description: 'The admin behind a manual run; null for the cron', example: null }),
@@ -813,7 +813,7 @@ export const DependencyHealthSchema = z.object({
 }).openapi('DependencyHealth');
 
 export const JobHealthSchema = z.object({
-  job: z.enum(['billing', 'sweep_submissions']).openapi({ example: 'billing' }),
+  job: z.enum(['billing', 'sweep_submissions', 'reconcile_payments']).openapi({ example: 'billing' }),
   lastRun: JobRunSchema.extend({
     ageMs: z.number().int().nonnegative().openapi({ description: 'Milliseconds since the run started', example: 3_600_000 }),
   }).nullable().openapi({ description: 'Null when the job has never run' }),

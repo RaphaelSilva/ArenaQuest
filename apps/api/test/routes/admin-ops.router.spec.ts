@@ -107,7 +107,8 @@ describe('GET /admin/ops/health', () => {
     }
     expect(body.latestMigration).toBe(NEWEST_MIGRATION);
 
-    expect(body.jobs.map((j) => j.job)).toEqual(['billing', 'sweep_submissions']);
+    expect(body.jobs.map((j) => j.job)).toEqual(['billing', 'sweep_submissions', 'reconcile_payments']);
+    expect(body.jobs[2].lastRun).toBeNull();
     const billing = body.jobs[0].lastRun;
     const sweep = body.jobs[1].lastRun;
     expect(billing).toMatchObject({ id: 'ops-billing-new', status: 'failed' });

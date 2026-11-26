@@ -134,6 +134,7 @@ describe('AdminOpsController.health', () => {
     expect(data.jobs).toEqual([
       { job: 'billing', lastRun: { ...run(JobName.BILLING, '2026-10-11T03:00:00.000Z'), ageMs: 9 * 3_600_000 } },
       { job: 'sweep_submissions', lastRun: null },
+      { job: 'reconcile_payments', lastRun: null },
     ]);
   });
 

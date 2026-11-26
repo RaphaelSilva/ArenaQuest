@@ -1956,6 +1956,188 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/billing/payments/exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Payment Exceptions
+         * @description What the gateway could not settle on its own, oldest first: `orphan`, `mismatch` and `failed` events, events left `received` for over an hour, checkouts in `mismatch` and checkouts under dispute. Dismissed rows are excluded. Reads the database only — no provider is called — so it also answers on a label whose provider was unbound.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The exceptions */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PaymentExceptionList"];
+                    };
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/payments/exceptions/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss a Payment Exception
+         * @description Records who dismissed the row, when and why, and removes it from the list and from the reconcile run's stale count. It changes no status, no outcome and writes no ledger row. `404` when the `ref` names nothing currently on the list (unknown, or already dismissed).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["DismissPaymentExceptionBody"];
+                };
+            };
+            responses: {
+                /** @description Dismissed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DismissedPaymentException"];
+                    };
+                };
+                /** @description Validation failed — a malformed `ref`, or a note that is blank or longer than 500 characters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The `ref` names nothing on the exceptions list */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/billing/payments/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run the Payment Reconcile
+         * @description Runs the hourly reconcile job on demand, with the same caps: at most 25 checkouts are asked about at their provider and 10 unsettled events retried; the rest is counted as deferred and taken first by the next run. A payment the provider holds whose notification never arrived lands exactly as a webhook would land it. The run is recorded as a `reconcile_payments` job run with `trigger: manual`. `200` even when the run failed — read `status`. `404` on a label with no payment provider (nothing is recorded).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The run and its counts */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReconcilePaymentsRun"];
+                    };
+                };
+                /** @description Forbidden — admin only */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No payment provider is bound on this label */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_CONFIG_INVALID`: the provider list, a secret or the key mode is invalid; the failed run is recorded */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/billing/payments/{id}/reverse": {
         parameters: {
             query?: never;
@@ -12285,6 +12467,21 @@ export interface components {
              */
             status: "ok" | "degraded" | "down";
         };
+        DismissPaymentExceptionBody: {
+            /**
+             * @description Why it is being dismissed — 1 to 500 characters, not blank.
+             * @example Matched by hand to the November invoice.
+             */
+            note: string;
+            /** @example event:mercadopago:123456789 */
+            ref: string;
+        };
+        DismissedPaymentException: {
+            /** @example 2026-11-26T15:00:00.000Z */
+            dismissedAt: string;
+            dismissedBy: string;
+            ref: string;
+        };
         EditSubmissionBody: {
             /** @description Markdown; sanitised, then must be ≤ SUBMISSION_DESCRIPTION_MAX characters */
             description?: string;
@@ -12377,7 +12574,7 @@ export interface components {
              * @example billing
              * @enum {string}
              */
-            job: "billing" | "sweep_submissions";
+            job: "billing" | "sweep_submissions" | "reconcile_payments";
             /** @description Null when the job has never run */
             lastRun: components["schemas"]["JobRun"] & ({
                 /**
@@ -12411,7 +12608,7 @@ export interface components {
              * @example billing
              * @enum {string}
              */
-            job: "billing" | "sweep_submissions";
+            job: "billing" | "sweep_submissions" | "reconcile_payments";
             /** @example 2026-10-11T03:00:00.000Z */
             startedAt: string;
             /**
@@ -13158,6 +13355,71 @@ export interface components {
             /** @description With `PAYMENT_REFERENCE_EXISTS`: the id of the ledger row that already carries the reference */
             paymentId?: string;
         };
+        PaymentException: {
+            /** @description Processing attempts of an event; `null` for a checkout row. */
+            attempts: number | null;
+            checkoutId: string | null;
+            /**
+             * @description The stored failure, mismatch or dispute description. Never a provider message.
+             * @example payment not landed: the receivable is void
+             */
+            detail: string | null;
+            /** @description The provider's notification id; `null` for a checkout row. */
+            eventId: string | null;
+            /** @example payment */
+            eventType: string | null;
+            /**
+             * @description `orphan`: a provider payment that names no checkout of ours. `mismatch`: a payment that does not fit its checkout — nothing landed. `failed`: processing failed and is retried for 72 hours. `received`: left unprocessed for over an hour. `dispute`: a chargeback on a landed payment (`detail` reads `dispute opened|won|lost`).
+             * @example orphan
+             * @enum {string}
+             */
+            kind: "orphan" | "mismatch" | "failed" | "received" | "dispute";
+            /**
+             * @description When the event was received, or the checkout last changed. The list is ordered by it, oldest first.
+             * @example 2026-11-26T14:03:00.000Z
+             */
+            occurredAt: string;
+            /**
+             * @example mercadopago
+             * @enum {string}
+             */
+            provider: "stripe" | "mercadopago" | "asaas" | "pagarme";
+            /** @description The provider's payment id (bare), when known — what the dashboard link and *match by hand* use. */
+            providerPaymentId: string | null;
+            /** @description What the checkout was collecting; `null` when no checkout is known. */
+            receivable: {
+                /**
+                 * @description What the checkout asked for — not necessarily what the provider captured.
+                 * @example 15000
+                 */
+                amountMinor: number;
+                /** @example BRL */
+                currency: string;
+                id: string;
+                /**
+                 * @example invoice
+                 * @enum {string}
+                 */
+                kind: "invoice" | "event_charge";
+                studentName: string | null;
+                /** @description The student who owes it. */
+                userId: string;
+            } | null;
+            /**
+             * @description Stable handle for dismissal: `event:<provider>:<eventId>` or `checkout:<checkoutId>`. Opaque to the client — send it back as is.
+             * @example event:mercadopago:123456789
+             */
+            ref: string;
+            /**
+             * @description Which record the row stands for.
+             * @enum {string}
+             */
+            source: "event" | "checkout";
+        };
+        PaymentExceptionList: {
+            /** @description Oldest first; dismissed rows excluded. */
+            exceptions: components["schemas"]["PaymentException"][];
+        };
         PaymentsWebhookAck: {
             /**
              * @description `applied`: this delivery changed the ledger or a dispute state. `duplicate`: the event, or everything it named, was already recorded. `ignored`: nothing to do (a pending, failed or expired payment, or an event kind the adapter ignores). `orphan`: the provider does not know the payment, or it names no checkout of this provider. `mismatch`: the payment does not fit its checkout; nothing landed.
@@ -13249,6 +13511,107 @@ export interface components {
              * @description Presigned PUT; send the declared Content-Type and length
              */
             uploadUrl: string;
+        };
+        ReconcilePaymentsRun: {
+            /**
+             * @description Why the run failed; `null` on `ok`.
+             * @example null
+             */
+            error: string | null;
+            /**
+             * @description `failed` when a checkout sat on a provider that is no longer bound (`unreachable > 0`).
+             * @example ok
+             * @enum {string}
+             */
+            status: "ok" | "failed";
+            summary: components["schemas"]["ReconcilePaymentsSummary"];
+        };
+        ReconcilePaymentsSummary: {
+            /**
+             * @description Open with no provider session for over 30 minutes: closed `failed`, no provider call.
+             * @example 0
+             */
+            abandoned: number;
+            /**
+             * @description The provider could not be asked; tried again next run.
+             * @example 0
+             */
+            checkoutErrors: number;
+            /**
+             * @description Provider searches made — at most 25 per run.
+             * @example 0
+             */
+            checkoutsAsked: number;
+            /**
+             * @description Due and left for the next run.
+             * @example 0
+             */
+            checkoutsDeferred: number;
+            /**
+             * @description Checkouts due when the run started.
+             * @example 0
+             */
+            checkoutsDue: number;
+            /**
+             * @description Due and left for the next run.
+             * @example 0
+             */
+            eventsDeferred: number;
+            /**
+             * @description Unsettled events due when the run started.
+             * @example 0
+             */
+            eventsDue: number;
+            /**
+             * @description Of those, how many failed again.
+             * @example 0
+             */
+            eventsFailed: number;
+            /**
+             * @description Events processed again — at most 10 per run.
+             * @example 0
+             */
+            eventsRetried: number;
+            /**
+             * @description Of those, how many reached a final outcome.
+             * @example 0
+             */
+            eventsSettled: number;
+            /**
+             * @description Checkouts closed `expired` after the provider reported nothing paid.
+             * @example 0
+             */
+            expired: number;
+            /**
+             * @description Payments the provider held whose checkout is now `paid`.
+             * @example 0
+             */
+            landed: number;
+            /**
+             * @description A payment was found that does not fit its checkout; see the exceptions list.
+             * @example 0
+             */
+            mismatched: number;
+            /**
+             * @description `mismatch` events and checkouts older than 7 days, not dismissed.
+             * @example 0
+             */
+            staleMismatches: number;
+            /**
+             * @description `orphan` events older than 7 days, not dismissed.
+             * @example 0
+             */
+            staleOrphans: number;
+            /**
+             * @description Asked, nothing paid yet, not yet expired.
+             * @example 0
+             */
+            stillOpen: number;
+            /**
+             * @description On a provider that is no longer bound: expired without being asked. Non-zero fails the run.
+             * @example 0
+             */
+            unreachable: number;
         };
         RecordPaymentBody: {
             /** @example 15000 */

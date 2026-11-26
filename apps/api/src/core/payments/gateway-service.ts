@@ -36,6 +36,12 @@
  * 0026 §5): the provider is asked what it holds, then asked to return the
  * money, and the reversal is written **only when the provider accepted** —
  * under the provider's refund id, so every step is safe to repeat.
+ *
+ * `confirmCheckout` is the reconcile run's question about one checkout (RFC
+ * 0026 §6): it asks the provider what the session produced and hands every
+ * payment to `applyPayment` — the landing above, not a second one.
+ * `listExceptions` / `dismissException` are the admin's to-do list (§7): they
+ * read and annotate the gateway's own two tables and never call a provider.
  */
 import type {
   IPaymentGateway,
@@ -51,10 +57,13 @@ import type { EventChargePaymentRecord, PaymentRecord } from '@arenaquest/shared
 import type {
   GatewayCheckoutRecord,
   GatewayEventRecord,
+  GatewayExceptionRecord,
+  GatewayExceptionRef,
   IGatewayRepository,
 } from '@arenaquest/shared/ports/i-gateway-repository';
 import type { IRateLimiter } from '@arenaquest/shared/ports/i-rate-limiter';
 import { Entities } from '@arenaquest/shared/types/entities';
+import { PAYMENT_PROVIDER_NAMES } from '@arenaquest/shared/ports/i-payment-gateway';
 import {
   buildGatewayReference,
   providerMethodsForCurrency,
@@ -283,6 +292,152 @@ export interface LiveCheckout {
   pending: PendingCheckout;
 }
 
+// ---------------------------------------------------------------------------
+// Reconciliation (RFC 0026 §6) and exceptions (§7)
+// ---------------------------------------------------------------------------
+
+/** An `open` checkout with no provider session is given up on once it is this old. */
+export const CHECKOUT_SESSIONLESS_AFTER_MS = 30 * 60_000;
+
+/** Thrown inside the service when a provider call outlives its budget; only its name is ever stored. */
+export class ProviderTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`the provider did not answer within ${timeoutMs} ms`);
+    this.name = 'ProviderTimeoutError';
+  }
+}
+
+/** Bounds one provider call. The timer is always cleared; `undefined` means no bound. */
+async function withProviderTimeout<T>(call: Promise<T>, timeoutMs: number | undefined): Promise<T> {
+  if (timeoutMs === undefined) return call;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new ProviderTimeoutError(timeoutMs)), timeoutMs);
+  });
+  try {
+    return await Promise.race([call, timeout]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+export interface ProviderCallOptions {
+  /** Upper bound of each provider call, in milliseconds. Omitted: unbounded. */
+  timeoutMs?: number;
+}
+
+export interface ConfirmCheckoutOptions extends ProviderCallOptions {
+  /**
+   * `false` when the caller's budget of provider calls is spent: a checkout
+   * that needs one is answered `deferred` and left untouched, while the cases
+   * that cost no call are still handled.
+   */
+  ask?: boolean;
+}
+
+/**
+ * What asking about one checkout came to:
+ * - `landed` — the provider holds a payment and the checkout is now `paid`;
+ * - `mismatch` — a payment was found that does not fit; nothing landed;
+ * - `expired` — nothing paid and the checkout is past its expiry: closed;
+ * - `open` — nothing paid yet, not yet expired;
+ * - `closed` — an already closed checkout got its final ask and nothing changed;
+ * - `abandoned` — `open` with no provider session for over 30 minutes: closed `failed`, no call;
+ * - `unreachable` — its provider is no longer bound: expired without a call;
+ * - `deferred` — needs a provider call the caller could not afford;
+ * - `error` — the provider (or the landing) failed; asked again next run.
+ */
+export type ConfirmCheckoutOutcome =
+  | 'landed'
+  | 'mismatch'
+  | 'expired'
+  | 'open'
+  | 'closed'
+  | 'abandoned'
+  | 'unreachable'
+  | 'deferred'
+  | 'error';
+
+export interface ConfirmCheckoutResult {
+  outcome: ConfirmCheckoutOutcome;
+  /** Whether a provider call was made — what the caller's cap counts. */
+  asked: boolean;
+}
+
+/** Why a row is on the exceptions list. */
+export type PaymentExceptionKind = 'orphan' | 'mismatch' | 'failed' | 'received' | 'dispute';
+
+/** One row of the admin exceptions list (RFC 0026 §7). Ids and states only — never a body. */
+export interface PaymentExceptionView {
+  /** Stable handle for `dismissException`: `event:<provider>:<eventId>` or `checkout:<checkoutId>`. */
+  ref: string;
+  kind: PaymentExceptionKind;
+  /** Which table the row lives in. */
+  source: 'event' | 'checkout';
+  provider: PaymentProviderName;
+  /** The provider's notification id; `null` for a checkout row. */
+  eventId: string | null;
+  /** `gateway_events.type`; `null` for a checkout row. */
+  eventType: string | null;
+  /** The provider's payment id (bare), when one is known. */
+  providerPaymentId: string | null;
+  checkoutId: string | null;
+  /** Processing attempts of an event; `null` for a checkout row. */
+  attempts: number | null;
+  /** The stored failure / mismatch / dispute description; never a provider message. */
+  detail: string | null;
+  /** When the event was received, or the checkout last changed. */
+  occurredAt: string;
+  /** What the checkout was collecting — `null` when no checkout is known (an orphan). */
+  receivable: {
+    kind: ReceivableKind;
+    id: string;
+    userId: string;
+    /** `null` when the student no longer resolves. */
+    studentName: string | null;
+    /** What the checkout asked for — not what the provider captured. */
+    amountMinor: number;
+    currency: string;
+  } | null;
+}
+
+export interface DismissedException {
+  ref: string;
+  dismissedBy: string;
+  dismissedAt: string;
+}
+
+const EVENT_REF_PREFIX = 'event:';
+const CHECKOUT_REF_PREFIX = 'checkout:';
+
+/** The stable string form of an exception's identity. An event id may itself contain `:`. */
+export function formatExceptionRef(ref: GatewayExceptionRef): string {
+  return ref.kind === 'event'
+    ? `${EVENT_REF_PREFIX}${ref.provider}:${ref.eventId}`
+    : `${CHECKOUT_REF_PREFIX}${ref.checkoutId}`;
+}
+
+/** The inverse of `formatExceptionRef`; `null` for anything it would not have produced. */
+export function parseExceptionRef(ref: string): GatewayExceptionRef | null {
+  if (ref.startsWith(CHECKOUT_REF_PREFIX)) {
+    const checkoutId = ref.slice(CHECKOUT_REF_PREFIX.length);
+    return checkoutId === '' ? null : { kind: 'checkout', checkoutId };
+  }
+  if (!ref.startsWith(EVENT_REF_PREFIX)) return null;
+  const rest = ref.slice(EVENT_REF_PREFIX.length);
+  const colon = rest.indexOf(':');
+  if (colon <= 0) return null;
+  const provider = PAYMENT_PROVIDER_NAMES.find((name) => name === rest.slice(0, colon));
+  const eventId = rest.slice(colon + 1);
+  return provider && eventId !== '' ? { kind: 'event', provider, eventId } : null;
+}
+
+function exceptionRefOf(row: GatewayExceptionRecord): GatewayExceptionRef {
+  return row.kind === 'event'
+    ? { kind: 'event', provider: row.event.provider, eventId: row.event.eventId }
+    : { kind: 'checkout', checkoutId: row.checkout.id };
+}
+
 function refusal(status: number, error: string, meta?: Record<string, unknown>): ControllerResult<never> {
   return meta ? { ok: false, status, error, meta } : { ok: false, status, error };
 }
@@ -370,9 +525,14 @@ export class GatewayService {
   /**
    * One verified delivery. Never throws: the service's own failure is the
    * outcome `failed`, with the event left unsettled so a redelivery is
-   * processed again.
+   * processed again. `options.timeoutMs` bounds the provider read — the
+   * reconcile run sets it; a webhook request leaves it to the platform.
    */
-  async handleEvent(provider: PaymentProviderName, event: ProviderEvent): Promise<GatewayHandleResult> {
+  async handleEvent(
+    provider: PaymentProviderName,
+    event: ProviderEvent,
+    options: ProviderCallOptions = {},
+  ): Promise<GatewayHandleResult> {
     const providerPaymentId = event.kind === 'ignored' ? null : event.paymentId;
     const result = (outcome: GatewayHandleOutcome, checkoutId: string | null = null): GatewayHandleResult => {
       const answer = { outcome, provider, eventId: event.eventId, checkoutId, providerPaymentId };
@@ -413,7 +573,7 @@ export class GatewayService {
       const gateway = this.deps.gateways.get(provider);
       if (!gateway) throw new Error(`no adapter is bound for ${provider}`);
 
-      const payment = await gateway.getPayment(event.paymentId);
+      const payment = await withProviderTimeout(gateway.getPayment(event.paymentId), options.timeoutMs);
       const acted: GatewayPaymentOutcome = payment
         ? await this.applyPayment(provider, payment, {
             occurredAt: event.occurredAt,
@@ -894,6 +1054,208 @@ export class GatewayService {
   /** One receivable's payment in progress, or `null` — whatever the receivable's own status. */
   async findLiveCheckout(kind: ReceivableKind, receivableId: string): Promise<PendingCheckout | null> {
     return toPendingCheckout(await this.deps.gatewayRepo.findOpenCheckout(kind, receivableId), this.now());
+  }
+
+  // -------------------------------------------------------------------------
+  // Reconciliation (RFC 0026 §6) and exceptions (§7)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Asks the provider about one checkout the reconcile run found due, and
+   * lands whatever it holds through `applyPayment` — the webhook's own path,
+   * idempotent on the reference index. Never throws.
+   *
+   * Two cases cost no provider call: an `open` checkout that never got its
+   * session (the create call died) is closed `failed` once it is 30 minutes
+   * old; a checkout whose provider is no longer bound cannot be asked about,
+   * so it is expired and reported `unreachable`.
+   *
+   * `lastCheckedAt` is stamped whenever the question was answered. After a
+   * provider error it is stamped only on an `open` checkout — so one failing
+   * row rotates to the back of the queue — while a closed one keeps its claim
+   * to the single final ask.
+   */
+  async confirmCheckout(
+    checkout: GatewayCheckoutRecord,
+    options: ConfirmCheckoutOptions = {},
+  ): Promise<ConfirmCheckoutResult> {
+    const repo = this.deps.gatewayRepo;
+    const now = this.now();
+    const wasOpen = checkout.status === CheckoutStatus.OPEN;
+    const sessionId = checkout.providerSessionId;
+    const gateway = this.deps.gateways.get(checkout.provider);
+    try {
+      if (wasOpen && sessionId === null) {
+        if (now.getTime() - Date.parse(checkout.createdAt) <= CHECKOUT_SESSIONLESS_AFTER_MS) {
+          return { outcome: 'open', asked: false };
+        }
+        await repo.closeCheckout(checkout.id, {
+          status: CheckoutStatus.FAILED,
+          failureDetail: 'no provider session after 30 minutes',
+        });
+        return { outcome: 'abandoned', asked: false };
+      }
+
+      if (!gateway) {
+        if (wasOpen) {
+          await repo.closeCheckout(checkout.id, {
+            status: CheckoutStatus.EXPIRED,
+            failureDetail: 'provider no longer bound',
+          });
+        }
+        await repo.markChecked(checkout.id);
+        return { outcome: 'unreachable', asked: false };
+      }
+
+      if (sessionId === null) {
+        // Closed before any session existed: there is nothing to ask about.
+        await repo.markChecked(checkout.id);
+        return { outcome: 'closed', asked: false };
+      }
+    } catch {
+      return { outcome: 'error', asked: false };
+    }
+    if (!gateway || sessionId === null) return { outcome: 'error', asked: false };
+
+    if (options.ask === false) return { outcome: 'deferred', asked: false };
+
+    try {
+      const payments = await withProviderTimeout(
+        gateway.findPaymentsForCheckout(sessionId),
+        options.timeoutMs,
+      );
+      for (const payment of payments) await this.applyPayment(checkout.provider, payment);
+
+      const current = (await repo.getCheckout(checkout.id)) ?? checkout;
+      let outcome: ConfirmCheckoutOutcome;
+      if (current.status === CheckoutStatus.PAID && checkout.status !== CheckoutStatus.PAID) {
+        outcome = 'landed';
+      } else if (current.status === CheckoutStatus.MISMATCH && checkout.status !== CheckoutStatus.MISMATCH) {
+        outcome = 'mismatch';
+      } else if (current.status === CheckoutStatus.OPEN) {
+        if (Date.parse(current.expiresAt) <= now.getTime()) {
+          await repo.closeCheckout(current.id, { status: CheckoutStatus.EXPIRED });
+          outcome = 'expired';
+        } else {
+          outcome = 'open';
+        }
+      } else {
+        outcome = 'closed';
+      }
+      // After the close, so an expired row is not due again for its "final ask".
+      await repo.markChecked(checkout.id);
+      return { outcome, asked: true };
+    } catch {
+      if (wasOpen) {
+        try {
+          await repo.markChecked(checkout.id);
+        } catch {
+          // It is asked about again next run either way.
+        }
+      }
+      return { outcome: 'error', asked: true };
+    }
+  }
+
+  /**
+   * The admin's to-do list, oldest first: `orphan`, `mismatch` and `failed`
+   * events, events left `received` for over an hour, checkouts in `mismatch`
+   * and checkouts under dispute — dismissed rows excluded. Reads the database
+   * only; no provider is ever called.
+   */
+  async listExceptions(): Promise<PaymentExceptionView[]> {
+    const rows = await this.deps.gatewayRepo.listExceptions();
+    const names = new Map<string, string | null>();
+    const payer = this.deps.checkout?.payer;
+    const nameOf = async (userId: string): Promise<string | null> => {
+      if (!names.has(userId)) {
+        let name: string | null = null;
+        try {
+          name = payer ? ((await payer(userId))?.name ?? null) : null;
+        } catch {
+          // A name is a courtesy; the row is listed without it.
+        }
+        names.set(userId, name);
+      }
+      return names.get(userId) ?? null;
+    };
+
+    const views: PaymentExceptionView[] = [];
+    for (const row of rows) {
+      const checkout = row.checkout;
+      const receivable = checkout
+        ? {
+            kind: checkout.receivableKind,
+            id: checkout.receivableId,
+            userId: checkout.userId,
+            studentName: await nameOf(checkout.userId),
+            amountMinor: checkout.amountMinor,
+            currency: checkout.currency,
+          }
+        : null;
+      const ref = formatExceptionRef(exceptionRefOf(row));
+      if (row.kind === 'event') {
+        views.push({
+          ref,
+          kind: row.event.outcome as PaymentExceptionKind,
+          source: 'event',
+          provider: row.event.provider,
+          eventId: row.event.eventId,
+          eventType: row.event.type,
+          providerPaymentId: row.event.providerPaymentId ?? checkout?.providerPaymentId ?? null,
+          checkoutId: checkout?.id ?? row.event.checkoutId,
+          attempts: row.event.attempts,
+          detail: row.event.error,
+          occurredAt: row.occurredAt,
+          receivable,
+        });
+      } else {
+        views.push({
+          ref,
+          kind: row.checkout.status === CheckoutStatus.MISMATCH ? 'mismatch' : 'dispute',
+          source: 'checkout',
+          provider: row.checkout.provider,
+          eventId: null,
+          eventType: null,
+          providerPaymentId: row.checkout.providerPaymentId,
+          checkoutId: row.checkout.id,
+          attempts: null,
+          detail: row.checkout.failureDetail,
+          occurredAt: row.occurredAt,
+          receivable,
+        });
+      }
+    }
+    return views;
+  }
+
+  /**
+   * Dismisses one row **currently on the list** (milestone 30, decision 20):
+   * who, when and the note are stored and the row leaves the list and the
+   * stale count. No status, no outcome and no ledger row changes. A `ref` that
+   * is malformed is `400`; one that names nothing on the list — unknown,
+   * already dismissed, or not an exception at all — is `404`.
+   */
+  async dismissException(
+    ref: string,
+    note: string,
+    adminId: string,
+  ): Promise<ControllerResult<DismissedException>> {
+    const parsed = parseExceptionRef(ref);
+    if (!parsed) return refusal(400, 'ValidationError', { message: 'the ref is not an exception reference' });
+    const canonical = formatExceptionRef(parsed);
+
+    const repo = this.deps.gatewayRepo;
+    const listed = (await repo.listExceptions()).some((row) => formatExceptionRef(exceptionRefOf(row)) === canonical);
+    if (!listed) return CHECKOUT_NOT_FOUND;
+    if (!(await repo.dismissException(parsed, { dismissedBy: adminId, note }))) return CHECKOUT_NOT_FOUND;
+
+    const dismissedAt = this.now().toISOString();
+    // The note is the admin's free text and stays in the row, not in the log.
+    console.info(
+      JSON.stringify({ event: 'payments.exception_dismissed', actor: adminId, ref: canonical, at: dismissedAt }),
+    );
+    return { ok: true, data: { ref: canonical, dismissedBy: adminId, dismissedAt } };
   }
 
   // -------------------------------------------------------------------------

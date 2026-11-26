@@ -16,6 +16,7 @@ import { buildContainer } from '@api/container';
 import { runScheduledBilling } from '@api/core/billing/billing-service';
 import { sweepPendingSubmissions } from '@api/jobs/sweep-pending-submissions';
 import { reconcileMissions } from '@api/jobs/reconcile-missions';
+import { runReconcilePayments, scheduledPlan } from '@api/jobs/reconcile-payments';
 import {
   recordJobRun,
   pruneJobRuns,
@@ -51,6 +52,12 @@ export default {
   },
 
   /**
+   * Dispatches on `controller.cron` (`scheduledPlan`): the hourly expression
+   * runs the payment reconcile alone, so it neither spends the daily jobs'
+   * budget nor waits behind them; an unknown expression logs an error and runs
+   * nothing. The payment run records its own `job_runs` row and, with no
+   * provider bound, returns before reading anything.
+   *
    * The daily billing run (RFC 0013 §6), fired by `triggers.crons`.
    *
    * A delegation and nothing else: every rule lives in
@@ -77,13 +84,49 @@ export default {
    * older than 180 days are pruned last.
    */
   async scheduled(
-    _controller: ScheduledController,
+    controller: ScheduledController,
     env: AppEnv,
     _ctx: ExecutionContext,
   ): Promise<void> {
+    const plan = scheduledPlan(controller.cron, controller.scheduledTime);
+    if (!plan) {
+      console.error(
+        JSON.stringify({ event: 'scheduled.unknown_cron', cron: controller.cron, at: new Date().toISOString() }),
+      );
+      return;
+    }
+
     const container = buildContainer(env);
     const jobRuns = container.infra.jobRuns;
     const { JobName, JobTrigger } = Entities.Config;
+
+    if (plan.reconcilePayments) {
+      // Sequenced before the daily jobs only in the single-trigger fallback;
+      // a failure here must not skip them.
+      try {
+        await runReconcilePayments(
+          {
+            config: container.payments.config,
+            gateways: container.payments.gateways,
+            gatewayRepo: container.payments.gatewayRepo,
+            gatewayService: container.payments.gatewayService,
+            jobRuns,
+          },
+          { trigger: JobTrigger.CRON },
+        );
+      } catch (error) {
+        if (!plan.daily) throw error;
+        console.error(
+          JSON.stringify({
+            event: 'payments.reconcile_failed',
+            error: error instanceof Error ? error.name : 'Error',
+            at: new Date().toISOString(),
+          }),
+        );
+      }
+    }
+    if (!plan.daily) return;
+
     try {
       await recordJobRun(
         jobRuns,

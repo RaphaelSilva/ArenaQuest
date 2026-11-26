@@ -1,6 +1,7 @@
 import { env, createExecutionContext, createScheduledController, waitOnExecutionContext } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
+import { DAILY_CRON, RECONCILE_PAYMENTS_CRON, scheduledPlan } from '@api/jobs/reconcile-payments';
 import { BillingService } from '@api/core/billing/billing-service';
 import { D1JobRunRepository } from '@api/adapters/db/d1-job-run-repository';
 import { JOB_RUN_ERROR_MAX_LENGTH } from '@arenaquest/shared/ports';
@@ -81,11 +82,24 @@ async function insertAged(job: string, daysAgo: number): Promise<string> {
   return id;
 }
 
-async function runScheduled() {
-  const controller = createScheduledController({ scheduledTime: Date.now(), cron: '0 3 * * *' });
+async function runScheduled(cron: string = DAILY_CRON, overrides: Record<string, string> = {}) {
+  const controller = createScheduledController({ scheduledTime: Date.now(), cron });
   const ctx = createExecutionContext();
-  await worker.scheduled(controller, env as AppEnv, ctx);
+  await worker.scheduled(controller, { ...env, ...overrides } as AppEnv, ctx);
   await waitOnExecutionContext(ctx);
+}
+
+// `wrangler.jsonc` as text, inlined by Vite - the Workers pool has no filesystem.
+const wranglerConfig = Object.values(
+  import.meta.glob('../../wrangler.jsonc', { query: '?raw', import: 'default', eager: true }),
+)[0] as string;
+
+/** The `triggers.crons` array of `wrangler.jsonc`, read from the file itself (comments stripped). */
+function configuredCrons(): string[] {
+  const withoutComments = wranglerConfig.replace(/\/\*[\s\S]*?\*\//g, '');
+  const block = /"triggers"\s*:\s*\{\s*"crons"\s*:\s*\[([^\]]*)\]/.exec(withoutComments);
+  if (!block) throw new Error('wrangler.jsonc has no top-level triggers.crons');
+  return [...block[1].matchAll(/"([^"]*)"/g)].map((match) => match[1]);
 }
 
 describe('scheduled() - job_runs recording', () => {
@@ -152,5 +166,73 @@ describe('scheduled() - job_runs recording', () => {
     expect(ids).not.toContain(old);
     expect(ids).toContain(kept);
     expect(ids).toHaveLength(3);
+  });
+});
+
+/**
+ * The dispatch on `controller.cron` (RFC 0026 section 6; M30 Task 09): each
+ * expression has its own invocation and its own jobs, and an expression the
+ * Worker does not know runs nothing.
+ */
+describe('scheduled() - dispatch on controller.cron', () => {
+  // A provider named in the list with no adapter in the production map is an
+  // invalid configuration - the one way the real Worker's reconcile run
+  // records a row without a stub: `failed`, `PAYMENTS_CONFIG_INVALID`.
+  const BOUND = { PAYMENTS_PROVIDERS: 'mercadopago:pix', PAYMENTS_KEY_MODE: 'test' };
+
+  it('the two expressions in wrangler.jsonc are exactly the dispatch constants', () => {
+    expect(configuredCrons()).toEqual([DAILY_CRON, RECONCILE_PAYMENTS_CRON]);
+    expect(DAILY_CRON).toBe('0 6 * * *');
+    expect(RECONCILE_PAYMENTS_CRON).toBe('17 * * * *');
+  });
+
+  it('plans the daily jobs for one expression, the payment reconcile for the other, nothing for the rest', () => {
+    expect(scheduledPlan(DAILY_CRON, 0)).toEqual({ daily: true, reconcilePayments: false });
+    expect(scheduledPlan(RECONCILE_PAYMENTS_CRON, 0)).toEqual({ daily: false, reconcilePayments: true });
+    for (const cron of ['0 3 * * *', '17 * * * * ', '* * * * *', '']) expect(scheduledPlan(cron, 0)).toBeNull();
+  });
+
+  it('the hourly expression runs no daily job, and under `none` writes no job_runs row at all', async () => {
+    const billingSpy = vi.spyOn(BillingService.prototype, 'runBillingCycle');
+    const stale = await insertStalePending();
+
+    await runScheduled(RECONCILE_PAYMENTS_CRON);
+
+    expect(await rows()).toEqual([]);
+    expect(billingSpy).not.toHaveBeenCalled();
+    expect(await submissionExists(stale.id)).toBe(true);
+    await env.DB.prepare('DELETE FROM topic_submissions WHERE id = ?').bind(stale.id).run();
+  });
+
+  it('the hourly expression records exactly one reconcile_payments row when a provider is listed', async () => {
+    const billingSpy = vi.spyOn(BillingService.prototype, 'runBillingCycle');
+
+    await runScheduled(RECONCILE_PAYMENTS_CRON, BOUND);
+
+    const all = await rows();
+    expect(all.map((r) => [r.job, r.trigger, r.status, r.actor_id])).toEqual([
+      ['reconcile_payments', 'cron', 'failed', null],
+    ]);
+    expect(all[0].error).toMatch(/^PAYMENTS_CONFIG_INVALID: no_adapter/);
+    expect(all[0].finished_at).not.toBeNull();
+    expect(billingSpy).not.toHaveBeenCalled();
+  });
+
+  it('the daily expression does not run the payment reconcile, even with a provider listed', async () => {
+    await runScheduled(DAILY_CRON, BOUND);
+
+    expect((await rows()).map((r) => r.job)).toEqual(['billing', 'sweep_submissions']);
+  });
+
+  it('an unknown expression logs an error and runs nothing', async () => {
+    const billingSpy = vi.spyOn(BillingService.prototype, 'runBillingCycle');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await runScheduled('0 3 * * *', BOUND);
+
+    expect(await rows()).toEqual([]);
+    expect(billingSpy).not.toHaveBeenCalled();
+    const logged = error.mock.calls.map((call) => JSON.parse(String(call[0])));
+    expect(logged).toEqual([expect.objectContaining({ event: 'scheduled.unknown_cron', cron: '0 3 * * *' })]);
   });
 });

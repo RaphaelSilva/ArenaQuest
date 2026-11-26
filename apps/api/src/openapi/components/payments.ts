@@ -181,3 +181,117 @@ export const RefundUnrecordedBody = z
     }),
   })
   .openapi('RefundUnrecordedBody');
+
+// ---------------------------------------------------------------------------
+// Reconcile run and exceptions (RFC 0026 §6, §7)
+// ---------------------------------------------------------------------------
+
+const count = (description: string) => z.number().int().min(0).openapi({ description, example: 0 });
+
+/** The counts of one reconcile run — also what `job_runs.summary` holds for `reconcile_payments`. */
+export const ReconcilePaymentsSummarySchema = z
+  .object({
+    checkoutsDue: count('Checkouts due when the run started.'),
+    checkoutsAsked: count('Provider searches made — at most 25 per run.'),
+    landed: count('Payments the provider held whose checkout is now `paid`.'),
+    expired: count('Checkouts closed `expired` after the provider reported nothing paid.'),
+    stillOpen: count('Asked, nothing paid yet, not yet expired.'),
+    abandoned: count('Open with no provider session for over 30 minutes: closed `failed`, no provider call.'),
+    unreachable: count('On a provider that is no longer bound: expired without being asked. Non-zero fails the run.'),
+    mismatched: count('A payment was found that does not fit its checkout; see the exceptions list.'),
+    checkoutErrors: count('The provider could not be asked; tried again next run.'),
+    checkoutsDeferred: count('Due and left for the next run.'),
+    eventsDue: count('Unsettled events due when the run started.'),
+    eventsRetried: count('Events processed again — at most 10 per run.'),
+    eventsSettled: count('Of those, how many reached a final outcome.'),
+    eventsFailed: count('Of those, how many failed again.'),
+    eventsDeferred: count('Due and left for the next run.'),
+    staleOrphans: count('`orphan` events older than 7 days, not dismissed.'),
+    staleMismatches: count('`mismatch` events and checkouts older than 7 days, not dismissed.'),
+  })
+  .openapi('ReconcilePaymentsSummary');
+
+/** `200` of `POST /v1/admin/billing/payments/reconcile`. A failed run is still a `200`: the verdict is in the body. */
+export const ReconcilePaymentsRunSchema = z
+  .object({
+    status: z.enum(['ok', 'failed']).openapi({
+      description: '`failed` when a checkout sat on a provider that is no longer bound (`unreachable > 0`).',
+      example: 'ok',
+    }),
+    error: z.string().nullable().openapi({ description: 'Why the run failed; `null` on `ok`.', example: null }),
+    summary: ReconcilePaymentsSummarySchema,
+  })
+  .openapi('ReconcilePaymentsRun');
+
+/** One row of the exceptions list. Ids and states only. */
+export const PaymentExceptionSchema = z
+  .object({
+    ref: z.string().openapi({
+      description:
+        'Stable handle for dismissal: `event:<provider>:<eventId>` or `checkout:<checkoutId>`. Opaque to the client — send it back as is.',
+      example: 'event:mercadopago:123456789',
+    }),
+    kind: z.enum(['orphan', 'mismatch', 'failed', 'received', 'dispute']).openapi({
+      description:
+        '`orphan`: a provider payment that names no checkout of ours. `mismatch`: a payment that does not fit its checkout — nothing landed. ' +
+        '`failed`: processing failed and is retried for 72 hours. `received`: left unprocessed for over an hour. ' +
+        '`dispute`: a chargeback on a landed payment (`detail` reads `dispute opened|won|lost`).',
+      example: 'orphan',
+    }),
+    source: z.enum(['event', 'checkout']).openapi({ description: 'Which record the row stands for.' }),
+    provider: ProviderNameSchema,
+    eventId: z.string().nullable().openapi({ description: 'The provider\'s notification id; `null` for a checkout row.' }),
+    eventType: z.string().nullable().openapi({ example: 'payment' }),
+    providerPaymentId: z.string().nullable().openapi({
+      description: 'The provider\'s payment id (bare), when known — what the dashboard link and *match by hand* use.',
+    }),
+    checkoutId: z.string().nullable(),
+    attempts: z.number().int().nullable().openapi({ description: 'Processing attempts of an event; `null` for a checkout row.' }),
+    detail: z.string().nullable().openapi({
+      description: 'The stored failure, mismatch or dispute description. Never a provider message.',
+      example: 'payment not landed: the receivable is void',
+    }),
+    occurredAt: z.string().openapi({
+      description: 'When the event was received, or the checkout last changed. The list is ordered by it, oldest first.',
+      example: '2026-11-26T14:03:00.000Z',
+    }),
+    receivable: z
+      .object({
+        kind: ReceivableKindSchema,
+        id: z.string(),
+        userId: z.string().openapi({ description: 'The student who owes it.' }),
+        studentName: z.string().nullable(),
+        amountMinor: z.number().int().openapi({
+          description: 'What the checkout asked for — not necessarily what the provider captured.',
+          example: 15000,
+        }),
+        currency: z.string().openapi({ example: 'BRL' }),
+      })
+      .nullable()
+      .openapi({ description: 'What the checkout was collecting; `null` when no checkout is known.' }),
+  })
+  .openapi('PaymentException');
+
+export const PaymentExceptionListSchema = z
+  .object({ exceptions: z.array(PaymentExceptionSchema).openapi({ description: 'Oldest first; dismissed rows excluded.' }) })
+  .openapi('PaymentExceptionList');
+
+/** Body of `POST /v1/admin/billing/payments/exceptions/dismiss`. */
+export const DismissPaymentExceptionBodySchema = z
+  .object({
+    ref: z.string().min(1).max(300).openapi({ example: 'event:mercadopago:123456789' }),
+    note: z.string().min(1).max(500).openapi({
+      description: 'Why it is being dismissed — 1 to 500 characters, not blank.',
+      example: 'Matched by hand to the November invoice.',
+    }),
+  })
+  .strict()
+  .openapi('DismissPaymentExceptionBody');
+
+export const DismissedPaymentExceptionSchema = z
+  .object({
+    ref: z.string(),
+    dismissedBy: z.string(),
+    dismissedAt: z.string().openapi({ example: '2026-11-26T15:00:00.000Z' }),
+  })
+  .openapi('DismissedPaymentException');

@@ -52,13 +52,11 @@ export interface OpsHealth {
 }
 
 /**
- * The jobs health reports on. `reconcile_payments` is a job *name* since M30
- * Task 01 but has no run yet, so it stays off this list until the job itself
- * ships (M30 Task 09) — listing it now would show a job that never ran.
+ * The jobs health reports on: every job name. `reconcile_payments` (M30)
+ * records a run only on a label that binds a payment provider, so elsewhere
+ * its `lastRun` stays `null` — which is the truth there.
  */
-const HEALTH_JOBS: ReadonlyArray<Entities.Config.JobName> = Object.values(Entities.Config.JobName).filter(
-  (job) => job !== Entities.Config.JobName.RECONCILE_PAYMENTS,
-);
+const HEALTH_JOBS: ReadonlyArray<Entities.Config.JobName> = Object.values(Entities.Config.JobName);
 
 export interface ListJobRunsQuery {
   job?: Entities.Config.JobName;
