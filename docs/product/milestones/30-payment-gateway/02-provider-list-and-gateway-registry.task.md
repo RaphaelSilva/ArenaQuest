@@ -1,6 +1,6 @@
 # Task 02 — Backend: Provider list, gateway registry and stub adapter (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Backend API
@@ -80,15 +80,15 @@ task the default (`none`) is observable: an empty registry, and nothing else in 
 
 ## Acceptance Criteria
 
-- [ ] `none` and an absent variable both yield an empty registry and a valid configuration.
-- [ ] Each of the five rules has a test where the list is refused with a distinct reason, and no
+- [x] `none` and an absent variable both yield an empty registry and a valid configuration.
+- [x] Each of the five rules has a test where the list is refused with a distinct reason, and no
       refusal degrades to `none` or to fewer methods.
-- [ ] `mercadopago:pix+card,asaas:` (with stubs bound) yields one pay option, two bound providers.
-- [ ] A `live` key under `PAYMENTS_KEY_MODE=test`, and a `test` key under `live`, are each invalid.
-- [ ] `grep -r "stub-gateway-adapter" apps/api/src` returns nothing.
-- [ ] Every `env.*` block of `wrangler.jsonc` carries both variables; `make cf-typegen` leaves no diff.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] `mercadopago:pix+card,asaas:` (with stubs bound) yields one pay option, two bound providers.
+- [x] A `live` key under `PAYMENTS_KEY_MODE=test`, and a `test` key under `live`, are each invalid.
+- [x] `grep -r "stub-gateway-adapter" apps/api/src` returns nothing.
+- [x] Every `env.*` block of `wrangler.jsonc` carries both variables; `make cf-typegen` leaves no diff.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
