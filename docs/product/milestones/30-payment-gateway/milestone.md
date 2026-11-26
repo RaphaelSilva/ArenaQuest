@@ -156,7 +156,7 @@ source. Task 14 is the one backend task of Phase 4 (reminder e-mail copy).
 | 11 | [Payment due card on the dashboard](./11-dashboard-payment-due-card.task.md) | 4 | Frontend | ✅ Done |
 | 12 | [Admin ledger, pending online payment and refund confirmation](./12-admin-ledger-online-payments.task.md) | 4 | Frontend | ✅ Done |
 | 13 | [Payment exceptions panel](./13-payment-exceptions-panel.task.md) | 4 | Frontend | ✅ Done |
-| 14 | [Pay link in the reminder e-mails](./14-reminder-email-pay-link.task.md) | 4 | Backend | ☐ Open |
+| 14 | [Pay link in the reminder e-mails](./14-reminder-email-pay-link.task.md) | 4 | Backend | ✅ Done |
 | 15 | [Provider configuration schema and provisioning](./15-provider-configuration-and-provisioning.task.md) | 5 | Backend | ✅ Done |
 | 16 | [Operations runbook, staging rollout and closeout](./16-runbook-staging-rollout-and-closeout.task.md) | 5 | Backend | ☐ Open |
 
