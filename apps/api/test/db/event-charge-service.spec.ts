@@ -4,7 +4,8 @@ import { D1EventChargeRepository } from '@api/adapters/db/d1-event-charge-reposi
 import { D1EventRepository } from '@api/adapters/db/d1-event-repository';
 import { D1UserGroupRepository } from '@api/adapters/db/d1-user-group-repository';
 import { D1BillingRepository } from '@api/adapters/db/d1-billing-repository';
-import { EventChargeService } from '@api/core/billing/event-charge-service';
+import { EventChargeService, PAYMENT_REFERENCE_EXISTS } from '@api/core/billing/event-charge-service';
+import { SYSTEM_PAYMENT_ACTOR_ID } from '@api/adapters/db/d1-gateway-repository';
 import { Entities } from '@arenaquest/shared/types/entities';
 import type { ControllerResult } from '@api/core/result';
 import { applyMigrations } from '../helpers/apply-migrations';
@@ -440,6 +441,277 @@ describe('EventChargeService', () => {
     expect(detail.adjustments).toEqual([]);
     expect(detail.balanceMinor).toBe(7000);
     expectStatus(await service.getChargeDetail('nope'), 404);
+  });
+
+  // -------------------------------------------------------------------------
+  // Gateway entry points (RFC 0026 §5) — against the real partial unique index
+  // -------------------------------------------------------------------------
+
+  describe('gateway entry points', () => {
+    const ref = (kind: string) => `mercadopago:${kind}-${crypto.randomUUID()}`;
+
+    async function openCharge() {
+      await priced();
+      return issueOne();
+    }
+
+    function land(chargeId: string, externalReference: string, amountMinor = 8000, currency = 'BRL') {
+      return service.recordGatewayPayment(chargeId, {
+        amountMinor,
+        currency,
+        paidAt: '2030-01-05T12:00:00.000Z',
+        externalReference,
+      });
+    }
+
+    async function paymentRows(chargeId: string): Promise<number> {
+      return count('SELECT COUNT(*) AS n FROM event_charge_payments WHERE charge_id = ?', chargeId);
+    }
+
+    it('lands a payment that differs from an admin one only in method, recorder and reference', async () => {
+      const charge = await openCharge();
+      const other = await issueOne(eventId, userB);
+      const reference = ref('pay');
+
+      const { payment, created } = expectOk(await land(charge.id, reference));
+      const typed = expectOk(
+        await service.recordPayment(
+          other.id,
+          { amountMinor: 8000, method: PaymentMethod.PIX, paidAt: '2030-01-05' },
+          adminId,
+        ),
+      );
+
+      expect(created).toBe(true);
+      expect(payment).toMatchObject({
+        method: PaymentMethod.GATEWAY,
+        recordedBy: SYSTEM_PAYMENT_ACTOR_ID,
+        externalReference: reference,
+        paidAt: '2030-01-05',
+        reversesId: null,
+      });
+      expect({ ...payment, id: '', chargeId: '', method: '', recordedBy: '', externalReference: '', recordedAt: '' }).toEqual({
+        ...typed,
+        id: '',
+        chargeId: '',
+        method: '',
+        recordedBy: '',
+        externalReference: '',
+        recordedAt: '',
+      });
+      const [landed, admin] = await Promise.all([repo.getCharge(charge.id), repo.getCharge(other.id)]);
+      expect(landed).toMatchObject({ status: ChargeStatus.PAID, balanceMinor: 0 });
+      expect(admin).toMatchObject({ status: ChargeStatus.PAID, balanceMinor: 0 });
+    });
+
+    it('audits payments.gateway_landed by the system actor with ids only', async () => {
+      const charge = await openCharge();
+      const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const { payment } = expectOk(await land(charge.id, ref('pay')));
+      const lines = info.mock.calls.map(([line]) => JSON.parse(String(line)));
+      info.mockRestore();
+
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatchObject({
+        event: 'payments.gateway_landed',
+        actor: SYSTEM_PAYMENT_ACTOR_ID,
+        rail: 'extras',
+        chargeId: charge.id,
+        paymentId: payment.id,
+      });
+      expect(lines[0]).not.toHaveProperty('amountMinor');
+    });
+
+    it('is idempotent: two calls, and two concurrent calls, leave one row with one id', async () => {
+      const charge = await openCharge();
+      const reference = ref('pay');
+
+      const first = expectOk(await land(charge.id, reference));
+      const second = expectOk(await land(charge.id, reference, 1));
+      expect(second).toEqual({ payment: first.payment, created: false });
+      expect(await paymentRows(charge.id)).toBe(1);
+
+      const racing = ref('pay');
+      const results = (await Promise.all([land(charge.id, racing, 10), land(charge.id, racing, 10)])).map(expectOk);
+      expect(results[0].payment.id).toBe(results[1].payment.id);
+      expect(results.filter((r) => r.created)).toHaveLength(1);
+      expect(await count('SELECT COUNT(*) AS n FROM event_charge_payments WHERE external_reference = ?', racing)).toBe(1);
+    });
+
+    it('returns the stored row when the index refuses an insert the read missed', async () => {
+      const charge = await openCharge();
+      const reference = ref('pay');
+      const first = expectOk(await land(charge.id, reference));
+
+      // The read misses once, as it does for the loser of a race; the index then decides.
+      const find = vi.spyOn(repo, 'findGatewayPayment').mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+      const second = expectOk(await land(charge.id, reference));
+      find.mockRestore();
+
+      expect(second).toEqual({ payment: first.payment, created: false });
+      expect(await paymentRows(charge.id)).toBe(1);
+    });
+
+    it('refuses a foreign currency, a malformed reference, an unknown and a void charge, writing nothing', async () => {
+      const charge = await openCharge();
+      expectStatus(await land(charge.id, ref('pay'), 8000, 'USD'), 400);
+      expectStatus(await land(charge.id, 'pay-1'), 400);
+      expectStatus(await land(charge.id, 'paypal:1'), 400);
+      expectStatus(await land('nope', ref('pay')), 404);
+      expectOk(await service.voidCharge(charge.id, 'Cancelled', adminId));
+      expectStatus(await land(charge.id, ref('pay')), 409);
+      expect(await paymentRows(charge.id)).toBe(0);
+    });
+
+    it('an overpayment lands whole and leaves a credit', async () => {
+      const charge = await openCharge();
+      expectOk(await land(charge.id, ref('pay'), 10000));
+      expect(await repo.getCharge(charge.id)).toMatchObject({ status: ChargeStatus.PAID, balanceMinor: -2000 });
+    });
+
+    it('recomputes the extras standing after a landed payment and after its reversal', async () => {
+      const charge = await openCharge();
+      const asOf = '2031-01-01';
+      const standing = async () => expectOk(await service.getExtrasStanding(userA, asOf));
+
+      expect(await standing()).toMatchObject({ standing: 'delinquent', outstandingMinor: 8000, openCharges: 1 });
+
+      const { payment } = expectOk(await land(charge.id, ref('pay')));
+      expect(await standing()).toMatchObject({ standing: 'good', outstandingMinor: 0, openCharges: 0 });
+
+      const refundRef = ref('refund');
+      const { payment: reversal, created } = expectOk(
+        await service.reverseGatewayPayment(payment.id, { externalReference: refundRef, paidAt: '2030-01-08' }),
+      );
+      expect(created).toBe(true);
+      expect(reversal).toMatchObject({
+        amountMinor: -8000,
+        method: PaymentMethod.GATEWAY,
+        externalReference: refundRef,
+        reversesId: payment.id,
+        recordedBy: SYSTEM_PAYMENT_ACTOR_ID,
+      });
+      expect(reversal.externalReference).not.toBe(payment.externalReference);
+      expect(await standing()).toMatchObject({ standing: 'delinquent', outstandingMinor: 8000, openCharges: 1 });
+      expect((await repo.getCharge(charge.id))?.status).toBe(ChargeStatus.OPEN);
+    });
+
+    it('reversal: idempotent on the refund id, one per payment, never the original reference', async () => {
+      const charge = await openCharge();
+      const { payment } = expectOk(await land(charge.id, ref('pay')));
+      const refundRef = ref('refund');
+      const command = { externalReference: refundRef, paidAt: '2030-01-08', recordedBy: adminId, note: 'Duplicate.' };
+
+      const [a, b] = (
+        await Promise.all([
+          service.reverseGatewayPayment(payment.id, command),
+          service.reverseGatewayPayment(payment.id, command),
+        ])
+      ).map(expectOk);
+      expect(a.payment.id).toBe(b.payment.id);
+      expect(a.payment).toMatchObject({ recordedBy: adminId, note: 'Duplicate.' });
+      expect(await paymentRows(charge.id)).toBe(2);
+
+      expectStatus(
+        await service.reverseGatewayPayment(payment.id, { externalReference: payment.externalReference!, paidAt: '2030-01-08' }),
+        400,
+      );
+      expectStatus(
+        await service.reverseGatewayPayment(payment.id, { externalReference: 'stripe:re_1', paidAt: '2030-01-08' }),
+        400,
+      );
+      expectStatus(
+        await service.reverseGatewayPayment(payment.id, { externalReference: ref('refund'), paidAt: '2030-01-08' }),
+        409,
+      );
+      expectStatus(
+        await service.reverseGatewayPayment(a.payment.id, { externalReference: ref('refund'), paidAt: '2030-01-08' }),
+        409,
+      );
+      expectStatus(
+        await service.reverseGatewayPayment('nope', { externalReference: ref('refund'), paidAt: '2030-01-08' }),
+        404,
+      );
+      const typed = expectOk(
+        await service.recordPayment(charge.id, { amountMinor: 10, method: PaymentMethod.CASH }, adminId),
+      );
+      expectStatus(
+        await service.reverseGatewayPayment(typed.id, { externalReference: ref('refund'), paidAt: '2030-01-08' }),
+        409,
+      );
+      expect(await paymentRows(charge.id)).toBe(3);
+    });
+
+    it('books a provider-side refund and a lost dispute as negative rows with no reversesId', async () => {
+      const charge = await openCharge();
+      expectOk(await land(charge.id, ref('pay')));
+      const refundRef = ref('refund');
+      const command = { amountMinor: 3000, currency: 'BRL', paidAt: '2030-01-09', externalReference: refundRef };
+
+      const first = expectOk(await service.recordGatewayRefund(charge.id, command));
+      expect(first.created).toBe(true);
+      expect(first.payment).toMatchObject({
+        amountMinor: -3000,
+        method: PaymentMethod.GATEWAY,
+        reversesId: null,
+        recordedBy: SYSTEM_PAYMENT_ACTOR_ID,
+        note: `provider refund ${refundRef.slice('mercadopago:'.length)}`,
+      });
+      expect(expectOk(await service.recordGatewayRefund(charge.id, command))).toEqual({
+        payment: first.payment,
+        created: false,
+      });
+      expect(await repo.getCharge(charge.id)).toMatchObject({ status: ChargeStatus.OPEN, balanceMinor: 3000 });
+
+      const disputeRef = ref('dispute');
+      const [lost, twin] = (
+        await Promise.all(
+          [0, 1].map(() =>
+            service.recordGatewayRefund(charge.id, {
+              amountMinor: 5000,
+              currency: 'BRL',
+              paidAt: '2030-01-10',
+              externalReference: disputeRef,
+              kind: 'dispute',
+            }),
+          ),
+        )
+      ).map(expectOk);
+      expect(lost.payment.id).toBe(twin.payment.id);
+      expect(lost.payment.note).toBe(`provider dispute ${disputeRef.slice('mercadopago:'.length)}`);
+      expect(await paymentRows(charge.id)).toBe(3);
+
+      expectStatus(await service.recordGatewayRefund(charge.id, { ...command, externalReference: ref('refund'), currency: 'USD' }), 400);
+      expectStatus(await service.recordGatewayRefund(charge.id, { ...command, externalReference: ref('refund'), amountMinor: 0 }), 400);
+      expectStatus(await service.recordGatewayRefund('nope', { ...command, externalReference: ref('refund') }), 404);
+      expect(await paymentRows(charge.id)).toBe(3);
+    });
+
+    it('admin form with method = gateway: 400 malformed, 409 PAYMENT_REFERENCE_EXISTS with the row id', async () => {
+      const charge = await openCharge();
+      const reference = ref('pay');
+      const gateway = (externalReference?: string | null) =>
+        service.recordPayment(charge.id, { amountMinor: 100, method: PaymentMethod.GATEWAY, externalReference }, adminId);
+
+      expectStatus(await gateway(), 400);
+      expectStatus(await gateway('receipt 12'), 400);
+
+      const first = expectOk(await gateway(reference));
+      expect(first.recordedBy).toBe(adminId);
+      expect(await gateway(reference)).toMatchObject({
+        ok: false,
+        status: 409,
+        error: PAYMENT_REFERENCE_EXISTS,
+        meta: { paymentId: first.id },
+      });
+
+      // Two concurrent submissions of a fresh reference: one row, one 409.
+      const racing = ref('pay');
+      const results = await Promise.all([gateway(racing), gateway(racing)]);
+      expect(results.filter((r) => r.ok)).toHaveLength(1);
+      expect(results.find((r) => !r.ok)).toMatchObject({ status: 409, error: PAYMENT_REFERENCE_EXISTS });
+      expect(await paymentRows(charge.id)).toBe(2);
+    });
   });
 
   it('emits a billing.charge.* audit line with the actor for each write', async () => {

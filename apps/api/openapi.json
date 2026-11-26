@@ -4660,6 +4660,26 @@
         ],
         "type": "object"
       },
+      "PaymentConflictBody": {
+        "properties": {
+          "error": {
+            "description": "`PAYMENT_REFERENCE_EXISTS` when a gateway payment with this externalReference is already on the ledger; `Conflict` otherwise",
+            "example": "PAYMENT_REFERENCE_EXISTS",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "paymentId": {
+            "description": "With `PAYMENT_REFERENCE_EXISTS`: the id of the ledger row that already carries the reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
       "PlayerProgression": {
         "properties": {
           "badges": {
@@ -7082,6 +7102,7 @@
     },
     "/v1/admin/billing/charges/{id}/payments": {
       "post": {
+        "description": "With `method: \"gateway\"` the `externalReference` is required, must read `<provider>:<id>` for a known provider, and is unique on the ledger.",
         "parameters": [
           {
             "in": "path",
@@ -7114,7 +7135,7 @@
             "description": "Payment recorded"
           },
           "400": {
-            "description": "Validation failed"
+            "description": "Validation failed — including a `gateway` payment whose externalReference is not `<provider>:<id>`"
           },
           "403": {
             "description": "Forbidden — admin only"
@@ -7123,7 +7144,14 @@
             "description": "Not found"
           },
           "409": {
-            "description": "Conflict"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentConflictBody"
+                }
+              }
+            },
+            "description": "Conflict — `PAYMENT_REFERENCE_EXISTS` when a gateway payment with this reference is already on the ledger (`paymentId` names it); otherwise a void receivable"
           }
         },
         "security": [
@@ -7794,6 +7822,7 @@
     },
     "/v1/admin/billing/invoices/{id}/payments": {
       "post": {
+        "description": "With `method: \"gateway\"` the `externalReference` is required, must read `<provider>:<id>` for a known provider, and is unique on the ledger.",
         "parameters": [
           {
             "in": "path",
@@ -7826,7 +7855,7 @@
             "description": "Payment recorded"
           },
           "400": {
-            "description": "Validation failed"
+            "description": "Validation failed — including a `gateway` payment whose externalReference is not `<provider>:<id>`"
           },
           "403": {
             "description": "Forbidden — admin only"
@@ -7835,7 +7864,14 @@
             "description": "Not found"
           },
           "409": {
-            "description": "Conflict"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentConflictBody"
+                }
+              }
+            },
+            "description": "Conflict — `PAYMENT_REFERENCE_EXISTS` when a gateway payment with this reference is already on the ledger (`paymentId` names it); otherwise a void receivable"
           }
         },
         "security": [

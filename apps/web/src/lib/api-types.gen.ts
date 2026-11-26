@@ -685,7 +685,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record an Event Charge Payment */
+        /**
+         * Record an Event Charge Payment
+         * @description With `method: "gateway"` the `externalReference` is required, must read `<provider>:<id>` for a known provider, and is unique on the ledger.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -710,7 +713,7 @@ export interface paths {
                         "application/json": components["schemas"]["BillingEventChargePayment"];
                     };
                 };
-                /** @description Validation failed */
+                /** @description Validation failed — including a `gateway` payment whose externalReference is not `<provider>:<id>` */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -731,12 +734,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Conflict */
+                /** @description Conflict — `PAYMENT_REFERENCE_EXISTS` when a gateway payment with this reference is already on the ledger (`paymentId` names it); otherwise a void receivable */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["PaymentConflictBody"];
+                    };
                 };
             };
         };
@@ -1538,7 +1543,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record a Payment */
+        /**
+         * Record a Payment
+         * @description With `method: "gateway"` the `externalReference` is required, must read `<provider>:<id>` for a known provider, and is unique on the ledger.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -1563,7 +1571,7 @@ export interface paths {
                         "application/json": components["schemas"]["BillingPayment"];
                     };
                 };
-                /** @description Validation failed */
+                /** @description Validation failed — including a `gateway` payment whose externalReference is not `<provider>:<id>` */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -1584,12 +1592,14 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Conflict */
+                /** @description Conflict — `PAYMENT_REFERENCE_EXISTS` when a gateway payment with this reference is already on the ledger (`paymentId` names it); otherwise a void receivable */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["PaymentConflictBody"];
+                    };
                 };
             };
         };
@@ -12416,6 +12426,16 @@ export interface components {
              * @enum {string}
              */
             status: "ok" | "degraded" | "down";
+        };
+        PaymentConflictBody: {
+            /**
+             * @description `PAYMENT_REFERENCE_EXISTS` when a gateway payment with this externalReference is already on the ledger; `Conflict` otherwise
+             * @example PAYMENT_REFERENCE_EXISTS
+             */
+            error: string;
+            message?: string;
+            /** @description With `PAYMENT_REFERENCE_EXISTS`: the id of the ledger row that already carries the reference */
+            paymentId?: string;
         };
         PlayerProgression: {
             badges: {
