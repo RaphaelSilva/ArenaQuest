@@ -10830,6 +10830,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/webhooks/payments/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Receive a payment provider webhook
+         * @description Anonymous, signed by the provider. A delivery is a **trigger only**: the body decides nothing but which payment to fetch from the provider, and the fetched state decides the outcome. Verified-but-unusable deliveries (`orphan`, `mismatch`) answer `200` and are recorded for an admin; the service's own failure answers `503` so the provider delivers again. The request body is the provider's own payload and is read raw, so no schema is declared for it.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    provider: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The delivery was verified and recorded */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PaymentsWebhookAck"];
+                    };
+                };
+                /** @description The delivery is not authentic; nothing was written */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description This label and environment do not bind the provider */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description The body exceeds 64 KiB */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Too Many Requests (120 per minute per IP) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_CONFIG_INVALID`: the provider list or its secrets are invalid */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_EVENT_FAILED`: processing failed; deliver again */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -12436,6 +12543,14 @@ export interface components {
             message?: string;
             /** @description With `PAYMENT_REFERENCE_EXISTS`: the id of the ledger row that already carries the reference */
             paymentId?: string;
+        };
+        PaymentsWebhookAck: {
+            /**
+             * @description `applied`: this delivery changed the ledger or a dispute state. `duplicate`: the event, or everything it named, was already recorded. `ignored`: nothing to do (a pending, failed or expired payment, or an event kind the adapter ignores). `orphan`: the provider does not know the payment, or it names no checkout of this provider. `mismatch`: the payment does not fit its checkout; nothing landed.
+             * @example applied
+             * @enum {string}
+             */
+            outcome: "applied" | "duplicate" | "ignored" | "orphan" | "mismatch";
         };
         PlayerProgression: {
             badges: {
