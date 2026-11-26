@@ -1,10 +1,13 @@
 import { vi } from 'vitest';
-import type { MyBillingStatement } from '@web/lib/me-billing-api';
 import type {
-  BillingReportCurrency,
-  BillingStatementCharge,
-  Standing,
-} from '@web/lib/admin-billing-api';
+  CheckoutSession,
+  CheckoutStatus,
+  MyBillingStatement,
+  MyStatementCharge,
+  PayOption,
+  PendingCheckout,
+} from '@web/lib/me-billing-api';
+import type { BillingReportCurrency, Standing } from '@web/lib/admin-billing-api';
 
 export const BRL: BillingReportCurrency = { code: 'BRL', exponent: 2, symbol: 'R$' };
 export const JPY: BillingReportCurrency = { code: 'JPY', exponent: 0, symbol: '¥' };
@@ -23,6 +26,8 @@ export function emptyStatement(overrides: Partial<MyBillingStatement> = {}): MyB
     outstandingMinor: 0,
     contractGroups: [],
     invoices: [],
+    // What the API sends under `PAYMENTS_PROVIDERS = none`: nothing to pay with.
+    payOptions: [],
     // The API always sends the extras rail; never charged reads as this.
     extras: { standing: 'good', oldestOverdueDate: null, outstandingMinor: 0, charges: [] },
     ...overrides,
@@ -31,8 +36,8 @@ export function emptyStatement(overrides: Partial<MyBillingStatement> = {}): MyB
 
 /** One event charge as the statement carries it: the charge, its event, its ledger. */
 export function extrasCharge(
-  overrides: Partial<BillingStatementCharge> = {},
-): BillingStatementCharge {
+  overrides: Partial<MyStatementCharge> = {},
+): MyStatementCharge {
   return {
     id: 'ch1',
     eventId: 'e1',
@@ -54,6 +59,7 @@ export function extrasCharge(
     payments: [],
     eventTitle: 'Winter Seminar',
     eventStartsAt: '2026-07-18T09:00:00Z',
+    pendingCheckout: null,
     ...overrides,
   };
 }
@@ -113,6 +119,7 @@ export function statementWith(
         voidedAt: null,
         voidReason: null,
         balanceMinor: 20000,
+        pendingCheckout: null,
         adjustments: [
           {
             id: 'adj1',
@@ -156,5 +163,93 @@ export function makeStatementTransport(next: () => MyBillingStatement | Error) {
       return { ok: false, status: 500, json: async () => ({ error: 'BOOM' }) } as unknown as Response;
     }
     return { ok: true, status: 200, json: async () => result } as unknown as Response;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Online payment (RFC 0026) — shared by the statement and the dashboard card.
+// ---------------------------------------------------------------------------
+
+/** One provider offering Pix and card: the single-button case. */
+export const ONE_PROVIDER: PayOption[] = [{ provider: 'mercadopago', methods: ['pix', 'card'] }];
+
+/** Two providers, one method each, in the order the API lists them. */
+export const TWO_PROVIDERS: PayOption[] = [
+  { provider: 'mercadopago', methods: ['pix'] },
+  { provider: 'stripe', methods: ['card'] },
+];
+
+export function pendingCheckout(overrides: Partial<PendingCheckout> = {}): PendingCheckout {
+  return {
+    checkoutId: 'co1',
+    provider: 'mercadopago',
+    createdAt: '2026-09-01T12:00:00.000Z',
+    expiresAt: '2099-01-01T12:00:00.000Z',
+    createdBy: 'u1',
+    ...overrides,
+  };
+}
+
+export function checkoutSession(overrides: Partial<CheckoutSession> = {}): CheckoutSession {
+  return {
+    checkoutId: 'co1',
+    provider: 'mercadopago',
+    url: 'https://pay.example.test/checkout/co1',
+    expiresAt: '2099-01-01T12:00:00.000Z',
+    amountMinor: 20000,
+    currency: 'BRL',
+    status: 'open',
+    ...overrides,
+  };
+}
+
+export function checkoutStatus(overrides: Partial<CheckoutStatus> = {}): CheckoutStatus {
+  return {
+    checkoutId: 'co1',
+    provider: 'mercadopago',
+    kind: 'invoice',
+    receivableId: 'inv1',
+    status: 'open',
+    amountMinor: 20000,
+    currency: 'BRL',
+    createdAt: '2026-09-01T12:00:00.000Z',
+    expiresAt: '2099-01-01T12:00:00.000Z',
+    closedAt: null,
+    ...overrides,
+  };
+}
+
+type Reply = { status: number; body: unknown; headers?: Record<string, string> };
+
+/**
+ * A fake `HttpTransport` for the whole `/me/billing` surface: the statement,
+ * `POST …/checkouts` and `GET …/checkouts/{id}`. Each handler is read at call
+ * time, so a test can change what the API answers between two requests.
+ */
+export function makeBillingTransport(handlers: {
+  statement: () => MyBillingStatement;
+  createCheckout?: (body: Record<string, unknown>) => Reply | Promise<Reply>;
+  getCheckout?: (checkoutId: string) => Reply | Promise<Reply>;
+}) {
+  const respond = (reply: Reply) =>
+    ({
+      ok: reply.status >= 200 && reply.status < 300,
+      status: reply.status,
+      headers: new Headers(reply.headers ?? {}),
+      json: async () => reply.body,
+    }) as unknown as Response;
+
+  return vi.fn(async (method: string, path: string, options?: { body?: unknown }) => {
+    if (method === 'GET' && path === '/me/billing') {
+      return respond({ status: 200, body: handlers.statement() });
+    }
+    if (method === 'POST' && path === '/me/billing/checkouts' && handlers.createCheckout) {
+      const body = JSON.parse(String(options?.body ?? '{}')) as Record<string, unknown>;
+      return respond(await handlers.createCheckout(body));
+    }
+    if (method === 'GET' && path.startsWith('/me/billing/checkouts/') && handlers.getCheckout) {
+      return respond(await handlers.getCheckout(path.slice('/me/billing/checkouts/'.length)));
+    }
+    return respond({ status: 404, body: { error: 'NotFound' } });
   });
 }

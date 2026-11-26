@@ -1,21 +1,36 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { formatMoney } from '@arenaquest/shared/domain/billing/format-money';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
 import { Spinner } from '@web/components/spinner';
+import { PayAction, isPayable } from '@web/components/billing/pay-action';
 import type { MyBillingStatement } from '@web/lib/me-billing-api';
-import type { BillingStatementCharge, Standing } from '@web/lib/admin-billing-api';
+import type {
+  BillingStatementCharge,
+  PaymentMethod,
+  Standing,
+} from '@web/lib/admin-billing-api';
+import { useCheckoutReturn } from './use-checkout-return';
 
 /**
  * `/settings/billing` — the student's own side of the ledger.
  *
- * A read-only statement of what the API returned: the contract terms, every
- * invoice with its due date and balance, the payments and adjustments against
- * them, and the outstanding total. There is no payment affordance here by
- * design — money arrives out of band and an admin records it.
+ * A statement of what the API returned: the contract terms, every invoice with
+ * its due date and balance, the payments and adjustments against them, and the
+ * outstanding total.
+ *
+ * When the label offers an online method (`payOptions` non-empty, RFC 0026 §7)
+ * each open invoice and event charge also carries a *Pay* action that opens the
+ * provider's hosted page in a new tab. With no method offered the page is the
+ * read-only statement it always was. Either way nothing here is gated on a
+ * standing or on an unpaid receivable: the page only adds a way to pay.
+ *
+ * The return from the hosted page (`?checkout=…&outcome=…`) is a hint that
+ * starts a bounded poll — see `use-checkout-return.ts`. What is shown always
+ * comes from the status route and the statement.
  *
  * This is a sibling of `/settings`, so it follows that page's idiom: inline
  * style objects over the `--aq-*` custom properties, not the Tailwind utility
@@ -166,6 +181,21 @@ const badge = {
   border: '1px solid var(--aq-border2)',
 };
 
+const returnNotice = {
+  ...s.card,
+  fontSize: 13,
+  lineHeight: 1.6,
+  padding: '14px 18px',
+};
+
+type LedgerLine = {
+  id: string;
+  method: PaymentMethod;
+  paidAt: string;
+  amountMinor: number;
+  reversesId: string | null;
+};
+
 type ChargeLabel = 'open' | 'overdue' | 'paid' | 'void';
 
 /**
@@ -190,6 +220,12 @@ export default function StudentBillingPage() {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const clientRef = useRef(client);
+  useEffect(() => {
+    clientRef.current = client;
+  }, [client]);
 
   useEffect(() => {
     let cancelled = false;
@@ -213,6 +249,53 @@ export default function StudentBillingPage() {
       cancelled = true;
     };
   }, [client, attempt]);
+
+  // A quiet re-read: the statement on screen stays mounted (a pay action may be
+  // showing a link or an error), and a failure simply keeps what was there.
+  const refresh = useCallback(() => setRefreshTick((n) => n + 1), []);
+  useEffect(() => {
+    if (refreshTick === 0) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await clientRef.current.meBilling.getMyStatement();
+        if (!cancelled) {
+          setStatement(data);
+          setFailed(false);
+        }
+      } catch {
+        // Keep the statement already shown.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshTick]);
+
+  const getCheckout = useCallback(
+    (checkoutId: string) => clientRef.current.meBilling.getCheckout(checkoutId),
+    [],
+  );
+  const returnPhase = useCheckoutReturn(getCheckout, refresh);
+
+  /**
+   * One line of a receivable's payment history. A gateway row reads *Paid
+   * online* with its date; its refund — a mirror reversal or a provider-side
+   * negative row — reads as a refund, and a payment that was reversed says so.
+   */
+  const paymentLine = (payment: LedgerLine, all: readonly LedgerLine[]): string => {
+    if (payment.method !== 'gateway') {
+      return `${d.paymentMethod[payment.method]} · ${payment.paidAt}${
+        payment.reversesId === null ? '' : ` · ${d.invoices.reversal}`
+      }`;
+    }
+    const date = payment.paidAt.slice(0, 10);
+    if (payment.reversesId !== null || payment.amountMinor < 0) return d.pay.history.refund(date);
+    const paid = d.pay.history.paidOnline(date);
+    return all.some((other) => other.reversesId === payment.id)
+      ? `${paid} · ${d.pay.history.refundedTag}`
+      : paid;
+  };
 
   const currency = statement?.currency ?? null;
   const money = useCallback(
@@ -243,6 +326,20 @@ export default function StudentBillingPage() {
         <Link href="/settings" style={s.backLink}>
           {d.backLink}
         </Link>
+
+        {returnPhase !== null && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={
+              returnPhase === 'failed'
+                ? { ...returnNotice, borderColor: 'var(--aq-error)' }
+                : returnNotice
+            }
+          >
+            {d.pay.returned[returnPhase]}
+          </div>
+        )}
 
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
@@ -275,7 +372,9 @@ export default function StudentBillingPage() {
                 </div>
               </div>
               <p style={s.note}>{d.asOf(statement.asOf)}</p>
-              <p style={s.note}>{d.paymentNote}</p>
+              <p style={s.note}>
+                {statement.payOptions.length === 0 ? d.paymentNote : d.pay.note}
+              </p>
             </div>
 
             {/* A member with no contract is a normal state, not an error: the
@@ -368,6 +467,16 @@ export default function StudentBillingPage() {
                           </div>
                         </div>
 
+                        {isPayable(invoice) && (
+                          <PayAction
+                            kind="invoice"
+                            id={invoice.id}
+                            payOptions={statement.payOptions}
+                            pendingCheckout={invoice.pendingCheckout}
+                            onChanged={refresh}
+                          />
+                        )}
+
                         <div style={s.subHeading}>{d.invoices.adjustmentsHeading}</div>
                         {invoice.adjustments.length === 0 ? (
                           <p style={s.meta}>{d.invoices.noAdjustments}</p>
@@ -391,10 +500,7 @@ export default function StudentBillingPage() {
                           <ul style={s.lineList}>
                             {invoice.payments.map((payment) => (
                               <li key={payment.id} style={s.line}>
-                                <span>
-                                  {`${d.paymentMethod[payment.method]} · ${payment.paidAt}`}
-                                  {payment.reversesId === null ? '' : ` · ${d.invoices.reversal}`}
-                                </span>
+                                <span>{paymentLine(payment, invoice.payments)}</span>
                                 <span>{money(payment.amountMinor)}</span>
                               </li>
                             ))}
@@ -474,6 +580,16 @@ export default function StudentBillingPage() {
                           </div>
                         </div>
 
+                        {isPayable(charge) && (
+                          <PayAction
+                            kind="event_charge"
+                            id={charge.id}
+                            payOptions={statement.payOptions}
+                            pendingCheckout={charge.pendingCheckout}
+                            onChanged={refresh}
+                          />
+                        )}
+
                         {charge.adjustments.length > 0 && (
                           <>
                             <div style={s.subHeading}>{d.invoices.adjustmentsHeading}</div>
@@ -496,10 +612,7 @@ export default function StudentBillingPage() {
                             <ul style={s.lineList}>
                               {charge.payments.map((payment) => (
                                 <li key={payment.id} style={s.line}>
-                                  <span>
-                                    {`${d.paymentMethod[payment.method]} · ${payment.paidAt}`}
-                                    {payment.reversesId === null ? '' : ` · ${d.invoices.reversal}`}
-                                  </span>
+                                    <span>{paymentLine(payment, charge.payments)}</span>
                                   <span>{money(payment.amountMinor)}</span>
                                 </li>
                               ))}

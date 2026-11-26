@@ -6,7 +6,10 @@ import { dictEn } from '@web/i18n/dict-en';
 import { createMeBillingApi } from '@web/lib/me-billing-api';
 import type { Standing } from '@web/lib/admin-billing-api';
 import {
+  ONE_PROVIDER,
+  extrasCharge,
   makeStatementTransport,
+  pendingCheckout,
   statementWith,
 } from '@web/components/billing/__tests__/statement-fixture';
 
@@ -45,6 +48,7 @@ vi.mock('@web/context/auth-context', async () => {
 });
 
 import ProtectedLayout from '../layout';
+import StudentBillingPage from '../settings/billing/page';
 
 const banner = dictEn.layout.standingBanner;
 
@@ -135,6 +139,81 @@ describe('A delinquent standing withholds nothing', () => {
 
   it('does not redirect a delinquent student anywhere', async () => {
     await renderAt('delinquent');
+    expect(routerMocks.replace).not.toHaveBeenCalled();
+    expect(routerMocks.push).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * RFC 0026 adds a way to pay — and only that. With an online method offered,
+ * a delinquent student with an unpaid invoice, an overdue event charge and a
+ * checkout still in progress keeps every affordance a student in good standing
+ * has; the statement itself gains its pay actions for both alike, enabled.
+ */
+describe('Online payment withholds nothing', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const pay = dictEn.settings.billing.pay;
+
+  async function renderStatementAt(standing: Standing): Promise<RenderResult> {
+    const http = makeStatementTransport(() => {
+      const statement = statementWith(standing, {
+        payOptions: ONE_PROVIDER,
+        extras: {
+          standing,
+          oldestOverdueDate: standing === 'delinquent' ? '2026-08-01' : null,
+          outstandingMinor: 25000,
+          charges: [extrasCharge({ pendingCheckout: pendingCheckout() })],
+        },
+      });
+      return statement;
+    });
+    client = { meBilling: createMeBillingApi(http) };
+    const view = render(
+      <DictProvider value={dictEn}>
+        <ProtectedLayout>
+          <Screen />
+          <StudentBillingPage />
+        </ProtectedLayout>
+      </DictProvider>,
+    );
+    await screen.findByRole('button', { name: pay.action });
+    fireEvent.click(screen.getByRole('button', { name: dictEn.layout.nav.openMenu }));
+    return view;
+  }
+
+  it('keeps every affordance for a delinquent student and adds only the notice', async () => {
+    const good = await renderStatementAt('good');
+    const goodAffordances = affordances(good);
+    expect(goodAffordances).toContain(`button||${pay.action}`);
+    expect(goodAffordances).toContain(`button||${pay.openAgain}`);
+    good.unmount();
+
+    const delinquent = await renderStatementAt('delinquent');
+    const delinquentAffordances = affordances(delinquent);
+
+    for (const affordance of goodAffordances) {
+      expect(delinquentAffordances).toContain(affordance);
+    }
+    const added = delinquentAffordances.filter((a) => !goodAffordances.includes(a));
+    expect(added).toEqual(
+      [`a|/settings/billing|${banner.link}`, `button||${banner.dismiss}`].sort(),
+    );
+  });
+
+  it('leaves content links enabled and disables nothing beside an unpaid receivable', async () => {
+    const view = await renderStatementAt('delinquent');
+    expect(screen.getByRole('link', { name: 'catalog-item' })).toHaveAttribute(
+      'href',
+      '/catalog/kata',
+    );
+    expect(screen.getByRole('button', { name: 'screen-action' })).toBeEnabled();
+    expect(screen.getByLabelText('screen-field')).toBeEnabled();
+    expect(screen.getByRole('button', { name: pay.action })).toBeEnabled();
+    expect(screen.getByRole('button', { name: pay.openAgain })).toBeEnabled();
+    expect(affordances(view).some((a) => a.endsWith(':disabled'))).toBe(false);
+    expect(view.container.querySelectorAll('[aria-disabled="true"]')).toHaveLength(0);
+    expect(view.container.querySelector('fieldset[disabled]')).toBeNull();
     expect(routerMocks.replace).not.toHaveBeenCalled();
     expect(routerMocks.push).not.toHaveBeenCalled();
   });

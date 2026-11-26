@@ -2502,6 +2502,48 @@ export const dictPt = {
         waiver: 'Isenção',
         surcharge: 'Acréscimo',
       },
+      pay: {
+        note:
+          'Você pode pagar online uma fatura ou cobrança em aberto pelo botão Pagar ao lado dela. Pagamentos feitos pessoalmente continuam sendo registrados pela academia. Se algo aqui parecer errado, fale com seu professor.',
+        groupLabel: 'Pagamento online',
+        action: 'Pagar',
+        payWith: (methods: string) => `Pagar com ${methods}`,
+        method: {
+          pix: 'Pix',
+          card: 'Cartão',
+          boleto: 'Boleto',
+        },
+        methodSeparator: ' ou ',
+        opening: 'Abrindo a página de pagamento em uma nova aba…',
+        inProgress: (expiresAt: string) => `Pagamento em andamento · expira em ${expiresAt}`,
+        openAgain: 'Abrir novamente',
+        blocked: 'Seu navegador bloqueou a nova aba.',
+        blockedLink: 'Abrir a página de pagamento',
+        errors: {
+          not_payable: 'Isto não pode mais ser pago online — talvez já esteja pago ou cancelado. Seu extrato foi atualizado.',
+          provider_unavailable: 'O provedor de pagamento está indisponível no momento. Tente novamente em alguns minutos.',
+          too_many_attempts: 'Muitas tentativas de pagamento. Aguarde um pouco antes de tentar de novo.',
+          configuration: 'O pagamento online não está funcionando no momento. Avise seu professor.',
+          in_progress: 'Um pagamento já está sendo aberto para este item. Aguarde um instante e tente de novo.',
+          provider_required: 'As opções de pagamento mudaram. Escolha novamente como pagar.',
+          not_found: 'Este item não está mais disponível para pagamento online. Seu extrato foi atualizado.',
+          unknown: 'Não foi possível abrir a página de pagamento. Tente novamente.',
+        },
+        history: {
+          paidOnline: (date: string) => `Pago online · ${date}`,
+          refund: (date: string) => `Estornado · ${date}`,
+          refundedTag: 'Estornado',
+        },
+        returned: {
+          confirming: 'Confirmando seu pagamento…',
+          paid: 'Pagamento confirmado. Obrigado!',
+          cancelled: 'O pagamento não foi concluído. Você pode tentar de novo quando quiser.',
+          expired: 'Este link de pagamento expirou. Você pode pagar novamente pelo seu extrato.',
+          failed: 'Não foi possível concluir o pagamento. Se você foi cobrado, fale com seu professor.',
+          still_confirming:
+            'Seu pagamento ainda está sendo confirmado. Você pode sair desta página com segurança — seu extrato é atualizado assim que a confirmação chegar.',
+        },
+      },
       extras: {
         heading: 'Extras',
         intro:
