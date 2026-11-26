@@ -9,7 +9,7 @@ import { billingRunDeps } from '@api/core/billing/billing-service';
 import { recordJobRun, billingOutcome } from '@api/jobs/record-job-run';
 import { Entities } from '@arenaquest/shared/types/entities';
 import { respondWith, respondCreated, respondNoContent } from '@api/routes/_shared/envelope';
-import { PaymentConflictBody } from '@api/openapi/components';
+import { PaymentConflictBody, PayOptionSchema, PendingCheckoutSchema } from '@api/openapi/components';
 import { runMissionHook } from '@api/core/missions/hook';
 import type { AppContainer } from '@api/container';
 
@@ -202,9 +202,17 @@ const AgingReportSchema = z
   })
   .openapi('BillingAgingReport');
 
+/** The receivable's live hosted checkout (RFC 0026 §7); null when none is in progress. */
+const PendingCheckoutField = PendingCheckoutSchema.nullable().openapi({
+  description:
+    'The live hosted checkout of this receivable — open, with a provider session and not yet ' +
+    'expired — or `null`. A receivable has at most one.',
+});
+
 const StatementInvoiceSchema = InvoiceWithBalanceSchema.extend({
   adjustments: z.array(AdjustmentSchema),
   payments: z.array(PaymentSchema),
+  pendingCheckout: PendingCheckoutField,
 }).openapi('BillingStatementInvoice');
 
 const StatementContractGroupSchema = z
@@ -283,6 +291,7 @@ const StatementChargeSchema = EventChargeDetailSchema.extend({
   eventTitle: z.string().openapi({ example: 'Seminário de Inverno' }),
   /** When the event starts; null when the event no longer exists. */
   eventStartsAt: z.string().nullable().openapi({ example: '2026-07-18T13:00:00.000Z' }),
+  pendingCheckout: PendingCheckoutField,
 }).openapi('BillingStatementCharge');
 
 export const StandingSchema = z
@@ -317,6 +326,12 @@ export const StudentStatementSchema = z
     contractGroups: z.array(StatementContractGroupSchema),
     invoices: z.array(StatementInvoiceSchema),
     extras: StatementExtrasSchema,
+    payOptions: z.array(PayOptionSchema).openapi({
+      description:
+        'The providers a receivable can be paid through and the methods each offers, in the ' +
+        'label\'s list order. Empty when online payment is off or misconfigured — the statement ' +
+        'never fails on payment configuration.',
+    }),
   })
   .openapi('BillingStudentStatement');
 

@@ -4,6 +4,8 @@ import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { applyMigrations } from '../helpers/apply-migrations';
 import { v1 } from '../helpers/v1';
+import { buildPaymentsTestApp, type PaymentsTestApp } from '../adapters/payment/payments-test-app';
+import { StubGatewayAdapter } from '../adapters/payment/stub-gateway-adapter';
 
 /**
  * The extras rail over HTTP, against real SQLite (RFC 0015 §7): the student's
@@ -27,7 +29,14 @@ let adminToken: string;
 let paidUpToken: string;
 let buyerToken: string;
 
-async function call(method: string, path: string, token: string, body?: unknown): Promise<Response> {
+async function call(
+  method: string,
+  path: string,
+  token: string,
+  body?: unknown,
+  /** The same app with stub payment adapters bound; the real Worker binds none. */
+  app?: PaymentsTestApp,
+): Promise<Response> {
   const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const request = new IncomingRequest(`http://example.com${v1(path)}`, {
@@ -36,7 +45,7 @@ async function call(method: string, path: string, token: string, body?: unknown)
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const ctx = createExecutionContext();
-  const res = await worker.fetch(request, env as AppEnv, ctx);
+  const res = app ? await app.fetch(request, ctx) : await worker.fetch(request, env as AppEnv, ctx);
   await waitOnExecutionContext(ctx);
   return res;
 }
@@ -252,5 +261,86 @@ describe('admin reports — extras', () => {
     expect(report.cashReceivedMinor).toBe(report.receivedMinor + report.extras.receivedMinor);
     expect(report.extras.chargesIssued).toBeGreaterThanOrEqual(2);
     expect(report.extras.chargedMinor).toBeGreaterThanOrEqual(20000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Paying an event charge online (RFC 0026 §3, §7)
+// ---------------------------------------------------------------------------
+
+describe('checkouts — extras', () => {
+  type Session = { checkoutId: string; provider: string; url: string; amountMinor: number; currency: string; status: string };
+  type Pending = { checkoutId: string; provider: string; createdBy: string; expiresAt: string } | null;
+  type PayStatement = {
+    payOptions: Array<{ provider: string; methods: string[] }>;
+    invoices: Array<{ id: string; pendingCheckout: Pending }>;
+    extras: { charges: Array<{ id: string; eventId: string; pendingCheckout: Pending }> };
+  };
+
+  it('opens a checkout for the caller’s own event charge and shows it pending on that charge only', async () => {
+    const mp = new StubGatewayAdapter('mercadopago');
+    const app = buildPaymentsTestApp(env as Env, 'mercadopago:pix', [mp]);
+
+    const before = await jsonOf<PayStatement>(await call('GET', '/me/billing', buyerToken, undefined, app), 200);
+    expect(before.payOptions).toEqual([{ provider: 'mercadopago', methods: ['pix'] }]);
+    const charge = before.extras.charges[0];
+    expect(charge.pendingCheckout).toBeNull();
+
+    const created = await jsonOf<Session>(
+      await call('POST', '/me/billing/checkouts', buyerToken, { kind: 'event_charge', id: charge.id }, app),
+      201,
+    );
+    expect(created).toMatchObject({ provider: 'mercadopago', amountMinor: 8000, currency: 'BRL', status: 'open' });
+    // The hosted page names the event, as snapshotted on the charge.
+    expect(mp.callsTo('createCheckout')[0].req).toMatchObject({
+      description: 'Spring Workshop',
+      methods: ['pix'],
+      amountMinor: 8000,
+    });
+
+    const again = await jsonOf<Session>(
+      await call('POST', '/me/billing/checkouts', buyerToken, { kind: 'event_charge', id: charge.id }, app),
+      200,
+    );
+    expect(again.checkoutId).toBe(created.checkoutId);
+
+    const mine = await jsonOf<PayStatement>(await call('GET', '/me/billing', buyerToken, undefined, app), 200);
+    const admin = await jsonOf<PayStatement>(
+      await call('GET', `/admin/billing/students/${BUYER_ID}/statement`, adminToken, undefined, app),
+      200,
+    );
+    expect(mine.extras.charges[0].pendingCheckout).toMatchObject({
+      checkoutId: created.checkoutId,
+      provider: 'mercadopago',
+      createdBy: BUYER_ID,
+    });
+    expect(admin.extras).toEqual(mine.extras);
+
+    // The other student's charge is untouched and out of reach.
+    const other = await jsonOf<PayStatement>(await call('GET', '/me/billing', paidUpToken, undefined, app), 200);
+    expect(other.extras.charges[0].pendingCheckout).toBeNull();
+    expect(other.invoices.every((invoice) => invoice.pendingCheckout === null)).toBe(true);
+    const reach = await call(
+      'POST',
+      '/me/billing/checkouts',
+      buyerToken,
+      { kind: 'event_charge', id: other.extras.charges[0].id },
+      app,
+    );
+    expect(reach.status).toBe(404);
+    // A charge id is not an invoice id.
+    expect(
+      (await call('POST', '/me/billing/checkouts', buyerToken, { kind: 'invoice', id: charge.id }, app)).status,
+    ).toBe(404);
+  });
+
+  it('answers 404 for an event charge on a label with no provider', async () => {
+    const mine = await jsonOf<PayStatement>(await call('GET', '/me/billing', paidUpToken), 200);
+    expect(mine.payOptions).toEqual([]);
+    const res = await call('POST', '/me/billing/checkouts', paidUpToken, {
+      kind: 'event_charge',
+      id: mine.extras.charges[0].id,
+    });
+    expect(res.status).toBe(404);
   });
 });

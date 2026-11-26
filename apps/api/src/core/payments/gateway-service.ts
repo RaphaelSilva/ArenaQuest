@@ -23,9 +23,17 @@
  *
  * Logs carry ids and outcomes only — never a body, a secret or a provider
  * message.
+ *
+ * `createCheckout` is the other direction (RFC 0026 §3): it opens — or hands
+ * back — the **one** live hosted checkout of a receivable, for its full open
+ * balance. The row is written before the provider is called, so a crash
+ * between the two can never leave a provider session nobody knows about.
+ * `getCheckoutStatus` reads that row and never the provider.
  */
 import type {
+  PaymentMethodName,
   PaymentProviderName,
+  ProviderCheckout,
   ProviderDisputeOutcome,
   ProviderEvent,
   ProviderPayment,
@@ -35,16 +43,28 @@ import type {
   GatewayEventRecord,
   IGatewayRepository,
 } from '@arenaquest/shared/ports/i-gateway-repository';
+import type { IRateLimiter } from '@arenaquest/shared/ports/i-rate-limiter';
 import { Entities } from '@arenaquest/shared/types/entities';
-import { buildGatewayReference } from '@arenaquest/shared/domain/billing/gateway-money';
-import { RAIL_OF_KIND } from '@arenaquest/shared/domain/billing/receivable';
+import {
+  buildGatewayReference,
+  providerMethodsForCurrency,
+} from '@arenaquest/shared/domain/billing/gateway-money';
+import {
+  RAIL_OF_KIND,
+  fromCharge,
+  fromInvoice,
+  type Receivable,
+  type ReceivableKind,
+} from '@arenaquest/shared/domain/billing/receivable';
 import {
   GATEWAY_DISPUTE_DETAIL_PREFIX,
   SYSTEM_PAYMENT_ACTOR_ID,
 } from '@api/adapters/db/d1-gateway-repository';
+import { PAYMENTS_CONFIG_INVALID, type PaymentsConfigResult } from '@api/core/payments/config';
 import type { GatewayRegistry } from '@api/core/payments/gateway-registry';
 import type { BillingService } from '@api/core/billing/billing-service';
-import type { EventChargeService } from '@api/core/billing/event-charge-service';
+import { isUniqueFailure, type EventChargeService } from '@api/core/billing/event-charge-service';
+import type { ControllerResult } from '@api/core/result';
 
 const { CheckoutStatus, GatewayEventOutcome } = Entities.Config;
 
@@ -70,19 +90,135 @@ export interface GatewayPaymentOutcome {
 /** The contract rail, as far as the gateway may reach into it. */
 export type GatewayContractLedger = Pick<
   BillingService,
-  'recordGatewayPayment' | 'recordGatewayRefund' | 'raiseDisputeHold' | 'releaseDisputeHold'
+  'recordGatewayPayment' | 'recordGatewayRefund' | 'raiseDisputeHold' | 'releaseDisputeHold' | 'getInvoice'
 >;
 
 /** The extras rail: money only — an event charge never gets a hold. */
-export type GatewayExtrasLedger = Pick<EventChargeService, 'recordGatewayPayment' | 'recordGatewayRefund'>;
+export type GatewayExtrasLedger = Pick<
+  EventChargeService,
+  'recordGatewayPayment' | 'recordGatewayRefund' | 'getCharge'
+>;
+
+/** Who a hosted page is opened for: the provider wants a name and an e-mail. */
+export interface CheckoutPayerRecord {
+  id: string;
+  name: string;
+  email: string;
+}
+
+/** `null` when the user does not exist (or is not a person — the system actor). */
+export type CheckoutPayerReader = (userId: string) => Promise<CheckoutPayerRecord | null>;
+
+/**
+ * What creating a checkout needs beyond the collection path. Optional as a
+ * group: a service built without it (a webhook-only wiring, a unit test of
+ * landing) answers `404` to `createCheckout`, as a label with no provider does.
+ */
+export interface GatewayCheckoutDeps {
+  /** The checked provider list; `ok: false` is `500 PAYMENTS_CONFIG_INVALID`. */
+  config: PaymentsConfigResult;
+  /** Which providers offer which methods on this label. */
+  registry: Pick<GatewayRegistry, 'isEmpty' | 'payOptions' | 'methodsOf'>;
+  payer: CheckoutPayerReader;
+  /** The web origin the hosted page returns to — `WEB_BASE_URL`. */
+  webBaseUrl: string;
+  /** Per-student budget (`rl:checkouts:<userId>`); fails open. Omitted: no limit. */
+  limiter?: IRateLimiter;
+}
 
 export interface GatewayServiceDeps {
   gateways: Pick<GatewayRegistry, 'get'>;
   gatewayRepo: IGatewayRepository;
   billing: GatewayContractLedger;
   charges: GatewayExtrasLedger;
-  /** The clock a payment with no `paidAt` falls back to. */
+  checkout?: GatewayCheckoutDeps;
+  /** The clock a payment with no `paidAt` falls back to, and the one checkouts expire against. */
   now?: () => Date;
+}
+
+// ---------------------------------------------------------------------------
+// Checkout creation (RFC 0026 §3)
+// ---------------------------------------------------------------------------
+
+/** `400`: several providers offer a method and none was named, or the one named offers nothing here. */
+export const PAYMENT_PROVIDER_REQUIRED = 'PAYMENT_PROVIDER_REQUIRED';
+/** `409`: the receivable is void, settled or has no balance left. */
+export const RECEIVABLE_NOT_PAYABLE = 'RECEIVABLE_NOT_PAYABLE';
+/** `409`: the provider cannot settle the receivable's currency; decided before the provider is called. */
+export const PAYMENTS_UNSUPPORTED_CURRENCY = 'PAYMENTS_UNSUPPORTED_CURRENCY';
+/** `502`: the provider refused or failed to open the session; the row is closed `failed`. */
+export const PAYMENTS_PROVIDER_ERROR = 'PAYMENTS_PROVIDER_ERROR';
+/** `409`: another request is opening this receivable's checkout right now; ask again. */
+export const CHECKOUT_IN_PROGRESS = 'CHECKOUT_IN_PROGRESS';
+
+/** The expiry asked of the provider — an upper bound; the provider may grant less. */
+export const CHECKOUT_TTL_MS = 24 * 60 * 60_000;
+/** An open checkout is handed back only while more than this remains before its expiry. */
+export const CHECKOUT_REUSE_MIN_MS = 5 * 60_000;
+
+/** What the row holds until the provider answers; never served. */
+const CHECKOUT_URL_PLACEHOLDER = 'about:blank';
+
+export interface CreateCheckoutInput {
+  kind: ReceivableKind;
+  /** The receivable's id. */
+  id: string;
+  /** Required when several providers offer a method. */
+  provider?: string;
+}
+
+export interface CheckoutActor {
+  /** The student who owes the receivable; anything owed by someone else is `404`. */
+  userId: string;
+  /** Who pressed the button: the student, or an admin acting on their behalf. */
+  createdBy: string;
+}
+
+/** A hosted session the caller can be sent to. */
+export interface CheckoutSession {
+  checkoutId: string;
+  provider: PaymentProviderName;
+  /** The provider's hosted page. */
+  url: string;
+  expiresAt: string;
+  /** The receivable's full open balance when the checkout was created. */
+  amountMinor: number;
+  currency: string;
+  status: 'open';
+}
+
+export interface CreateCheckoutResult {
+  checkout: CheckoutSession;
+  /** `true` when an open checkout was handed back (`200`), `false` when this call opened one (`201`). */
+  reused: boolean;
+}
+
+/** One checkout as its row stands — the provider is never asked. */
+export interface CheckoutStatusView {
+  checkoutId: string;
+  provider: PaymentProviderName;
+  kind: ReceivableKind;
+  /** The invoice or event charge it collects. */
+  receivableId: string;
+  status: Entities.Config.CheckoutStatus;
+  amountMinor: number;
+  currency: string;
+  createdAt: string;
+  expiresAt: string;
+  /** `null` while the checkout is `open`. */
+  closedAt: string | null;
+}
+
+function refusal(status: number, error: string, meta?: Record<string, unknown>): ControllerResult<never> {
+  return meta ? { ok: false, status, error, meta } : { ok: false, status, error };
+}
+
+const CHECKOUT_NOT_FOUND = refusal(404, 'NotFound');
+
+/** The earlier of two ISO instants; `fallback` when `candidate` is not a date. */
+function earlierInstant(candidate: string, fallback: string): string {
+  const at = Date.parse(candidate);
+  return Number.isFinite(at) && at < Date.parse(fallback) ? new Date(at).toISOString() : fallback;
 }
 
 /** `gateway_events.type` of a dispute event: the kind plus its outcome, so a stored row can be replayed. */
@@ -430,4 +566,284 @@ export class GatewayService {
     }
     return changed;
   }
+
+  // -------------------------------------------------------------------------
+  // Checkouts (RFC 0026 §3)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Whether the checkout routes exist on this label at all: `null` when they
+   * do, otherwise the refusal — `500 PAYMENTS_CONFIG_INVALID` for an invalid
+   * provider list, `404` when no provider is bound. A route asks this before
+   * it validates anything, so a label under `none` answers `404` to any body.
+   *
+   * An invalid list binds nothing, so the configuration is asked first:
+   * otherwise its `500` would hide behind the empty registry's `404`.
+   */
+  checkoutGate(): ControllerResult<never> | null {
+    const deps = this.deps.checkout;
+    if (!deps) return CHECKOUT_NOT_FOUND;
+    if (!deps.config.ok) {
+      console.error(
+        JSON.stringify({ event: 'payments.config_invalid', reason: deps.config.reason, detail: deps.config.detail }),
+      );
+      return refusal(500, PAYMENTS_CONFIG_INVALID);
+    }
+    return deps.registry.isEmpty ? CHECKOUT_NOT_FOUND : null;
+  }
+
+  /**
+   * Opens — or hands back — the one live hosted checkout of a receivable.
+   *
+   * The refusals come in a fixed order: configuration (`500`) and feature gate
+   * (`404`) → provider (`400`) → the receivable exists and is `actor.userId`'s
+   * (`404`) → payable (`409`) → currency (`409`, before any provider call) →
+   * an open checkout worth reusing is returned → the per-student budget
+   * (`429`) → the row → the provider (`502`, row closed `failed`).
+   *
+   * The budget counts provider calls, not button presses: handing back an open
+   * checkout costs nothing, and a checkout an admin opens on a student's
+   * behalf (`createdBy !== userId`) does not draw on the student's budget.
+   */
+  async createCheckout(
+    input: CreateCheckoutInput,
+    actor: CheckoutActor,
+  ): Promise<ControllerResult<CreateCheckoutResult>> {
+    const deps = this.deps.checkout;
+    const closed = this.checkoutGate();
+    if (closed || !deps) return closed ?? CHECKOUT_NOT_FOUND;
+
+    // 1. The provider: the one named, or the only one that offers a method.
+    const options = deps.registry.payOptions;
+    const option =
+      input.provider === undefined
+        ? options.length === 1
+          ? options[0]
+          : undefined
+        : options.find((candidate) => candidate.provider === input.provider);
+    const gateway = option ? this.deps.gateways.get(option.provider) : null;
+    if (!option || !gateway) return refusal(400, PAYMENT_PROVIDER_REQUIRED);
+    const provider = option.provider;
+
+    // 2. The receivable, and whose it is. Someone else's is a missing one.
+    const receivable = await this.readReceivable(input.kind, input.id);
+    if (!receivable || receivable.userId !== actor.userId) return CHECKOUT_NOT_FOUND;
+
+    // 3. Payable, and in a currency this provider settles.
+    if (receivable.status !== 'open' || receivable.balanceMinor <= 0) {
+      return refusal(409, RECEIVABLE_NOT_PAYABLE);
+    }
+    const settles: ReadonlyArray<string> = providerMethodsForCurrency(provider, receivable.currency);
+    const methods: PaymentMethodName[] = deps.registry
+      .methodsOf(provider)
+      .filter((method) => settles.includes(method));
+    if (methods.length === 0) return refusal(409, PAYMENTS_UNSUPPORTED_CURRENCY);
+
+    // 4. One live attempt.
+    const repo = this.deps.gatewayRepo;
+    const now = this.now();
+    const existing = await repo.findOpenCheckout(receivable.kind, receivable.id);
+    const disposition = existing ? this.dispose(existing, provider, receivable, now) : 'none';
+    if (existing && disposition === 'reuse') {
+      return { ok: true, data: { checkout: toSession(existing), reused: true } };
+    }
+
+    const limited = await this.checkoutBudget(deps.limiter, actor);
+    if (limited) return limited;
+
+    const payer = await deps.payer(actor.userId);
+    if (!payer) return CHECKOUT_NOT_FOUND;
+
+    // 5. Row first. An open row that never got its session is called again
+    //    under its own id; anything else stale is closed before the new one.
+    let row: GatewayCheckoutRecord;
+    if (existing && disposition === 'retry') {
+      row = existing;
+    } else {
+      if (existing) {
+        await repo.closeCheckout(existing.id, {
+          status: disposition === 'expire' ? CheckoutStatus.EXPIRED : CheckoutStatus.CANCELLED,
+        });
+      }
+      try {
+        row = await repo.createCheckout({
+          id: crypto.randomUUID(),
+          provider,
+          receivableKind: receivable.kind,
+          receivableId: receivable.id,
+          userId: receivable.userId,
+          createdBy: actor.createdBy,
+          amountMinor: receivable.balanceMinor,
+          currency: receivable.currency,
+          checkoutUrl: CHECKOUT_URL_PLACEHOLDER,
+          expiresAt: new Date(now.getTime() + CHECKOUT_TTL_MS).toISOString(),
+        });
+      } catch (error) {
+        if (!isUniqueFailure(error)) throw error;
+        // A concurrent request won the one-open-row index. Its checkout is the
+        // answer when it is already usable; otherwise it is still being opened.
+        const winner = await repo.findOpenCheckout(receivable.kind, receivable.id);
+        if (winner && this.dispose(winner, provider, receivable, now) === 'reuse') {
+          return { ok: true, data: { checkout: toSession(winner), reused: true } };
+        }
+        return refusal(409, CHECKOUT_IN_PROGRESS);
+      }
+    }
+
+    // 6. Provider second, keyed on the row's id.
+    let opened: ProviderCheckout;
+    try {
+      opened = await gateway.createCheckout({
+        checkoutId: row.id,
+        amountMinor: row.amountMinor,
+        currency: row.currency,
+        description: checkoutDescription(receivable),
+        payer: { id: payer.id, name: payer.name, email: payer.email },
+        methods,
+        returnUrls: this.returnUrls(deps.webBaseUrl, row.id),
+        expiresAt: row.expiresAt,
+      });
+      if (!opened.sessionId || !opened.url) throw new TypeError('the provider returned no session');
+    } catch (error) {
+      // The index is released; the next Pay starts a new attempt.
+      await repo.closeCheckout(row.id, {
+        status: CheckoutStatus.FAILED,
+        failureDetail: `provider call failed (${error instanceof Error && error.name ? error.name : 'Error'})`,
+      });
+      return refusal(502, PAYMENTS_PROVIDER_ERROR);
+    }
+
+    // The provider's expiry when it is earlier than the one asked for.
+    const expiresAt = earlierInstant(opened.expiresAt, row.expiresAt);
+    const stored = await repo.updateCheckout(row.id, {
+      providerSessionId: opened.sessionId,
+      checkoutUrl: opened.url,
+      expiresAt,
+    });
+
+    console.info(
+      JSON.stringify({
+        event: 'payments.checkout_created',
+        actor: actor.createdBy,
+        userId: receivable.userId,
+        checkoutId: row.id,
+        provider,
+        rail: receivable.rail,
+        receivableId: receivable.id,
+        at: this.now().toISOString(),
+      }),
+    );
+
+    return {
+      ok: true,
+      data: {
+        checkout: toSession({ ...(stored ?? row), checkoutUrl: opened.url, expiresAt }),
+        reused: false,
+      },
+    };
+  }
+
+  /**
+   * One checkout of `userId`'s, as its row stands. Reads the database only —
+   * the provider is never called, so polling this costs one read. A checkout
+   * that is someone else's is `404`, the same as one that does not exist.
+   */
+  async getCheckoutStatus(checkoutId: string, userId: string): Promise<ControllerResult<CheckoutStatusView>> {
+    const checkout = await this.deps.gatewayRepo.getCheckout(checkoutId);
+    if (!checkout || checkout.userId !== userId) return CHECKOUT_NOT_FOUND;
+    return {
+      ok: true,
+      data: {
+        checkoutId: checkout.id,
+        provider: checkout.provider,
+        kind: checkout.receivableKind,
+        receivableId: checkout.receivableId,
+        status: checkout.status,
+        amountMinor: checkout.amountMinor,
+        currency: checkout.currency,
+        createdAt: checkout.createdAt,
+        expiresAt: checkout.expiresAt,
+        closedAt: checkout.closedAt,
+      },
+    };
+  }
+
+  private async readReceivable(kind: ReceivableKind, id: string): Promise<Receivable | null> {
+    if (kind === 'invoice') {
+      const invoice = await this.deps.billing.getInvoice(id);
+      return invoice.ok ? fromInvoice(invoice.data) : null;
+    }
+    const charge = await this.deps.charges.getCharge(id);
+    return charge.ok ? fromCharge(charge.data) : null;
+  }
+
+  /**
+   * What an open checkout is worth to a new *Pay*:
+   * - `reuse` — same provider, has its session, still for the receivable's
+   *   balance, and more than five minutes from its expiry;
+   * - `retry` — same provider and still good, but the provider call never
+   *   completed: it is made again under the same id;
+   * - `expire` — at or within five minutes of its expiry;
+   * - `cancel` — on another provider (the student changed how to pay), or for
+   *   an amount the receivable no longer owes.
+   */
+  private dispose(
+    checkout: GatewayCheckoutRecord,
+    provider: PaymentProviderName,
+    receivable: Receivable,
+    now: Date,
+  ): 'reuse' | 'retry' | 'expire' | 'cancel' {
+    if (checkout.provider !== provider) return 'cancel';
+    const remaining = Date.parse(checkout.expiresAt) - now.getTime();
+    if (!(remaining > CHECKOUT_REUSE_MIN_MS)) return 'expire';
+    if (checkout.amountMinor !== receivable.balanceMinor || checkout.currency !== receivable.currency) {
+      return 'cancel';
+    }
+    return checkout.providerSessionId === null ? 'retry' : 'reuse';
+  }
+
+  /** `429` once the student's budget is spent; a limiter outage never blocks a payment. */
+  private async checkoutBudget(
+    limiter: IRateLimiter | undefined,
+    actor: CheckoutActor,
+  ): Promise<ControllerResult<never> | null> {
+    if (!limiter || actor.createdBy !== actor.userId) return null;
+    try {
+      const state = await limiter.peek(actor.userId);
+      if (!state.allowed) {
+        return refusal(429, 'TooManyRequests', { retryAfterSeconds: state.retryAfterSeconds ?? 1 });
+      }
+      await limiter.hit(actor.userId);
+    } catch {
+      console.error('[rate-limit] checkouts limiter failed, failing open');
+    }
+    return null;
+  }
+
+  /** Hints only: the page that reads them asks `getCheckoutStatus` and believes that. */
+  private returnUrls(webBaseUrl: string, checkoutId: string): { success: string; cancel: string } {
+    const base = `${webBaseUrl.replace(/\/+$/, '')}/settings/billing?checkout=${encodeURIComponent(checkoutId)}`;
+    return { success: `${base}&outcome=success`, cancel: `${base}&outcome=cancel` };
+  }
+}
+
+/**
+ * What the hosted page shows. An invoice is named by its period, in the wording
+ * the port documents ("Mensalidade 2026-11") — the API holds no dictionary; an
+ * event charge by the event title snapshotted when it was issued.
+ */
+function checkoutDescription(receivable: Receivable): string {
+  return receivable.kind === 'invoice' ? `Mensalidade ${receivable.label}` : receivable.label;
+}
+
+function toSession(checkout: GatewayCheckoutRecord): CheckoutSession {
+  return {
+    checkoutId: checkout.id,
+    provider: checkout.provider,
+    url: checkout.checkoutUrl,
+    expiresAt: checkout.expiresAt,
+    amountMinor: checkout.amountMinor,
+    currency: checkout.currency,
+    status: 'open',
+  };
 }

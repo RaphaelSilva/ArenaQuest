@@ -8524,6 +8524,201 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/billing/checkouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pay One Of My Receivables
+         * @description Opens the hosted checkout for the **full open balance** of one invoice or event charge of the caller's own, or hands back the one already open. A receivable has one live checkout: a second call answers `200` with the same session while more than five minutes remain before its expiry, and replaces it otherwise; naming another provider cancels the first. The body names a receivable, never a user — anything that is not the caller's is `404`, as a missing one is. Refusals come in this order: `404` (no provider on this label) / `500 PAYMENTS_CONFIG_INVALID` → `400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `429` → `502 PAYMENTS_PROVIDER_ERROR`. Handing back an open checkout does not count toward the limit of 10 new checkouts an hour. Sent with `Cache-Control: private, no-store`.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateCheckoutBody"];
+                };
+            };
+            responses: {
+                /** @description The receivable already had an open checkout; this is it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CheckoutSession"];
+                    };
+                };
+                /** @description A new hosted checkout was opened */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CheckoutSession"];
+                    };
+                };
+                /** @description Invalid body, or `PAYMENT_PROVIDER_REQUIRED`: several providers offer a method and none was named, or the one named offers no method on this label */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": (components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        }) | components["schemas"]["ValidationErrorBody"];
+                    };
+                };
+                /** @description Unauthenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found. Also the answer of a label with no payment provider (`PAYMENTS_PROVIDERS = none`): the route does not exist there. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `RECEIVABLE_NOT_PAYABLE`: void, settled or with no balance. `PAYMENTS_UNSUPPORTED_CURRENCY`: the provider cannot settle the receivable's currency (decided before the provider is called). `CHECKOUT_IN_PROGRESS`: a concurrent request is opening this receivable's checkout — ask again. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description Too Many Requests: 10 new checkouts per hour per student (`Retry-After` is set) */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_CONFIG_INVALID`: the provider list or its secrets are invalid */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_PROVIDER_ERROR`: the provider did not open the session; nothing is left open */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/billing/checkouts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Checkout Status
+         * @description One checkout of the caller's own, as its row stands. **The provider is never called** — polling this costs one database read. The page a student returns to from the hosted checkout reads this and believes it, not the `outcome` in its own URL. A checkout that belongs to someone else is `404`, the same as one that does not exist. Sent with `Cache-Control: private, no-store`.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The checkout */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CheckoutStatus"];
+                    };
+                };
+                /** @description Unauthenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found. Also the answer of a label with no payment provider (`PAYMENTS_PROVIDERS = none`): the route does not exist there. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+                /** @description `PAYMENTS_CONFIG_INVALID`: the provider list or its secrets are invalid */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorBody"] & {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/change-password": {
         parameters: {
             query?: never;
@@ -11451,6 +11646,7 @@ export interface components {
             eventStartsAt: string | null;
             /** @example Seminário de Inverno */
             eventTitle: string;
+            pendingCheckout: components["schemas"]["PendingCheckout"];
         };
         BillingStatementContractGroup: {
             contractGroupId: string;
@@ -11477,6 +11673,7 @@ export interface components {
         BillingStatementInvoice: components["schemas"]["BillingInvoiceWithBalance"] & {
             adjustments: components["schemas"]["BillingInvoiceAdjustment"][];
             payments: components["schemas"]["BillingPayment"][];
+            pendingCheckout: components["schemas"]["PendingCheckout"];
         };
         BillingStudentStatement: {
             contractGroups: components["schemas"]["BillingStatementContractGroup"][];
@@ -11487,6 +11684,8 @@ export interface components {
             invoices: components["schemas"]["BillingStatementInvoice"][];
             /** @example 15000 */
             outstandingMinor: number;
+            /** @description The providers a receivable can be paid through and the methods each offers, in the label's list order. Empty when online payment is off or misconfigured — the statement never fails on payment configuration. */
+            payOptions: components["schemas"]["PayOption"][];
             /** @example 2026-01-01 */
             studentSince: string | null;
             userId: string;
@@ -11540,6 +11739,60 @@ export interface components {
             /** @example 2026-01-01 */
             endDate?: string;
             graceDays?: number;
+        };
+        CheckoutSession: {
+            /**
+             * @description The receivable's full open balance when the checkout was created.
+             * @example 15000
+             */
+            amountMinor: number;
+            checkoutId: string;
+            /** @example BRL */
+            currency: string;
+            /**
+             * @description The earlier of the provider's own expiry and 24 hours from creation.
+             * @example 2026-11-27T14:03:00.000Z
+             */
+            expiresAt: string;
+            /**
+             * @example mercadopago
+             * @enum {string}
+             */
+            provider: "stripe" | "mercadopago" | "asaas" | "pagarme";
+            /** @enum {string} */
+            status: "open";
+            /**
+             * @description The provider's hosted page. Open it in a new tab; never in a frame.
+             * @example https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=123
+             */
+            url: string;
+        };
+        CheckoutStatus: {
+            /** @example 15000 */
+            amountMinor: number;
+            checkoutId: string;
+            closedAt: string | null;
+            createdAt: string;
+            /** @example BRL */
+            currency: string;
+            expiresAt: string;
+            /**
+             * @example invoice
+             * @enum {string}
+             */
+            kind: "invoice" | "event_charge";
+            /**
+             * @example mercadopago
+             * @enum {string}
+             */
+            provider: "stripe" | "mercadopago" | "asaas" | "pagarme";
+            receivableId: string;
+            /**
+             * @description `open`: no payment confirmed yet (a Pix may be confirmed minutes after the redirect). `paid`: the money is on the ledger — refetch the statement. Anything else: this attempt is over.
+             * @example open
+             * @enum {string}
+             */
+            status: "open" | "paid" | "expired" | "cancelled" | "failed" | "mismatch";
         };
         ClassNote: components["schemas"]["Note"] & {
             /**
@@ -11654,6 +11907,20 @@ export interface components {
             graceDays: number;
             name: string;
             scopeTopicId?: string | null;
+        };
+        CreateCheckoutBody: {
+            /** @description The invoice or event charge id. */
+            id: string;
+            /**
+             * @example invoice
+             * @enum {string}
+             */
+            kind: "invoice" | "event_charge";
+            /**
+             * @description Required when several providers offer a method (see `payOptions`); one that offers nothing on this label is `400 PAYMENT_PROVIDER_REQUIRED`.
+             * @example mercadopago
+             */
+            provider?: string;
         };
         DashboardMissionEntry: {
             enrollment: components["schemas"]["MissionEnrollmentView"];
@@ -12534,6 +12801,20 @@ export interface components {
              */
             status: "ok" | "degraded" | "down";
         };
+        PayOption: {
+            /**
+             * @example [
+             *       "pix",
+             *       "card"
+             *     ]
+             */
+            methods: ("pix" | "card" | "boleto")[];
+            /**
+             * @example mercadopago
+             * @enum {string}
+             */
+            provider: "stripe" | "mercadopago" | "asaas" | "pagarme";
+        };
         PaymentConflictBody: {
             /**
              * @description `PAYMENT_REFERENCE_EXISTS` when a gateway payment with this externalReference is already on the ledger; `Conflict` otherwise
@@ -12552,6 +12833,21 @@ export interface components {
              */
             outcome: "applied" | "duplicate" | "ignored" | "orphan" | "mismatch";
         };
+        /** @description The live hosted checkout of this receivable — open, with a provider session and not yet expired — or `null`. A receivable has at most one. */
+        PendingCheckout: {
+            checkoutId: string;
+            /** @example 2026-11-26T14:03:00.000Z */
+            createdAt: string;
+            /** @description The student, or the admin who opened it on their behalf. */
+            createdBy: string;
+            /** @example 2026-11-27T14:03:00.000Z */
+            expiresAt: string;
+            /**
+             * @example mercadopago
+             * @enum {string}
+             */
+            provider: "stripe" | "mercadopago" | "asaas" | "pagarme";
+        } | null;
         PlayerProgression: {
             badges: {
                 badgeId: string;

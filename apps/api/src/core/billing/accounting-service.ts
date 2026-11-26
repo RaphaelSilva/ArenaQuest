@@ -14,7 +14,12 @@ import type {
   SubscriptionRecord,
 } from '@arenaquest/shared/ports';
 import { Entities } from '@arenaquest/shared/types/entities';
-import type { BillingRail } from '@arenaquest/shared/domain/billing/receivable';
+import type { BillingRail, ReceivableKind } from '@arenaquest/shared/domain/billing/receivable';
+import type { GatewayCheckoutRecord } from '@arenaquest/shared/ports/i-gateway-repository';
+import type {
+  PaymentMethodName,
+  PaymentProviderName,
+} from '@arenaquest/shared/ports/i-payment-gateway';
 import type { ControllerResult } from '@api/core/result';
 import { resolveExtrasRail } from '@api/core/billing/event-charge-service';
 
@@ -160,9 +165,31 @@ export interface AgingReport {
   studentCount: number;
 }
 
+/**
+ * The one live hosted checkout of a receivable (RFC 0026 §7): an `open` row
+ * that has its provider session and has not reached its expiry. It carries no
+ * URL — *Open again* asks `POST …/checkouts`, which answers the same session.
+ */
+export interface PendingCheckout {
+  checkoutId: string;
+  provider: PaymentProviderName;
+  createdAt: string;
+  expiresAt: string;
+  /** The student, or the admin who opened it on their behalf. */
+  createdBy: string;
+}
+
+/** One way to pay: a provider and the methods this label offers through it, in list order. */
+export interface StatementPayOption {
+  provider: PaymentProviderName;
+  methods: PaymentMethodName[];
+}
+
 export interface StatementInvoice extends InvoiceWithBalanceRecord {
   adjustments: InvoiceAdjustmentRecord[];
   payments: PaymentRecord[];
+  /** `null` when no hosted checkout is live for this invoice. */
+  pendingCheckout: PendingCheckout | null;
 }
 
 export interface StatementContractGroup {
@@ -185,6 +212,8 @@ export interface StatementCharge extends EventChargeWithBalanceRecord {
   eventStartsAt: string | null;
   adjustments: EventChargeAdjustmentRecord[];
   payments: EventChargePaymentRecord[];
+  /** `null` when no hosted checkout is live for this charge. */
+  pendingCheckout: PendingCheckout | null;
 }
 
 /**
@@ -216,6 +245,12 @@ export interface StudentStatement {
   invoices: StatementInvoice[];
   /** The extras rail, beside — never inside — the contract figures above. */
   extras: StatementExtras;
+  /**
+   * The providers a receivable can be paid through, in list order; empty when
+   * payments are off **or misconfigured** — a statement never fails on payment
+   * configuration (milestone 30 decision 24).
+   */
+  payOptions: StatementPayOption[];
 }
 
 /**
@@ -240,6 +275,43 @@ const NO_EXTRAS: ExtrasLedgerReader = {
 };
 
 const NO_EVENTS: EventTitleReader = { findById: async () => null };
+
+/**
+ * What a statement reads of the payment gateway (RFC 0026 §7): the pay options
+ * of this label and the open checkout of a receivable. Read-only, and never
+ * the provider — both answers come from configuration and the database.
+ */
+export interface StatementPaymentsReader {
+  payOptions(): ReadonlyArray<{ provider: PaymentProviderName; methods: ReadonlyArray<PaymentMethodName> }>;
+  findOpenCheckout(kind: ReceivableKind, id: string): Promise<GatewayCheckoutRecord | null>;
+}
+
+/** No gateway at all — what the RFC 0013 reports, and a label under `none`, read. */
+const NO_PAYMENTS: StatementPaymentsReader = {
+  payOptions: () => [],
+  findOpenCheckout: async () => null,
+};
+
+/**
+ * The statement's view of an open checkout, or `null` when it is not a
+ * payment in progress: no provider session yet (the provider call was
+ * interrupted) or already past its expiry (the reconcile run closes it).
+ */
+export function toPendingCheckout(
+  checkout: GatewayCheckoutRecord | null,
+  now: Date = new Date(),
+): PendingCheckout | null {
+  if (!checkout || checkout.status !== 'open' || checkout.providerSessionId === null) return null;
+  const expires = Date.parse(checkout.expiresAt);
+  if (!Number.isFinite(expires) || expires <= now.getTime()) return null;
+  return {
+    checkoutId: checkout.id,
+    provider: checkout.provider,
+    createdAt: checkout.createdAt,
+    expiresAt: checkout.expiresAt,
+    createdBy: checkout.createdBy,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Dates — every comparison is on a `YYYY-MM-DD` string, in whole days
@@ -405,6 +477,8 @@ export class AccountingService {
     private readonly charges: ExtrasLedgerReader = NO_EXTRAS,
     /** Event titles and dates for the statement's charges. */
     private readonly events: EventTitleReader = NO_EVENTS,
+    /** Pay options and open checkouts for the statement. Defaults to "no gateway". */
+    private readonly payments: StatementPaymentsReader = NO_PAYMENTS,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -622,6 +696,11 @@ export class AccountingService {
     const codes = new Set<string>();
     let outstandingMinor = 0;
 
+    const pendingInvoices = await this.pendingCheckouts(
+      'invoice',
+      invoices.filter((invoice) => invoice.status === InvoiceStatus.OPEN).map((invoice) => invoice.id),
+    );
+
     const statementInvoices: StatementInvoice[] = invoices
       .slice()
       .sort((a, b) => compare(a.dueDate, b.dueDate) || compare(a.periodStart, b.periodStart))
@@ -648,6 +727,7 @@ export class AccountingService {
             .paymentsFor(invoice.id)
             .slice()
             .sort((a, b) => compare(a.paidAt, b.paidAt)),
+          pendingCheckout: pendingInvoices.get(invoice.id) ?? null,
         };
       });
 
@@ -684,8 +764,50 @@ export class AccountingService {
         contractGroups,
         invoices: statementInvoices,
         extras,
+        payOptions: this.payOptions(),
       },
     };
+  }
+
+  /**
+   * The label's pay options, copied out of the registry. An empty registry —
+   * `none`, or an invalid provider list — reads as "no way to pay online", and
+   * a reader that throws reads the same: the statement still answers.
+   */
+  private payOptions(): StatementPayOption[] {
+    try {
+      return this.payments
+        .payOptions()
+        .map((option) => ({ provider: option.provider, methods: [...option.methods] }));
+    } catch (error) {
+      console.error('[billing] pay options could not be read; the statement carries none', error);
+      return [];
+    }
+  }
+
+  /**
+   * The live checkout of each **open** receivable named, by receivable id. A
+   * paid or void receivable is not asked about: nothing is pending on it that
+   * the student could act on. A failed read costs the pending marker, never
+   * the statement.
+   */
+  private async pendingCheckouts(
+    kind: ReceivableKind,
+    ids: string[],
+  ): Promise<Map<string, PendingCheckout>> {
+    const now = new Date();
+    const pending = new Map<string, PendingCheckout>();
+    await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const checkout = toPendingCheckout(await this.payments.findOpenCheckout(kind, id), now);
+          if (checkout) pending.set(id, checkout);
+        } catch (error) {
+          console.error('[billing] open checkout could not be read; the statement omits it', error);
+        }
+      }),
+    );
+    return pending;
   }
 
   /**
@@ -708,6 +830,11 @@ export class AccountingService {
       await Promise.all(
         eventIds.map(async (id) => [id, await this.events.findById(id)] as const),
       ),
+    );
+
+    const pending = await this.pendingCheckouts(
+      'event_charge',
+      charges.filter((charge) => charge.status === ChargeStatus.OPEN).map((charge) => charge.id),
     );
 
     const listed: StatementCharge[] = charges
@@ -733,6 +860,7 @@ export class AccountingService {
             .paymentsFor(charge.id)
             .slice()
             .sort((a, b) => compare(a.paidAt, b.paidAt)),
+          pendingCheckout: pending.get(charge.id) ?? null,
         };
       });
 

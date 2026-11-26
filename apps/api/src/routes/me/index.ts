@@ -18,6 +18,7 @@ import type {
   EngagementContext,
   ContentContext,
   EventsContext,
+  PaymentsContext,
 } from '@api/container';
 
 export function buildMeRouter(slice: {
@@ -31,6 +32,8 @@ export function buildMeRouter(slice: {
   billing: BillingContext;
   /** Event visibility of mission targets (RFC 0022 §8). */
   events: EventsContext;
+  /** The gateway behind the caller's own checkouts (RFC 0026 §3). */
+  payments?: PaymentsContext;
 }): OpenAPIHono {
   const { accountController } = slice.controllers;
 
@@ -56,7 +59,7 @@ export function buildMeRouter(slice: {
 
   // 5. The caller's own billing statement. It rides the sub-app `authGuard`
   //    above and adds no guard of its own — billing reports, it never gates.
-  meRouter.route('/', buildMeBillingRouter({ billing: slice.billing }));
+  meRouter.route('/', buildMeBillingRouter({ billing: slice.billing, payments: slice.payments }));
 
   // 6. The caller's own notes across topics (RFC 0016 §5).
   meRouter.route('/', buildMeNotesRouter(slice));

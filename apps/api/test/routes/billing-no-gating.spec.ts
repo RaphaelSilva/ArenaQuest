@@ -4,6 +4,8 @@ import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { applyMigrations } from '../helpers/apply-migrations';
 import { v1 } from '../helpers/v1';
+import { buildPaymentsTestApp, type PaymentsTestApp } from '../adapters/payment/payments-test-app';
+import { StubGatewayAdapter } from '../adapters/payment/stub-gateway-adapter';
 
 /**
  * The no-gating regression — RFC 0013's central non-goal, asserted rather than
@@ -44,7 +46,7 @@ function daysAgo(days: number): string {
 async function call(
   method: string,
   path: string,
-  options: { token?: string; body?: unknown } = {},
+  options: { token?: string; body?: unknown; app?: PaymentsTestApp } = {},
 ): Promise<Response> {
   const headers: Record<string, string> = {};
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
@@ -57,7 +59,10 @@ async function call(
   });
 
   const ctx = createExecutionContext();
-  const res = await worker.fetch(request, env as AppEnv, ctx);
+  // `app`: the same Worker app with a stub payment provider bound (RFC 0026).
+  const res = options.app
+    ? await options.app.fetch(request, ctx)
+    : await worker.fetch(request, env as AppEnv, ctx);
   await waitOnExecutionContext(ctx);
   return res;
 }
@@ -228,6 +233,51 @@ describe('a delinquent student is still a student', () => {
       // stronger than asserting 200: it fails on a paywall of any status too.
       expect(res.status).not.toBe(402);
       expect(res.status).toBe(200);
+    }
+  });
+
+  /**
+   * RFC 0026 adds the first routes where money *moves*, and they are part of
+   * this matrix on purpose: paying is open to a delinquent student exactly as
+   * it is to anyone else, and having a payment provider bound — or a checkout
+   * open and unpaid — closes nothing in `OPEN_TO_THEM`.
+   */
+  it('lets them open and read a checkout like anyone else, with a provider bound', async () => {
+    const mp = new StubGatewayAdapter('mercadopago');
+    const app = buildPaymentsTestApp(env as Env, 'mercadopago:pix+card', [mp]);
+
+    const statement = await jsonOf<{ standing: string; invoices: Array<{ id: string }> }>(
+      await call('GET', '/me/billing', { token: debtorToken, app }),
+      200,
+    );
+    expect(statement.standing).toBe('delinquent');
+
+    const opened = await call('POST', '/me/billing/checkouts', {
+      token: debtorToken,
+      app,
+      body: { kind: 'invoice', id: statement.invoices[0].id },
+    });
+    const checkout = await jsonOf<{ checkoutId: string; amountMinor: number }>(opened, 201);
+    expect(checkout.amountMinor).toBe(25000);
+
+    const read = await call('GET', `/me/billing/checkouts/${checkout.checkoutId}`, { token: debtorToken, app });
+    expect(read.status).toBe(200);
+
+    // An open, unpaid checkout changes nothing about what they may open.
+    for (const route of OPEN_TO_THEM) {
+      const res = await call(route.method, route.path, { token: debtorToken, app });
+      expect(res.status).not.toBe(402);
+      expect(res.status).toBe(200);
+    }
+  });
+
+  it('answers the checkout routes 404 — never 402 — where no provider is bound', async () => {
+    for (const [method, path, body] of [
+      ['POST', '/me/billing/checkouts', { kind: 'invoice', id: 'any' }],
+      ['GET', '/me/billing/checkouts/any', undefined],
+    ] as const) {
+      const res = await call(method, path, { token: debtorToken, body });
+      expect(res.status).toBe(404);
     }
   });
 

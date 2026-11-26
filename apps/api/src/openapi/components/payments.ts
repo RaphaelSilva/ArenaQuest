@@ -18,3 +18,98 @@ export const PaymentsWebhookAckSchema = z
     }),
   })
   .openapi('PaymentsWebhookAck');
+
+// ---------------------------------------------------------------------------
+// Checkouts and pay options (RFC 0026 §3, §7)
+// ---------------------------------------------------------------------------
+
+const ProviderNameSchema = z.enum(['stripe', 'mercadopago', 'asaas', 'pagarme']).openapi({ example: 'mercadopago' });
+
+const ReceivableKindSchema = z.enum(['invoice', 'event_charge']).openapi({ example: 'invoice' });
+
+/** One way to pay on this label: a provider and the methods it offers, in list order. */
+export const PayOptionSchema = z
+  .object({
+    provider: ProviderNameSchema,
+    methods: z.array(z.enum(['pix', 'card', 'boleto'])).min(1).openapi({ example: ['pix', 'card'] }),
+  })
+  .openapi('PayOption');
+
+/**
+ * The live hosted checkout of one receivable. It carries no URL: *Open again*
+ * calls `POST /v1/me/billing/checkouts`, which answers the same session.
+ */
+export const PendingCheckoutSchema = z
+  .object({
+    checkoutId: z.string(),
+    provider: ProviderNameSchema,
+    createdAt: z.string().openapi({ example: '2026-11-26T14:03:00.000Z' }),
+    expiresAt: z.string().openapi({ example: '2026-11-27T14:03:00.000Z' }),
+    createdBy: z.string().openapi({
+      description: 'The student, or the admin who opened it on their behalf.',
+    }),
+  })
+  .openapi('PendingCheckout');
+
+/** Body of `POST /v1/me/billing/checkouts`: a receivable of the caller's own — never a user. */
+export const CreateCheckoutBodySchema = z
+  .object({
+    kind: ReceivableKindSchema,
+    id: z.string().min(1).max(100).openapi({ description: 'The invoice or event charge id.' }),
+    provider: z
+      .string()
+      .min(1)
+      .max(40)
+      .optional()
+      .openapi({
+        description:
+          'Required when several providers offer a method (see `payOptions`); one that offers ' +
+          'nothing on this label is `400 PAYMENT_PROVIDER_REQUIRED`.',
+        example: 'mercadopago',
+      }),
+  })
+  .strict()
+  .openapi('CreateCheckoutBody');
+
+/** A hosted session the caller can be sent to. */
+export const CheckoutSessionSchema = z
+  .object({
+    checkoutId: z.string(),
+    provider: ProviderNameSchema,
+    url: z.string().openapi({
+      description: 'The provider\'s hosted page. Open it in a new tab; never in a frame.',
+      example: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=123',
+    }),
+    expiresAt: z.string().openapi({
+      description: 'The earlier of the provider\'s own expiry and 24 hours from creation.',
+      example: '2026-11-27T14:03:00.000Z',
+    }),
+    amountMinor: z.number().int().openapi({
+      description: 'The receivable\'s full open balance when the checkout was created.',
+      example: 15000,
+    }),
+    currency: z.string().openapi({ example: 'BRL' }),
+    status: z.enum(['open']),
+  })
+  .openapi('CheckoutSession');
+
+/** One checkout as its row stands; the provider is not asked. */
+export const CheckoutStatusSchema = z
+  .object({
+    checkoutId: z.string(),
+    provider: ProviderNameSchema,
+    kind: ReceivableKindSchema,
+    receivableId: z.string(),
+    status: z.enum(['open', 'paid', 'expired', 'cancelled', 'failed', 'mismatch']).openapi({
+      description:
+        '`open`: no payment confirmed yet (a Pix may be confirmed minutes after the redirect). ' +
+        '`paid`: the money is on the ledger — refetch the statement. Anything else: this attempt is over.',
+      example: 'open',
+    }),
+    amountMinor: z.number().int().openapi({ example: 15000 }),
+    currency: z.string().openapi({ example: 'BRL' }),
+    createdAt: z.string(),
+    expiresAt: z.string(),
+    closedAt: z.string().nullable(),
+  })
+  .openapi('CheckoutStatus');
