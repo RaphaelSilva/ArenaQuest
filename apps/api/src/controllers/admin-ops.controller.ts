@@ -51,6 +51,15 @@ export interface OpsHealth {
   jobs: JobHealth[];
 }
 
+/**
+ * The jobs health reports on. `reconcile_payments` is a job *name* since M30
+ * Task 01 but has no run yet, so it stays off this list until the job itself
+ * ships (M30 Task 09) — listing it now would show a job that never ran.
+ */
+const HEALTH_JOBS: ReadonlyArray<Entities.Config.JobName> = Object.values(Entities.Config.JobName).filter(
+  (job) => job !== Entities.Config.JobName.RECONCILE_PAYMENTS,
+);
+
 export interface ListJobRunsQuery {
   job?: Entities.Config.JobName;
   /** ISO timestamp, validated upstream. */
@@ -147,7 +156,7 @@ export class AdminOpsController {
 
     const checkedAt = this.now();
     const byJob = new Map(latestRuns.map((run) => [run.job, run]));
-    const jobs: JobHealth[] = Object.values(Entities.Config.JobName).map((job) => {
+    const jobs: JobHealth[] = HEALTH_JOBS.map((job) => {
       const run = byJob.get(job);
       return {
         job,

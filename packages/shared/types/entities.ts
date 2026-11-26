@@ -1,4 +1,6 @@
 import type { RequirementKind } from '../domain/missions/requirements';
+import type { ReceivableKind } from '../domain/billing/receivable';
+import type { PaymentProviderName } from '../ports/i-payment-gateway';
 
 export namespace Entities {
 
@@ -8,6 +10,12 @@ export namespace Entities {
             INACTIVE = 'inactive',
             PENDING = 'pending',
             BANNED = 'banned',
+            /**
+             * A machine actor, not a person (RFC 0026 R8): the `users` row that
+             * satisfies `recorded_by` on ledger rows the payment gateway writes.
+             * It is not `ACTIVE`, so it can never log in, and it holds no role.
+             */
+            SYSTEM = 'system',
         }
 
         export enum TopicNodeStatus {
@@ -228,6 +236,8 @@ export namespace Entities {
             BILLING = 'billing',
             /** The abandoned-upload sweep (RFC 0020 section 9). */
             SWEEP_SUBMISSIONS = 'sweep_submissions',
+            /** The hourly payment-gateway reconcile run (RFC 0026 section 6). */
+            RECONCILE_PAYMENTS = 'reconcile_payments',
         }
 
         /** What started a job run. */
@@ -242,6 +252,51 @@ export namespace Entities {
         export enum JobRunStatus {
             RUNNING = 'running',
             OK = 'ok',
+            FAILED = 'failed',
+        }
+
+        /**
+         * Lifecycle of one attempt to collect a receivable through a provider's
+         * hosted page (RFC 0026 section 2). Constrained by the
+         * `status IN ('open','paid','expired','cancelled','failed','mismatch')`
+         * CHECK on `gateway_checkouts`. A checkout is **not money**: `paid`
+         * means a ledger row exists, and that row is the truth.
+         */
+        export enum CheckoutStatus {
+            /** Live: at most one per receivable. */
+            OPEN = 'open',
+            /** A provider payment was confirmed and landed on the ledger. */
+            PAID = 'paid',
+            /** Its expiry passed with no confirmed payment. */
+            EXPIRED = 'expired',
+            /** Replaced because the student chose another provider. */
+            CANCELLED = 'cancelled',
+            /** The provider never opened a session for it. */
+            FAILED = 'failed',
+            /** The provider reported a payment that does not match it; nothing landed. */
+            MISMATCH = 'mismatch',
+        }
+
+        /**
+         * The current state of one provider event (RFC 0026 sections 2 and 4).
+         * Constrained by the `outcome IN (...)` CHECK on `gateway_events`.
+         * `received` and `failed` are **unsettled** — the event is processed
+         * again; every other value is final.
+         */
+        export enum GatewayEventOutcome {
+            /** Written before processing; an attempt is running or died. */
+            RECEIVED = 'received',
+            /** Put at least one row on the ledger. */
+            APPLIED = 'applied',
+            /** Everything it named was already on the ledger. */
+            DUPLICATE = 'duplicate',
+            /** Authentic, and nothing to do (an ignored kind, a pending payment). */
+            IGNORED = 'ignored',
+            /** The provider does not know the payment, or it names no checkout of ours. */
+            ORPHAN = 'orphan',
+            /** The payment's currency differs from the checkout's; nothing landed. */
+            MISMATCH = 'mismatch',
+            /** Our own failure; answered 503 so the provider redelivers. */
             FAILED = 'failed',
         }
 
@@ -929,6 +984,74 @@ export namespace Entities {
             reversesId: string | null;
             recordedBy: string;
             recordedAt: Date;
+        }
+
+        /**
+         * One attempt to collect one receivable's open balance through a
+         * provider's hosted page (RFC 0026 section 2). **Not money** — money is
+         * a `Payment` or an `EventChargePayment`. The receivable is named by
+         * `receivable.ts`'s `(kind, id)`, so both rails are payable through one
+         * flow; at most one `open` checkout exists per receivable.
+         */
+        export interface GatewayCheckout {
+            /** Also the provider idempotency key and the metadata back-reference. */
+            id: string;
+            provider: PaymentProviderName;
+            receivableKind: ReceivableKind;
+            receivableId: string;
+            /** The student who owes it. */
+            userId: string;
+            /** The student, or an admin creating a link on their behalf. */
+            createdBy: string;
+            /** The balance at creation; what the provider was asked to collect. */
+            amountMinor: number;
+            currency: string;
+            status: Config.CheckoutStatus;
+            /** The hosted session / preference id (bare); null until the provider answered. */
+            providerSessionId: string | null;
+            /** The provider payment id (bare); set when a payment is confirmed. */
+            providerPaymentId: string | null;
+            /** Exactly one of the two is set on a `paid` row, matching `receivableKind`. */
+            invoicePaymentId: string | null;
+            chargePaymentId: string | null;
+            checkoutUrl: string;
+            expiresAt: Date;
+            createdAt: Date;
+            updatedAt: Date;
+            closedAt: Date | null;
+            /** Last time the reconcile run asked the provider about it. */
+            lastCheckedAt: Date | null;
+            /** Provider status / mismatch description; never a body. */
+            failureDetail: string | null;
+            /** Dismissal hides the row from the exceptions list and changes nothing else. */
+            dismissedAt: Date | null;
+            dismissedBy: string | null;
+            dismissNote: string | null;
+        }
+
+        /**
+         * One provider event (webhook delivery), kept for de-duplication and
+         * audit (RFC 0026 section 2). Keyed on `(provider, eventId)`: one row
+         * per event however many times it is delivered. A trigger to go and
+         * look, never a fact in itself.
+         */
+        export interface GatewayEvent {
+            provider: PaymentProviderName;
+            /** The provider's event / notification id — never the payment id. */
+            eventId: string;
+            type: string;
+            providerPaymentId: string | null;
+            checkoutId: string | null;
+            receivedAt: Date;
+            processedAt: Date | null;
+            outcome: Config.GatewayEventOutcome;
+            /** Every processing attempt, whoever made it. */
+            attempts: number;
+            /** A message truncated to 1024 characters; never a body. */
+            error: string | null;
+            dismissedAt: Date | null;
+            dismissedBy: string | null;
+            dismissNote: string | null;
         }
     }
 }

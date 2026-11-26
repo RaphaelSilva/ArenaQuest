@@ -230,6 +230,12 @@ export interface IEventChargeRepository {
   // Ledger — append-only on both tables.
   recordPayment(input: RecordChargePaymentInput): Promise<EventChargePaymentRecord>;
   getPayment(id: string): Promise<EventChargePaymentRecord | null>;
+  /**
+   * The gateway row (`method = 'gateway'`) carrying this provider-qualified
+   * reference (`<provider>:<id>`), or `null`. At most one exists — the answer to
+   * "did this provider payment or refund already land?" (RFC 0026 section 9).
+   */
+  findGatewayPayment(externalReference: string): Promise<EventChargePaymentRecord | null>;
   applyAdjustment(input: ApplyChargeAdjustmentInput): Promise<EventChargeAdjustmentRecord>;
   listLedger(filter: ChargeLedgerFilter): Promise<ChargeLedgerEntryRecord[]>;
 }
