@@ -1,6 +1,6 @@
 # Task 08 — Backend: Admin on-behalf checkouts and gateway refunds (Phase 3)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Backend API
@@ -72,15 +72,15 @@ refund that already happened is recorded, not repeated.
 
 ## Acceptance Criteria
 
-- [ ] An admin can create a checkout for a student's open invoice and for an open event charge;
+- [x] An admin can create a checkout for a student's open invoice and for an open event charge;
       the row records the admin as `created_by`.
-- [ ] A refused refund leaves the ledger byte-for-byte unchanged.
-- [ ] Reversing the same gateway payment twice yields one reversal row and two `200` answers.
-- [ ] A reversal's reference is the provider's refund id.
-- [ ] A `content_creator` and a `tutor` get `403` on the two checkout routes and on both reverse routes.
-- [ ] `apps/api/openapi.json` documents the new routes, the new error codes and the pending flag.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A refused refund leaves the ledger byte-for-byte unchanged.
+- [x] Reversing the same gateway payment twice yields one reversal row and two `200` answers.
+- [x] A reversal's reference is the provider's refund id.
+- [x] A `content_creator` and a `tutor` get `403` on the two checkout routes and on both reverse routes.
+- [x] `apps/api/openapi.json` documents the new routes, the new error codes and the pending flag.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
