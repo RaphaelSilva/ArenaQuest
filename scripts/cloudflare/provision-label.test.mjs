@@ -5,6 +5,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   parseArgs,
@@ -29,8 +33,13 @@ import {
   checkProbes,
   runCheck,
   checkResults,
+  committedEnvVars,
+  paymentWebhookReminders,
+  formatReminders,
 } from './provision-label.mjs';
-import { mapExitCode } from '../label.mjs';
+import { mapExitCode, formatChecklist, parseJsonc, PATHS } from '../label.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 const profileText = `/** profile comment */
 {
@@ -558,7 +567,8 @@ test('runCheck executes only list commands and reports present / missing / unkno
 test('runCheck JSON shape carries names only — never a secret-shaped value', () => {
   const { run } = stubRunner(CHECK_ANSWERS);
   const report = runCheck(planProfile, 'production', schema, { run });
-  assert.deepEqual(Object.keys(report), ['label', 'env', 'resources', 'secrets']);
+  assert.deepEqual(Object.keys(report), ['label', 'env', 'resources', 'secrets', 'reminders']);
+  assert.deepEqual(report.reminders, []);
   assert.deepEqual(Object.keys(report.resources[0]), ['id', 'kind', 'name', 'present', 'fix']);
   assert.deepEqual(Object.keys(report.secrets[0]), ['name', 'scope', 'present', 'fix']);
   assert.doesNotMatch(JSON.stringify(report), /[0-9a-f]{64}/);
@@ -590,4 +600,194 @@ test('checkResults maps the report onto the checklist exit codes: 0 present, 1 m
   assert.equal(mapExitCode(results), 2);
   assert.equal(results.find((r) => r.key === 'pages acme-web').status, 'skip');
   assert.ok(results.every((r) => ['cf-resources', 'api-secrets', 'previews'].includes(r.group)));
+});
+
+// ── payment gateway secrets (RFC 0026 section 8, R13) ───────────────────────
+// The REAL deployment schema: these tests pin what the committed contract says.
+const realSchema = parseJsonc(readFileSync(PATHS.schema, 'utf8'));
+const BASE_EXTERNAL = ['R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'GOOGLE_CLIENT_SECRET', 'RESEND_API_KEY'];
+const MP_SECRETS = ['PAYMENTS_MERCADOPAGO_SECRET_KEY', 'PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET'];
+const paymentNames = (names) => names.filter((n) => n.startsWith('PAYMENTS_'));
+
+test('externalSecretNames names no payment secret for none, an absent list or no Worker block', () => {
+  assert.deepEqual(externalSecretNames(realSchema, planProfile, 'staging'), BASE_EXTERNAL);
+  assert.deepEqual(externalSecretNames(realSchema, planProfile, 'staging', {}), BASE_EXTERNAL);
+  assert.deepEqual(externalSecretNames(realSchema, planProfile, 'staging', { PAYMENTS_PROVIDERS: 'none', PAYMENTS_KEY_MODE: 'test' }), BASE_EXTERNAL);
+});
+
+test('externalSecretNames names exactly the two secrets of one bound provider', () => {
+  const names = externalSecretNames(realSchema, planProfile, 'staging', { PAYMENTS_PROVIDERS: 'mercadopago:pix+card' });
+  assert.deepEqual(names, [...BASE_EXTERNAL, ...MP_SECRETS]);
+  // a retired entry still needs both (config.ts rule 4)
+  assert.deepEqual(paymentNames(externalSecretNames(realSchema, planProfile, 'production', { PAYMENTS_PROVIDERS: 'mercadopago:' })), MP_SECRETS);
+});
+
+test('externalSecretNames names both pairs for two bound providers and nothing for the others', () => {
+  const names = externalSecretNames(realSchema, planProfile, 'production', { PAYMENTS_PROVIDERS: 'mercadopago:pix,stripe:card' });
+  assert.deepEqual(paymentNames(names).sort(), [
+    'PAYMENTS_MERCADOPAGO_SECRET_KEY', 'PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET',
+    'PAYMENTS_STRIPE_SECRET_KEY', 'PAYMENTS_STRIPE_WEBHOOK_SECRET',
+  ]);
+  assert.ok(!names.includes('JWT_SECRET'));
+});
+
+test('externalSecretNames reads the mail driver from the resolved vars too', () => {
+  // The committed Worker block wins over the profile, as in `label.mjs check`.
+  assert.ok(!externalSecretNames(realSchema, planProfile, 'staging', { MAIL_DRIVER: 'console' }).includes('RESEND_API_KEY'));
+});
+
+test('committedEnvVars reads the Worker vars and the previews vars of one env block', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aq-provision-test-'));
+  const path = join(dir, 'wrangler.jsonc');
+  writeFileSync(path, `{
+    // a comment, as in the real file
+    "env": {
+      "acme-staging": {
+        "vars": { "PAYMENTS_PROVIDERS": "mercadopago:pix", "PAYMENTS_KEY_MODE": "test" },
+        "previews": { "vars": { "APP_PREVIEW": "1" } }
+      },
+      "acme": { "vars": { "PAYMENTS_PROVIDERS": "none" } }
+    }
+  }`);
+  try {
+    assert.deepEqual(committedEnvVars('acme', 'staging', path), {
+      worker: { PAYMENTS_PROVIDERS: 'mercadopago:pix', PAYMENTS_KEY_MODE: 'test' },
+      preview: { APP_PREVIEW: '1' },
+    });
+    assert.deepEqual(committedEnvVars('acme', 'production', path), { worker: { PAYMENTS_PROVIDERS: 'none' }, preview: null });
+    assert.deepEqual(committedEnvVars('other', 'staging', path), { worker: null, preview: null });
+    assert.deepEqual(committedEnvVars('acme', 'staging', join(dir, 'missing.jsonc')), { worker: null, preview: null });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('every committed label is on none: its check plan names no payment secret and no reminder', () => {
+  for (const label of ['arenaquest', 'spaziord', 'budo']) {
+    const profile = parseJsonc(readFileSync(join(HERE, '..', '..', 'config', 'labels', `${label}.jsonc`), 'utf8'));
+    for (const env of ['staging', 'production']) {
+      const vars = committedEnvVars(label, env);
+      assert.equal(vars.worker?.PAYMENTS_PROVIDERS, 'none', `${label}/${env}`);
+      const plan = buildCheckPlan(profile, env, realSchema, vars);
+      assert.deepEqual(paymentNames([...plan.secrets.worker, ...plan.secrets.preview]), [], `${label}/${env}`);
+      assert.deepEqual(plan.reminders, [], `${label}/${env}`);
+      assert.ok(!Object.keys(plan.fixes).some((k) => k.includes('PAYMENTS_')), `${label}/${env}`);
+    }
+  }
+});
+
+const MP_VARS = { worker: { PAYMENTS_PROVIDERS: 'mercadopago:pix+card', PAYMENTS_KEY_MODE: 'test' }, preview: { APP_PREVIEW: '1' } };
+
+test('buildCheckPlan expects a bound provider\'s two secrets on the Worker, never on the Preview base config', () => {
+  const plan = buildCheckPlan(planProfile, 'staging', realSchema, MP_VARS);
+  assert.deepEqual(plan.secrets.worker, ['JWT_SECRET', ...BASE_EXTERNAL, ...MP_SECRETS]);
+  assert.deepEqual(plan.secrets.preview, ['JWT_SECRET', ...BASE_EXTERNAL]);
+  assert.equal(plan.fixes.PAYMENTS_MERCADOPAGO_SECRET_KEY, 'bash scripts/create-secrets.sh PAYMENTS_MERCADOPAGO_SECRET_KEY --env acme-staging');
+  assert.equal(plan.fixes.PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET, 'bash scripts/create-secrets.sh PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET --env acme-staging');
+  assert.ok(!Object.keys(plan.fixes).some((k) => k.startsWith('preview:PAYMENTS_')));
+  assert.deepEqual(plan.reminders, [{
+    key: 'payments-webhook-mercadopago',
+    detail: 'Webhook registered in the Mercado Pago dashboard: https://api-acme-staging.sub.workers.dev/v1/webhooks/payments/mercadopago',
+  }]);
+});
+
+test('paymentWebhookReminders gives one URL per bound provider and none for a label on none', () => {
+  assert.deepEqual(paymentWebhookReminders(realSchema, planProfile, 'production'), []);
+  assert.deepEqual(paymentWebhookReminders(realSchema, planProfile, 'production', { PAYMENTS_PROVIDERS: 'none' }), []);
+  const two = paymentWebhookReminders(realSchema, planProfile, 'production', { PAYMENTS_PROVIDERS: 'stripe:card,asaas:' });
+  assert.deepEqual(two.map((r) => r.detail), [
+    'Webhook registered in the Stripe dashboard: https://api.acme.app/v1/webhooks/payments/stripe',
+    'Webhook registered in the Asaas dashboard: https://api.acme.app/v1/webhooks/payments/asaas',
+  ]);
+});
+
+/** Secret names as `wrangler secret list --format json` prints them. */
+const secretList = (names) => ({ status: 0, stdout: JSON.stringify(names.map((name) => ({ name, type: 'secret_text' }))) });
+
+test('runCheck lists exactly the bound provider\'s two secrets, each missing one with its fix command, and no value', () => {
+  const { run, calls } = stubRunner({
+    ...CHECK_ANSWERS,
+    // One of the two is set; a secret of an unbound provider is set too and must not be reported.
+    'pnpm --filter api exec wrangler secret list --env acme --format json':
+      secretList(['JWT_SECRET', 'PAYMENTS_MERCADOPAGO_SECRET_KEY', 'PAYMENTS_STRIPE_SECRET_KEY']),
+  });
+  const vars = { worker: { PAYMENTS_PROVIDERS: 'mercadopago:pix+card', PAYMENTS_KEY_MODE: 'live' }, preview: null };
+  const report = runCheck(planProfile, 'production', realSchema, { run, vars });
+
+  for (const argv of calls) assert.ok(argv.includes('list'), `--check spawned a non-list command: ${renderCommand(argv)}`);
+  const payments = report.secrets.filter((s) => s.name.startsWith('PAYMENTS_'));
+  assert.deepEqual(payments, [
+    { name: 'PAYMENTS_MERCADOPAGO_SECRET_KEY', scope: 'worker', present: true, fix: null },
+    {
+      name: 'PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET',
+      scope: 'worker',
+      present: false,
+      fix: 'bash scripts/create-secrets.sh PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET --env acme',
+    },
+  ]);
+  assert.deepEqual(report.reminders.map((r) => r.key), ['payments-webhook-mercadopago']);
+
+  // Names, states and commands only: the report has no field a value could sit in.
+  for (const s of report.secrets) assert.deepEqual(Object.keys(s), ['name', 'scope', 'present', 'fix']);
+  const printed = JSON.stringify(report) + formatChecklist('acme', 'production', 'Acme', checkResults(report));
+  assert.doesNotMatch(printed, /secret_text|[0-9a-f]{64}|APP_USR-|TEST-/);
+  assert.match(printed, /PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET\s+not set for env\.acme/);
+  assert.match(printed, /→ bash scripts\/create-secrets\.sh PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET --env acme/);
+});
+
+test('runCheck reports a bound provider\'s secrets as unknown, with the fix, when the list fails', () => {
+  const { run } = stubRunner({ ...CHECK_ANSWERS, 'pnpm --filter api exec wrangler secret list --env acme --format json': { status: 1, output: 'no creds' } });
+  const vars = { worker: { PAYMENTS_PROVIDERS: 'mercadopago:pix' }, preview: null };
+  const report = runCheck(planProfile, 'production', realSchema, { run, vars });
+  const payments = report.secrets.filter((s) => s.name.startsWith('PAYMENTS_'));
+  assert.deepEqual(payments.map((s) => s.name), MP_SECRETS);
+  assert.ok(payments.every((s) => s.present === null && s.fix.includes('create-secrets.sh')));
+});
+
+test('runCheck on staging probes the Preview base config for no payment secret', () => {
+  const answers = {
+    'pnpm --filter api exec wrangler secret list --env acme-staging --format json': secretList(['JWT_SECRET', ...BASE_EXTERNAL]),
+    'pnpm --filter api exec wrangler preview base-config secret list --env acme-staging --json': secretList(['JWT_SECRET', ...BASE_EXTERNAL]),
+  };
+  const report = runCheck(planProfile, 'staging', realSchema, { run: stubRunner(answers).run, vars: MP_VARS });
+  const payments = report.secrets.filter((s) => s.name.startsWith('PAYMENTS_'));
+  assert.deepEqual(payments.map((s) => [s.name, s.scope, s.present]), MP_SECRETS.map((name) => [name, 'worker', false]));
+  assert.ok(report.secrets.filter((s) => s.scope === 'preview').every((s) => s.present === true));
+});
+
+test('a webhook reminder is printed under the checklist and never changes the exit code', () => {
+  const answers = { ...CHECK_ANSWERS };
+  answers['pnpm --filter api exec wrangler r2 bucket list'] = { status: 0, stdout: '[{"name":"acme-media"},{"name":"acme-backups"}]' };
+  answers['pnpm --filter web exec wrangler pages project list --json'] = { status: 0, stdout: '[{"name":"acme-web"}]' };
+  answers['pnpm --filter api exec wrangler deployments list --env acme'] = { status: 0, stdout: 'Created: ...' };
+  answers['pnpm --filter api exec wrangler secret list --env acme --format json'] = secretList(['JWT_SECRET', ...BASE_EXTERNAL, ...MP_SECRETS]);
+  const vars = { worker: { PAYMENTS_PROVIDERS: 'mercadopago:pix+card' }, preview: null };
+  const report = runCheck(planProfile, 'production', realSchema, { run: stubRunner(answers).run, vars });
+
+  assert.equal(mapExitCode(checkResults(report)), 0, 'every secret present: the reminder is not a gap');
+  assert.ok(checkResults(report).every((r) => ['cf-resources', 'api-secrets', 'previews'].includes(r.group)));
+  assert.deepEqual(formatReminders(report), [
+    'Not verifiable from here — confirm at each bound provider:',
+    '  - Webhook registered in the Mercado Pago dashboard: https://api.acme.app/v1/webhooks/payments/mercadopago',
+  ]);
+  assert.deepEqual(formatReminders(runCheck(planProfile, 'production', realSchema, { run: stubRunner(answers).run })), []);
+});
+
+test('a provisioning plan writes no payment secret: JWT_SECRET is the only secret put', () => {
+  for (const env of ['staging', 'production']) {
+    const plan = buildProvisionPlan(planProfile, env, {
+      schema: realSchema,
+      withDomain: true,
+      vars: { worker: { PAYMENTS_PROVIDERS: 'mercadopago:pix,stripe:card' }, preview: { APP_PREVIEW: '1' } },
+    });
+    const commands = plan.flatMap((step) => step.commands);
+    const puts = commands.filter((argv) => argv.includes('put'));
+    assert.ok(puts.length > 0);
+    for (const argv of puts) assert.ok(argv.includes('JWT_SECRET'), renderCommand(argv));
+    for (const argv of commands) assert.doesNotMatch(renderCommand(argv), /PAYMENTS_/, renderCommand(argv));
+    // …and the dry run still tells the operator which ones it will only report.
+    const note = plan.find((s) => s.id === 'secrets').note;
+    assert.match(note, /never written: .*PAYMENTS_STRIPE_SECRET_KEY, PAYMENTS_STRIPE_WEBHOOK_SECRET, PAYMENTS_MERCADOPAGO_SECRET_KEY, PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET/);
+    if (env === 'staging') assert.match(note, /on the Preview base config only: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, GOOGLE_CLIENT_SECRET, RESEND_API_KEY\)/);
+  }
 });

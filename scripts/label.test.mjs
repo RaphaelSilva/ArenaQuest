@@ -35,6 +35,11 @@ import {
   diffPaths,
   validateProfile,
   backupBucketName,
+  listNamesProvider,
+  resolveEnvVars,
+  externalConfirmations,
+  provisioningCommands,
+  defaultPaymentsKeyMode,
 } from './label.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -538,4 +543,198 @@ test('the budo production profile keeps web and API on one site', () => {
   const e = deriveExpected(profile, 'production');
   assert.equal(e.NEXT_PUBLIC_API_URL, 'https://api.taibudo.com');
   assert.equal(checkCookieSite(e.NEXT_PUBLIC_API_URL, e.NEXT_PUBLIC_SITE_URL, profile.environments.production.cookieSameSite).status, 'pass');
+});
+
+// ── payment gateway: the `~=` operator (RFC 0026 section 8) ──────────────────
+const MP = 'PAYMENTS_PROVIDERS~=mercadopago';
+
+test('requiredWhenActive ~= is true when the list names the provider, a retired entry included', () => {
+  assert.equal(requiredWhenActive(MP, { PAYMENTS_PROVIDERS: 'mercadopago:pix+card' }), true);
+  assert.equal(requiredWhenActive(MP, { PAYMENTS_PROVIDERS: 'stripe:card,mercadopago:pix' }), true);
+  assert.equal(requiredWhenActive(MP, { PAYMENTS_PROVIDERS: 'mercadopago:' }), true);
+  // whitespace is ignored the way the Worker's parser ignores it
+  assert.equal(requiredWhenActive(MP, { PAYMENTS_PROVIDERS: ' stripe:card , mercadopago : pix ' }), true);
+});
+
+test('requiredWhenActive ~= is false for none, an absent or blank value and another provider', () => {
+  assert.equal(requiredWhenActive(MP, { PAYMENTS_PROVIDERS: 'none' }), false);
+  assert.equal(requiredWhenActive(MP, {}), false);
+  assert.equal(requiredWhenActive(MP, undefined), false);
+  assert.equal(requiredWhenActive(MP, { PAYMENTS_PROVIDERS: null }), false);
+  assert.equal(requiredWhenActive(MP, { PAYMENTS_PROVIDERS: '' }), false);
+  assert.equal(requiredWhenActive(MP, { PAYMENTS_PROVIDERS: '   ' }), false);
+  assert.equal(requiredWhenActive(MP, { PAYMENTS_PROVIDERS: 'stripe:card' }), false);
+});
+
+test('requiredWhenActive ~= is not a substring match and is case-sensitive', () => {
+  assert.equal(requiredWhenActive(MP, { PAYMENTS_PROVIDERS: 'mercadopago2:pix' }), false);
+  assert.equal(requiredWhenActive(MP, { PAYMENTS_PROVIDERS: 'xmercadopago:pix' }), false);
+  assert.equal(requiredWhenActive('PAYMENTS_PROVIDERS~=pago', { PAYMENTS_PROVIDERS: 'mercadopago:pix' }), false);
+  // a method is never read as a provider
+  assert.equal(requiredWhenActive('PAYMENTS_PROVIDERS~=pix', { PAYMENTS_PROVIDERS: 'mercadopago:pix' }), false);
+  assert.equal(requiredWhenActive(MP, { PAYMENTS_PROVIDERS: 'MercadoPago:pix' }), false);
+});
+
+test('requiredWhenActive ~= tells two bound providers apart', () => {
+  const resolved = { PAYMENTS_PROVIDERS: 'mercadopago:pix,stripe:card' };
+  assert.equal(requiredWhenActive('PAYMENTS_PROVIDERS~=mercadopago', resolved), true);
+  assert.equal(requiredWhenActive('PAYMENTS_PROVIDERS~=stripe', resolved), true);
+  assert.equal(requiredWhenActive('PAYMENTS_PROVIDERS~=asaas', resolved), false);
+  assert.equal(listNamesProvider('mercadopago:pix,stripe:card', 'pagarme'), false);
+});
+
+test('requiredWhenActive keeps the exact behaviour of the KEY=value form', () => {
+  assert.equal(requiredWhenActive('MAIL_DRIVER=resend', { MAIL_DRIVER: 'resend' }), true);
+  assert.equal(requiredWhenActive('MAIL_DRIVER=resend', { MAIL_DRIVER: 'console' }), false);
+  assert.equal(requiredWhenActive('MAIL_DRIVER=resend', { MAIL_DRIVER: 'resend,console' }), false, '= is never a list match');
+  assert.equal(requiredWhenActive('MAIL_DRIVER=resend', {}), false);
+  assert.equal(requiredWhenActive(' MAIL_DRIVER = resend ', { MAIL_DRIVER: 'resend' }), true);
+  assert.equal(requiredWhenActive('MAIL_DRIVER=', {}), true, 'an empty value still equals an absent var');
+  assert.equal(requiredWhenActive('MAIL_DRIVER', { MAIL_DRIVER: 'resend' }), false);
+  assert.equal(requiredWhenActive('', { MAIL_DRIVER: 'resend' }), false);
+  assert.equal(requiredWhenActive(undefined, { MAIL_DRIVER: 'resend' }), false);
+  // a value that happens to contain "~=" is still an equality
+  assert.equal(requiredWhenActive('K=a~=b', { K: 'a~=b' }), true);
+});
+
+// ── payment gateway: the schema ──────────────────────────────────────────────
+function schemaPaymentProviders(section) {
+  return Object.keys(section)
+    .map((name) => /^PAYMENTS_([A-Z]+)_SECRET_KEY$/.exec(name)?.[1].toLowerCase())
+    .filter(Boolean);
+}
+
+test('the schema names exactly the providers the shared capability table knows', () => {
+  const source = readFileSync(join(ROOT, 'packages', 'shared', 'ports', 'i-payment-gateway.ts'), 'utf8');
+  const literal = /export const PAYMENT_PROVIDER_NAMES = \[([^\]]*)\] as const;/.exec(source);
+  assert.ok(literal, 'PAYMENT_PROVIDER_NAMES not found in packages/shared/ports/i-payment-gateway.ts');
+  const shared = [...literal[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  assert.ok(shared.length > 0);
+
+  const s = schema();
+  assert.deepEqual(schemaPaymentProviders(s['api-secrets']).sort(), [...shared].sort());
+  for (const provider of shared) {
+    const upper = provider.toUpperCase();
+    const condition = `PAYMENTS_PROVIDERS~=${provider}`;
+    assert.deepEqual(s['api-secrets'][`PAYMENTS_${upper}_SECRET_KEY`], { required: false, requiredWhen: condition });
+    assert.deepEqual(s['api-secrets'][`PAYMENTS_${upper}_WEBHOOK_SECRET`], { required: false, requiredWhen: condition });
+    const reminder = s.external[`payments-webhook-${provider}`];
+    assert.equal(reminder.requiredWhen, condition);
+    assert.ok(reminder.confirm.includes(`https://<apiHost>/v1/webhooks/payments/${provider}`));
+  }
+  // no payment secret outside the known pairs
+  const paymentSecrets = Object.keys(s['api-secrets']).filter((k) => k.startsWith('PAYMENTS_'));
+  assert.equal(paymentSecrets.length, shared.length * 2);
+});
+
+test('the schema declares the two payment vars as optional, the key mode as an enum', () => {
+  const vars = schema()['api-vars'];
+  assert.deepEqual(vars.PAYMENTS_PROVIDERS, { required: false });
+  assert.deepEqual(vars.PAYMENTS_KEY_MODE, { required: false, enum: ['test', 'live'] });
+  // optional: a label that carries neither is still complete
+  assert.ok(!checkPresence(vars, {}).some((k) => k.startsWith('PAYMENTS_')));
+});
+
+test('checkPresence asks for a payment pair only while the list names its provider', () => {
+  const sec = schema()['api-secrets'];
+  const payments = (resolved) => checkPresence(sec, resolved).filter((k) => k.startsWith('PAYMENTS_'));
+  assert.deepEqual(payments({ PAYMENTS_PROVIDERS: 'none' }), []);
+  assert.deepEqual(payments({}), []);
+  assert.deepEqual(payments({ PAYMENTS_PROVIDERS: 'mercadopago:pix+card' }),
+    ['PAYMENTS_MERCADOPAGO_SECRET_KEY', 'PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET']);
+  assert.deepEqual(payments({ PAYMENTS_PROVIDERS: 'mercadopago:pix,asaas:' }), [
+    'PAYMENTS_MERCADOPAGO_SECRET_KEY', 'PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET',
+    'PAYMENTS_ASAAS_SECRET_KEY', 'PAYMENTS_ASAAS_WEBHOOK_SECRET',
+  ]);
+});
+
+// ── payment gateway: conditions read the resolved vars ───────────────────────
+test('resolveEnvVars layers the committed Worker vars over the profile', () => {
+  const p = profile();
+  assert.equal(resolveEnvVars(p, 'staging').PAYMENTS_PROVIDERS, undefined);
+  assert.equal(resolveEnvVars(p, 'staging').MAIL_DRIVER, 'resend');
+  const resolved = resolveEnvVars(p, 'staging', { PAYMENTS_PROVIDERS: 'stripe:card', MAIL_DRIVER: 'console' });
+  assert.equal(resolved.PAYMENTS_PROVIDERS, 'stripe:card');
+  assert.equal(resolved.MAIL_DRIVER, 'console');
+  assert.equal(resolved.WEB_BASE_URL, 'https://acme-web-staging.pages.dev');
+});
+
+test('provisioningCommands lists a payment secret only for a provider the Worker block binds', () => {
+  const p = profile();
+  const none = provisioningCommands(p, schema(), 'staging', { PAYMENTS_PROVIDERS: 'none' });
+  assert.doesNotMatch(none, /PAYMENTS_/);
+  assert.doesNotMatch(provisioningCommands(p, schema(), 'staging'), /PAYMENTS_/);
+  assert.match(none, /create-secrets\.sh RESEND_API_KEY --env acme-staging/, 'the mail gate still reads the profile');
+
+  const bound = provisioningCommands(p, schema(), 'production', { PAYMENTS_PROVIDERS: 'mercadopago:pix+card' });
+  assert.match(bound, /create-secrets\.sh PAYMENTS_MERCADOPAGO_SECRET_KEY --env acme\n/);
+  assert.match(bound, /create-secrets\.sh PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET --env acme\n/);
+  assert.doesNotMatch(bound, /PAYMENTS_STRIPE|PAYMENTS_ASAAS|PAYMENTS_PAGARME/);
+  assert.match(bound, /# Webhook registered in the Mercado Pago dashboard: https:\/\/api\.acme\.app\/v1\/webhooks\/payments\/mercadopago/);
+});
+
+test('externalConfirmations adds one webhook reminder per bound provider, built from the API host', () => {
+  const p = profile();
+  const keys = (vars) => externalConfirmations(schema(), p, 'staging', resolveEnvVars(p, 'staging', vars)).map((c) => c.key);
+  assert.deepEqual(keys(null), ['google-oauth', 'dns', 'resend']);
+  assert.deepEqual(keys({ PAYMENTS_PROVIDERS: 'none' }), ['google-oauth', 'dns', 'resend']);
+  assert.deepEqual(keys({ PAYMENTS_PROVIDERS: 'mercadopago:pix,stripe:card' }),
+    ['google-oauth', 'dns', 'resend', 'payments-webhook-stripe', 'payments-webhook-mercadopago']);
+
+  const resolved = resolveEnvVars(p, 'staging', { PAYMENTS_PROVIDERS: 'asaas:' });
+  const reminder = externalConfirmations(schema(), p, 'staging', resolved).find((c) => c.key === 'payments-webhook-asaas');
+  assert.equal(reminder.detail,
+    'Webhook registered in the Asaas dashboard: https://api-acme-staging.acme.workers.dev/v1/webhooks/payments/asaas');
+  // the pre-existing confirmations keep their text
+  const google = externalConfirmations(schema(), p, 'staging', resolved).find((c) => c.key === 'google-oauth');
+  assert.match(google.detail, /https:\/\/api-acme-staging\.acme\.workers\.dev\/auth\/google\/callback is an Authorised redirect URI/);
+});
+
+// ── payment gateway: the generated Worker block ──────────────────────────────
+test('scaffoldWranglerText generates a new label dark: none, test on staging, live on production', () => {
+  const out = parseJsonc(scaffoldWranglerText('{\n\t"env": {\n\t}\n}\n', 'acme', profile()));
+  assert.equal(out.env['acme-staging'].vars.PAYMENTS_PROVIDERS, 'none');
+  assert.equal(out.env['acme-staging'].vars.PAYMENTS_KEY_MODE, 'test');
+  assert.equal(out.env.acme.vars.PAYMENTS_PROVIDERS, 'none');
+  assert.equal(out.env.acme.vars.PAYMENTS_KEY_MODE, 'live');
+  assert.equal(defaultPaymentsKeyMode('staging'), 'test');
+  assert.equal(defaultPaymentsKeyMode('production'), 'live');
+});
+
+test('a previews block never carries a payment var', () => {
+  const out = parseJsonc(scaffoldWranglerText('{\n\t"env": {\n\t}\n}\n', 'acme', profile()));
+  const previewVars = Object.keys(out.env['acme-staging'].previews.vars);
+  assert.ok(!previewVars.some((k) => k.startsWith('PAYMENTS_')), 'a preview runs with an empty registry');
+  assert.ok(!Object.keys(derivePreviewsBlock(profile(), 'staging').vars).some((k) => k.startsWith('PAYMENTS_')));
+});
+
+test('scaffoldWranglerText carries a committed provider list over a regeneration', () => {
+  const p = profile();
+  const once = scaffoldWranglerText('{\n\t"env": {\n\t}\n}\n', 'acme', p);
+  const bound = once
+    .replace('"PAYMENTS_PROVIDERS": "none"', '"PAYMENTS_PROVIDERS": "mercadopago:pix+card"');
+  assert.notEqual(bound, once);
+  const again = parseJsonc(scaffoldWranglerText(bound, 'acme', p));
+  // only the first block (staging) was edited; production stays dark
+  assert.equal(again.env['acme-staging'].vars.PAYMENTS_PROVIDERS, 'mercadopago:pix+card');
+  assert.equal(again.env['acme-staging'].vars.PAYMENTS_KEY_MODE, 'test');
+  assert.equal(again.env.acme.vars.PAYMENTS_PROVIDERS, 'none');
+  assert.equal(again.env.acme.vars.PAYMENTS_KEY_MODE, 'live');
+  assert.equal(scaffoldWranglerText(bound, 'acme', p), scaffoldWranglerText(scaffoldWranglerText(bound, 'acme', p), 'acme', p));
+});
+
+test('regenerating a committed label leaves its payment vars as committed (every label stays dark)', () => {
+  const text = readFileSync(join(ROOT, 'apps', 'api', 'wrangler.jsonc'), 'utf8');
+  const committed = parseJsonc(text).env;
+  for (const label of ['arenaquest', 'spaziord', 'budo']) {
+    const p = parseJsonc(readFileSync(join(ROOT, 'config', 'labels', `${label}.jsonc`), 'utf8'));
+    const regenerated = parseJsonc(scaffoldWranglerText(text, label, p)).env;
+    for (const [name, mode] of [[`${label}-staging`, 'test'], [label, 'live']]) {
+      for (const key of ['PAYMENTS_PROVIDERS', 'PAYMENTS_KEY_MODE']) {
+        assert.equal(regenerated[name].vars[key], committed[name].vars[key], `${name}.${key}`);
+      }
+      assert.equal(committed[name].vars.PAYMENTS_PROVIDERS, 'none', `${name} must stay dark`);
+      assert.equal(committed[name].vars.PAYMENTS_KEY_MODE, mode, name);
+    }
+  }
 });

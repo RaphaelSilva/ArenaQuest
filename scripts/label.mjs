@@ -261,15 +261,81 @@ export function buildResolved(profile, env, expected, wranglerVars = null) {
   return resolved;
 }
 
-/** Is a `requiredWhen` condition (e.g. "MAIL_DRIVER=resend") active? */
+/**
+ * The resolved config map of an environment from the profile alone plus, when
+ * given, the `vars` of its committed `env.<label>` Worker block. This is the map
+ * every `requiredWhen` condition is evaluated against: a var that only the
+ * Worker block carries (`PAYMENTS_PROVIDERS`) is invisible to a caller that
+ * passes the mail driver alone.
+ */
+export function resolveEnvVars(profile, env, wranglerVars = null) {
+  return buildResolved(profile, env, deriveExpected(profile, env), wranglerVars);
+}
+
+/**
+ * Does a provider list (`PAYMENTS_PROVIDERS`) name `provider`?
+ *
+ * Reads the list the way the Worker does (apps/api/src/core/payments/config.ts):
+ * comma-separated entries, whitespace trimmed, the provider being the text
+ * before the `:`, lower case and matched exactly. A retired entry with no
+ * method (`asaas:`) still names its provider. `none`, an absent or a blank
+ * value name nobody, and a provider whose name merely contains the text
+ * (`mercadopago2:pix`) does not match.
+ */
+export function listNamesProvider(value, provider) {
+  if (value === undefined || value === null) return false;
+  const list = String(value).trim();
+  if (list === '' || list === 'none') return false;
+  const want = String(provider).trim();
+  if (want === '') return false;
+  return list.split(',').some((entry) => {
+    const colon = entry.indexOf(':');
+    return (colon === -1 ? entry : entry.slice(0, colon)).trim() === want;
+  });
+}
+
+/**
+ * Is a `requiredWhen` condition active against the resolved vars?
+ *
+ *   KEY=value    — the var equals the value exactly ("MAIL_DRIVER=resend").
+ *   KEY~=name    — the var is a provider list that names `name`
+ *                  ("PAYMENTS_PROVIDERS~=mercadopago"; see listNamesProvider).
+ */
 export function requiredWhenActive(condition, resolved) {
   if (!condition) return false;
   const idx = condition.indexOf('=');
   if (idx === -1) return false;
-  const key = condition.slice(0, idx).trim();
   const val = condition.slice(idx + 1).trim();
-  return String(resolved[key] ?? '') === val;
+  if (idx > 0 && condition[idx - 1] === '~') {
+    return listNamesProvider(resolved?.[condition.slice(0, idx - 1).trim()], val);
+  }
+  const key = condition.slice(0, idx).trim();
+  return String(resolved?.[key] ?? '') === val;
 }
+
+/**
+ * The active `external` confirmations of an environment, each with its
+ * placeholders filled in: `[{ key, detail, requiredWhen }]`. An entry with a
+ * `requiredWhen` is listed only while that condition holds against `resolved`.
+ * Pure — these are statements a human confirms, never something probed.
+ */
+export function externalConfirmations(schema, profile, env, resolved) {
+  const e = profile.environments[env];
+  const out = [];
+  for (const [key, spec] of Object.entries(schema?.external ?? {})) {
+    if (spec.requiredWhen && !requiredWhenActive(spec.requiredWhen, resolved)) continue;
+    const detail = String(spec.confirm || '')
+      .replace('<GOOGLE_REDIRECT_URI>', resolved.GOOGLE_REDIRECT_URI || '')
+      .replace('<apiHost>', e.apiHost || '')
+      .replace('<webOrigin>', e.webOrigin || '')
+      .replace('<MAIL_FROM>', resolved.MAIL_FROM || '');
+    out.push({ key, detail, requiredWhen: spec.requiredWhen ?? null });
+  }
+  return out;
+}
+
+/** Key prefix of the `external` entries that remind the operator to register a provider webhook. */
+export const PAYMENT_WEBHOOK_CONFIRMATION_PREFIX = 'payments-webhook-';
 
 export function isActive(spec, resolved) {
   return Boolean(spec.required) || requiredWhenActive(spec.requiredWhen, resolved);
@@ -621,7 +687,35 @@ export function checkPreviewsBlock(profile, env, actualPreviews) {
     .map((d) => ({ ...d, reason: d.expected === undefined ? 'unexpected field' : 'drifted from the profile' }));
 }
 
-function buildEnvBlockObject(profile, env, expected) {
+/** What a generated env block carries when no committed block says otherwise: payments off. */
+export const PAYMENTS_PROVIDERS_DEFAULT = 'none';
+
+/** The key mode an environment is generated with (milestone 30 decision 19). */
+export function defaultPaymentsKeyMode(env) {
+  return env === 'production' ? 'live' : 'test';
+}
+
+/**
+ * The two payment vars of an env block (RFC 0026 section 8). They have no
+ * profile source — binding a provider is an edit of the Worker block — so a
+ * regeneration carries the committed values over and only falls back to the
+ * dark default (`none`; `test` on staging, `live` on production) for a block
+ * that does not exist yet. Without this, re-provisioning a label would
+ * silently turn its payments off. Never part of a `previews` block: a preview
+ * runs with an empty registry.
+ */
+function derivePaymentVars(env, committedVars) {
+  const carried = (key) => {
+    const value = committedVars?.[key];
+    return typeof value === 'string' && value.trim() !== '' ? value : null;
+  };
+  return {
+    PAYMENTS_PROVIDERS: carried('PAYMENTS_PROVIDERS') ?? PAYMENTS_PROVIDERS_DEFAULT,
+    PAYMENTS_KEY_MODE: carried('PAYMENTS_KEY_MODE') ?? defaultPaymentsKeyMode(env),
+  };
+}
+
+function buildEnvBlockObject(profile, env, expected, committedVars = null) {
   const e = profile.environments[env];
   return {
     name: e.worker,
@@ -638,6 +732,7 @@ function buildEnvBlockObject(profile, env, expected) {
     vars: {
       ...deriveEnvVars(profile, env, expected),
       GOOGLE_CLIENT_ID: e.googleClientId || '<fill: Google OAuth client id (not a secret)>',
+      ...derivePaymentVars(env, committedVars),
     },
     observability: { enabled: true, logs: { enabled: true } },
     // Workers Previews (RFC 0021): staging only, never production.
@@ -665,6 +760,16 @@ export function scaffoldWranglerText(text, label, profile) {
   const startMark = `// >>> label:${label} (generated) >>>`;
   const endMark = `// <<< label:${label} <<<`;
 
+  // 0. Read what the committed blocks say before they are removed: the payment
+  //    vars are carried over (derivePaymentVars), everything else is re-derived.
+  let committedEnv = {};
+  try {
+    committedEnv = parseJsonc(text).env ?? {};
+  } catch {
+    committedEnv = {};
+  }
+  const committedVars = (name) => committedEnv[name]?.vars ?? null;
+
   // 1. Remove any previous generated block for this label.
   const removeRe = new RegExp(
     `[ \\t]*${escapeRegExp(startMark)}[\\s\\S]*?${escapeRegExp(endMark)}\\n?`,
@@ -674,8 +779,12 @@ export function scaffoldWranglerText(text, label, profile) {
 
   // 2. Build the JSON fragment for staging + production.
   const entries = {
-    [`${label}-staging`]: buildEnvBlockObject(profile, 'staging', deriveExpected(profile, 'staging')),
-    [label]: buildEnvBlockObject(profile, 'production', deriveExpected(profile, 'production')),
+    [`${label}-staging`]: buildEnvBlockObject(
+      profile, 'staging', deriveExpected(profile, 'staging'), committedVars(`${label}-staging`),
+    ),
+    [label]: buildEnvBlockObject(
+      profile, 'production', deriveExpected(profile, 'production'), committedVars(label),
+    ),
   };
   const body = Object.entries(entries)
     .map(([k, v]) => `${JSON.stringify(k)}: ${JSON.stringify(v, null, 2)},`)
@@ -832,9 +941,15 @@ export function setPreviewsBlockText(text, label, profile) {
   return { text: next, changed: next !== text, existed: Boolean(existing) };
 }
 
-/** The provisioning command list a maintainer runs by hand (printed, never run). */
-export function provisioningCommands(profile, schema, env) {
+/**
+ * The provisioning command list a maintainer runs by hand (printed, never run).
+ * `wranglerVars` are the `vars` of the env's Worker block: the secrets listed
+ * are the ones active against the resolved vars, so a bound payment provider
+ * gets its two `create-secrets.sh` lines and a label on `none` gets neither.
+ */
+export function provisioningCommands(profile, schema, env, wranglerVars = null) {
   const e = profile.environments[env];
+  const resolved = resolveEnvVars(profile, env, wranglerVars);
   const wEnv = env === 'production' ? profile.label : `${profile.label}-staging`;
   const kvNamespace = kvNamespaceName(profile.label, env);
   const lines = [];
@@ -849,8 +964,11 @@ export function provisioningCommands(profile, schema, env) {
   lines.push(`# Secrets (values entered interactively — never committed):`);
   for (const name of Object.keys(schema['api-secrets'] || {})) {
     const spec = schema['api-secrets'][name];
-    if (!spec.required && !requiredWhenActive(spec.requiredWhen, { MAIL_DRIVER: e.mail?.driver })) continue;
+    if (!isActive(spec, resolved)) continue;
     lines.push(`${PATHS.createSecrets} ${name} --env ${wEnv}`);
+  }
+  for (const { key, detail } of externalConfirmations(schema, profile, env, resolved)) {
+    if (key.startsWith(PAYMENT_WEBHOOK_CONFIRMATION_PREFIX)) lines.push(`# ${detail}`);
   }
   return lines.join('\n');
 }
@@ -895,12 +1013,12 @@ function wranglerEnvName(label, env) {
   return env === 'production' ? label : `${label}-staging`;
 }
 
-/** Return an existing env.<name> block of wrangler.jsonc, or null. */
-function readWranglerEnvBlock(label, env) {
-  if (!existsSync(PATHS.wrangler)) return null;
+/** Return an existing env.<name> block of wrangler.jsonc, or null. Read-only. */
+export function readWranglerEnvBlock(label, env, path = PATHS.wrangler) {
+  if (!existsSync(path)) return null;
   let cfg;
   try {
-    cfg = readJsonc(PATHS.wrangler);
+    cfg = readJsonc(path);
   } catch {
     return null;
   }
@@ -1095,13 +1213,7 @@ function cmdCheck(label, env) {
   }
 
   // ── external: manual confirmations carrying the exact value ───────────────
-  for (const [key, spec] of Object.entries(schema.external)) {
-    if (spec.requiredWhen && !requiredWhenActive(spec.requiredWhen, resolved)) continue;
-    const detail = String(spec.confirm || '')
-      .replace('<GOOGLE_REDIRECT_URI>', resolved.GOOGLE_REDIRECT_URI || '')
-      .replace('<apiHost>', e.apiHost || '')
-      .replace('<webOrigin>', e.webOrigin || '')
-      .replace('<MAIL_FROM>', resolved.MAIL_FROM || '');
+  for (const { key, detail } of externalConfirmations(schema, profile, env, resolved)) {
     results.push({ group: 'external', key, status: 'manual', detail });
   }
 
@@ -1214,9 +1326,10 @@ function cmdScaffold(label, outPath) {
   console.log(workflowStanza(profile, 'production'));
   console.log('');
   console.log('── Provisioning commands (run by hand — nothing below is executed) ──');
-  console.log(provisioningCommands(profile, schema, 'staging'));
+  const written = parseJsonc(after).env ?? {};
+  console.log(provisioningCommands(profile, schema, 'staging', written[`${label}-staging`]?.vars ?? null));
   console.log('');
-  console.log(provisioningCommands(profile, schema, 'production'));
+  console.log(provisioningCommands(profile, schema, 'production', written[label]?.vars ?? null));
   return 0;
 }
 
