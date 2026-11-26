@@ -7,4 +7,8 @@ export {
   CreateCheckoutBodySchema,
   CheckoutSessionSchema,
   CheckoutStatusSchema,
+  CreateCheckoutOnBehalfBodySchema,
+  PendingCheckoutsSummarySchema,
+  RefundConflictBody,
+  RefundUnrecordedBody,
 } from '@api/openapi/components/payments';

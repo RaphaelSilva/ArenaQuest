@@ -212,6 +212,15 @@ export interface IGatewayRepository {
   getCheckout(id: string): Promise<GatewayCheckoutRecord | null>;
   /** The one `open` checkout of a receivable, on whatever provider. */
   findOpenCheckout(receivableKind: ReceivableKind, receivableId: string): Promise<GatewayCheckoutRecord | null>;
+  /**
+   * Every `open` checkout, across all receivables and students, oldest first —
+   * the one set-based read behind the admin roster and charge list, which
+   * would otherwise ask once per receivable. Bounded by the number of open
+   * receivables (one open checkout each). A row past its `expiresAt` is still
+   * `open` until the reconcile run closes it; the caller decides what counts
+   * as a payment in progress.
+   */
+  listOpenCheckouts(): Promise<GatewayCheckoutRecord[]>;
   /** Status-preserving write; `null` when the checkout does not exist. */
   updateCheckout(id: string, patch: UpdateGatewayCheckoutInput): Promise<GatewayCheckoutRecord | null>;
   /**

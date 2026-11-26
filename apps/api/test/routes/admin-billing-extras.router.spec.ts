@@ -1,9 +1,12 @@
 import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import worker, { type AppEnv } from '../../src/index';
 import { JwtAuthAdapter } from '@api/adapters/auth';
 import { applyMigrations } from '../helpers/apply-migrations';
 import { v1 } from '../helpers/v1';
+import { buildPaymentsTestApp, type PaymentsTestApp } from '../adapters/payment/payments-test-app';
+import { StubGatewayAdapter, stubPayment } from '../adapters/payment/stub-gateway-adapter';
+import { insertChargePayment, seedGatewayWorld, type GatewayWorld } from '../db/gateway-fixtures';
 
 /**
  * The extras rail over HTTP (RFC 0015 §7): the HTTP statuses of the whole
@@ -22,6 +25,7 @@ const DRAFT = 'extras-event-draft';
 
 let adminToken: string;
 let creatorToken: string;
+let tutorToken: string;
 
 interface Charge { id: string; userId: string; status: string; termsSource: string }
 interface Payment { id: string }
@@ -58,9 +62,10 @@ beforeAll(async () => {
   ]);
 
   const adapter = new JwtAuthAdapter({ secret: env.JWT_SECRET, accessTokenExpiresInSeconds: 900 });
-  [adminToken, creatorToken] = await Promise.all([
+  [adminToken, creatorToken, tutorToken] = await Promise.all([
     adapter.signAccessToken({ sub: ADMIN_ID, email: 'admin@extras.test', roles: ['admin'] }),
     adapter.signAccessToken({ sub: 'cc', email: 'cc@extras.test', roles: ['content_creator'] }),
+    adapter.signAccessToken({ sub: 'tutor', email: 'tutor@extras.test', roles: ['tutor'] }),
   ]);
 });
 
@@ -69,6 +74,8 @@ async function billing(
   path: string,
   body?: unknown,
   token = adminToken,
+  /** The same Worker app with stub payment adapters bound; without it the real Worker (`none`) answers. */
+  app?: PaymentsTestApp,
 ): Promise<Response> {
   const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -78,7 +85,7 @@ async function billing(
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const ctx = createExecutionContext();
-  const res = await worker.fetch(request, env as AppEnv, ctx);
+  const res = app ? await app.fetch(request, ctx) : await worker.fetch(request, env as AppEnv, ctx);
   await waitOnExecutionContext(ctx);
   return res;
 }
@@ -269,9 +276,181 @@ describe('/v1/admin/billing extras rail', () => {
     ['POST', '/charges/any/adjustments', { kind: 'discount', amountMinor: -1, reason: 'x' }],
     ['POST', '/charges/any/payments', { amountMinor: 1, method: 'cash' }],
     ['POST', '/charge-payments/any/reverse', { reason: 'x' }],
+    ['POST', '/charges/any/checkouts', {}],
     ['GET', `/events/${PUBLISHED}/summary`, undefined],
     ['GET', `/events/${PUBLISHED}/audience-check?userIds=${BUYER_A}`, undefined],
   ])('content_creator gets 403 on %s %s', async (method, path, body) => {
     expect((await billing(method, path, body, creatorToken)).status).toBe(403);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The payment gateway, admin side (RFC 0026 §3, §5, §7) — extras rail
+// ---------------------------------------------------------------------------
+
+describe('/v1/admin/billing extras rail — checkouts on behalf, refunds and the pending flag', () => {
+  type Session = { checkoutId: string; provider: string; url: string; expiresAt: string; amountMinor: number };
+  type Row = {
+    id: string;
+    chargeId: string;
+    amountMinor: number;
+    method: string;
+    externalReference: string | null;
+    reversesId: string | null;
+    recordedBy: string;
+  };
+  type Listed = { id: string; status: string; pendingCheckout: { checkoutId: string; createdBy: string; expiresAt: string } | null };
+
+  let mp: StubGatewayAdapter;
+  let app: PaymentsTestApp;
+  let world: GatewayWorld;
+
+  const viaApp = (method: string, path: string, body?: unknown, token = adminToken) =>
+    billing(method, path, body, token, app);
+
+  async function ledger(): Promise<string> {
+    const { results } = await env.DB
+      .prepare('SELECT * FROM event_charge_payments WHERE charge_id = ? ORDER BY id')
+      .bind(world.chargeId)
+      .all();
+    return JSON.stringify(results);
+  }
+
+  async function landed(): Promise<{ id: string; providerId: string }> {
+    const providerId = `pay-${crypto.randomUUID()}`;
+    const id = await insertChargePayment(world, { method: 'gateway', externalReference: `mercadopago:${providerId}` });
+    mp.setPayment(stubPayment({ id: providerId, amountMinor: 8000 }));
+    return { id, providerId };
+  }
+
+  const listed = async (run = viaApp): Promise<Listed> =>
+    (await jsonOf<Listed[]>(await run('GET', `/charges?userId=${world.studentId}`), 200)).find(
+      (charge) => charge.id === world.chargeId,
+    )!;
+
+  beforeEach(async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mp = new StubGatewayAdapter('mercadopago');
+    app = buildPaymentsTestApp(env as Env, 'mercadopago:pix+card', [mp]);
+    world = await seedGatewayWorld();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('opens a checkout for a student\'s open charge, with the admin as its creator', async () => {
+    const res = await viaApp('POST', `/charges/${world.chargeId}/checkouts`, {});
+    const session = await jsonOf<Session>(res, 201);
+
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(session).toMatchObject({ provider: 'mercadopago', amountMinor: 8000 });
+    const row = await env.DB
+      .prepare('SELECT user_id, created_by, receivable_kind, receivable_id FROM gateway_checkouts WHERE id = ?')
+      .bind(session.checkoutId)
+      .first();
+    expect(row).toEqual({
+      user_id: world.studentId,
+      created_by: ADMIN_ID,
+      receivable_kind: 'event_charge',
+      receivable_id: world.chargeId,
+    });
+    expect(mp.callsTo('createCheckout')[0].req).toMatchObject({ description: 'Seminar', payer: { id: world.studentId } });
+
+    const again = await jsonOf<Session>(await viaApp('POST', `/charges/${world.chargeId}/checkouts`, {}), 200);
+    expect(again.checkoutId).toBe(session.checkoutId);
+  });
+
+  it('404s a missing charge and an invoice id, 404s under `none`, and 403s a content_creator and a tutor', async () => {
+    expect((await viaApp('POST', '/charges/nope/checkouts', {})).status).toBe(404);
+    expect((await viaApp('POST', `/charges/${world.invoiceId}/checkouts`, {})).status).toBe(404);
+    expect((await billing('POST', `/charges/${world.chargeId}/checkouts`, {})).status).toBe(404);
+    for (const token of [creatorToken, tutorToken]) {
+      expect((await viaApp('POST', `/charges/${world.chargeId}/checkouts`, {}, token)).status).toBe(403);
+    }
+    expect(mp.calls).toHaveLength(0);
+  });
+
+  it('says on the charge list whether a checkout is in progress', async () => {
+    expect((await listed()).pendingCheckout).toBeNull();
+
+    const session = await jsonOf<Session>(await viaApp('POST', `/charges/${world.chargeId}/checkouts`, {}), 201);
+
+    expect((await listed()).pendingCheckout).toEqual({
+      checkoutId: session.checkoutId,
+      provider: 'mercadopago',
+      createdAt: expect.any(String),
+      expiresAt: session.expiresAt,
+      createdBy: ADMIN_ID,
+    });
+    // The flag is the database's, not the provider list's: the real Worker sees it too.
+    expect((await listed(billing)).pendingCheckout?.checkoutId).toBe(session.checkoutId);
+
+    // Cash at the door: allowed, the answer says a checkout is open, and a
+    // settled charge no longer reads as pending.
+    const cash = await jsonOf<Row & { pendingCheckout: { checkoutId: string } | null }>(
+      await viaApp('POST', `/charges/${world.chargeId}/payments`, { amountMinor: 8000, method: 'cash' }),
+      201,
+    );
+    expect(cash.pendingCheckout?.checkoutId).toBe(session.checkoutId);
+    const after = await listed();
+    expect(after).toMatchObject({ status: 'paid', pendingCheckout: null });
+  });
+
+  it('refunds a gateway payment at the provider and writes one reversal under the refund id — twice, 200 both times', async () => {
+    const { id, providerId } = await landed();
+
+    const first = await jsonOf<Row>(await viaApp('POST', `/charge-payments/${id}/reverse`, { reason: 'Event cancelled.' }), 200);
+    const second = await jsonOf<Row>(await viaApp('POST', `/charge-payments/${id}/reverse`, { reason: 'Event cancelled.' }), 200);
+
+    expect(first).toMatchObject({
+      chargeId: world.chargeId,
+      amountMinor: -8000,
+      method: 'gateway',
+      reversesId: id,
+      externalReference: 'mercadopago:mercadopago-refund-1',
+      recordedBy: ADMIN_ID,
+    });
+    expect(second.id).toBe(first.id);
+    expect(mp.callsTo('refund')).toEqual([
+      { method: 'refund', paymentId: providerId, amountMinor: 8000, idempotencyKey: `rev:${id}` },
+    ]);
+    const reversals = await env.DB
+      .prepare('SELECT COUNT(*) AS n FROM event_charge_payments WHERE reverses_id = ?')
+      .bind(id)
+      .first<{ n: number }>();
+    expect(reversals?.n).toBe(1);
+  });
+
+  it('writes nothing when the provider refuses, or is no longer bound', async () => {
+    const { id } = await landed();
+    const before = await ledger();
+
+    mp.failRefunds(new Error('refused'));
+    const refused = await viaApp('POST', `/charge-payments/${id}/reverse`, { reason: 'x' });
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({ error: 'PAYMENTS_REFUND_REFUSED' });
+
+    const unbound = await billing('POST', `/charge-payments/${id}/reverse`, { reason: 'x' });
+    expect(unbound.status).toBe(409);
+    expect(await unbound.json()).toEqual({ error: 'PAYMENTS_PROVIDER_NOT_ENABLED' });
+
+    expect(await ledger()).toBe(before);
+  });
+
+  it('reverses a cash payment as before — 201 and no provider call — and 403s the other roles on a gateway row', async () => {
+    const cash = await jsonOf<Row>(
+      await viaApp('POST', `/charges/${world.chargeId}/payments`, { amountMinor: 3000, method: 'cash' }),
+      201,
+    );
+    const reversal = await jsonOf<Row>(await viaApp('POST', `/charge-payments/${cash.id}/reverse`, { reason: 'Typo.' }), 201);
+    expect(reversal).toMatchObject({ amountMinor: -3000, method: 'cash', reversesId: cash.id });
+
+    const { id } = await landed();
+    for (const token of [creatorToken, tutorToken]) {
+      expect((await viaApp('POST', `/charge-payments/${id}/reverse`, { reason: 'x' }, token)).status).toBe(403);
+    }
+    expect(mp.calls).toHaveLength(0);
   });
 });

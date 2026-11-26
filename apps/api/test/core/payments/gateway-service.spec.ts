@@ -6,6 +6,9 @@ import {
   GatewayService,
   PAYMENT_PROVIDER_REQUIRED,
   PAYMENTS_PROVIDER_ERROR,
+  PAYMENTS_PROVIDER_NOT_ENABLED,
+  PAYMENTS_REFUND_REFUSED,
+  PAYMENTS_REFUND_UNRECORDED,
   PAYMENTS_UNSUPPORTED_CURRENCY,
   RECEIVABLE_NOT_PAYABLE,
   disputeReference,
@@ -25,6 +28,7 @@ import type {
   MarkGatewayEventInput,
 } from '@arenaquest/shared/ports/i-gateway-repository';
 import type { ProviderEvent, ProviderPayment } from '@arenaquest/shared/ports/i-payment-gateway';
+import type { PaymentRecord, RecordPaymentInput } from '@arenaquest/shared/ports';
 import type { IRateLimiter } from '@arenaquest/shared/ports/i-rate-limiter';
 import { PAYMENTS_CONFIG_INVALID } from '@api/core/payments/config';
 import { buildPaymentsWiring } from '@api/core/payments/gateway-registry';
@@ -129,6 +133,10 @@ class MemoryGatewayRepo {
         (row) => row.receivableKind === kind && row.receivableId === id && row.status === CheckoutStatus.OPEN,
       ) ?? null
     );
+  }
+
+  async listOpenCheckouts() {
+    return this.open();
   }
 
   open(): GatewayCheckoutRecord[] {
@@ -1144,6 +1152,466 @@ describe('GatewayService.createCheckout', () => {
       expect(theirs).toEqual({ ok: false, status: 404, error: 'NotFound' });
       expect(missing).toEqual(theirs);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// On behalf of a student, and the payments in progress (RFC 0026 §3, §7)
+// ---------------------------------------------------------------------------
+
+describe('GatewayService — the admin\'s side of a checkout', () => {
+  const NOW = new Date('2026-03-01T12:00:00.000Z');
+  const ADMIN = 'admin-1';
+
+  let repo: MemoryGatewayRepo;
+  let mp: StubGatewayAdapter;
+  let hits: string[];
+  let payers: string[];
+  let info: ReturnType<typeof vi.spyOn>;
+
+  function build(owner = STUDENT) {
+    const wiring = buildPaymentsWiring(stubPaymentsEnv('mercadopago:pix+card'), stubGatewayFactories(mp));
+    const receivable = { id: INVOICE, userId: owner, status: 'open', balanceMinor: 15000, currency: 'BRL', periodStart: '2026-03-01' };
+    const limiter: IRateLimiter = {
+      peek: async (key) => {
+        hits.push(`peek:${key}`);
+        return { allowed: false, remaining: 0, retryAfterSeconds: 60 };
+      },
+      hit: async (key) => {
+        hits.push(`hit:${key}`);
+        return { allowed: true, remaining: 0 };
+      },
+      reset: async () => {},
+    };
+    return new GatewayService({
+      gateways: wiring.gateways,
+      gatewayRepo: repo as unknown as IGatewayRepository,
+      billing: {
+        getInvoice: async (id: string) =>
+          id === INVOICE ? { ok: true as const, data: receivable } : { ok: false as const, status: 404, error: 'NotFound' },
+      } as unknown as GatewayContractLedger,
+      charges: {} as GatewayExtrasLedger,
+      checkout: {
+        config: wiring.config,
+        registry: wiring.gateways,
+        payer: async (userId) => {
+          payers.push(userId);
+          return { id: userId, name: 'Ana', email: 'ana@example.com' };
+        },
+        webBaseUrl: 'https://app.example.com',
+        limiter,
+      },
+      now: () => NOW,
+    });
+  }
+
+  beforeEach(() => {
+    repo = new MemoryGatewayRepo();
+    mp = new StubGatewayAdapter('mercadopago');
+    hits = [];
+    payers = [];
+    info = vi.spyOn(console, 'info').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('opens the checkout for the receivable\'s own student, with the admin as its creator', async () => {
+    const result = await build().createCheckoutOnBehalf({ kind: 'invoice', id: INVOICE }, ADMIN);
+
+    expect(result.ok && result.data.reused).toBe(false);
+    const [row] = repo.open();
+    expect(row).toMatchObject({ userId: STUDENT, createdBy: ADMIN, amountMinor: 15000, receivableId: INVOICE });
+    // The hosted page is opened for the student, never for the admin.
+    expect(payers).toEqual([STUDENT]);
+    expect(mp.callsTo('createCheckout')[0].req.payer.id).toBe(STUDENT);
+    const audit = info.mock.calls.map((call) => JSON.parse(call[0] as string));
+    expect(audit.find((line) => line.event === 'payments.checkout_created')).toMatchObject({
+      actor: ADMIN,
+      userId: STUDENT,
+    });
+  });
+
+  it('never consults or charges the student\'s budget — not even for an admin who owes the receivable', async () => {
+    // The limiter above refuses everyone it is asked about.
+    expect((await build().createCheckoutOnBehalf({ kind: 'invoice', id: INVOICE }, ADMIN)).ok).toBe(true);
+    expect((await build(ADMIN).createCheckoutOnBehalf({ kind: 'invoice', id: INVOICE }, ADMIN)).ok).toBe(true);
+    expect(hits).toEqual([]);
+
+    // The student's own door still draws on it.
+    repo.checkouts.clear();
+    const own = await build().createCheckout({ kind: 'invoice', id: INVOICE }, { userId: STUDENT, createdBy: STUDENT });
+    expect(own.ok).toBe(false);
+    expect(hits).toEqual([`peek:${STUDENT}`]);
+  });
+
+  it('hands the admin\'s open checkout back to the admin and to the student alike', async () => {
+    const service = build();
+    const first = await service.createCheckoutOnBehalf({ kind: 'invoice', id: INVOICE }, ADMIN);
+    const again = await service.createCheckoutOnBehalf({ kind: 'invoice', id: INVOICE }, 'admin-2');
+
+    expect(first.ok && again.ok && again.data.reused).toBe(true);
+    expect(first.ok && again.ok && again.data.checkout.checkoutId === first.data.checkout.checkoutId).toBe(true);
+    expect(repo.open()).toHaveLength(1);
+    expect(repo.open()[0].createdBy).toBe(ADMIN);
+    expect(mp.callsTo('createCheckout')).toHaveLength(1);
+  });
+
+  it('answers 404 for a receivable that does not exist, after the provider is resolved', async () => {
+    const service = build();
+    expect(await service.createCheckoutOnBehalf({ kind: 'invoice', id: 'nope' }, ADMIN)).toMatchObject({ status: 404 });
+    expect(await service.createCheckoutOnBehalf({ kind: 'invoice', id: 'nope', provider: 'stripe' }, ADMIN)).toMatchObject({
+      status: 400,
+      error: PAYMENT_PROVIDER_REQUIRED,
+    });
+  });
+
+  it('lists the payments in progress in one read, by the statement\'s own rule', async () => {
+    repo.addCheckout({ id: 'live', receivableId: 'inv-live', expiresAt: '2026-03-02T12:00:00.000Z' });
+    repo.addCheckout({ id: 'no-session', receivableId: 'inv-a', providerSessionId: null });
+    repo.addCheckout({ id: 'past', receivableId: 'inv-b', expiresAt: NOW.toISOString() });
+    repo.addCheckout({ id: 'paid', receivableId: 'inv-c', status: CheckoutStatus.PAID });
+    repo.addCheckout({ id: 'charge', receivableKind: 'event_charge', receivableId: CHARGE, userId: 'student-2' });
+    const read = vi.spyOn(repo, 'listOpenCheckouts');
+    const service = build();
+
+    const live = await service.listLiveCheckouts();
+
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(live.map((row) => [row.receivableKind, row.receivableId, row.userId, row.pending.checkoutId])).toEqual([
+      ['invoice', 'inv-live', STUDENT, 'live'],
+      ['event_charge', CHARGE, 'student-2', 'charge'],
+    ]);
+    expect(await service.findLiveCheckout('invoice', 'inv-live')).toMatchObject({ checkoutId: 'live' });
+    expect(await service.findLiveCheckout('invoice', 'inv-a')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Admin refunds (RFC 0026 §5) — on the real contract-rail entry points
+// ---------------------------------------------------------------------------
+
+describe('GatewayService.refundInvoicePayment', () => {
+  const ADMIN = 'admin-1';
+  const NOW = new Date('2026-02-01T10:00:00.000Z');
+  const { BillingCycle, ContractTermsSource, PaymentMethod } = Entities.Config;
+
+  /** The fake ledger, with a store that can fail the next inserts. */
+  class FlakyRepository extends FakeBillingRepository {
+    failWrites = 0;
+    override async recordPayment(input: RecordPaymentInput): Promise<PaymentRecord> {
+      if (this.failWrites > 0) {
+        this.failWrites -= 1;
+        throw new Error('D1_ERROR: unavailable');
+      }
+      return super.recordPayment(input);
+    }
+  }
+
+  let ledger: FlakyRepository;
+  let billing: BillingService;
+  let mp: StubGatewayAdapter;
+  let service: GatewayService;
+  let info: ReturnType<typeof vi.spyOn>;
+  let invoiceId: string;
+  let original: PaymentRecord;
+
+  function ok<T>(result: { ok: true; data: T } | { ok: false; status: number; error: string }): T {
+    if (!result.ok) throw new Error(`expected ok, got ${result.status} ${result.error}`);
+    return result.data;
+  }
+  const rows = () => ledger.payments.filter((payment) => payment.invoiceId === invoiceId);
+  const audits = (name: string) =>
+    info.mock.calls.map((call) => JSON.parse(call[0] as string)).filter((line) => line.event === name);
+  const refund = (paymentId = original.id, reason = 'Asked for it back.') =>
+    service.refundInvoicePayment(paymentId, { reason }, ADMIN);
+
+  function build(list: string) {
+    const wiring = buildPaymentsWiring(stubPaymentsEnv(list), stubGatewayFactories(mp));
+    return new GatewayService({
+      gateways: wiring.gateways,
+      gatewayRepo: new MemoryGatewayRepo() as unknown as IGatewayRepository,
+      billing,
+      charges: {} as GatewayExtrasLedger,
+      checkout: {
+        config: wiring.config,
+        registry: wiring.gateways,
+        payer: async () => null,
+        webBaseUrl: 'https://app.example.com',
+      },
+      now: () => NOW,
+    });
+  }
+
+  beforeEach(async () => {
+    info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    ledger = new FlakyRepository();
+    billing = new BillingService(ledger);
+    mp = new StubGatewayAdapter('mercadopago');
+    mp.now = () => new Date('2026-01-20T08:00:00.000Z');
+    service = build('mercadopago:pix+card');
+
+    const plan = ok(
+      await billing.createPlan(
+        { name: 'Monthly', amountMinor: 15000, currency: 'BRL', cycle: BillingCycle.MONTHLY, graceDays: 5 },
+        ADMIN,
+      ),
+    );
+    const contract = ok(
+      await billing.signContract(
+        { userId: STUDENT, planId: plan.id, dueDay: 10, startDate: '2026-01-01', termsSource: ContractTermsSource.STANDARD },
+        ADMIN,
+      ),
+    );
+    invoiceId = ok(await billing.issueAdHocInvoice({ subscriptionId: contract.id, referenceDate: '2026-01-15' }, ADMIN)).id;
+    original = ok(
+      await billing.recordGatewayPayment(invoiceId, {
+        amountMinor: 15000,
+        currency: 'BRL',
+        paidAt: '2026-01-12T14:03:00.000Z',
+        externalReference: 'mercadopago:pay-1',
+      }),
+    ).payment;
+    mp.setPayment(stubPayment({ id: 'pay-1', amountMinor: 15000 }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('asks the provider first, then refunds the full amount and writes the reversal under the refund id', async () => {
+    const result = ok(await refund());
+
+    expect(mp.calls.map((call) => call.method)).toEqual(['getPayment', 'refund']);
+    expect(mp.callsTo('refund')[0]).toMatchObject({
+      paymentId: 'pay-1',
+      amountMinor: 15000,
+      idempotencyKey: `rev:${original.id}`,
+    });
+    expect(result).toMatchObject({ created: true, refundId: 'mercadopago-refund-1' });
+    expect(result.payment).toMatchObject({
+      amountMinor: -15000,
+      method: PaymentMethod.GATEWAY,
+      reversesId: original.id,
+      externalReference: 'mercadopago:mercadopago-refund-1',
+      note: 'Asked for it back.',
+      recordedBy: ADMIN,
+      paidAt: '2026-02-01',
+    });
+    expect(rows()).toHaveLength(2);
+    expect(audits('payments.refund_requested')).toEqual([
+      { event: 'payments.refund_requested', actor: ADMIN, rail: 'contract', provider: 'mercadopago', paymentId: original.id, at: NOW.toISOString() },
+    ]);
+    expect(audits('payments.gateway_reversed')).toHaveLength(1);
+  });
+
+  it('writes nothing when the provider refuses: 409 PAYMENTS_REFUND_REFUSED', async () => {
+    const before = JSON.stringify(ledger.payments);
+    mp.failRefunds(new Error('insufficient funds — a provider message that must not travel'));
+
+    const result = await refund();
+
+    expect(result).toEqual({ ok: false, status: 409, error: PAYMENTS_REFUND_REFUSED });
+    expect(JSON.stringify(ledger.payments)).toBe(before);
+    expect(audits('payments.gateway_reversed')).toHaveLength(0);
+  });
+
+  it('records a refund the provider already holds instead of asking for another', async () => {
+    mp.setPayment(
+      stubPayment({
+        id: 'pay-1',
+        amountMinor: 15000,
+        status: 'refunded',
+        refunds: [{ id: 'dash-9', amountMinor: 15000, createdAt: '2026-01-25T18:30:00.000Z' }],
+      }),
+    );
+
+    const result = ok(await refund());
+
+    expect(mp.callsTo('refund')).toHaveLength(0);
+    expect(result).toMatchObject({ created: true, refundId: 'dash-9' });
+    expect(result.payment).toMatchObject({
+      reversesId: original.id,
+      externalReference: 'mercadopago:dash-9',
+      paidAt: '2026-01-25',
+    });
+    expect(rows()).toHaveLength(2);
+    expect(audits('payments.refund_requested')).toHaveLength(0);
+  });
+
+  it('returns the row the notification already landed, unlinked, and writes nothing', async () => {
+    mp.setPayment(
+      stubPayment({
+        id: 'pay-1',
+        amountMinor: 15000,
+        refunds: [{ id: 'dash-9', amountMinor: 15000, createdAt: '2026-01-25T18:30:00.000Z' }],
+      }),
+    );
+    const landed = ok(
+      await billing.recordGatewayRefund(invoiceId, {
+        amountMinor: 15000,
+        currency: 'BRL',
+        paidAt: '2026-01-25T18:30:00.000Z',
+        externalReference: 'mercadopago:dash-9',
+      }),
+    ).payment;
+
+    const result = ok(await refund());
+
+    expect(result).toMatchObject({ created: false, refundId: 'dash-9' });
+    expect(result.payment.id).toBe(landed.id);
+    expect(result.payment.reversesId).toBeNull();
+    expect(rows()).toHaveLength(2);
+    expect(mp.callsTo('refund')).toHaveLength(0);
+  });
+
+  it('answers the same row twice and refunds once', async () => {
+    const first = ok(await refund());
+    const second = ok(await refund());
+
+    expect(second.payment.id).toBe(first.payment.id);
+    expect(second.created).toBe(false);
+    expect(mp.callsTo('refund')).toHaveLength(1);
+    expect(rows()).toHaveLength(2);
+  });
+
+  it('says a lost write out loud (503, naming the refund), and the same request completes it', async () => {
+    ledger.failWrites = 1;
+
+    const lost = await refund();
+
+    expect(lost).toEqual({
+      ok: false,
+      status: 503,
+      error: PAYMENTS_REFUND_UNRECORDED,
+      meta: { refundId: 'mercadopago-refund-1' },
+    });
+    expect(rows()).toHaveLength(1);
+
+    const retried = ok(await refund());
+
+    expect(retried).toMatchObject({ created: true, refundId: 'mercadopago-refund-1' });
+    expect(retried.payment).toMatchObject({ reversesId: original.id, externalReference: 'mercadopago:mercadopago-refund-1' });
+    // One refund at the provider, however many requests it took.
+    expect(mp.callsTo('refund')).toHaveLength(1);
+    expect(rows()).toHaveLength(2);
+  });
+
+  it('is 503 too when the write fails for a refund that was already at the provider', async () => {
+    ok(await refund());
+    ledger.payments.pop();
+    ledger.failWrites = 1;
+
+    expect(await refund()).toMatchObject({ status: 503, error: PAYMENTS_REFUND_UNRECORDED, meta: { refundId: 'mercadopago-refund-1' } });
+    expect(mp.callsTo('refund')).toHaveLength(1);
+  });
+
+  it('refuses a provider that is not bound any more, before any provider call', async () => {
+    // Under `none`, and on a label that moved to another provider.
+    for (const list of ['none', 'stripe:card']) {
+      const wiring = buildPaymentsWiring(
+        stubPaymentsEnv(list),
+        stubGatewayFactories(mp, new StubGatewayAdapter('stripe')),
+      );
+      service = new GatewayService({
+        gateways: wiring.gateways,
+        gatewayRepo: new MemoryGatewayRepo() as unknown as IGatewayRepository,
+        billing,
+        charges: {} as GatewayExtrasLedger,
+        checkout: { config: wiring.config, registry: wiring.gateways, payer: async () => null, webBaseUrl: 'https://x' },
+        now: () => NOW,
+      });
+
+      expect(await refund()).toEqual({ ok: false, status: 409, error: PAYMENTS_PROVIDER_NOT_ENABLED });
+    }
+    expect(mp.calls).toHaveLength(0);
+    expect(rows()).toHaveLength(1);
+  });
+
+  it('still refunds through a retired provider (bound, offering no method)', async () => {
+    service = build('mercadopago:');
+
+    expect(ok(await refund()).created).toBe(true);
+  });
+
+  it('is loud about an invalid provider list: 500 PAYMENTS_CONFIG_INVALID', async () => {
+    service = build('mercadopago:pix,mercadopago:card');
+
+    expect(await refund()).toEqual({ ok: false, status: 500, error: PAYMENTS_CONFIG_INVALID });
+    expect(mp.calls).toHaveLength(0);
+  });
+
+  it('requests nothing when the provider cannot be asked (502) or does not know the payment (409)', async () => {
+    mp.failLookups(new Error('timeout'));
+    expect(await refund()).toEqual({ ok: false, status: 502, error: PAYMENTS_PROVIDER_ERROR });
+
+    mp.failLookups(null).removePayment('pay-1');
+    expect(await refund()).toMatchObject({ status: 409, error: PAYMENTS_REFUND_REFUSED });
+
+    expect(mp.callsTo('refund')).toHaveLength(0);
+    expect(rows()).toHaveLength(1);
+  });
+
+  it('refuses when the provider holds only a partial refund: the mirror row would count it twice', async () => {
+    mp.setPayment(
+      stubPayment({
+        id: 'pay-1',
+        amountMinor: 15000,
+        refunds: [{ id: 'part-1', amountMinor: 5000, createdAt: '2026-01-25T18:30:00.000Z' }],
+      }),
+    );
+
+    expect(await refund()).toMatchObject({ status: 409, error: PAYMENTS_REFUND_REFUSED });
+    expect(mp.callsTo('refund')).toHaveLength(0);
+    expect(rows()).toHaveLength(1);
+  });
+
+  it('never reaches a provider for a reversal row, a cash row, a missing row or a blank reason', async () => {
+    const reversal = ok(await refund()).payment;
+    const cash = ok(await billing.recordPayment(invoiceId, { amountMinor: 100, method: PaymentMethod.CASH }, ADMIN));
+    mp.calls.length = 0;
+
+    expect(await refund(reversal.id)).toMatchObject({ status: 409, error: 'Conflict' });
+    expect(await refund(cash.id)).toMatchObject({ status: 409, error: 'Conflict' });
+    expect(await refund('nope')).toMatchObject({ status: 404 });
+    expect(await refund(original.id, '   ')).toMatchObject({ status: 400, error: 'ValidationError' });
+    expect(mp.calls).toHaveLength(0);
+  });
+});
+
+describe('BillingService.reversePayment — gateway rows', () => {
+  it('refuses a gateway row: the provider returns the money first', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    const ledger = new FakeBillingRepository();
+    const billing = new BillingService(ledger);
+    const { BillingCycle, ContractTermsSource } = Entities.Config;
+    const plan = await billing.createPlan(
+      { name: 'Monthly', amountMinor: 15000, currency: 'BRL', cycle: BillingCycle.MONTHLY, graceDays: 5 },
+      'admin-1',
+    );
+    if (!plan.ok) throw new Error('plan');
+    const contract = await billing.signContract(
+      { userId: STUDENT, planId: plan.data.id, dueDay: 10, startDate: '2026-01-01', termsSource: ContractTermsSource.STANDARD },
+      'admin-1',
+    );
+    if (!contract.ok) throw new Error('contract');
+    const invoice = await billing.issueAdHocInvoice({ subscriptionId: contract.data.id, referenceDate: '2026-01-15' }, 'admin-1');
+    if (!invoice.ok) throw new Error('invoice');
+    const landed = await billing.recordGatewayPayment(invoice.data.id, {
+      amountMinor: 15000,
+      currency: 'BRL',
+      paidAt: '2026-01-12',
+      externalReference: 'mercadopago:pay-1',
+    });
+    if (!landed.ok) throw new Error('landed');
+
+    const result = await billing.reversePayment(landed.data.payment.id, { reason: 'by hand' }, 'admin-1');
+
+    expect(result).toMatchObject({ ok: false, status: 409, error: 'Conflict' });
+    expect(ledger.payments).toHaveLength(1);
+    vi.restoreAllMocks();
   });
 });
 

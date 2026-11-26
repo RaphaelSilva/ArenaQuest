@@ -29,15 +29,25 @@
  * balance. The row is written before the provider is called, so a crash
  * between the two can never leave a provider session nobody knows about.
  * `getCheckoutStatus` reads that row and never the provider.
+ * `createCheckoutOnBehalf` is the admin's door to the same code: the owner is
+ * the receivable's student, the creator is the admin.
+ *
+ * `refundInvoicePayment` / `refundChargePayment` are the admin's refund (RFC
+ * 0026 §5): the provider is asked what it holds, then asked to return the
+ * money, and the reversal is written **only when the provider accepted** —
+ * under the provider's refund id, so every step is safe to repeat.
  */
 import type {
+  IPaymentGateway,
   PaymentMethodName,
   PaymentProviderName,
   ProviderCheckout,
   ProviderDisputeOutcome,
   ProviderEvent,
   ProviderPayment,
+  ProviderRefundResult,
 } from '@arenaquest/shared/ports/i-payment-gateway';
+import type { EventChargePaymentRecord, PaymentRecord } from '@arenaquest/shared/ports';
 import type {
   GatewayCheckoutRecord,
   GatewayEventRecord,
@@ -48,6 +58,7 @@ import { Entities } from '@arenaquest/shared/types/entities';
 import {
   buildGatewayReference,
   providerMethodsForCurrency,
+  splitGatewayReference,
 } from '@arenaquest/shared/domain/billing/gateway-money';
 import {
   RAIL_OF_KIND,
@@ -63,6 +74,7 @@ import {
 import { PAYMENTS_CONFIG_INVALID, type PaymentsConfigResult } from '@api/core/payments/config';
 import type { GatewayRegistry } from '@api/core/payments/gateway-registry';
 import type { BillingService } from '@api/core/billing/billing-service';
+import { toPendingCheckout, type PendingCheckout } from '@api/core/billing/accounting-service';
 import { isUniqueFailure, type EventChargeService } from '@api/core/billing/event-charge-service';
 import type { ControllerResult } from '@api/core/result';
 
@@ -90,13 +102,19 @@ export interface GatewayPaymentOutcome {
 /** The contract rail, as far as the gateway may reach into it. */
 export type GatewayContractLedger = Pick<
   BillingService,
-  'recordGatewayPayment' | 'recordGatewayRefund' | 'raiseDisputeHold' | 'releaseDisputeHold' | 'getInvoice'
+  | 'recordGatewayPayment'
+  | 'recordGatewayRefund'
+  | 'reverseGatewayPayment'
+  | 'raiseDisputeHold'
+  | 'releaseDisputeHold'
+  | 'getInvoice'
+  | 'getPayment'
 >;
 
 /** The extras rail: money only — an event charge never gets a hold. */
 export type GatewayExtrasLedger = Pick<
   EventChargeService,
-  'recordGatewayPayment' | 'recordGatewayRefund' | 'getCharge'
+  'recordGatewayPayment' | 'recordGatewayRefund' | 'reverseGatewayPayment' | 'getCharge' | 'getPayment'
 >;
 
 /** Who a hosted page is opened for: the provider wants a name and an e-mail. */
@@ -174,6 +192,15 @@ export interface CheckoutActor {
   createdBy: string;
 }
 
+/** Who a checkout is opened for, as the one creation path sees it. */
+interface CheckoutParty {
+  /** `null`: whoever owes the receivable — the admin's on-behalf door, which names no student. */
+  userId: string | null;
+  createdBy: string;
+  /** Whether the owner's hourly budget is consulted and charged; never for an admin. */
+  budgeted: boolean;
+}
+
 /** A hosted session the caller can be sent to. */
 export interface CheckoutSession {
   checkoutId: string;
@@ -207,6 +234,53 @@ export interface CheckoutStatusView {
   expiresAt: string;
   /** `null` while the checkout is `open`. */
   closedAt: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Refunds (RFC 0026 §5) and live checkouts (§7)
+// ---------------------------------------------------------------------------
+
+/** `409`: the payment's provider is not bound on this label any more; nothing is written. */
+export const PAYMENTS_PROVIDER_NOT_ENABLED = 'PAYMENTS_PROVIDER_NOT_ENABLED';
+/** `409`: the provider did not return the money (or holds no full refund to record); nothing is written. */
+export const PAYMENTS_REFUND_REFUSED = 'PAYMENTS_REFUND_REFUSED';
+/**
+ * `503`: the provider **did** return the money and the reversal could not be
+ * written. Never "refund failed": repeating the same request completes it.
+ */
+export const PAYMENTS_REFUND_UNRECORDED = 'PAYMENTS_REFUND_UNRECORDED';
+
+/** The idempotency key of an admin refund: one per ledger row, so a second click cannot refund twice. */
+export function refundIdempotencyKey(paymentId: string): string {
+  return `rev:${paymentId}`;
+}
+
+export interface RefundPaymentCommand {
+  /** Mandatory, as on every reversal; it becomes the reversal row's note. */
+  reason: string;
+  /** `YYYY-MM-DD`; defaults to the provider's refund date, else today. */
+  paidAt?: string;
+}
+
+export interface RefundPaymentResult<P> {
+  /** The reversal row — the one this call wrote, or the one already on the ledger. */
+  payment: P;
+  /** `false` when the refund id was already on the ledger and nothing was written. */
+  created: boolean;
+  /** The provider's refund id (bare). */
+  refundId: string;
+}
+
+/** The two rails' ledger rows, as far as a refund reads them. */
+type LedgerPayment = PaymentRecord | EventChargePaymentRecord;
+
+/** One receivable's payment in progress, for the set-based admin reads. */
+export interface LiveCheckout {
+  receivableKind: ReceivableKind;
+  receivableId: string;
+  /** The student who owes the receivable. */
+  userId: string;
+  pending: PendingCheckout;
 }
 
 function refusal(status: number, error: string, meta?: Record<string, unknown>): ControllerResult<never> {
@@ -609,6 +683,28 @@ export class GatewayService {
     input: CreateCheckoutInput,
     actor: CheckoutActor,
   ): Promise<ControllerResult<CreateCheckoutResult>> {
+    return this.openCheckout(input, { ...actor, budgeted: actor.createdBy === actor.userId });
+  }
+
+  /**
+   * The admin's door (RFC 0026 §3, "on behalf of a student"): the same rules
+   * and the same refusal order, with the owner read **from the receivable** —
+   * the request names no student — and `createdBy` the admin. The student's
+   * hourly budget is neither consulted nor charged, even for an admin who
+   * happens to owe the receivable themselves. The hosted URL in the answer is
+   * what the admin hands over; nothing is charged to anyone until it is paid.
+   */
+  async createCheckoutOnBehalf(
+    input: CreateCheckoutInput,
+    adminId: string,
+  ): Promise<ControllerResult<CreateCheckoutResult>> {
+    return this.openCheckout(input, { userId: null, createdBy: adminId, budgeted: false });
+  }
+
+  private async openCheckout(
+    input: CreateCheckoutInput,
+    actor: CheckoutParty,
+  ): Promise<ControllerResult<CreateCheckoutResult>> {
     const deps = this.deps.checkout;
     const closed = this.checkoutGate();
     if (closed || !deps) return closed ?? CHECKOUT_NOT_FOUND;
@@ -627,7 +723,9 @@ export class GatewayService {
 
     // 2. The receivable, and whose it is. Someone else's is a missing one.
     const receivable = await this.readReceivable(input.kind, input.id);
-    if (!receivable || receivable.userId !== actor.userId) return CHECKOUT_NOT_FOUND;
+    if (!receivable || (actor.userId !== null && receivable.userId !== actor.userId)) {
+      return CHECKOUT_NOT_FOUND;
+    }
 
     // 3. Payable, and in a currency this provider settles.
     if (receivable.status !== 'open' || receivable.balanceMinor <= 0) {
@@ -648,10 +746,10 @@ export class GatewayService {
       return { ok: true, data: { checkout: toSession(existing), reused: true } };
     }
 
-    const limited = await this.checkoutBudget(deps.limiter, actor);
+    const limited = actor.budgeted ? await this.checkoutBudget(deps.limiter, receivable.userId) : null;
     if (limited) return limited;
 
-    const payer = await deps.payer(actor.userId);
+    const payer = await deps.payer(receivable.userId);
     if (!payer) return CHECKOUT_NOT_FOUND;
 
     // 5. Row first. An open row that never got its session is called again
@@ -768,6 +866,207 @@ export class GatewayService {
     };
   }
 
+  // -------------------------------------------------------------------------
+  // Live checkouts — the admin's "pending online payment" (RFC 0026 §7)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Every payment in progress, in **one** read: what the roster and the charge
+   * list join in memory. "In progress" is the statement's own rule
+   * (`toPendingCheckout`): open, with its provider session, not past expiry.
+   */
+  async listLiveCheckouts(): Promise<LiveCheckout[]> {
+    const now = this.now();
+    const live: LiveCheckout[] = [];
+    for (const checkout of await this.deps.gatewayRepo.listOpenCheckouts()) {
+      const pending = toPendingCheckout(checkout, now);
+      if (!pending) continue;
+      live.push({
+        receivableKind: checkout.receivableKind,
+        receivableId: checkout.receivableId,
+        userId: checkout.userId,
+        pending,
+      });
+    }
+    return live;
+  }
+
+  /** One receivable's payment in progress, or `null` — whatever the receivable's own status. */
+  async findLiveCheckout(kind: ReceivableKind, receivableId: string): Promise<PendingCheckout | null> {
+    return toPendingCheckout(await this.deps.gatewayRepo.findOpenCheckout(kind, receivableId), this.now());
+  }
+
+  // -------------------------------------------------------------------------
+  // Admin refunds (RFC 0026 §5)
+  // -------------------------------------------------------------------------
+
+  /** Refunds a gateway payment of a contract invoice at its provider, then writes the reversal. */
+  async refundInvoicePayment(
+    paymentId: string,
+    command: RefundPaymentCommand,
+    adminId: string,
+  ): Promise<ControllerResult<RefundPaymentResult<PaymentRecord>>> {
+    const { billing } = this.deps;
+    return this.refundPayment('contract', paymentId, command, adminId, {
+      read: (id) => billing.getPayment(id),
+      reverse: (id, reversal) => billing.reverseGatewayPayment(id, reversal),
+    });
+  }
+
+  /** The extras rail's twin of `refundInvoicePayment`. */
+  async refundChargePayment(
+    paymentId: string,
+    command: RefundPaymentCommand,
+    adminId: string,
+  ): Promise<ControllerResult<RefundPaymentResult<EventChargePaymentRecord>>> {
+    const { charges } = this.deps;
+    return this.refundPayment('extras', paymentId, command, adminId, {
+      read: (id) => charges.getPayment(id),
+      reverse: (id, reversal) => charges.reverseGatewayPayment(id, reversal),
+    });
+  }
+
+  /**
+   * The order is the contract (RFC 0026 §5):
+   *
+   * 1. the row is a positive `gateway` payment (anything else never reaches a
+   *    provider) and the request carries a reason;
+   * 2. the adapter comes from the reference's provider prefix — an invalid
+   *    provider list is `500 PAYMENTS_CONFIG_INVALID`, a provider no longer
+   *    bound is `409 PAYMENTS_PROVIDER_NOT_ENABLED`;
+   * 3. **ask before refunding**: the payment is read from the provider. A full
+   *    refund it already holds is not requested again — the reversal is
+   *    recorded under that refund id (or the row already carrying it is
+   *    returned);
+   * 4. only a payment with no refund at all reaches `gateway.refund`, for the
+   *    original's full amount, under `rev:<payment id>`. A refusal is `409
+   *    PAYMENTS_REFUND_REFUSED` and **nothing is written**;
+   * 5. the reversal is written with the provider's refund id as its reference.
+   *    If that write fails after the provider accepted, the answer is `503
+   *    PAYMENTS_REFUND_UNRECORDED` naming the refund — and the same request,
+   *    repeated, finds the refund at step 3 and completes it.
+   */
+  private async refundPayment<P extends LedgerPayment>(
+    rail: 'contract' | 'extras',
+    paymentId: string,
+    command: RefundPaymentCommand,
+    adminId: string,
+    ledger: {
+      read(id: string): Promise<ControllerResult<P>>;
+      reverse(
+        id: string,
+        reversal: { externalReference: string; paidAt: string; note: string; recordedBy: string },
+      ): Promise<ControllerResult<{ payment: P; created: boolean }>>;
+    },
+  ): Promise<ControllerResult<RefundPaymentResult<P>>> {
+    if (command.reason.trim() === '') {
+      return refusal(400, 'ValidationError', { message: 'a reversal requires a reason' });
+    }
+
+    // 1. The row.
+    const read = await ledger.read(paymentId);
+    if (!read.ok) return read;
+    const original = read.data;
+    if (original.method !== Entities.Config.PaymentMethod.GATEWAY) {
+      return refusal(409, 'Conflict', { message: 'only a gateway payment is refunded through its provider' });
+    }
+    if (original.reversesId !== null || original.amountMinor <= 0) {
+      return refusal(409, 'Conflict', { message: 'a reversal cannot itself be reversed' });
+    }
+
+    // 2. The adapter, from the reference's own provider prefix.
+    const config = this.deps.checkout?.config;
+    if (config && !config.ok) {
+      console.error(
+        JSON.stringify({ event: 'payments.config_invalid', reason: config.reason, detail: config.detail }),
+      );
+      return refusal(500, PAYMENTS_CONFIG_INVALID);
+    }
+    const reference = splitGatewayReference(original.externalReference);
+    const gateway = reference ? this.deps.gateways.get(reference.provider) : null;
+    if (!reference || !gateway) return refusal(409, PAYMENTS_PROVIDER_NOT_ENABLED);
+    const provider = reference.provider;
+
+    // 3. Ask before refunding.
+    let held: ProviderPayment | null;
+    try {
+      held = await gateway.getPayment(reference.id);
+    } catch {
+      // Nothing was asked of the provider and nothing is written.
+      return refusal(502, PAYMENTS_PROVIDER_ERROR);
+    }
+    if (!held) {
+      return refusal(409, PAYMENTS_REFUND_REFUSED, { message: 'the provider does not know this payment' });
+    }
+
+    const today = this.now().toISOString();
+    const write = async (refundId: string, paidAt: string, accepted: boolean) => {
+      let written: ControllerResult<{ payment: P; created: boolean }>;
+      try {
+        written = await ledger.reverse(original.id, {
+          externalReference: buildGatewayReference(provider, refundId),
+          paidAt,
+          note: command.reason.trim(),
+          recordedBy: adminId,
+        });
+      } catch {
+        // The money left and the ledger does not say so yet.
+        return refusal(503, PAYMENTS_REFUND_UNRECORDED, { refundId });
+      }
+      if (!written.ok) {
+        // A refund this very call obtained and could not book is said out loud;
+        // a ledger refusal about a refund that was already there is passed on.
+        return accepted ? refusal(503, PAYMENTS_REFUND_UNRECORDED, { refundId }) : written;
+      }
+      return { ok: true as const, data: { ...written.data, refundId } };
+    };
+
+    if (held.refunds.length > 0) {
+      const full = held.refunds.find((refund) => refund.amountMinor === original.amountMinor);
+      if (!full) {
+        // Partial refunds were made at the provider; they land on their own
+        // (unlinked) and the full mirror row would count them twice.
+        return refusal(409, PAYMENTS_REFUND_REFUSED, {
+          message: 'the provider already holds a partial refund of this payment; refund the rest at the provider',
+        });
+      }
+      return write(full.id, command.paidAt ?? full.createdAt, false);
+    }
+
+    // 4. The refund itself: full amount, keyed on the ledger row.
+    this.auditRefund('payments.refund_requested', adminId, rail, provider, original.id);
+    let refund: ProviderRefundResult;
+    try {
+      refund = await this.requestRefund(gateway, reference.id, original);
+    } catch {
+      return refusal(409, PAYMENTS_REFUND_REFUSED);
+    }
+
+    // 5. The reversal, under the provider's refund id.
+    return write(refund.refundId, command.paidAt ?? today, true);
+  }
+
+  private async requestRefund(
+    gateway: IPaymentGateway,
+    providerPaymentId: string,
+    original: LedgerPayment,
+  ): Promise<ProviderRefundResult> {
+    const refund = await gateway.refund(providerPaymentId, original.amountMinor, refundIdempotencyKey(original.id));
+    if (!refund.refundId) throw new TypeError('the provider returned no refund id');
+    return refund;
+  }
+
+  /** Ids only: never an amount, a reason or a provider message. */
+  private auditRefund(
+    event: string,
+    actor: string,
+    rail: 'contract' | 'extras',
+    provider: PaymentProviderName,
+    paymentId: string,
+  ): void {
+    console.info(JSON.stringify({ event, actor, rail, provider, paymentId, at: this.now().toISOString() }));
+  }
+
   private async readReceivable(kind: ReceivableKind, id: string): Promise<Receivable | null> {
     if (kind === 'invoice') {
       const invoice = await this.deps.billing.getInvoice(id);
@@ -805,15 +1104,15 @@ export class GatewayService {
   /** `429` once the student's budget is spent; a limiter outage never blocks a payment. */
   private async checkoutBudget(
     limiter: IRateLimiter | undefined,
-    actor: CheckoutActor,
+    userId: string,
   ): Promise<ControllerResult<never> | null> {
-    if (!limiter || actor.createdBy !== actor.userId) return null;
+    if (!limiter) return null;
     try {
-      const state = await limiter.peek(actor.userId);
+      const state = await limiter.peek(userId);
       if (!state.allowed) {
         return refusal(429, 'TooManyRequests', { retryAfterSeconds: state.retryAfterSeconds ?? 1 });
       }
-      await limiter.hit(actor.userId);
+      await limiter.hit(userId);
     } catch {
       console.error('[rate-limit] checkouts limiter failed, failing open');
     }

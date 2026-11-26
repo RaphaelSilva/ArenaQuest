@@ -477,7 +477,8 @@ describe('BillingService — standing, the roster and holds', () => {
         expect(entry).not.toHaveProperty('standing');
         expect(entry).not.toHaveProperty('outstandingMinor');
         expect(Object.keys(entry).sort()).toEqual(
-          ['asOf', 'contract', 'currency', 'extras', 'hold', 'userId'],
+          // `pendingCheckouts` (RFC 0026 §7) counts hosted links, never money.
+          ['asOf', 'contract', 'currency', 'extras', 'hold', 'pendingCheckouts', 'userId'],
         );
       }
     });

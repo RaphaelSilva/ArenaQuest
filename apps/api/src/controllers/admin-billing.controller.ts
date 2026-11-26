@@ -4,7 +4,6 @@ import type {
   EventChargeAdjustmentRecord,
   EventChargePaymentRecord,
   EventChargeRecord,
-  EventChargeWithBalanceRecord,
   EventPriceRecord,
   BillingPlanRecord,
   BillingStandingHoldRecord,
@@ -26,16 +25,24 @@ import type {
   AccountingService,
   AgingReport,
   MovementReport,
+  PendingCheckout,
   StudentStatement,
 } from '@api/core/billing/accounting-service';
 import {
   MAX_CHARGE_USERS,
   type AudienceCheckResult,
   type EventChargeDetail,
+  type EventChargeListItem,
   type EventChargeService,
   type EventChargeSummary,
   type IssueEventChargesResult,
 } from '@api/core/billing/event-charge-service';
+import {
+  PAYMENTS_PROVIDER_NOT_ENABLED,
+  type CheckoutSession,
+  type GatewayService,
+} from '@api/core/payments/gateway-service';
+import type { ReceivableKind } from '@arenaquest/shared/domain/billing/receivable';
 
 /**
  * AdminBillingController — the admin billing lifecycle as `ControllerResult<T>`.
@@ -241,6 +248,92 @@ const SetHoldSchema = z.object({
   expiresAt: IsoDateSchema.nullable().optional(),
 });
 
+/**
+ * Body of the two on-behalf checkout routes. The receivable is in the path and
+ * its student is read from it, so the body can only say *how* to pay — and is
+ * `strict`: a `userId` here is a validation error, not an ignored field.
+ */
+const CreateCheckoutOnBehalfSchema = z.object({ provider: z.string().min(1).max(40).optional() }).strict();
+
+/**
+ * The slice of the gateway the admin billing surface reaches (RFC 0026 §3, §5,
+ * §7): checkouts on a student's behalf, refunds, and the payments in progress.
+ * Absent on a wiring without a gateway — the checkout routes then answer
+ * `404`, a gateway row cannot be refunded, and nothing reads as pending.
+ */
+export type AdminPayments = Pick<
+  GatewayService,
+  | 'checkoutGate'
+  | 'createCheckoutOnBehalf'
+  | 'refundInvoicePayment'
+  | 'refundChargePayment'
+  | 'listLiveCheckouts'
+  | 'findLiveCheckout'
+>;
+
+/** A hosted session, and whether this call opened it (`201`) or it was already open (`200`). */
+export interface OnBehalfCheckoutAnswer {
+  checkout: CheckoutSession;
+  created: boolean;
+}
+
+/**
+ * A payment just recorded, plus the receivable's hosted checkout still in
+ * progress — so the form can warn that the student holds a live link and may
+ * pay a second time. The payment is recorded either way.
+ */
+export type RecordedPayment<P> = P & { pendingCheckout: PendingCheckout | null };
+
+const NOT_FOUND: ControllerResult<never> = { ok: false, status: 404, error: 'NotFound' };
+
+/** `null` when the routes exist; `404` with no gateway wired, else the gateway's own answer. */
+function onBehalfGate(payments: AdminPayments | undefined): ControllerResult<never> | null {
+  return payments ? payments.checkoutGate() : NOT_FOUND;
+}
+
+async function openOnBehalf(
+  payments: AdminPayments | undefined,
+  kind: ReceivableKind,
+  id: string,
+  body: unknown,
+  adminId: string,
+): Promise<ControllerResult<OnBehalfCheckoutAnswer>> {
+  const closed = onBehalfGate(payments);
+  if (closed || !payments) return closed ?? NOT_FOUND;
+  const parsed = CreateCheckoutOnBehalfSchema.safeParse(body ?? {});
+  if (!parsed.success) return invalid(parsed.error);
+  const result = await payments.createCheckoutOnBehalf({ kind, id, provider: parsed.data.provider }, adminId);
+  if (!result.ok) return result;
+  return { ok: true, data: { checkout: result.data.checkout, created: !result.data.reused } };
+}
+
+/**
+ * The payment is on the ledger by the time this runs, so a failed read here
+ * must never turn its `201` into an error the admin would answer by recording
+ * it again: no answer is `null`.
+ */
+async function withPendingCheckout<P extends object>(
+  payments: AdminPayments | undefined,
+  kind: ReceivableKind,
+  receivableId: string,
+  payment: P,
+): Promise<RecordedPayment<P>> {
+  let pendingCheckout: PendingCheckout | null = null;
+  try {
+    pendingCheckout = payments ? await payments.findLiveCheckout(kind, receivableId) : null;
+  } catch {
+    console.error(JSON.stringify({ event: 'payments.pending_checkout_read_failed', kind, receivableId }));
+  }
+  return { ...payment, pendingCheckout };
+}
+
+/** A gateway row with no gateway wired: its provider cannot be asked, so nothing is written. */
+const PROVIDER_NOT_ENABLED: ControllerResult<never> = {
+  ok: false,
+  status: 409,
+  error: PAYMENTS_PROVIDER_NOT_ENABLED,
+};
+
 function invalid(error: z.ZodError): ControllerResult<never> {
   return {
     ok: false,
@@ -266,6 +359,8 @@ export class AdminBillingController {
      * cron passes the same two through `runScheduledBilling`.
      */
     private readonly runDeps: BillingRunDeps = silentBillingRunDeps(),
+    /** The payment gateway; absent on a wiring without one. */
+    private readonly payments?: AdminPayments,
   ) {}
 
   // Plans ---------------------------------------------------------------
@@ -382,16 +477,34 @@ export class AdminBillingController {
     return this.service.applyAdjustment(invoiceId, parsed.data, actorId);
   }
 
+  /**
+   * Recording money on an invoice with a hosted checkout in progress stays
+   * allowed — the student may well have paid at the door (RFC 0026 §7). The
+   * answer names that checkout so the form can say so.
+   */
   async recordPayment(
     invoiceId: string,
     body: unknown,
     actorId: string,
-  ): Promise<ControllerResult<PaymentRecord>> {
+  ): Promise<ControllerResult<RecordedPayment<PaymentRecord>>> {
     const parsed = RecordPaymentSchema.safeParse(body);
     if (!parsed.success) return invalid(parsed.error);
-    return this.service.recordPayment(invoiceId, parsed.data, actorId);
+    const recorded = await this.service.recordPayment(invoiceId, parsed.data, actorId);
+    if (!recorded.ok) return recorded;
+    return { ok: true, data: await withPendingCheckout(this.payments, 'invoice', invoiceId, recorded.data) };
   }
 
+  /**
+   * Two paths behind one route, chosen by the row's own `method`:
+   *
+   * - anything but `gateway` is RFC 0013's reversal, exactly as before — the
+   *   mirror row, and **no provider is called**;
+   * - a `gateway` row is a refund (RFC 0026 §5): the provider returns the
+   *   money first, and the reversal is written only when it accepted.
+   *
+   * The reversal of a gateway row is itself a `gateway` row, which is how the
+   * router tells the two apart (`200` for a refund, `201` for a mirror row).
+   */
   async reversePayment(
     paymentId: string,
     body: unknown,
@@ -399,7 +512,34 @@ export class AdminBillingController {
   ): Promise<ControllerResult<PaymentRecord>> {
     const parsed = ReversePaymentSchema.safeParse(body ?? {});
     if (!parsed.success) return invalid(parsed.error);
+
+    const original = await this.service.getPayment(paymentId);
+    if (original.ok && original.data.method === PaymentMethod.GATEWAY) {
+      if (!this.payments) return PROVIDER_NOT_ENABLED;
+      const refunded = await this.payments.refundInvoicePayment(paymentId, parsed.data, actorId);
+      return refunded.ok ? { ok: true, data: refunded.data.payment } : refunded;
+    }
     return this.service.reversePayment(paymentId, parsed.data, actorId);
+  }
+
+  // Checkouts on a student's behalf (RFC 0026 §3) -------------------------
+
+  /** Whether the on-behalf checkout routes exist on this label; asked before a body is read. */
+  checkoutGate(): ControllerResult<never> | null {
+    return onBehalfGate(this.payments);
+  }
+
+  /**
+   * Opens — or hands back — the hosted checkout of a student's invoice. The
+   * student is the invoice's own; the admin is recorded as its creator and
+   * gets the URL to hand over.
+   */
+  async createCheckout(
+    invoiceId: string,
+    body: unknown,
+    actorId: string,
+  ): Promise<ControllerResult<OnBehalfCheckoutAnswer>> {
+    return openOnBehalf(this.payments, 'invoice', invoiceId, body, actorId);
   }
 
   // Reports — read-only ---------------------------------------------------
@@ -432,7 +572,11 @@ export class AdminBillingController {
   async listStudentRoster(query: unknown): Promise<ControllerResult<RosterEntry[]>> {
     const parsed = RosterQuerySchema.safeParse(query ?? {});
     if (!parsed.success) return invalid(parsed.error);
-    return this.service.listStudentRoster(parsed.data);
+    const payments = this.payments;
+    return this.service.listStudentRoster(
+      parsed.data,
+      payments ? () => payments.listLiveCheckouts() : undefined,
+    );
   }
 
   async setHold(
@@ -500,7 +644,11 @@ const AudienceCheckQuerySchema = z.object({
  * enrollment directly.
  */
 export class AdminEventChargeController {
-  constructor(private readonly service: EventChargeService) {}
+  constructor(
+    private readonly service: EventChargeService,
+    /** The payment gateway; absent on a wiring without one. */
+    private readonly payments?: AdminPayments,
+  ) {}
 
   // Price ---------------------------------------------------------------
 
@@ -524,10 +672,14 @@ export class AdminEventChargeController {
 
   // Charges -------------------------------------------------------------
 
-  async listCharges(query: unknown): Promise<ControllerResult<EventChargeWithBalanceRecord[]>> {
+  async listCharges(query: unknown): Promise<ControllerResult<EventChargeListItem[]>> {
     const parsed = ListEventChargesQuerySchema.safeParse(query ?? {});
     if (!parsed.success) return invalid(parsed.error);
-    return this.service.listCharges(parsed.data);
+    const payments = this.payments;
+    return this.service.listCharges(
+      parsed.data,
+      payments ? () => payments.listLiveCheckouts() : undefined,
+    );
   }
 
   async getCharge(id: string): Promise<ControllerResult<EventChargeDetail>> {
@@ -565,16 +717,20 @@ export class AdminEventChargeController {
     return this.service.applyAdjustment(chargeId, parsed.data, actorId);
   }
 
+  /** As on the contract rail: allowed with a checkout in progress, and the answer names it. */
   async recordPayment(
     chargeId: string,
     body: unknown,
     actorId: string,
-  ): Promise<ControllerResult<EventChargePaymentRecord>> {
+  ): Promise<ControllerResult<RecordedPayment<EventChargePaymentRecord>>> {
     const parsed = RecordPaymentSchema.safeParse(body);
     if (!parsed.success) return invalid(parsed.error);
-    return this.service.recordPayment(chargeId, parsed.data, actorId);
+    const recorded = await this.service.recordPayment(chargeId, parsed.data, actorId);
+    if (!recorded.ok) return recorded;
+    return { ok: true, data: await withPendingCheckout(this.payments, 'event_charge', chargeId, recorded.data) };
   }
 
+  /** The extras twin of `AdminBillingController.reversePayment`: a `gateway` row is refunded at its provider. */
   async reversePayment(
     paymentId: string,
     body: unknown,
@@ -582,7 +738,23 @@ export class AdminEventChargeController {
   ): Promise<ControllerResult<EventChargePaymentRecord>> {
     const parsed = ReversePaymentSchema.safeParse(body ?? {});
     if (!parsed.success) return invalid(parsed.error);
+
+    const original = await this.service.getPayment(paymentId);
+    if (original.ok && original.data.method === PaymentMethod.GATEWAY) {
+      if (!this.payments) return PROVIDER_NOT_ENABLED;
+      const refunded = await this.payments.refundChargePayment(paymentId, parsed.data, actorId);
+      return refunded.ok ? { ok: true, data: refunded.data.payment } : refunded;
+    }
     return this.service.reversePayment(paymentId, parsed.data, actorId);
+  }
+
+  /** The extras twin of `AdminBillingController.createCheckout`. */
+  async createCheckout(
+    chargeId: string,
+    body: unknown,
+    actorId: string,
+  ): Promise<ControllerResult<OnBehalfCheckoutAnswer>> {
+    return openOnBehalf(this.payments, 'event_charge', chargeId, body, actorId);
   }
 
   // Reads ---------------------------------------------------------------

@@ -18,6 +18,8 @@ import { fromCharge, resolveRailStanding } from '@arenaquest/shared/domain/billi
 import { splitGatewayReference } from '@arenaquest/shared/domain/billing/gateway-money';
 import { SYSTEM_PAYMENT_ACTOR_ID } from '@api/adapters/db/d1-gateway-repository';
 import type { ControllerResult } from '@api/core/result';
+import type { PendingCheckout } from '@api/core/billing/accounting-service';
+import type { LiveCheckout } from '@api/core/payments/gateway-service';
 
 /**
  * EventChargeService — the write rules of the extras rail (RFC 0015 §3).
@@ -160,6 +162,18 @@ export interface GatewayChargePaymentResult {
   payment: EventChargePaymentRecord;
   created: boolean;
 }
+
+/**
+ * One row of the admin charge list: the charge, its balance, and its payment
+ * in progress (RFC 0026 §7) — the same view the statement gives, `null` when
+ * no hosted checkout is live or the charge is no longer `open`.
+ */
+export interface EventChargeListItem extends EventChargeWithBalanceRecord {
+  pendingCheckout: PendingCheckout | null;
+}
+
+/** Every payment in progress, in one read (`GatewayService.listLiveCheckouts`); injected per call. */
+export type ChargeLiveCheckoutReader = () => Promise<ReadonlyArray<LiveCheckout>>;
 
 export interface EventChargeDetail extends EventChargeWithBalanceRecord {
   adjustments: EventChargeAdjustmentRecord[];
@@ -388,10 +402,38 @@ export class EventChargeService {
   // Charges
   // -------------------------------------------------------------------------
 
+  /**
+   * The admin list. `liveCheckouts` is **one** set-based read joined in memory
+   * — never one lookup per charge; omitted (no gateway), every row reads
+   * `pendingCheckout: null`.
+   */
   async listCharges(
     filter: EventChargeFilter,
-  ): Promise<ControllerResult<EventChargeWithBalanceRecord[]>> {
-    return { ok: true, data: await this.repo.listCharges(filter) };
+    liveCheckouts?: ChargeLiveCheckoutReader,
+  ): Promise<ControllerResult<EventChargeListItem[]>> {
+    const [charges, live] = await Promise.all([
+      this.repo.listCharges(filter),
+      liveCheckouts ? liveCheckouts() : [],
+    ]);
+    const pendingByCharge = new Map<string, PendingCheckout>();
+    for (const checkout of live) {
+      if (checkout.receivableKind === 'event_charge') pendingByCharge.set(checkout.receivableId, checkout.pending);
+    }
+    return {
+      ok: true,
+      data: charges.map((charge) => ({
+        ...charge,
+        pendingCheckout:
+          charge.status === ChargeStatus.OPEN ? (pendingByCharge.get(charge.id) ?? null) : null,
+      })),
+    };
+  }
+
+  /** One ledger row, whatever its sign — what the admin's reversal branches on. */
+  async getPayment(id: string): Promise<ControllerResult<EventChargePaymentRecord>> {
+    const payment = await this.repo.getPayment(id);
+    if (!payment) return notFound('payment not found');
+    return { ok: true, data: payment };
   }
 
   /**
@@ -896,6 +938,10 @@ export class EventChargeService {
 
     const original = await this.repo.getPayment(paymentId);
     if (!original) return notFound('payment not found');
+    if (original.method === PaymentMethod.GATEWAY) {
+      // See `BillingService.reversePayment`: the provider returns the money first.
+      return conflict('a gateway payment is reversed by refunding it at its provider');
+    }
     if (original.reversesId !== null) return conflict('a reversal cannot itself be reversed');
 
     const ledger = await this.repo.listLedger({ chargeId: original.chargeId });
