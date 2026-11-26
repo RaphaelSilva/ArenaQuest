@@ -1,6 +1,6 @@
 # Task 06 — Backend: Webhook route and payment landing (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Backend API
@@ -84,17 +84,17 @@ provider's page reaches the ledger with no human step.
 
 ## Acceptance Criteria
 
-- [ ] A verified delivery for a paid checkout leaves exactly one gateway payment row, the
+- [x] A verified delivery for a paid checkout leaves exactly one gateway payment row, the
       checkout `paid` with its payment id, and the event `applied`.
-- [ ] Replaying that delivery any number of times adds no row and no event.
-- [ ] No response, log line or `gateway_events.error` contains a request body or a secret.
-- [ ] An invalid signature writes nothing to any table.
-- [ ] A dispute `opened` on an invoice checkout makes the student's contract standing `hold`
+- [x] Replaying that delivery any number of times adds no row and no event.
+- [x] No response, log line or `gateway_events.error` contains a request body or a secret.
+- [x] An invalid signature writes nothing to any table.
+- [x] A dispute `opened` on an invoice checkout makes the student's contract standing `hold`
       with the system actor as its author, and `won` or `lost` releases it.
-- [ ] With `PAYMENTS_PROVIDERS = none` the route answers `404` for every provider name.
-- [ ] `billing-no-gating.spec.ts` passes unchanged.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] With `PAYMENTS_PROVIDERS = none` the route answers `404` for every provider name.
+- [x] `billing-no-gating.spec.ts` passes unchanged.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
