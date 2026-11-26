@@ -4680,6 +4680,26 @@
         ],
         "type": "object"
       },
+      "PaymentsWebhookAck": {
+        "properties": {
+          "outcome": {
+            "description": "`applied`: this delivery changed the ledger or a dispute state. `duplicate`: the event, or everything it named, was already recorded. `ignored`: nothing to do (a pending, failed or expired payment, or an event kind the adapter ignores). `orphan`: the provider does not know the payment, or it names no checkout of this provider. `mismatch`: the payment does not fit its checkout; nothing landed.",
+            "enum": [
+              "applied",
+              "duplicate",
+              "ignored",
+              "orphan",
+              "mismatch"
+            ],
+            "example": "applied",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "type": "object"
+      },
       "PlayerProgression": {
         "properties": {
           "badges": {
@@ -19374,6 +19394,142 @@
         "summary": "Finish a submission upload",
         "tags": [
           "topics:submissions"
+        ]
+      }
+    },
+    "/v1/webhooks/payments/{provider}": {
+      "post": {
+        "description": "Anonymous, signed by the provider. A delivery is a **trigger only**: the body decides nothing but which payment to fetch from the provider, and the fetched state decides the outcome. Verified-but-unusable deliveries (`orphan`, `mismatch`) answer `200` and are recorded for an admin; the service's own failure answers `503` so the provider delivers again. The request body is the provider's own payload and is read raw, so no schema is declared for it.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "example": "mercadopago",
+              "maxLength": 40,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentsWebhookAck"
+                }
+              }
+            },
+            "description": "The delivery was verified and recorded"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "The delivery is not authentic; nothing was written"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "This label and environment do not bind the provider"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "The body exceeds 64 KiB"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Too Many Requests (120 per minute per IP)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`PAYMENTS_CONFIG_INVALID`: the provider list or its secrets are invalid"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    {
+                      "additionalProperties": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "`PAYMENTS_EVENT_FAILED`: processing failed; deliver again"
+          }
+        },
+        "summary": "Receive a payment provider webhook",
+        "tags": [
+          "payments"
         ]
       }
     }

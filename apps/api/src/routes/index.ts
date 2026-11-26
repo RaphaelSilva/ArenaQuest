@@ -9,6 +9,7 @@ import { buildCommentsRouter } from '@api/routes/comments.router';
 import { buildNotesRouter } from '@api/routes/notes.router';
 import { buildSubmissionsRouter } from '@api/routes/submissions.router';
 import { buildEventsRouter } from '@api/routes/events.router';
+import { buildPaymentsWebhookRouter } from '@api/routes/webhooks/payments.router';
 import { buildHealthRouter } from '@api/routes/public/health';
 
 import { authGuard } from '@api/middleware/auth-guard';
@@ -88,6 +89,9 @@ export class AppRouter {
     // Anonymous by design (RFC 0014 §6) — mounted here rather than inside
     // `buildPublicRouter`, whose routes all carry `authGuard`.
     v1.route('/events', buildEventsRouter(container));
+    // Anonymous *and* rejecting (RFC 0026 §4): no `authGuard`, no user — the
+    // provider's signature is the only credential this surface reads.
+    v1.route('/webhooks/payments', buildPaymentsWebhookRouter(container));
 
     app.route('/v1', v1);
 

@@ -311,6 +311,16 @@ export interface SetHoldCommand {
   expiresAt?: string | null;
 }
 
+/** The reason on the hold a provider dispute raises (RFC 0026 §5). */
+export const DISPUTE_HOLD_REASON = 'payment under dispute';
+
+export interface DisputeHoldResult {
+  /** The hold in force after the call — the dispute's, or the one that was already there. */
+  hold: BillingStandingHoldRecord;
+  /** `false` when a hold was already in force and was left untouched. */
+  raised: boolean;
+}
+
 /**
  * "Does this user exist?", injected rather than imported, in the shape
  * `AccountingService` already established. Setting a hold on an unknown id is
@@ -1616,6 +1626,60 @@ export class BillingService {
     });
 
     return { ok: true, data: null };
+  }
+
+  /**
+   * The dispute hold (RFC 0026 §5): "stop chasing this one — a payment is
+   * being verified", raised by the system actor when a provider opens a
+   * dispute on a contract-rail payment. Never called for an event charge.
+   *
+   * A hold already in force is left exactly as it is — an admin's arrangement
+   * outranks the machine's — and the call reports `raised: false`. Like every
+   * hold it changes a reported standing, never a balance or a permission.
+   */
+  async raiseDisputeHold(userId: string): Promise<ControllerResult<DisputeHoldResult>> {
+    const existing = await this.repo.getHold(userId);
+    if (existing && holdInForce(existing, today())) {
+      return { ok: true, data: { hold: existing, raised: false } };
+    }
+
+    const hold = await this.repo.setHold({
+      userId,
+      reason: DISPUTE_HOLD_REASON,
+      expiresAt: null,
+      setBy: SYSTEM_PAYMENT_ACTOR_ID,
+    });
+
+    this.audit('billing.set_hold', SYSTEM_PAYMENT_ACTOR_ID, {
+      userId: hold.userId,
+      reason: hold.reason,
+      expiresAt: hold.expiresAt,
+    });
+
+    return { ok: true, data: { hold, raised: true } };
+  }
+
+  /**
+   * Releases the dispute hold when the dispute closes, won or lost. Only a hold
+   * the system actor wrote is removed: one an admin set — before the dispute,
+   * or in its place — is not the gateway's to lift. An admin may still lift
+   * the dispute hold earlier through `clearHold`; this then finds nothing.
+   */
+  async releaseDisputeHold(userId: string): Promise<ControllerResult<{ released: boolean }>> {
+    const existing = await this.repo.getHold(userId);
+    if (!existing || existing.setBy !== SYSTEM_PAYMENT_ACTOR_ID) {
+      return { ok: true, data: { released: false } };
+    }
+
+    await this.repo.clearHold(userId);
+
+    this.audit('billing.clear_hold', SYSTEM_PAYMENT_ACTOR_ID, {
+      userId,
+      reason: existing.reason,
+      expiresAt: existing.expiresAt,
+    });
+
+    return { ok: true, data: { released: true } };
   }
 
   // -------------------------------------------------------------------------

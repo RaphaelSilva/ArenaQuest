@@ -55,6 +55,7 @@ import {
   type GatewayRegistry,
   type PaymentGatewayFactoryMap,
 } from '@api/core/payments/gateway-registry';
+import { GatewayService } from '@api/core/payments/gateway-service';
 import { BillingService } from '@api/core/billing/billing-service';
 import { AccountingService } from '@api/core/billing/accounting-service';
 import { EventChargeService } from '@api/core/billing/event-charge-service';
@@ -222,6 +223,8 @@ export interface InfraContext {
     forgotPassword: IRateLimiter;
     /** The anonymous events board, keyed on `CF-Connecting-IP`. */
     events: IRateLimiter;
+    /** The payment webhook (RFC 0026 §4), keyed on `CF-Connecting-IP`: 120 a minute. */
+    webhooks: IRateLimiter;
   };
   cors: {
     allowedOrigins?: string;
@@ -238,7 +241,7 @@ export interface InfraContext {
   jobRuns: IJobRunRepository;
 }
 
-/** Payment gateway (RFC 0026 section 9). The service joins in a later task. */
+/** Payment gateway (RFC 0026 section 9). */
 export interface PaymentsContext {
   /**
    * The checked `PAYMENTS_PROVIDERS` / `PAYMENTS_KEY_MODE` — the *result*, not a
@@ -251,6 +254,8 @@ export interface PaymentsContext {
   gateways: GatewayRegistry;
   /** `gateway_checkouts` and `gateway_events`; built per request like every adapter. */
   gatewayRepo: IGatewayRepository;
+  /** The collection path: a verified provider event in, ledger rows out (RFC 0026 §4, §5). */
+  gatewayService: GatewayService;
 }
 
 /** What a caller may replace when building the container. */
@@ -436,6 +441,12 @@ export function buildContainer(env: Env, options: BuildContainerOptions = {}): A
 
   // The gateway's own two tables (checkouts and webhook events) — never money.
   const gatewayRepo: IGatewayRepository = new D1GatewayRepository(env.DB);
+  const gatewayService = new GatewayService({
+    gateways: payments.gateways,
+    gatewayRepo,
+    billing: billingService,
+    charges: eventChargeService,
+  });
 
   // Infra: job runs
   const jobRuns = new D1JobRunRepository(env.DB);
@@ -474,6 +485,16 @@ export function buildContainer(env: Env, options: BuildContainerOptions = {}): A
     maxAttempts: 60,
     lockoutMs: 60_000,
     prefix: 'rl:events:',
+  });
+
+  // The payment webhook (RFC 0026 §4) is anonymous and must reject: its budget
+  // bounds the CPU spent on signature checks, it does not authenticate.
+  // Providers burst on retry storms, hence twice the events board's rate.
+  const webhooksLimiter = new KvRateLimiter(env.RATE_LIMIT_KV, {
+    windowMs: 60_000,
+    maxAttempts: 120,
+    lockoutMs: 60_000,
+    prefix: 'rl:webhooks:',
   });
 
   // Student submissions (RFC 0020 §10): keyed by user id, presign only. It
@@ -547,11 +568,11 @@ export function buildContainer(env: Env, options: BuildContainerOptions = {}): A
     },
     billing: { billingRepo, billingService, accountingService, eventChargeRepo, eventChargeService },
     events: { eventRepo, storage, users, userGroups },
-    payments: { config: payments.config, gateways: payments.gateways, gatewayRepo },
+    payments: { config: payments.config, gateways: payments.gateways, gatewayRepo, gatewayService },
     infra: {
       auth,
       mailer,
-      rateLimiters: { login: loginLimiter, register: registerLimiter, activate: activateLimiter, forgotPassword: forgotPasswordLimiter, events: eventsLimiter },
+      rateLimiters: { login: loginLimiter, register: registerLimiter, activate: activateLimiter, forgotPassword: forgotPasswordLimiter, events: eventsLimiter, webhooks: webhooksLimiter },
       cors: {
         allowedOrigins: env.ALLOWED_ORIGINS,
         // Enforce strict validation when ALLOWED_ORIGINS is configured; fall
