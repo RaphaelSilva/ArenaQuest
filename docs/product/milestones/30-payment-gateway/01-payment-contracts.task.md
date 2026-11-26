@@ -1,6 +1,6 @@
 # Task 01 — Backend: Payment contracts: ports, money conversion and entities (Phase 0)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Backend API
@@ -75,16 +75,16 @@ None — independent. First task of the milestone.
 
 ## Acceptance Criteria
 
-- [ ] `IPaymentGateway` and `IGatewayRepository` are exported from `packages/shared/ports` and
+- [x] `IPaymentGateway` and `IGatewayRepository` are exported from `packages/shared/ports` and
       reference no Cloudflare or provider-SDK type.
-- [ ] `decimalToMinor('180.50', 2)` is `18050`, `decimalToMinor('180', 2)` is `18000`, and
+- [x] `decimalToMinor('180.50', 2)` is `18050`, `decimalToMinor('180', 2)` is `18000`, and
       `'180.505'` at exponent 2, `'-1.00'`, `''`, `'1,50'` and `'1e3'` each throw.
-- [ ] The capability lookup refuses a method or a currency the table does not list, for every
+- [x] The capability lookup refuses a method or a currency the table does not list, for every
       provider name.
-- [ ] `UserStatus` has `system`, `JobName` has `reconcile_payments`, and no existing test changes
+- [x] `UserStatus` has `system`, `JobName` has `reconcile_payments`, and no existing test changes
       its expectation.
-- [ ] Changed files lint clean; `make test-api` green (and the shared specs with it).
-- [ ] No diff outside the scope guardrail.
+- [x] Changed files lint clean; `make test-api` green (and the shared specs with it).
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
