@@ -11,7 +11,7 @@ import type {
   Standing,
 } from '@web/lib/admin-billing-api';
 import type { HttpTransport } from '@web/lib/api-client';
-import { makeTransport } from './test-transport';
+import { ADMIN_USER, makeTransport } from './test-transport';
 import { StudentStatementPanel } from '../student-statement-panel';
 
 const BRL = { code: 'BRL', exponent: 2, symbol: 'R$' };
@@ -56,6 +56,7 @@ function statement(versions: BillingSubscription[]): BillingStudentStatement {
         versions,
       },
     ],
+    payOptions: [],
     invoices: [],
     extras: { standing: 'good', oldestOverdueDate: null, outstandingMinor: 0, charges: [] },
   };
@@ -83,6 +84,7 @@ function charge(overrides: Partial<BillingStatementCharge> = {}): BillingStateme
     payments: [],
     eventTitle: 'Winter Seminar',
     eventStartsAt: '2026-07-18T13:00:00.000Z',
+    pendingCheckout: null,
     ...overrides,
   };
 }
@@ -97,7 +99,7 @@ let client: { adminBilling: ReturnType<typeof createAdminBillingApi> };
 
 vi.mock('@web/context/auth-context', async () => {
   const actual = await vi.importActual('@web/context/auth-context');
-  return { ...actual, useApiClient: () => client };
+  return { ...actual, useApiClient: () => client, useAuthContext: () => ({ user: ADMIN_USER }) };
 });
 
 const onClose = vi.fn();
@@ -369,6 +371,83 @@ describe('StudentStatementPanel', () => {
       const extras = within(await screen.findByRole('region', { name: rails.extras }));
       expect(extras.getByText(d.extrasEmpty)).toBeInTheDocument();
       expect(extras.getByText(standingDict.good)).toBeInTheDocument();
+    });
+  });
+
+  describe('online payment', () => {
+    const g = dictEn.admin.billing.gateway;
+    const PENDING = {
+      checkoutId: 'chk-1',
+      provider: 'mercadopago' as const,
+      createdAt: '2026-11-26T14:03:00.000Z',
+      expiresAt: '2026-11-27T14:03:00.000Z',
+      createdBy: 'u1',
+    };
+    const openInvoice = {
+      id: 'inv-11111111-aaaa',
+      subscriptionId: 'v1',
+      userId: 'u1',
+      periodStart: '2026-11-01',
+      periodEnd: '2026-11-30',
+      dueDate: '2026-11-10',
+      amountMinor: 50000,
+      balanceMinor: 50000,
+      currency: 'BRL',
+      graceDays: 5,
+      status: 'open' as const,
+      issuedAt: '2026-11-01T00:00:00Z',
+      voidedAt: null,
+      voidReason: null,
+      adjustments: [],
+      payments: [],
+      pendingCheckout: null,
+    };
+
+    it('marks an invoice and an event charge that have a pending online payment', async () => {
+      payload = {
+        ...statement([version()]),
+        invoices: [{ ...openInvoice, pendingCheckout: PENDING }],
+        extras: {
+          standing: 'due',
+          oldestOverdueDate: null,
+          outstandingMinor: 25000,
+          charges: [charge({ pendingCheckout: PENDING })],
+        },
+      };
+      renderPanel();
+
+      const flags = await screen.findAllByTestId('pending-online-payment');
+      expect(flags).toHaveLength(2);
+      for (const flag of flags) expect(flag).toHaveTextContent(g.pending.label);
+      expect(flags[0]).toHaveTextContent(g.pending.openedByStudent);
+    });
+
+    it('offers a payment link on an open invoice and an open charge, and none on a settled one', async () => {
+      payload = {
+        ...statement([version()]),
+        payOptions: [{ provider: 'mercadopago', methods: ['pix'] }],
+        invoices: [
+          openInvoice,
+          { ...openInvoice, id: 'inv-22222222-bbbb', status: 'paid', balanceMinor: 0 },
+        ],
+        extras: {
+          standing: 'due',
+          oldestOverdueDate: null,
+          outstandingMinor: 25000,
+          charges: [charge()],
+        },
+      };
+      renderPanel();
+
+      expect(
+        await screen.findByRole('button', { name: g.link.invoiceAriaLabel('inv-1111') }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: g.link.chargeAriaLabel('ch1') }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: g.link.invoiceAriaLabel('inv-2222') }),
+      ).not.toBeInTheDocument();
     });
   });
 });

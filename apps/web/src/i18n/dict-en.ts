@@ -1350,6 +1350,142 @@ export const dictEn = {
           balance: 'Balance',
         },
       },
+      gateway: {
+        provider: {
+          stripe: 'Stripe',
+          mercadopago: 'Mercado Pago',
+          asaas: 'Asaas',
+          pagarme: 'Pagar.me',
+        },
+        method: {
+          pix: 'Pix',
+          card: 'Card',
+          boleto: 'Boleto',
+        },
+        methodSeparator: ', ',
+        ledger: {
+          paymentId: (provider: string, id: string) => `${provider} · payment ${id}`,
+          refundId: (provider: string, id: string) => `${provider} · refund ${id}`,
+          unknownReference: (reference: string) => `Provider reference ${reference}`,
+          dashboardLink: 'Open in the provider dashboard',
+          dashboardAriaLabel: (provider: string, id: string) =>
+            `Open payment ${id} in the ${provider} dashboard (new tab)`,
+          refundButton: 'Refund',
+          refundAriaLabel: (reference: string) => `Refund online payment ${reference}`,
+          refundOf: (reference: string) => `Refund of payment ${reference}`,
+          refunded: 'Refunded',
+          providerRefund: 'Refund made at the provider',
+          providerRefundNote:
+            'Returned on the provider side (a refund or a lost dispute) and recorded from there. It mirrors no entry on this ledger.',
+        },
+        refund: {
+          dialogTitle: 'Refund an online payment',
+          explainer: (provider: string, amount: string) =>
+            `This asks ${provider} to return ${amount} to the student. The reversal is written to the ledger only when ${provider} accepts.`,
+          fullOnly:
+            'The refund is for the full amount of the payment. Nothing is deleted: the reversal is appended under the original with your name and the reason below.',
+          confirmLabel: (provider: string, amount: string) =>
+            `I confirm: ask ${provider} to return ${amount}`,
+          confirmRequired: 'Tick the confirmation to request the refund.',
+          submit: 'Request refund',
+          retry: 'Try again',
+          outcomes: {
+            accepted: (provider: string) =>
+              `${provider} accepted the refund. The reversal is on the ledger.`,
+            alreadyRefunded: (provider: string) =>
+              `${provider} had already returned this payment. The refund is on the ledger; nothing was refunded twice.`,
+            refused: (provider: string) =>
+              `${provider} refused the refund. Nothing changed on the ledger.`,
+            refusedDetail: (provider: string, detail: string) =>
+              `${provider} refused the refund: ${detail} Nothing changed on the ledger.`,
+            providerNotEnabled: (provider: string) =>
+              `${provider} is not enabled on this label any more, so the refund cannot be requested from here. Nothing changed.`,
+            unrecorded: (provider: string, refundId: string) =>
+              `${provider} accepted the refund (${refundId}) and the money is being returned, but the reversal is not on the ledger yet. Try again: the same request records it and cannot refund twice.`,
+            configuration:
+              'Online payments are misconfigured on this label. No refund was requested and nothing changed.',
+            providerUnavailable: (provider: string) =>
+              `${provider} could not be reached. No refund was requested; try again in a moment.`,
+            conflict:
+              'This entry cannot be refunded: it is itself a refund, or it was already reversed. Nothing changed.',
+            unknown:
+              'The refund request failed. Read the entries again before trying once more.',
+          },
+        },
+        pending: {
+          label: 'Pending online payment',
+          line: (expiresAt: string) => `Pending online payment · expires ${expiresAt}`,
+          roster: (count: number, expiresAt: string) =>
+            count === 1
+              ? `Pending online payment · expires ${expiresAt}`
+              : `${count} pending online payments · first expires ${expiresAt}`,
+          rosterNoExpiry: (count: number) =>
+            count === 1 ? 'Pending online payment' : `${count} pending online payments`,
+          openedByStudent: 'link opened by the student',
+          openedOnBehalf: (name: string) => `link created by ${name}`,
+          eventPanel: (count: number, expiresAt: string) =>
+            count === 1
+              ? `1 charge has a pending online payment · expires ${expiresAt}`
+              : `${count} charges have a pending online payment · first expires ${expiresAt}`,
+        },
+        link: {
+          column: 'Online payment',
+          button: 'Payment link',
+          invoiceAriaLabel: (reference: string) => `Create a payment link for invoice ${reference}`,
+          chargeAriaLabel: (reference: string) => `Create a payment link for charge ${reference}`,
+          dialogTitle: 'Payment link',
+          explainer:
+            'Creates the hosted payment page for this student and gives you its link to send. Nothing is charged until the student pays, and the payment lands on the ledger by itself.',
+          liveNote: (expiresAt: string) =>
+            `A link is already live for this receivable (expires ${expiresAt}). Asking again with the same provider gives you that same link; another provider replaces it.`,
+          loadingOptions: 'Loading the payment methods…',
+          noProvider:
+            'No online payment method is enabled on this label, so no link can be created.',
+          providerLegend: 'How the student will pay',
+          providerOption: (provider: string, methods: string) => `${provider} — ${methods}`,
+          balanceLabel: 'Balance to pay',
+          create: 'Create link',
+          creating: 'Creating the link…',
+          created: 'New link created.',
+          reused: 'This is the link that was already live.',
+          urlLabel: 'Link to send to the student',
+          copy: 'Copy',
+          copied: 'Link copied.',
+          copyFailed: 'The link could not be copied. Select it and copy it by hand.',
+          expires: (expiresAt: string) => `Expires ${expiresAt}`,
+          close: 'Close',
+          errors: {
+            not_payable:
+              'This receivable can no longer be paid online: it is paid, void or has no balance left.',
+            provider_unavailable:
+              'The payment provider did not answer. No link was created; try again in a moment.',
+            configuration:
+              'Online payments are misconfigured on this label. No link was created.',
+            in_progress: 'Another link is being created for this receivable. Try again.',
+            provider_required:
+              'The payment methods on offer changed. Close this dialog and open it again.',
+            not_found:
+              'No link can be created: the receivable is gone, or no provider is enabled.',
+            unknown: 'The link could not be created.',
+          },
+        },
+        form: {
+          explainer:
+            'Online is for matching by hand a payment the provider already holds. Enter the provider and the payment id exactly as the provider shows it.',
+          providerLabel: 'Provider',
+          paymentIdLabel: 'Provider payment id',
+          paymentIdHelp: (provider: string) =>
+            `Recorded as ${provider}:<id>. A provider payment can be on the ledger only once.`,
+          paymentIdRequired: 'An online payment needs the provider payment id.',
+          paymentIdInvalid: 'The payment id cannot contain spaces.',
+          duplicate: (reference: string) =>
+            `This provider payment is already on the ledger as payment ${reference}. Nothing was recorded.`,
+          openCheckoutWarning: (expiresAt: string) =>
+            `This receivable has an open online checkout (expires ${expiresAt}), so the student may still pay through it. You can record this payment anyway; the checkout expires on its own.`,
+          recordedWithOpenCheckout: (expiresAt: string) =>
+            `Payment recorded. An online checkout is still open until ${expiresAt}; it expires on its own.`,
+        },
+      },
       ledger: {
         heading: 'Invoices, adjustments and payments',
         appendOnlyNote:
@@ -1402,7 +1538,7 @@ export const dictEn = {
           pix: 'Pix',
           bank_transfer: 'Bank transfer',
           card: 'Card',
-          gateway: 'Gateway',
+          gateway: 'Online',
           other: 'Other',
         },
         recordedBy: (author: string) => `recorded by ${author}`,

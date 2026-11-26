@@ -1349,6 +1349,144 @@ export const dictPt = {
           balance: 'Saldo',
         },
       },
+      gateway: {
+        provider: {
+          stripe: 'Stripe',
+          mercadopago: 'Mercado Pago',
+          asaas: 'Asaas',
+          pagarme: 'Pagar.me',
+        },
+        method: {
+          pix: 'Pix',
+          card: 'Cartão',
+          boleto: 'Boleto',
+        },
+        methodSeparator: ', ',
+        ledger: {
+          paymentId: (provider: string, id: string) => `${provider} · pagamento ${id}`,
+          refundId: (provider: string, id: string) => `${provider} · reembolso ${id}`,
+          unknownReference: (reference: string) => `Referência do provedor ${reference}`,
+          dashboardLink: 'Abrir no painel do provedor',
+          dashboardAriaLabel: (provider: string, id: string) =>
+            `Abrir o pagamento ${id} no painel do ${provider} (nova aba)`,
+          refundButton: 'Reembolsar',
+          refundAriaLabel: (reference: string) => `Reembolsar o pagamento online ${reference}`,
+          refundOf: (reference: string) => `Reembolso do pagamento ${reference}`,
+          refunded: 'Reembolsado',
+          providerRefund: 'Reembolso feito no provedor',
+          providerRefundNote:
+            'Devolvido do lado do provedor (um reembolso ou uma disputa perdida) e registrado a partir de lá. Não espelha nenhum lançamento deste livro.',
+        },
+        refund: {
+          dialogTitle: 'Reembolsar um pagamento online',
+          explainer: (provider: string, amount: string) =>
+            `Isto pede ao ${provider} que devolva ${amount} ao aluno. O estorno só é escrito no livro quando o ${provider} aceitar.`,
+          fullOnly:
+            'O reembolso é do valor total do pagamento. Nada é apagado: o estorno é acrescentado sob o original, com o seu nome e o motivo abaixo.',
+          confirmLabel: (provider: string, amount: string) =>
+            `Confirmo: pedir ao ${provider} que devolva ${amount}`,
+          confirmRequired: 'Marque a confirmação para pedir o reembolso.',
+          submit: 'Pedir reembolso',
+          retry: 'Tentar de novo',
+          outcomes: {
+            accepted: (provider: string) =>
+              `O ${provider} aceitou o reembolso. O estorno está no livro.`,
+            alreadyRefunded: (provider: string) =>
+              `O ${provider} já tinha devolvido este pagamento. O reembolso está no livro; nada foi devolvido duas vezes.`,
+            refused: (provider: string) =>
+              `O ${provider} recusou o reembolso. Nada mudou no livro.`,
+            refusedDetail: (provider: string, detail: string) =>
+              `O ${provider} recusou o reembolso: ${detail} Nada mudou no livro.`,
+            providerNotEnabled: (provider: string) =>
+              `O ${provider} não está mais habilitado neste label, então o reembolso não pode ser pedido por aqui. Nada mudou.`,
+            unrecorded: (provider: string, refundId: string) =>
+              `O ${provider} aceitou o reembolso (${refundId}) e o dinheiro está sendo devolvido, mas o estorno ainda não está no livro. Tente de novo: o mesmo pedido o registra e não devolve duas vezes.`,
+            configuration:
+              'Os pagamentos online estão mal configurados neste label. Nenhum reembolso foi pedido e nada mudou.',
+            providerUnavailable: (provider: string) =>
+              `Não foi possível falar com o ${provider}. Nenhum reembolso foi pedido; tente de novo em instantes.`,
+            conflict:
+              'Este lançamento não pode ser reembolsado: ele próprio é um reembolso, ou já foi estornado. Nada mudou.',
+            unknown:
+              'O pedido de reembolso falhou. Leia os lançamentos de novo antes de tentar outra vez.',
+          },
+        },
+        pending: {
+          label: 'Pagamento online pendente',
+          line: (expiresAt: string) => `Pagamento online pendente · expira ${expiresAt}`,
+          roster: (count: number, expiresAt: string) =>
+            count === 1
+              ? `Pagamento online pendente · expira ${expiresAt}`
+              : `${count} pagamentos online pendentes · o primeiro expira ${expiresAt}`,
+          rosterNoExpiry: (count: number) =>
+            count === 1 ? 'Pagamento online pendente' : `${count} pagamentos online pendentes`,
+          openedByStudent: 'link aberto pelo aluno',
+          openedOnBehalf: (name: string) => `link criado por ${name}`,
+          eventPanel: (count: number, expiresAt: string) =>
+            count === 1
+              ? `1 cobrança tem um pagamento online pendente · expira ${expiresAt}`
+              : `${count} cobranças têm um pagamento online pendente · o primeiro expira ${expiresAt}`,
+        },
+        link: {
+          column: 'Pagamento online',
+          button: 'Link de pagamento',
+          invoiceAriaLabel: (reference: string) =>
+            `Criar um link de pagamento para a fatura ${reference}`,
+          chargeAriaLabel: (reference: string) =>
+            `Criar um link de pagamento para a cobrança ${reference}`,
+          dialogTitle: 'Link de pagamento',
+          explainer:
+            'Cria a página de pagamento hospedada para este aluno e entrega o link para você enviar. Nada é cobrado até o aluno pagar, e o pagamento entra no livro sozinho.',
+          liveNote: (expiresAt: string) =>
+            `Já existe um link ativo para este recebível (expira ${expiresAt}). Pedir de novo com o mesmo provedor devolve esse mesmo link; outro provedor o substitui.`,
+          loadingOptions: 'Carregando as formas de pagamento…',
+          noProvider:
+            'Nenhuma forma de pagamento online está habilitada neste label, então nenhum link pode ser criado.',
+          providerLegend: 'Como o aluno vai pagar',
+          providerOption: (provider: string, methods: string) => `${provider} — ${methods}`,
+          balanceLabel: 'Saldo a pagar',
+          create: 'Criar link',
+          creating: 'Criando o link…',
+          created: 'Novo link criado.',
+          reused: 'Este é o link que já estava ativo.',
+          urlLabel: 'Link para enviar ao aluno',
+          copy: 'Copiar',
+          copied: 'Link copiado.',
+          copyFailed: 'Não foi possível copiar o link. Selecione-o e copie manualmente.',
+          expires: (expiresAt: string) => `Expira ${expiresAt}`,
+          close: 'Fechar',
+          errors: {
+            not_payable:
+              'Este recebível não pode mais ser pago online: está pago, anulado ou sem saldo.',
+            provider_unavailable:
+              'O provedor de pagamento não respondeu. Nenhum link foi criado; tente de novo em instantes.',
+            configuration:
+              'Os pagamentos online estão mal configurados neste label. Nenhum link foi criado.',
+            in_progress: 'Outro link está sendo criado para este recebível. Tente de novo.',
+            provider_required:
+              'As formas de pagamento oferecidas mudaram. Feche esta janela e abra de novo.',
+            not_found:
+              'Nenhum link pode ser criado: o recebível não existe mais, ou nenhum provedor está habilitado.',
+            unknown: 'Não foi possível criar o link.',
+          },
+        },
+        form: {
+          explainer:
+            'Online serve para conciliar manualmente um pagamento que o provedor já tem. Informe o provedor e o id do pagamento exatamente como o provedor mostra.',
+          providerLabel: 'Provedor',
+          paymentIdLabel: 'Id do pagamento no provedor',
+          paymentIdHelp: (provider: string) =>
+            `Registrado como ${provider}:<id>. Um pagamento do provedor só pode estar no livro uma vez.`,
+          paymentIdRequired: 'Um pagamento online precisa do id do pagamento no provedor.',
+          paymentIdInvalid: 'O id do pagamento não pode conter espaços.',
+          duplicate: (reference: string) =>
+            `Este pagamento do provedor já está no livro como o pagamento ${reference}. Nada foi registrado.`,
+          openCheckoutWarning: (expiresAt: string) =>
+            `Este recebível tem um checkout online aberto (expira ${expiresAt}), então o aluno ainda pode pagar por ele. Você pode registrar este pagamento mesmo assim; o checkout expira sozinho.`,
+          recordedWithOpenCheckout: (expiresAt: string) =>
+            `Pagamento registrado. Um checkout online continua aberto até ${expiresAt}; ele expira sozinho.`,
+        },
+      },
       ledger: {
         heading: 'Faturas, ajustes e pagamentos',
         appendOnlyNote:
@@ -1401,7 +1539,7 @@ export const dictPt = {
           pix: 'Pix',
           bank_transfer: 'Transferência bancária',
           card: 'Cartão',
-          gateway: 'Gateway',
+          gateway: 'Online',
           other: 'Outro',
         },
         recordedBy: (author: string) => `registrado por ${author}`,

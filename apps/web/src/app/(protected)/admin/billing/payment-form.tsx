@@ -1,18 +1,25 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
+import { PAYMENT_PROVIDER_NAMES } from '@arenaquest/shared/ports/i-payment-gateway';
 import { Button, Input } from '@web/components/design-system';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
+import { AdminBillingApiError } from '@web/lib/admin-billing-api';
 import type {
+  BillingRecordedEventChargePayment,
+  BillingRecordedPayment,
   BillingReportCurrency,
   PaymentMethod,
+  PayOption,
+  PendingCheckout,
   RecordPaymentInput,
 } from '@web/lib/admin-billing-api';
 import type { LedgerTarget, LedgerTargetKind } from './ledger-target';
 import { Money } from './money';
 import { explain } from './explain-error';
-import { toMinorUnits } from './minor-units';
+import { fromMinorUnits, toMinorUnits } from './minor-units';
+import { useExpiryFormatter, useProviderLabel } from './gateway-ui';
 
 /** The six values `RecordPaymentBodySchema` accepts for `method`. */
 const METHODS: readonly PaymentMethod[] = [
@@ -24,7 +31,28 @@ const METHODS: readonly PaymentMethod[] = [
   'other',
 ];
 
-type FieldErrors = { amount?: string };
+type FieldErrors = { amount?: string; providerPaymentId?: string };
+
+/**
+ * What a caller may fill in before the form opens. The exceptions panel
+ * (milestone decision 23, *match by hand*) opens this form with
+ * `method: 'gateway'`, the provider and the provider's payment id taken from
+ * the exception row, and the amount the provider captured.
+ */
+export type PaymentFormPrefill = {
+  method?: PaymentMethod;
+  /** A provider name (`mercadopago`, …); only read when the method is `gateway`. */
+  provider?: string;
+  /** The bare provider payment id — the part after `<provider>:`. */
+  providerPaymentId?: string;
+  /** Minor units; shown at the currency's exponent. */
+  amountMinor?: number;
+  /** `YYYY-MM-DD`. */
+  paidAt?: string;
+};
+
+/** The row the API answered with, on either rail. */
+export type RecordedPayment = BillingRecordedPayment | BillingRecordedEventChargePayment;
 
 /**
  * Record a payment on an invoice — RFC 0013 §7, the admin write surface.
@@ -51,16 +79,43 @@ export function PaymentForm({
   invoice,
   kind = 'invoice',
   currency,
+  payOptions,
+  pendingCheckout = null,
+  prefill,
   onClose,
   onRecorded,
+  onReferenceExists,
 }: {
   /** The invoice — or, with `kind="charge"`, the event charge — being paid. */
   invoice: LedgerTarget;
   kind?: LedgerTargetKind;
   currency: BillingReportCurrency | null;
+  /**
+   * The label's bound providers (`statement.payOptions`), offered when the
+   * method is *Online*. Omitted or empty, every known provider is offered —
+   * the API accepts any known provider name in a gateway reference, which is
+   * what lets a payment of a since-retired provider be matched by hand.
+   */
+  payOptions?: readonly PayOption[];
+  /**
+   * The receivable's live hosted checkout, when it has one. The form warns and
+   * still records: the student may well have paid at the door.
+   */
+  pendingCheckout?: PendingCheckout | null;
+  /** Initial values; read once, when the form mounts. */
+  prefill?: PaymentFormPrefill;
   onClose: () => void;
-  /** Called after the server accepted the payment. */
-  onRecorded: () => void;
+  /**
+   * Called after the server accepted the payment, with the recorded row —
+   * whose `pendingCheckout` says whether a hosted checkout is still open.
+   */
+  onRecorded: (recorded: RecordedPayment) => void;
+  /**
+   * Called when the provider reference is already on the ledger
+   * (`409 PAYMENT_REFERENCE_EXISTS`), with the payment that carries it. The
+   * form shows the message itself and stays open.
+   */
+  onReferenceExists?: (paymentId: string) => void;
 }) {
   const dict = useDict();
   const d = dict.admin.billing.ledger.payment;
@@ -68,19 +123,14 @@ export function PaymentForm({
   const isCharge = kind === 'charge';
   const planValidation = dict.admin.billing.plans.validation;
   const methodLabels = dict.admin.billing.ledger.method;
+  const g = dict.admin.billing.gateway.form;
   const client = useApiClient();
+  const providerLabel = useProviderLabel();
+  const formatWhen = useExpiryFormatter();
 
   const methodId = useId();
+  const providerId = useId();
   const amountErrorId = useId();
-
-  const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState<PaymentMethod>('cash');
-  const [paidAt, setPaidAt] = useState('');
-  const [externalReference, setExternalReference] = useState('');
-
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   /**
    * Without a resolved currency there is no recorded exponent, so a typed
@@ -88,6 +138,34 @@ export function PaymentForm({
    * the exact failure `money.tsx` exists to prevent.
    */
   const exponent = currency?.exponent ?? null;
+
+  /** Bound providers first, in the API's order; a prefilled one is always offered. */
+  const providers = useMemo(() => {
+    const bound = (payOptions ?? []).map((option) => option.provider as string);
+    const base = bound.length > 0 ? bound : [...PAYMENT_PROVIDER_NAMES];
+    return prefill?.provider && !base.includes(prefill.provider)
+      ? [prefill.provider, ...base]
+      : base;
+  }, [payOptions, prefill?.provider]);
+
+  const [amount, setAmount] = useState(() =>
+    prefill?.amountMinor !== undefined && exponent !== null
+      ? fromMinorUnits(prefill.amountMinor, exponent)
+      : '',
+  );
+  const [method, setMethod] = useState<PaymentMethod>(prefill?.method ?? 'cash');
+  const [paidAt, setPaidAt] = useState(prefill?.paidAt ?? '');
+  const [externalReference, setExternalReference] = useState('');
+  const [provider, setProvider] = useState(prefill?.provider ?? '');
+  const [providerPaymentId, setProviderPaymentId] = useState(prefill?.providerPaymentId ?? '');
+
+  const isGateway = method === 'gateway';
+  /** The chosen provider, or the first offered while none was picked. */
+  const chosenProvider = providers.includes(provider) ? provider : (providers[0] ?? '');
+
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -116,10 +194,26 @@ export function PaymentForm({
       return;
     }
 
+    // A gateway row is keyed on `<provider>:<id>` (RFC 0026 R9): the server
+    // refuses anything else, and the form says so before spending a request.
+    const trimmedPaymentId = providerPaymentId.trim();
+    if (isGateway) {
+      if (!trimmedPaymentId) {
+        setFieldErrors({ providerPaymentId: g.paymentIdRequired });
+        return;
+      }
+      if (/\s/.test(trimmedPaymentId)) {
+        setFieldErrors({ providerPaymentId: g.paymentIdInvalid });
+        return;
+      }
+    }
+
     setFieldErrors({});
     setSubmitError(null);
 
-    const trimmedReference = externalReference.trim();
+    const trimmedReference = isGateway
+      ? `${chosenProvider}:${trimmedPaymentId}`
+      : externalReference.trim();
     const payload: RecordPaymentInput = {
       amountMinor: converted.amountMinor,
       method,
@@ -129,14 +223,19 @@ export function PaymentForm({
 
     setBusy(true);
     try {
-      if (isCharge) {
-        await client.adminBilling.extras.addPayment(invoice.id, payload);
-      } else {
-        await client.adminBilling.invoices.addPayment(invoice.id, payload);
-      }
-      onRecorded();
+      const recorded = isCharge
+        ? await client.adminBilling.extras.addPayment(invoice.id, payload)
+        : await client.adminBilling.invoices.addPayment(invoice.id, payload);
+      onRecorded(recorded);
     } catch (thrown) {
-      setSubmitError(explain(thrown, d.error));
+      const existing = thrown instanceof AdminBillingApiError ? thrown.existingPaymentId : null;
+      if (existing !== null) {
+        // Nothing was written: the provider payment is already on the ledger.
+        setSubmitError(g.duplicate(existing.slice(0, 8)));
+        onReferenceExists?.(existing);
+      } else {
+        setSubmitError(explain(thrown, d.error));
+      }
     } finally {
       setBusy(false);
     }
@@ -187,6 +286,16 @@ export function PaymentForm({
           </div>
         </dl>
 
+        {pendingCheckout && (
+          <p
+            role="note"
+            data-testid="open-checkout-warning"
+            className="rounded-md bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-900/30 dark:text-amber-200"
+          >
+            {g.openCheckoutWarning(formatWhen(pendingCheckout.expiresAt))}
+          </p>
+        )}
+
         <Input
           label={d.amountLabel(invoice.currency)}
           value={amount}
@@ -227,16 +336,50 @@ export function PaymentForm({
         />
 
         {/*
-          Where a future provider's charge id will land. An administrator
-          recording cash leaves it empty, and an empty field is omitted from the
-          request rather than sent as an empty string.
+          A free-form bank identifier, omitted from the request when empty. The
+          *Online* method replaces it with the provider and its payment id,
+          which together are the row's reference (`<provider>:<id>`).
         */}
-        <Input
-          label={d.referenceLabel}
-          value={externalReference}
-          onChange={(event) => setExternalReference(event.target.value)}
-          helperText={d.referenceHelp}
-        />
+        {isGateway ? (
+          <div className="space-y-3 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">{g.explainer}</p>
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor={providerId}
+                className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text2)]"
+              >
+                {g.providerLabel}
+              </label>
+              <select
+                id={providerId}
+                value={chosenProvider}
+                onChange={(event) => setProvider(event.target.value)}
+                className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+              >
+                {providers.map((name) => (
+                  <option key={name} value={name}>
+                    {providerLabel(name)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Input
+              label={g.paymentIdLabel}
+              value={providerPaymentId}
+              onChange={(event) => setProviderPaymentId(event.target.value)}
+              error={fieldErrors.providerPaymentId}
+              helperText={g.paymentIdHelp(chosenProvider)}
+              autoComplete="off"
+            />
+          </div>
+        ) : (
+          <Input
+            label={d.referenceLabel}
+            value={externalReference}
+            onChange={(event) => setExternalReference(event.target.value)}
+            helperText={d.referenceHelp}
+          />
+        )}
 
         {submitError && (
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">

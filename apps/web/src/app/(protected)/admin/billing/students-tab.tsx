@@ -23,6 +23,7 @@ import { StandingBadge } from './standing-badge';
 import { StudentStatementPanel } from './student-statement-panel';
 import { SignContractDialog } from './sign-contract-dialog';
 import type { SignableStudent } from './sign-contract-dialog';
+import { useExpiryFormatter } from './gateway-ui';
 
 /**
  * `contractStanding=exempt` is the held filter — a hold is the only way a
@@ -74,6 +75,8 @@ export function StudentsTab({
 }) {
   const dict = useDict();
   const d = dict.admin.billing.students;
+  const pendingDict = dict.admin.billing.gateway.pending;
+  const formatWhen = useExpiryFormatter();
   const client = useApiClient();
   const contractFilterId = useId();
   const extrasFilterId = useId();
@@ -335,10 +338,23 @@ export function StudentsTab({
           <TableBody>
             {rows.map((row) => {
               const name = nameOf(row.userId);
+              // Live hosted checkouts over both rails — a flag, never money.
+              const pendingCount = row.pendingCheckouts?.count ?? 0;
+              const pendingExpiry = row.pendingCheckouts?.earliestExpiresAt ?? null;
               return (
                 <TableRow key={row.userId}>
                   <TableCell>
                     <span className="font-medium text-zinc-900 dark:text-zinc-100">{name}</span>
+                    {pendingCount > 0 && (
+                      <span
+                        data-testid="roster-pending-online"
+                        className="mt-1 block text-xs font-medium text-amber-700 dark:text-amber-300"
+                      >
+                        {pendingExpiry
+                          ? pendingDict.roster(pendingCount, formatWhen(pendingExpiry))
+                          : pendingDict.rosterNoExpiry(pendingCount)}
+                      </span>
+                    )}
                     {row.hold && (
                       <span className="mt-1 block text-xs text-zinc-500">
                         {d.heldBy(row.hold.reason, row.hold.setBy)}
@@ -521,7 +537,9 @@ export function StudentsTab({
           userId={statementFor.userId}
           studentName={statementFor.name}
           contractStanding={statementFor.contractStanding}
+          nameOf={nameOf}
           onClose={() => setStatementFor(null)}
+          onPaymentLinkChanged={() => void load()}
           onSignContract={(userId) => setSignDraft({ userId, fromStatement: true })}
         />
       )}

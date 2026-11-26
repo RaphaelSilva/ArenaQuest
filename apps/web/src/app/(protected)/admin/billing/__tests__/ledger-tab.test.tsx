@@ -10,7 +10,7 @@ import type {
   BillingStudentStatement,
 } from '@web/lib/admin-billing-api';
 import type { HttpTransport } from '@web/lib/api-client';
-import { makeTransport } from './test-transport';
+import { ADMIN_USER, makeTransport } from './test-transport';
 import { LedgerTab } from '../ledger-tab';
 
 const BRL: BillingReportCurrency = { code: 'BRL', exponent: 2, symbol: 'R$' };
@@ -68,6 +68,7 @@ function statementWith(payments: BillingPayment[]): BillingStudentStatement {
     currentMembershipSince: '2025-01-01',
     outstandingMinor: 0,
     contractGroups: [],
+    payOptions: [],
     invoices: [
       {
         ...invoice,
@@ -84,6 +85,7 @@ function statementWith(payments: BillingPayment[]): BillingStudentStatement {
           },
         ],
         payments,
+        pendingCheckout: null,
       },
     ],
     extras: { standing: 'good', oldestOverdueDate: null, outstandingMinor: 0, charges: [] },
@@ -96,7 +98,7 @@ let payments: BillingPayment[] = [];
 
 vi.mock('@web/context/auth-context', async () => {
   const actual = await vi.importActual('@web/context/auth-context');
-  return { ...actual, useApiClient: () => client };
+  return { ...actual, useApiClient: () => client, useAuthContext: () => ({ user: ADMIN_USER }) };
 });
 
 const d = dictEn.admin.billing.ledger;

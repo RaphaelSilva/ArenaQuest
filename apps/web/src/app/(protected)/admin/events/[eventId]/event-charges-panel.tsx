@@ -10,6 +10,7 @@ import type {
   BillingReportCurrency,
 } from '@web/lib/admin-billing-api';
 import { Money } from '../../billing/money';
+import { useExpiryFormatter } from '../../billing/gateway-ui';
 import { EXTRAS_TAB_HREF } from '../../billing/plans-tab';
 
 /** The Extras tab of the billing console, opened on one event. */
@@ -23,13 +24,16 @@ type Loaded = {
   summary: BillingEventChargeSummary;
   hasPrice: boolean;
   currency: BillingReportCurrency | null;
+  /** Charges of this event with a live hosted checkout, and the first to expire. */
+  pending: { count: number; earliestExpiresAt: string | null };
 };
 
 /**
  * The event page's **Charges** panel (RFC 0015 §8) — read-only by design.
  *
  * It issues `GET`s only: the event's price (to know whether it is for sale),
- * its charge summary, and the aging report for the display currency — the
+ * its charge summary, its charge list (for the *pending online payment* flag,
+ * RFC 0026 §7), and the aging report for the display currency — the
  * summary carries a bare code, and the exponent `formatMoney` needs travels on
  * the reports, exactly as `/admin/billing` resolves it. No money is written
  * from the events backoffice: every write lives on the Extras tab, which the
@@ -41,6 +45,8 @@ type Loaded = {
 export function EventChargesPanel({ eventId }: { eventId: string }) {
   const dict = useDict();
   const d = dict.admin.events.charges;
+  const pendingDict = dict.admin.billing.gateway.pending;
+  const formatWhen = useExpiryFormatter();
   const client = useApiClient();
 
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -53,7 +59,7 @@ export function EventChargesPanel({ eventId }: { eventId: string }) {
     setFailed(false);
     void (async () => {
       try {
-        const [price, summary, currency] = await Promise.all([
+        const [price, summary, currency, pending] = await Promise.all([
           client.adminBilling.extras.getPrice(eventId),
           client.adminBilling.extras.summary(eventId),
           // The currency only formats the amounts: its failure withholds them
@@ -62,8 +68,19 @@ export function EventChargesPanel({ eventId }: { eventId: string }) {
             .aging()
             .then((aging) => aging.currency)
             .catch(() => null),
+          // A flag, not a figure: its failure hides the line and nothing else.
+          client.adminBilling.extras
+            .listCharges({ eventId })
+            .then((charges) => {
+              const expiries = charges
+                .map((charge) => charge.pendingCheckout?.expiresAt)
+                .filter((value): value is string => typeof value === 'string')
+                .sort();
+              return { count: expiries.length, earliestExpiresAt: expiries[0] ?? null };
+            })
+            .catch(() => ({ count: 0, earliestExpiresAt: null })),
         ]);
-        if (!cancelled) setLoaded({ summary, hasPrice: price !== null, currency });
+        if (!cancelled) setLoaded({ summary, hasPrice: price !== null, currency, pending });
       } catch {
         if (!cancelled) {
           setLoaded(null);
@@ -98,7 +115,7 @@ export function EventChargesPanel({ eventId }: { eventId: string }) {
     );
   }
 
-  const { summary, hasPrice, currency } = loaded;
+  const { summary, hasPrice, currency, pending } = loaded;
   if (!hasPrice && summary.chargeCount === 0) return null;
 
   const figures = [
@@ -152,6 +169,16 @@ export function EventChargesPanel({ eventId }: { eventId: string }) {
           ))}
         </ul>
       </div>
+
+      {pending.count > 0 && pending.earliestExpiresAt && (
+        <p
+          data-testid="event-pending-online"
+          className="text-sm font-medium"
+          style={{ color: 'var(--warning, var(--text))' }}
+        >
+          {pendingDict.eventPanel(pending.count, formatWhen(pending.earliestExpiresAt))}
+        </p>
+      )}
 
       <Link href={extrasTabHrefFor(eventId)} className="inline-block text-sm font-medium" style={{ color: 'var(--accent)' }}>
         {d.link}
