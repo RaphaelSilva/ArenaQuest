@@ -145,7 +145,7 @@ source. Task 14 is the one backend task of Phase 4 (reminder e-mail copy).
 |---|-----------|-------|------|--------|
 | 01 | [Payment contracts: ports, money conversion and entities](./01-payment-contracts.task.md) | 0 | Backend | ✅ Done |
 | 02 | [Provider list, gateway registry and stub adapter](./02-provider-list-and-gateway-registry.task.md) | 0 | Backend | ✅ Done |
-| 03 | [Gateway schema, repository and system actor](./03-gateway-schema-repository-and-system-actor.task.md) | 1 | Backend | ☐ Open |
+| 03 | [Gateway schema, repository and system actor](./03-gateway-schema-repository-and-system-actor.task.md) | 1 | Backend | ✅ Done |
 | 04 | [Gateway ledger entry points](./04-gateway-ledger-entry-points.task.md) | 1 | Backend | ☐ Open |
 | 05 | [Mercado Pago adapter](./05-mercadopago-adapter.task.md) | 2 | Backend | ☐ Open |
 | 06 | [Webhook route and payment landing](./06-webhook-route-and-payment-landing.task.md) | 2 | Backend | ☐ Open |
