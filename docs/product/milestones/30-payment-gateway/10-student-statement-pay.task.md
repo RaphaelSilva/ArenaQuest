@@ -1,6 +1,6 @@
 # Task 10 — Frontend: Pay on the student statement (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Frontend Web
@@ -73,16 +73,16 @@ only adds a way to pay.
 
 ## Acceptance Criteria
 
-- [ ] With `payOptions: []` the page renders exactly as it does today (no *Pay*, no new copy).
-- [ ] *Pay* on an open invoice opens the hosted URL in a new tab and the row turns into *payment
+- [x] With `payOptions: []` the page renders exactly as it does today (no *Pay*, no new copy).
+- [x] *Pay* on an open invoice opens the hosted URL in a new tab and the row turns into *payment
       in progress* without a full reload.
-- [ ] Returning with `outcome=success` while the checkout is still `open` does not show *Paid*.
-- [ ] No more than five status requests follow one return, and none while the tab is hidden.
-- [ ] At 390 px the statement has no horizontal scroll with the new actions.
-- [ ] `no-withholding.test.tsx` passes with a `delinquent` fixture: content links stay enabled.
-- [ ] `check-i18n-coverage.js` green; `dict-en.ts` and `dict-pt.ts` have identical keys.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] Returning with `outcome=success` while the checkout is still `open` does not show *Paid*.
+- [x] No more than five status requests follow one return, and none while the tab is hidden.
+- [x] At 390 px the statement has no horizontal scroll with the new actions.
+- [x] `no-withholding.test.tsx` passes with a `delinquent` fixture: content links stay enabled.
+- [x] `check-i18n-coverage.js` green; `dict-en.ts` and `dict-pt.ts` have identical keys.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
