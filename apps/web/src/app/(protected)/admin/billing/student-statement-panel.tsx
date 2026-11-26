@@ -17,6 +17,8 @@ import { ContractActions } from './contract-actions';
 import { ContractChain } from './contract-chain';
 import { Money } from './money';
 import { StandingBadge } from './standing-badge';
+import { PaymentLinkAction } from './payment-link';
+import { PendingCheckoutLine } from './gateway-ui';
 
 /** Presentation only: a charge's cached status, never a standing. */
 const CHARGE_TONE: Record<ChargeStatus, 'active' | 'archived' | 'inactive'> = {
@@ -71,6 +73,8 @@ export function StudentStatementPanel({
   onClose,
   onSignContract,
   contractStanding,
+  nameOf,
+  onPaymentLinkChanged,
 }: {
   userId: string;
   studentName: string;
@@ -81,6 +85,10 @@ export function StudentStatementPanel({
    * badge is drawn.
    */
   contractStanding?: Standing | null;
+  /** Names whoever opened a pending checkout on the student's behalf. */
+  nameOf?: (userId: string) => string;
+  /** A payment link was created here, so the roster's pending flag is stale. */
+  onPaymentLinkChanged?: () => void;
   onClose: () => void;
   /**
    * The second entry point into signing (RFC 0013 §7). Optional: the panel is
@@ -93,7 +101,14 @@ export function StudentStatementPanel({
   const d = dict.admin.billing.statement;
   const ledgerDict = dict.admin.billing.ledger;
   const rails = dict.admin.billing.rails;
+  const linkDict = dict.admin.billing.gateway.link;
   const client = useApiClient();
+
+  /** Re-reads the statement in place; the panel stays on screen. */
+  const linkChanged = () => {
+    setReloadToken((token) => token + 1);
+    onPaymentLinkChanged?.();
+  };
 
   const [statement, setStatement] = useState<BillingStudentStatement | null>(null);
   const [loading, setLoading] = useState(true);
@@ -306,12 +321,20 @@ export function StudentStatementPanel({
                       <TableCell isHeader>{d.columns.status}</TableCell>
                       <TableCell isHeader>{d.columns.amount}</TableCell>
                       <TableCell isHeader>{d.columns.balance}</TableCell>
+                      <TableCell isHeader>{linkDict.column}</TableCell>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {statement.invoices.map((invoice) => (
                       <TableRow key={invoice.id}>
-                        <TableCell>{`${invoice.periodStart} — ${invoice.periodEnd}`}</TableCell>
+                        <TableCell>
+                          {`${invoice.periodStart} — ${invoice.periodEnd}`}
+                          <PendingCheckoutLine
+                            pending={invoice.pendingCheckout}
+                            ownerId={statement.userId}
+                            nameOf={nameOf}
+                          />
+                        </TableCell>
                         <TableCell>{invoice.dueDate}</TableCell>
                         <TableCell>{ledgerDict.invoiceStatus[invoice.status]}</TableCell>
                         <TableCell>
@@ -319,6 +342,16 @@ export function StudentStatementPanel({
                         </TableCell>
                         <TableCell>
                           <Money amountMinor={invoice.balanceMinor} currency={statement.currency} />
+                        </TableCell>
+                        <TableCell>
+                          <PaymentLinkAction
+                            kind="invoice"
+                            target={invoice}
+                            currency={statement.currency}
+                            payOptions={statement.payOptions ?? []}
+                            pendingCheckout={invoice.pendingCheckout ?? null}
+                            onChanged={linkChanged}
+                          />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -330,6 +363,9 @@ export function StudentStatementPanel({
             <ExtrasSection
               extras={statement.extras ?? NO_EXTRAS}
               currency={statement.currency}
+              payOptions={statement.payOptions ?? []}
+              nameOf={nameOf}
+              onLinkChanged={linkChanged}
             />
           </div>
         ) : null}
@@ -347,14 +383,21 @@ export function StudentStatementPanel({
 function ExtrasSection({
   extras,
   currency,
+  payOptions,
+  nameOf,
+  onLinkChanged,
 }: {
   extras: BillingStatementExtras;
   currency: BillingStudentStatement['currency'];
+  payOptions: BillingStudentStatement['payOptions'];
+  nameOf?: (userId: string) => string;
+  onLinkChanged: () => void;
 }) {
   const dict = useDict();
   const d = dict.admin.billing.statement;
   const rails = dict.admin.billing.rails;
   const chargeStatus = dict.admin.billing.extras.charges.status;
+  const linkDict = dict.admin.billing.gateway.link;
 
   return (
     <section aria-label={rails.extras} className="space-y-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
@@ -395,12 +438,20 @@ function ExtrasSection({
               <TableCell isHeader>{d.columns.status}</TableCell>
               <TableCell isHeader>{d.columns.amount}</TableCell>
               <TableCell isHeader>{d.columns.balance}</TableCell>
+              <TableCell isHeader>{linkDict.column}</TableCell>
             </TableRow>
           </TableHeader>
           <TableBody>
             {extras.charges.map((charge) => (
               <TableRow key={charge.id}>
-                <TableCell>{charge.eventTitle}</TableCell>
+                <TableCell>
+                  {charge.eventTitle}
+                  <PendingCheckoutLine
+                    pending={charge.pendingCheckout}
+                    ownerId={charge.userId}
+                    nameOf={nameOf}
+                  />
+                </TableCell>
                 <TableCell>{charge.eventStartsAt ? charge.eventStartsAt.slice(0, 10) : d.none}</TableCell>
                 <TableCell>{charge.dueDate}</TableCell>
                 <TableCell>
@@ -413,6 +464,16 @@ function ExtrasSection({
                 </TableCell>
                 <TableCell>
                   <Money amountMinor={charge.balanceMinor} currency={currency} />
+                </TableCell>
+                <TableCell>
+                  <PaymentLinkAction
+                    kind="charge"
+                    target={charge}
+                    currency={currency}
+                    payOptions={payOptions}
+                    pendingCheckout={charge.pendingCheckout ?? null}
+                    onChanged={onLinkChanged}
+                  />
                 </TableCell>
               </TableRow>
             ))}

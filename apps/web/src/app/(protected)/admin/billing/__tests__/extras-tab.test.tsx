@@ -9,7 +9,7 @@ import type {
 } from '@web/lib/admin-billing-api';
 import type { AdminEvent } from '@web/lib/admin-events-api';
 import type { HttpTransport } from '@web/lib/api-client';
-import { makeTransport } from './test-transport';
+import { ADMIN_USER, makeTransport } from './test-transport';
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
@@ -28,7 +28,7 @@ let client: {
 
 vi.mock('@web/context/auth-context', async () => {
   const actual = await vi.importActual('@web/context/auth-context');
-  return { ...actual, useApiClient: () => client };
+  return { ...actual, useApiClient: () => client, useAuthContext: () => ({ user: ADMIN_USER }) };
 });
 
 import { ExtrasTab } from '../extras-tab';
@@ -303,5 +303,63 @@ describe('ExtrasTab', () => {
     expect(
       screen.getByRole('dialog', { name: d.dialog.title('Winter seminar') }),
     ).toBeInTheDocument();
+  });
+
+  it('marks a charge with a pending online payment and creates its link on behalf', async () => {
+    const g = dictEn.admin.billing.gateway;
+    const pending = {
+      checkoutId: 'chk-1',
+      provider: 'mercadopago',
+      createdAt: '2026-11-26T14:03:00.000Z',
+      expiresAt: '2026-11-27T14:03:00.000Z',
+      createdBy: 'u1',
+    };
+    const base = http.getMockImplementation()!;
+    http.mockImplementation(async (method: string, path: string, options?: { body?: string }) => {
+      const reply = (body: unknown) =>
+        ({ ok: true, status: 201, json: async () => body }) as unknown as Response;
+      if (path === '/admin/billing/charges?eventId=ev-1') {
+        return reply([{ ...CHARGE, pendingCheckout: pending }]);
+      }
+      // The pay options are the label's; the dialog reads the student's statement.
+      if (path === '/admin/billing/students/u1/statement') {
+        return reply({ payOptions: [{ provider: 'mercadopago', methods: ['pix'] }] });
+      }
+      if (path === '/admin/billing/charges/ch-11111111/checkouts') {
+        return reply({
+          checkoutId: 'chk-2',
+          provider: 'mercadopago',
+          url: 'https://pay.example.test/c/chk-2',
+          expiresAt: '2026-11-27T14:03:00.000Z',
+          amountMinor: 5000,
+          currency: 'BRL',
+          status: 'open',
+        });
+      }
+      return base(method, path, options);
+    });
+
+    await openEventAndCharge();
+    expect(screen.getAllByTestId('pending-online-payment').length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: g.link.chargeAriaLabel('ch-11111') }));
+    fireEvent.click(await screen.findByRole('button', { name: g.link.create }));
+
+    expect(await screen.findByLabelText(g.link.urlLabel)).toHaveValue(
+      'https://pay.example.test/c/chk-2',
+    );
+    expect(http).toHaveBeenCalledWith('POST', '/admin/billing/charges/ch-11111111/checkouts', {
+      body: '{}',
+    });
+  });
+
+  it('says so in the link dialog when the label offers no online method', async () => {
+    const g = dictEn.admin.billing.gateway.link;
+    // The base transport answers `{}` for the statement: no pay options.
+    await openEventAndCharge();
+    fireEvent.click(screen.getByRole('button', { name: g.chargeAriaLabel('ch-11111') }));
+
+    expect(await screen.findByText(g.noProvider)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: g.create })).not.toBeInTheDocument();
   });
 });

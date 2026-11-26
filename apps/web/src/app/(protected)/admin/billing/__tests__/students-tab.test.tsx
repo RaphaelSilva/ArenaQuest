@@ -6,7 +6,7 @@ import { dictEn } from '@web/i18n/dict-en';
 import { createAdminBillingApi } from '@web/lib/admin-billing-api';
 import type { BillingReportCurrency, BillingRosterEntry } from '@web/lib/admin-billing-api';
 import type { HttpTransport } from '@web/lib/api-client';
-import { makeTransport } from './test-transport';
+import { ADMIN_USER, makeTransport } from './test-transport';
 import { StudentsTab } from '../students-tab';
 import type { SignableStudent } from '../sign-contract-dialog';
 
@@ -40,6 +40,7 @@ const delinquent: BillingRosterEntry = {
   }),
   extras: null,
   hold: null,
+  pendingCheckouts: { count: 0, earliestExpiresAt: null },
 };
 
 const held: BillingRosterEntry = {
@@ -62,6 +63,7 @@ const held: BillingRosterEntry = {
     setBy: 'admin-9',
     setAt: '2026-08-01T00:00:00Z',
   },
+  pendingCheckouts: { count: 0, earliestExpiresAt: null },
 };
 
 /** RFC 0015 isolation case: the monthly fee is paid up, an extra slipped. */
@@ -78,6 +80,7 @@ const paidUpWithLateExtra: BillingRosterEntry = {
     overdueCharges: 1,
   },
   hold: null,
+  pendingCheckouts: { count: 0, earliestExpiresAt: null },
 };
 
 /** A buyer with no contract at all: listed only because of a charge. */
@@ -94,6 +97,7 @@ const extrasOnly: BillingRosterEntry = {
     overdueCharges: 0,
   },
   hold: null,
+  pendingCheckouts: { count: 0, earliestExpiresAt: null },
 };
 
 const NAMES: Record<string, string> = {
@@ -121,7 +125,7 @@ let client: { adminBilling: ReturnType<typeof createAdminBillingApi> };
 
 vi.mock('@web/context/auth-context', async () => {
   const actual = await vi.importActual('@web/context/auth-context');
-  return { ...actual, useApiClient: () => client };
+  return { ...actual, useApiClient: () => client, useAuthContext: () => ({ user: ADMIN_USER }) };
 });
 
 const onRosterChanged = vi.fn();
@@ -353,5 +357,27 @@ describe('StudentsTab', () => {
     for (const name of names) {
       expect(name).not.toMatch(/suspend|block|lock|revoke|restrict|disable|downgrade|paywall/i);
     }
+  });
+
+  it('marks a student with a pending online payment on the roster, with the earliest expiry', async () => {
+    const g = dictEn.admin.billing.gateway.pending;
+    const expiresAt = '2026-11-27T14:03:00.000Z';
+    const when = new Intl.DateTimeFormat(dictEn.admin.billing.money.locale, {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(new Date(expiresAt));
+    http = makeTransport(() => [
+      { ...delinquent, pendingCheckouts: { count: 2, earliestExpiresAt: expiresAt } },
+      held,
+    ]);
+    client = { adminBilling: createAdminBillingApi(http as unknown as HttpTransport) };
+    renderTab();
+
+    await screen.findByText('Alice Doe');
+    expect(within(rowOf('Alice Doe')).getByTestId('roster-pending-online')).toHaveTextContent(
+      g.roster(2, when),
+    );
+    // A student with none carries no flag.
+    expect(within(rowOf('Bruno Lima')).queryByTestId('roster-pending-online')).toBeNull();
   });
 });

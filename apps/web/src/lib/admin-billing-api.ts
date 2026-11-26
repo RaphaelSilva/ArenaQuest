@@ -1,4 +1,5 @@
 import type { HttpTransport } from './api-client';
+import type { components } from './api-types.gen';
 
 // ---------------------------------------------------------------------------
 // Wire types — string ids/dates mirroring `/v1/admin/billing/*` (RFC 0013 §5).
@@ -11,6 +12,22 @@ import type { HttpTransport } from './api-client';
 // this file formats it: the exponent and the symbol travel on
 // `BillingReportCurrency`, and rendering goes through `formatMoney`.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Online payment (RFC 0026 §7) — wire shapes straight from the generated
+// OpenAPI types, so a contract change fails `tsc` here rather than at runtime.
+// ---------------------------------------------------------------------------
+
+type Schemas = components['schemas'];
+
+/** One provider and the methods it offers on this label, in the API's order. */
+export type PayOption = Schemas['PayOption'];
+/** The live hosted checkout on a receivable. It carries **no URL** by design. */
+export type PendingCheckout = NonNullable<Schemas['PendingCheckout']>;
+/** A roster line's live checkouts, both rails together. */
+export type PendingCheckoutsSummary = Schemas['PendingCheckoutsSummary'];
+/** A hosted checkout as created — the only shape that carries the URL. */
+export type CheckoutSession = Schemas['CheckoutSession'];
 
 export type BillingCycle = 'monthly' | 'quarterly' | 'yearly';
 export type TermsSource = 'standard' | 'negotiated';
@@ -275,6 +292,23 @@ export type RecordPaymentInput = {
   note?: string;
 };
 
+/**
+ * What `POST …/payments` answers: the row, plus the receivable's live checkout
+ * at the moment of recording. Recording is never refused because of it.
+ */
+export type BillingRecordedPayment = BillingPayment & {
+  pendingCheckout: PendingCheckout | null;
+};
+
+/** `{}` lets the API pick the one offering provider; several need one named. */
+export type CreateCheckoutOnBehalfInput = { provider?: string };
+
+/**
+ * A checkout created on a student's behalf. `reused` is the API's `200`: the
+ * receivable already had a live checkout and this is that same link.
+ */
+export type OnBehalfCheckout = { session: CheckoutSession; reused: boolean };
+
 export type ReversePaymentInput = {
   /** Mandatory on the server; the UI refuses to submit without it. */
   reason: string;
@@ -345,6 +379,8 @@ export type BillingAgingReport = {
 export type BillingStatementInvoice = BillingInvoiceWithBalance & {
   adjustments: BillingAdjustment[];
   payments: BillingPayment[];
+  /** Non-null only while a hosted checkout is live on an open invoice. */
+  pendingCheckout: PendingCheckout | null;
 };
 
 export type BillingStatementContractGroup = {
@@ -362,6 +398,11 @@ export type BillingStudentStatement = {
   currentMembershipSince: string | null;
   outstandingMinor: number;
   contractGroups: BillingStatementContractGroup[];
+  /**
+   * What the label offers online, in the API's order; `[]` when nothing is.
+   * A statement never fails on payment configuration.
+   */
+  payOptions: PayOption[];
   invoices: BillingStatementInvoice[];
   /**
    * The extras rail, beside — never summed into — the contract
@@ -415,6 +456,8 @@ export type BillingRosterEntry = {
   contract: BillingRosterContract | null;
   extras: BillingRosterExtras | null;
   hold: BillingHold | null;
+  /** Live checkouts over the student's open invoices and charges together. */
+  pendingCheckouts: PendingCheckoutsSummary;
 };
 
 /**
@@ -479,6 +522,12 @@ export type BillingEventCharge = {
 
 export type BillingEventChargeWithBalance = BillingEventCharge & { balanceMinor: number };
 
+/** One row of `GET /charges`: the charge, its balance and its live checkout. */
+export type BillingEventChargeListItem = BillingEventChargeWithBalance & {
+  /** Always `null` for a charge that is not `open`. */
+  pendingCheckout: PendingCheckout | null;
+};
+
 export type BillingEventChargeAdjustment = {
   id: string;
   chargeId: string;
@@ -501,6 +550,10 @@ export type BillingEventChargePayment = {
   reversesId: string | null;
   recordedBy: string;
   recordedAt: string;
+};
+
+export type BillingRecordedEventChargePayment = BillingEventChargePayment & {
+  pendingCheckout: PendingCheckout | null;
 };
 
 export type BillingEventChargeDetail = BillingEventChargeWithBalance & {
@@ -560,6 +613,8 @@ export type BillingStatementCharge = BillingEventChargeDetail & {
   eventTitle: string;
   /** When the event starts; null when the event no longer exists. */
   eventStartsAt: string | null;
+  /** Non-null only while a hosted checkout is live on an open charge. */
+  pendingCheckout: PendingCheckout | null;
 };
 
 /** The extras rail of a statement: its own standing and its own outstanding. */
@@ -569,6 +624,78 @@ export type BillingStatementExtras = {
   outstandingMinor: number;
   charges: BillingStatementCharge[];
 };
+
+/**
+ * Why reversing a **gateway** payment did not end in a reversal row (RFC 0026
+ * §5). Every code the two `reverse` routes document maps to exactly one kind.
+ * Only `unrecorded` means money moved: the provider returned it and the ledger
+ * does not say so yet — the same request, repeated, records it.
+ */
+export type RefundErrorKind =
+  /** `409 PAYMENTS_REFUND_REFUSED` — the provider said no; nothing was written. */
+  | 'refused'
+  /** `409 PAYMENTS_PROVIDER_NOT_ENABLED` — the payment's provider is not bound here. */
+  | 'provider_not_enabled'
+  /** `503 PAYMENTS_REFUND_UNRECORDED` — refunded at the provider, not on the ledger yet. */
+  | 'unrecorded'
+  /** `500 PAYMENTS_CONFIG_INVALID` — no refund was requested. */
+  | 'configuration'
+  /** `502 PAYMENTS_PROVIDER_ERROR` — the provider could not be read; no refund was requested. */
+  | 'provider_unavailable'
+  /** `409 Conflict` — the row is itself a refund, or was already reversed. */
+  | 'conflict'
+  | 'unknown';
+
+const REFUND_ERROR_KINDS: Record<string, RefundErrorKind> = {
+  PAYMENTS_REFUND_REFUSED: 'refused',
+  PAYMENTS_PROVIDER_NOT_ENABLED: 'provider_not_enabled',
+  PAYMENTS_REFUND_UNRECORDED: 'unrecorded',
+  PAYMENTS_CONFIG_INVALID: 'configuration',
+  PAYMENTS_PROVIDER_ERROR: 'provider_unavailable',
+  Conflict: 'conflict',
+};
+
+/** Why an on-behalf checkout was refused, as the link dialog tells them apart. */
+export type OnBehalfCheckoutErrorKind =
+  /** `409 RECEIVABLE_NOT_PAYABLE` · `409 PAYMENTS_UNSUPPORTED_CURRENCY`. */
+  | 'not_payable'
+  /** `502 PAYMENTS_PROVIDER_ERROR` — trying again may work. */
+  | 'provider_unavailable'
+  /** `500 PAYMENTS_CONFIG_INVALID`. */
+  | 'configuration'
+  /** `409 CHECKOUT_IN_PROGRESS` — lost a creation race, even after one retry. */
+  | 'in_progress'
+  /** `400 PAYMENT_PROVIDER_REQUIRED` — the offered providers changed. */
+  | 'provider_required'
+  /** `404 NotFound` — no provider bound, or the receivable is gone. */
+  | 'not_found'
+  | 'unknown';
+
+const CHECKOUT_ERROR_KINDS: Record<string, OnBehalfCheckoutErrorKind> = {
+  RECEIVABLE_NOT_PAYABLE: 'not_payable',
+  PAYMENTS_UNSUPPORTED_CURRENCY: 'not_payable',
+  PAYMENTS_PROVIDER_ERROR: 'provider_unavailable',
+  PAYMENTS_CONFIG_INVALID: 'configuration',
+  CHECKOUT_IN_PROGRESS: 'in_progress',
+  PAYMENT_PROVIDER_REQUIRED: 'provider_required',
+  NotFound: 'not_found',
+};
+
+/** The `409` a gateway payment answers when its reference already landed. */
+export const PAYMENT_REFERENCE_EXISTS = 'PAYMENT_REFERENCE_EXISTS';
+
+/**
+ * How a gateway reversal that the API accepted (`200`) reads. The body is the
+ * reversal row and nothing else, so the only case told apart is the row the
+ * provider's own notification landed first — it mirrors no entry
+ * (`reversesId: null`). A refund the provider already held and that is being
+ * recorded by this very request is indistinguishable from a fresh one.
+ */
+export type RefundOutcome = 'accepted' | 'already_refunded';
+
+export function refundOutcomeOf(reversal: { reversesId: string | null }): RefundOutcome {
+  return reversal.reversesId === null ? 'already_refunded' : 'accepted';
+}
 
 export class AdminBillingApiError extends Error {
   constructor(
@@ -584,7 +711,41 @@ export class AdminBillingApiError extends Error {
   get detailMessage(): string | null {
     return typeof this.details.message === 'string' ? this.details.message : null;
   }
+
+  /** The refusal of a gateway reversal, as the refund dialog distinguishes it. */
+  get refundKind(): RefundErrorKind {
+    return REFUND_ERROR_KINDS[this.code] ?? 'unknown';
+  }
+
+  /** The provider's refund id on a `503 PAYMENTS_REFUND_UNRECORDED`. */
+  get refundId(): string | null {
+    return typeof this.details.refundId === 'string' ? this.details.refundId : null;
+  }
+
+  /** The refusal of an on-behalf checkout, as the link dialog distinguishes it. */
+  get checkoutKind(): OnBehalfCheckoutErrorKind {
+    return CHECKOUT_ERROR_KINDS[this.code] ?? 'unknown';
+  }
+
+  /**
+   * The ledger payment that already carries the provider reference, on a
+   * `409 PAYMENT_REFERENCE_EXISTS`; `null` for every other refusal.
+   */
+  get existingPaymentId(): string | null {
+    if (this.code !== PAYMENT_REFERENCE_EXISTS) return null;
+    return typeof this.details.paymentId === 'string' ? this.details.paymentId : null;
+  }
 }
+
+/** How long a lost creation race waits before its single retry. */
+export const ON_BEHALF_CHECKOUT_RETRY_DELAY_MS = 800;
+
+export type AdminBillingApiOptions = {
+  /** Injectable for tests; defaults to a real timer. */
+  wait?: (ms: number) => Promise<void>;
+};
+
+const defaultWait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 async function rejectWith(res: Response, fallback: string): Promise<never> {
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -607,7 +768,9 @@ function queryString(params: Record<string, string | undefined>): string {
 
 const BASE = '/admin/billing';
 
-export function createAdminBillingApi(http: HttpTransport) {
+export function createAdminBillingApi(http: HttpTransport, options: AdminBillingApiOptions = {}) {
+  const wait = options.wait ?? defaultWait;
+
   async function get<T>(path: string, fallback: string): Promise<T> {
     const res = await http('GET', path);
     if (!res.ok) await rejectWith(res, fallback);
@@ -623,6 +786,35 @@ export function createAdminBillingApi(http: HttpTransport) {
     const res = await http(method, path, input === undefined ? undefined : { body: JSON.stringify(input) });
     if (!res.ok) await rejectWith(res, fallback);
     return (await res.json()) as T;
+  }
+
+  /**
+   * A hosted checkout on a student's behalf (RFC 0026 §3; decision 22). The
+   * strict body takes `provider` and nothing else — never a user id: the
+   * student is the receivable's own. `201` is a new link, `200` the live one
+   * handed back. A `409 CHECKOUT_IN_PROGRESS` (a double click whose winner has
+   * no session yet) is retried **once**; an admin is never rate-limited.
+   */
+  async function createCheckout(
+    path: string,
+    input: CreateCheckoutOnBehalfInput,
+  ): Promise<OnBehalfCheckout> {
+    const body: CreateCheckoutOnBehalfInput =
+      input.provider === undefined ? {} : { provider: input.provider };
+    const post = async (): Promise<OnBehalfCheckout> => {
+      const res = await http('POST', path, { body: JSON.stringify(body) });
+      if (!res.ok) await rejectWith(res, 'BILLING_CHECKOUT_CREATE_FAILED');
+      return { session: (await res.json()) as CheckoutSession, reused: res.status === 200 };
+    };
+    try {
+      return await post();
+    } catch (thrown) {
+      if (!(thrown instanceof AdminBillingApiError) || thrown.checkoutKind !== 'in_progress') {
+        throw thrown;
+      }
+      await wait(ON_BEHALF_CHECKOUT_RETRY_DELAY_MS);
+      return post();
+    }
   }
 
   return {
@@ -737,13 +929,25 @@ export function createAdminBillingApi(http: HttpTransport) {
         );
       },
 
-      addPayment(id: string, input: RecordPaymentInput): Promise<BillingPayment> {
-        return send<BillingPayment>(
+      /**
+       * With `method: 'gateway'` the reference must be `<provider>:<id>`; one
+       * that already landed is a `409` whose error carries `existingPaymentId`.
+       */
+      addPayment(id: string, input: RecordPaymentInput): Promise<BillingRecordedPayment> {
+        return send<BillingRecordedPayment>(
           'POST',
           `${BASE}/invoices/${id}/payments`,
           'BILLING_PAYMENT_FAILED',
           input,
         );
+      },
+
+      /** A payment link for the invoice's own student. */
+      createCheckout(
+        id: string,
+        input: CreateCheckoutOnBehalfInput = {},
+      ): Promise<OnBehalfCheckout> {
+        return createCheckout(`${BASE}/invoices/${encodeURIComponent(id)}/checkouts`, input);
       },
     },
 
@@ -751,6 +955,11 @@ export function createAdminBillingApi(http: HttpTransport) {
       /**
        * Appends the mirror-image row. The original is never updated or deleted,
        * which is why no delete method exists on this module.
+       *
+       * A row whose `method` is `gateway` is refunded at its provider first and
+       * the reversal is written only when the provider accepts; a refusal is an
+       * `AdminBillingApiError` whose `refundKind` says which one, and repeating
+       * the request is always safe (one refund, one reversal row).
        */
       reverse(id: string, input: ReversePaymentInput): Promise<BillingPayment> {
         return send<BillingPayment>(
@@ -823,8 +1032,8 @@ export function createAdminBillingApi(http: HttpTransport) {
         if (!res.ok) await rejectWith(res, 'BILLING_EVENT_PRICE_CLEAR_FAILED');
       },
 
-      listCharges(query: EventChargeQuery = {}): Promise<BillingEventChargeWithBalance[]> {
-        return get<BillingEventChargeWithBalance[]>(
+      listCharges(query: EventChargeQuery = {}): Promise<BillingEventChargeListItem[]> {
+        return get<BillingEventChargeListItem[]>(
           `${BASE}/charges${queryString(query)}`,
           'BILLING_CHARGES_LIST_FAILED',
         );
@@ -865,8 +1074,11 @@ export function createAdminBillingApi(http: HttpTransport) {
         );
       },
 
-      addPayment(id: string, input: RecordPaymentInput): Promise<BillingEventChargePayment> {
-        return send<BillingEventChargePayment>(
+      addPayment(
+        id: string,
+        input: RecordPaymentInput,
+      ): Promise<BillingRecordedEventChargePayment> {
+        return send<BillingRecordedEventChargePayment>(
           'POST',
           `${BASE}/charges/${id}/payments`,
           'BILLING_CHARGE_PAYMENT_FAILED',
@@ -874,6 +1086,15 @@ export function createAdminBillingApi(http: HttpTransport) {
         );
       },
 
+      /** A payment link for the charge's own student (decision 22's path). */
+      createCheckout(
+        id: string,
+        input: CreateCheckoutOnBehalfInput = {},
+      ): Promise<OnBehalfCheckout> {
+        return createCheckout(`${BASE}/charges/${encodeURIComponent(id)}/checkouts`, input);
+      },
+
+      /** The extras twin of `payments.reverse`, gateway refund included. */
       reversePayment(id: string, input: ReversePaymentInput): Promise<BillingEventChargePayment> {
         return send<BillingEventChargePayment>(
           'POST',

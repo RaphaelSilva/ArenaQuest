@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import {
   Button,
   Input,
@@ -20,6 +20,8 @@ import type {
   BillingReportCurrency,
   InvoiceQuery,
   InvoiceStatus,
+  PayOption,
+  PendingCheckout,
 } from '@web/lib/admin-billing-api';
 import { Money, useMoneyFormatter } from './money';
 import { downloadCsv, toCsv } from './ledger-csv';
@@ -29,10 +31,20 @@ import { VoidInvoiceForm } from './void-invoice-form';
 import { ReversePaymentForm } from './reverse-payment-form';
 import { IssueInvoiceForm } from './issue-invoice-form';
 import { RunCyclePanel } from './run-cycle-panel';
+import { PaymentEntries } from './payment-entries';
+import { PaymentLinkAction } from './payment-link';
+import { PendingCheckoutLine, useExpiryFormatter } from './gateway-ui';
 
 const STATUSES: readonly InvoiceStatus[] = ['open', 'paid', 'void'];
 
-type Entries = { adjustments: BillingAdjustment[]; payments: BillingPayment[] };
+type Entries = {
+  adjustments: BillingAdjustment[];
+  payments: BillingPayment[];
+  /** The invoice's live hosted checkout, as its student's statement reports it. */
+  pendingCheckout: PendingCheckout | null;
+  /** What the label offers online — the statement is the only place it travels. */
+  payOptions: PayOption[];
+};
 
 type ReverseDraft = { payment: BillingPayment; invoiceId: string };
 
@@ -60,6 +72,8 @@ export function LedgerTab({
   const d = dict.admin.billing.ledger;
   const client = useApiClient();
   const formatMoneyValue = useMoneyFormatter(currency);
+  const formatWhen = useExpiryFormatter();
+  const gatewayForm = dict.admin.billing.gateway.form;
 
   const statusId = useId();
   const studentId = useId();
@@ -126,7 +140,12 @@ export function LedgerTab({
       try {
         const statement = await client.adminBilling.students.statement(invoice.userId);
         const match = statement.invoices.find((row) => row.id === invoice.id);
-        setEntries({ adjustments: match?.adjustments ?? [], payments: match?.payments ?? [] });
+        setEntries({
+          adjustments: match?.adjustments ?? [],
+          payments: match?.payments ?? [],
+          pendingCheckout: match?.pendingCheckout ?? null,
+          payOptions: statement.payOptions ?? [],
+        });
       } catch {
         setEntries(null);
         setEntriesError(d.detailsError);
@@ -164,10 +183,13 @@ export function LedgerTab({
     [expanded, loadEntries],
   );
 
-  const afterReverse = async () => {
+  const afterReverse = async (message?: string) => {
     if (!reverseDraft) return;
     const invoice = rows.find((row) => row.id === reverseDraft.invoiceId);
     setReverseDraft(null);
+    // A gateway refund says what the provider answered; a plain reversal is
+    // told by the mirror entry appearing under its original.
+    if (message) setNotice(message);
     // The mirror entry moves the balance, so the list is re-read for the
     // server's own status rather than adjusted here.
     setRefreshToken((token) => token + 1);
@@ -190,19 +212,6 @@ export function LedgerTab({
     ]);
     downloadCsv(`${d.exportFilename}.csv`, csv);
   };
-
-  // Originals first, each with the reversal that mirrors it, so a reversal is
-  // rendered under the entry it undoes rather than as a loose negative row.
-  const paymentGroups = useMemo(() => {
-    const payments = entries?.payments ?? [];
-    const reversalOf = new Map<string, BillingPayment>();
-    for (const payment of payments) {
-      if (payment.reversesId) reversalOf.set(payment.reversesId, payment);
-    }
-    return payments
-      .filter((payment) => payment.reversesId === null)
-      .map((payment) => ({ payment, reversal: reversalOf.get(payment.id) ?? null }));
-  }, [entries]);
 
   return (
     <section className="space-y-4">
@@ -427,6 +436,11 @@ export function LedgerTab({
                             <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                               {d.actionsHeading}
                             </h3>
+                            <PendingCheckoutLine
+                              pending={entries?.pendingCheckout}
+                              ownerId={invoice.userId}
+                              nameOf={nameOf}
+                            />
                             {invoice.status === 'void' ? (
                               <p className="text-sm text-zinc-500">{d.voidedNote}</p>
                             ) : (
@@ -467,6 +481,14 @@ export function LedgerTab({
                                 >
                                   {d.voidInvoice.button}
                                 </Button>
+                                <PaymentLinkAction
+                                  kind="invoice"
+                                  target={invoice}
+                                  currency={currency}
+                                  payOptions={entries?.payOptions ?? []}
+                                  pendingCheckout={entries?.pendingCheckout ?? null}
+                                  onChanged={() => void loadEntries(invoice)}
+                                />
                               </div>
                             )}
                           </div>
@@ -507,68 +529,14 @@ export function LedgerTab({
                             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
                               {d.paymentsHeading}
                             </h3>
-                            {paymentGroups.length === 0 ? (
-                              <p className="text-sm text-zinc-500">{d.paymentsEmpty}</p>
-                            ) : (
-                              <ul className="space-y-2">
-                                {paymentGroups.map(({ payment, reversal }) => (
-                                  <li
-                                    key={payment.id}
-                                    className="rounded-md border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
-                                  >
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                                        {`${d.method[payment.method]} · ${formatMoneyValue(
-                                          payment.amountMinor,
-                                          payment.currency,
-                                        )}`}
-                                      </span>
-                                      {reversal ? (
-                                        <span className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
-                                          {d.alreadyReversed}
-                                        </span>
-                                      ) : (
-                                        <Button
-                                          type="button"
-                                          variant="secondary"
-                                          size="sm"
-                                          onClick={() => {
-                                            setReverseDraft({
-                                              payment,
-                                              invoiceId: invoice.id,
-                                            });
-                                          }}
-                                          aria-label={d.reverseAriaLabel(shortRef(payment.id))}
-                                        >
-                                          {d.reverseButton}
-                                        </Button>
-                                      )}
-                                    </div>
-                                    <span className="block text-xs text-zinc-500">
-                                      {`${payment.paidAt} · ${d.recordedBy(payment.recordedBy)}`}
-                                    </span>
-
-                                    {/* The reversal lives under its original, never in its place. */}
-                                    {reversal && (
-                                      <div className="mt-2 border-l-2 border-amber-400 pl-3">
-                                        <span className="block text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                          {`${d.reversalOf(shortRef(payment.id))} · ${formatMoneyValue(
-                                            reversal.amountMinor,
-                                            reversal.currency,
-                                          )}`}
-                                        </span>
-                                        <span className="block text-xs text-zinc-500">
-                                          {d.reasonLine(reversal.note)}
-                                        </span>
-                                        <span className="block text-xs text-zinc-500">
-                                          {`${reversal.paidAt} · ${d.recordedBy(reversal.recordedBy)}`}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
+                            <PaymentEntries
+                              payments={entries?.payments ?? []}
+                              formatMoney={formatMoneyValue}
+                              emptyLabel={d.paymentsEmpty}
+                              onReverse={(payment) =>
+                                setReverseDraft({ payment, invoiceId: invoice.id })
+                              }
+                            />
                           </div>
                           </div>
                         </div>
@@ -585,6 +553,8 @@ export function LedgerTab({
       {reverseDraft && (
         <ReversePaymentForm
           paymentId={reverseDraft.payment.id}
+          payment={reverseDraft.payment}
+          currency={currency}
           onClose={() => setReverseDraft(null)}
           onReversed={afterReverse}
         />
@@ -594,8 +564,23 @@ export function LedgerTab({
         <PaymentForm
           invoice={writeDraft.invoice}
           currency={currency}
+          // The entries on screen are this invoice's: the button lives in them.
+          payOptions={expanded === writeDraft.invoice.id ? entries?.payOptions : undefined}
+          pendingCheckout={
+            expanded === writeDraft.invoice.id ? (entries?.pendingCheckout ?? null) : null
+          }
           onClose={() => setWriteDraft(null)}
-          onRecorded={() => afterWrite(writeDraft.invoice, d.payment.success)}
+          onRecorded={(recorded) =>
+            afterWrite(
+              writeDraft.invoice,
+              // Recording never closes a hosted checkout; say so when one is live.
+              recorded?.pendingCheckout
+                ? gatewayForm.recordedWithOpenCheckout(
+                    formatWhen(recorded.pendingCheckout.expiresAt),
+                  )
+                : d.payment.success,
+            )
+          }
         />
       )}
 

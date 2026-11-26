@@ -153,7 +153,7 @@ describe('EventChargesPanel', () => {
       },
       '/admin/billing/reports/aging': AGING,
     });
-    await waitFor(() => expect(http).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(http).toHaveBeenCalledTimes(4));
     await waitFor(() => expect(container).toBeEmptyDOMElement());
     expect(screen.queryByText(d.heading)).not.toBeInTheDocument();
   });
@@ -177,5 +177,51 @@ describe('EventChargesPanel', () => {
       '/admin/billing/reports/aging': AGING,
     });
     expect(await screen.findByRole('alert')).toHaveTextContent(d.loadError);
+  });
+
+  it('says how many charges have a pending online payment, and when the first expires', async () => {
+    const g = dictEn.admin.billing.gateway.pending;
+    const first = '2026-11-27T09:00:00.000Z';
+    const pendingAt = (expiresAt: string) => ({
+      checkoutId: `chk-${expiresAt}`,
+      provider: 'mercadopago',
+      createdAt: '2026-11-26T09:00:00.000Z',
+      expiresAt,
+      createdBy: 'u1',
+    });
+    mount({
+      '/admin/billing/event-prices/e1': { status: 200, body: PRICE },
+      '/admin/billing/events/e1/summary': { status: 200, body: summary() },
+      '/admin/billing/reports/aging': AGING,
+      '/admin/billing/charges?eventId=e1': {
+        status: 200,
+        body: [
+          { id: 'c1', pendingCheckout: pendingAt('2026-11-27T18:00:00.000Z') },
+          { id: 'c2', pendingCheckout: pendingAt(first) },
+          { id: 'c3', pendingCheckout: null },
+        ],
+      },
+    });
+
+    const when = new Intl.DateTimeFormat(dictEn.admin.billing.money.locale, {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(new Date(first));
+    expect(await screen.findByTestId('event-pending-online')).toHaveTextContent(
+      g.eventPanel(2, when),
+    );
+    // Still read-only: the flag adds a GET and no control.
+    for (const [method] of http.mock.calls) expect(method).toBe('GET');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('shows no pending line when no charge has a live checkout, or the list cannot be read', async () => {
+    mount({
+      '/admin/billing/event-prices/e1': { status: 200, body: PRICE },
+      '/admin/billing/events/e1/summary': { status: 200, body: summary() },
+      '/admin/billing/reports/aging': AGING,
+    });
+    await screen.findByRole('region', { name: d.heading });
+    expect(screen.queryByTestId('event-pending-online')).not.toBeInTheDocument();
   });
 });

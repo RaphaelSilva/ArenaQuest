@@ -154,7 +154,7 @@ source. Task 14 is the one backend task of Phase 4 (reminder e-mail copy).
 | 09 | [Reconcile run, cron dispatch and exceptions routes](./09-reconcile-run-and-exceptions-routes.task.md) | 3 | Backend | ✅ Done |
 | 10 | [Pay on the student statement](./10-student-statement-pay.task.md) | 4 | Frontend | ✅ Done |
 | 11 | [Payment due card on the dashboard](./11-dashboard-payment-due-card.task.md) | 4 | Frontend | ✅ Done |
-| 12 | [Admin ledger, pending online payment and refund confirmation](./12-admin-ledger-online-payments.task.md) | 4 | Frontend | ☐ Open |
+| 12 | [Admin ledger, pending online payment and refund confirmation](./12-admin-ledger-online-payments.task.md) | 4 | Frontend | ✅ Done |
 | 13 | [Payment exceptions panel](./13-payment-exceptions-panel.task.md) | 4 | Frontend | ☐ Open |
 | 14 | [Pay link in the reminder e-mails](./14-reminder-email-pay-link.task.md) | 4 | Backend | ☐ Open |
 | 15 | [Provider configuration schema and provisioning](./15-provider-configuration-and-provisioning.task.md) | 5 | Backend | ✅ Done |

@@ -1,6 +1,6 @@
 # Task 12 — Frontend: Admin ledger, pending online payment and refund confirmation (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Frontend Web
@@ -70,15 +70,15 @@ matched by hand. A cash payment on a receivable with an open checkout stays poss
 
 ## Acceptance Criteria
 
-- [ ] A gateway payment in the ledger shows *Online*, its provider id and a working deep link.
-- [ ] Reversing a gateway payment shows the refund confirmation; cancelling it sends no request.
-- [ ] A refused refund leaves the ledger view unchanged and shows the provider's refusal.
-- [ ] A student with an open checkout is marked on the roster and on their statement panel.
-- [ ] An admin can create and copy a payment link for a student's open invoice at 390 px.
-- [ ] Recording cash on a receivable with an open checkout warns and still succeeds.
-- [ ] `check-i18n-coverage.js` green; `dict-en.ts` and `dict-pt.ts` have identical keys.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A gateway payment in the ledger shows *Online*, its provider id and a working deep link.
+- [x] Reversing a gateway payment shows the refund confirmation; cancelling it sends no request.
+- [x] A refused refund leaves the ledger view unchanged and shows the provider's refusal.
+- [x] A student with an open checkout is marked on the roster and on their statement panel.
+- [x] An admin can create and copy a payment link for a student's open invoice at 390 px.
+- [x] Recording cash on a receivable with an open checkout warns and still succeeds.
+- [x] `check-i18n-coverage.js` green; `dict-en.ts` and `dict-pt.ts` have identical keys.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

@@ -16,9 +16,9 @@ import { useDict } from '@web/context/dict-context';
 import type { AdminEvent } from '@web/lib/admin-events-api';
 import type {
   BillingEventChargeDetail,
+  BillingEventChargeListItem,
   BillingEventChargePayment,
   BillingEventChargeSummary,
-  BillingEventChargeWithBalance,
   BillingEventPrice,
   BillingReportCurrency,
 } from '@web/lib/admin-billing-api';
@@ -30,6 +30,9 @@ import { AdjustmentForm } from './adjustment-form';
 import { VoidInvoiceForm } from './void-invoice-form';
 import { ReversePaymentForm } from './reverse-payment-form';
 import { ChargeDialog, type ChargeablePerson } from './charge-dialog';
+import { PaymentEntries } from './payment-entries';
+import { PaymentLinkAction } from './payment-link';
+import { PendingCheckoutLine, useExpiryFormatter } from './gateway-ui';
 
 /** Events are listed a page at a time; one page covers a dojo's calendar. */
 const EVENT_PAGE = 100;
@@ -38,7 +41,7 @@ const WHOLE_DAYS = /^\d+$/;
 
 type WriteDraft = {
   action: 'payment' | 'adjustment' | 'void';
-  charge: BillingEventChargeWithBalance;
+  charge: BillingEventChargeListItem;
 };
 
 function shortRef(id: string): string {
@@ -76,6 +79,8 @@ export function ExtrasTab({
   const planValidation = dict.admin.billing.plans.validation;
   const client = useApiClient();
   const formatMoneyValue = useMoneyFormatter(currency);
+  const formatWhen = useExpiryFormatter();
+  const gatewayForm = dict.admin.billing.gateway.form;
 
   const eventSelectId = useId();
 
@@ -99,7 +104,7 @@ export function ExtrasTab({
   const [summary, setSummary] = useState<BillingEventChargeSummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
-  const [charges, setCharges] = useState<BillingEventChargeWithBalance[]>([]);
+  const [charges, setCharges] = useState<BillingEventChargeListItem[]>([]);
   const [chargesLoading, setChargesLoading] = useState(false);
   const [chargesError, setChargesError] = useState<string | null>(null);
 
@@ -109,9 +114,10 @@ export function ExtrasTab({
   const [detailError, setDetailError] = useState<string | null>(null);
 
   const [writeDraft, setWriteDraft] = useState<WriteDraft | null>(null);
-  const [reverseDraft, setReverseDraft] = useState<{ paymentId: string; chargeId: string } | null>(
-    null,
-  );
+  const [reverseDraft, setReverseDraft] = useState<{
+    payment: BillingEventChargePayment;
+    chargeId: string;
+  } | null>(null);
   const [chargeOpen, setChargeOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -228,7 +234,7 @@ export function ExtrasTab({
     if (!next) fillPriceForm(null);
   };
 
-  const toggle = (charge: BillingEventChargeWithBalance) => {
+  const toggle = (charge: BillingEventChargeListItem) => {
     if (expanded === charge.id) {
       setExpanded(null);
       setDetail(null);
@@ -308,19 +314,7 @@ export function ExtrasTab({
     }
   };
 
-  // Originals first, each with the reversal that mirrors it.
-  const paymentGroups = useMemo(() => {
-    const payments = detail?.payments ?? [];
-    const reversalOf = new Map<string, BillingEventChargePayment>();
-    for (const payment of payments) {
-      if (payment.reversesId) reversalOf.set(payment.reversesId, payment);
-    }
-    return payments
-      .filter((payment) => payment.reversesId === null)
-      .map((payment) => ({ payment, reversal: reversalOf.get(payment.id) ?? null }));
-  }, [detail]);
-
-  const renderDetail = (charge: BillingEventChargeWithBalance) => {
+  const renderDetail = (charge: BillingEventChargeListItem) => {
     const reference = shortRef(charge.id);
     if (detailLoading) return <p className="text-sm text-zinc-500">{d.charges.detailsLoading}</p>;
     if (detailError) {
@@ -341,6 +335,11 @@ export function ExtrasTab({
           <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
             {ledger.actionsHeading}
           </h3>
+          <PendingCheckoutLine
+            pending={charge.pendingCheckout}
+            ownerId={charge.userId}
+            nameOf={nameOf}
+          />
           {charge.status === 'void' ? (
             <p className="text-sm text-zinc-500">{d.charges.voidedNote}</p>
           ) : (
@@ -381,6 +380,15 @@ export function ExtrasTab({
               >
                 {d.voidCharge.button}
               </Button>
+              {/* The pay options are the label's and only a statement carries
+                  them, so the dialog reads the student's when it opens. */}
+              <PaymentLinkAction
+                kind="charge"
+                target={charge}
+                currency={currency}
+                pendingCheckout={charge.pendingCheckout ?? null}
+                onChanged={() => setRefreshToken((token) => token + 1)}
+              />
             </div>
           )}
         </div>
@@ -421,61 +429,15 @@ export function ExtrasTab({
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
               {ledger.paymentsHeading}
             </h3>
-            {paymentGroups.length === 0 ? (
-              <p className="text-sm text-zinc-500">{d.charges.paymentsEmpty}</p>
-            ) : (
-              <ul className="space-y-2">
-                {paymentGroups.map(({ payment, reversal }) => (
-                  <li
-                    key={payment.id}
-                    className="rounded-md border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                        {`${ledger.method[payment.method]} · ${formatMoneyValue(
-                          payment.amountMinor,
-                          payment.currency,
-                        )}`}
-                      </span>
-                      {reversal ? (
-                        <span className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
-                          {ledger.alreadyReversed}
-                        </span>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setNotice(null);
-                            setReverseDraft({ paymentId: payment.id, chargeId: charge.id });
-                          }}
-                          aria-label={ledger.reverseAriaLabel(shortRef(payment.id))}
-                        >
-                          {ledger.reverseButton}
-                        </Button>
-                      )}
-                    </div>
-                    <span className="block text-xs text-zinc-500">
-                      {`${payment.paidAt} · ${ledger.recordedBy(payment.recordedBy)}`}
-                    </span>
-                    {reversal && (
-                      <div className="mt-2 border-l-2 border-amber-400 pl-3">
-                        <span className="block text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                          {`${ledger.reversalOf(shortRef(payment.id))} · ${formatMoneyValue(
-                            reversal.amountMinor,
-                            reversal.currency,
-                          )}`}
-                        </span>
-                        <span className="block text-xs text-zinc-500">
-                          {ledger.reasonLine(reversal.note)}
-                        </span>
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <PaymentEntries
+              payments={detail?.payments ?? []}
+              formatMoney={formatMoneyValue}
+              emptyLabel={d.charges.paymentsEmpty}
+              onReverse={(payment) => {
+                setNotice(null);
+                setReverseDraft({ payment, chargeId: charge.id });
+              }}
+            />
           </div>
         </div>
       </div>
@@ -714,7 +676,10 @@ export function ExtrasTab({
                           <TableCell className="font-mono text-xs">{reference}</TableCell>
                           <TableCell>{nameOf(charge.userId)}</TableCell>
                           <TableCell>{charge.dueDate}</TableCell>
-                          <TableCell>{d.charges.status[charge.status]}</TableCell>
+                          <TableCell>
+                            {d.charges.status[charge.status]}
+                            <PendingCheckoutLine pending={charge.pendingCheckout} />
+                          </TableCell>
                           <TableCell>
                             <Money
                               amountMinor={charge.amountMinor}
@@ -776,8 +741,18 @@ export function ExtrasTab({
           invoice={writeDraft.charge}
           kind="charge"
           currency={currency}
+          pendingCheckout={writeDraft.charge.pendingCheckout ?? null}
           onClose={() => setWriteDraft(null)}
-          onRecorded={() => afterWrite(writeDraft.charge.id, d.paymentSuccess)}
+          onRecorded={(recorded) =>
+            afterWrite(
+              writeDraft.charge.id,
+              recorded?.pendingCheckout
+                ? gatewayForm.recordedWithOpenCheckout(
+                    formatWhen(recorded.pendingCheckout.expiresAt),
+                  )
+                : d.paymentSuccess,
+            )
+          }
         />
       )}
 
@@ -802,10 +777,14 @@ export function ExtrasTab({
 
       {reverseDraft && (
         <ReversePaymentForm
-          paymentId={reverseDraft.paymentId}
+          paymentId={reverseDraft.payment.id}
+          payment={reverseDraft.payment}
+          currency={currency}
           kind="charge"
           onClose={() => setReverseDraft(null)}
-          onReversed={() => afterWrite(reverseDraft.chargeId, d.reverseSuccess)}
+          onReversed={(message) =>
+            afterWrite(reverseDraft.chargeId, message ?? d.reverseSuccess)
+          }
         />
       )}
 

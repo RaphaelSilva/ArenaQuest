@@ -179,3 +179,109 @@ describe('createAdminBillingApi — errors', () => {
     });
   });
 });
+
+describe('createAdminBillingApi — online payments (RFC 0026)', () => {
+  const SESSION = {
+    checkoutId: 'chk-1',
+    provider: 'mercadopago',
+    url: 'https://pay.example.test/chk-1',
+    expiresAt: '2026-11-27T14:03:00.000Z',
+    amountMinor: 15000,
+    currency: 'BRL',
+    status: 'open',
+  };
+
+  it('creates a checkout on behalf on each rail, with a strict body that names no user', async () => {
+    const { http, api } = apiWith(makeResponse({ status: 201, jsonData: SESSION }));
+
+    await expect(api.invoices.createCheckout('inv-1')).resolves.toEqual({
+      session: SESSION,
+      reused: false,
+    });
+    expect(http).toHaveBeenLastCalledWith('POST', '/admin/billing/invoices/inv-1/checkouts', {
+      body: '{}',
+    });
+
+    await api.extras.createCheckout('ch-1', { provider: 'stripe' });
+    // Decision 22: the charge route lives under the billing router.
+    expect(http).toHaveBeenLastCalledWith('POST', '/admin/billing/charges/ch-1/checkouts', {
+      body: JSON.stringify({ provider: 'stripe' }),
+    });
+  });
+
+  it('reports the live checkout handed back (200) as reused', async () => {
+    const { api } = apiWith(makeResponse({ status: 200, jsonData: SESSION }));
+    await expect(api.invoices.createCheckout('inv-1')).resolves.toMatchObject({ reused: true });
+  });
+
+  it('retries a lost creation race once, then gives the refusal back', async () => {
+    const lost = makeResponse({
+      ok: false,
+      status: 409,
+      jsonData: { error: 'CHECKOUT_IN_PROGRESS' },
+    });
+    const wait = vi.fn(async () => {});
+    const http = vi
+      .fn()
+      .mockResolvedValueOnce(lost)
+      .mockResolvedValueOnce(makeResponse({ status: 201, jsonData: SESSION }));
+    const api = createAdminBillingApi(http as unknown as HttpTransport, { wait });
+
+    await expect(api.invoices.createCheckout('inv-1')).resolves.toMatchObject({ reused: false });
+    expect(http).toHaveBeenCalledTimes(2);
+    expect(wait).toHaveBeenCalledTimes(1);
+
+    const always = vi.fn().mockResolvedValue(lost);
+    const stuck = createAdminBillingApi(always as unknown as HttpTransport, { wait });
+    await stuck.invoices.createCheckout('inv-1').catch((error: AdminBillingApiError) => {
+      expect(error.checkoutKind).toBe('in_progress');
+    });
+    expect(always).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['PAYMENTS_REFUND_REFUSED', 409, 'refused'],
+    ['PAYMENTS_PROVIDER_NOT_ENABLED', 409, 'provider_not_enabled'],
+    ['PAYMENTS_REFUND_UNRECORDED', 503, 'unrecorded'],
+    ['PAYMENTS_CONFIG_INVALID', 500, 'configuration'],
+    ['PAYMENTS_PROVIDER_ERROR', 502, 'provider_unavailable'],
+    ['Conflict', 409, 'conflict'],
+    ['SOMETHING_ELSE', 500, 'unknown'],
+  ] as const)('maps the reverse refusal %s to the refund kind', async (code, status, kind) => {
+    const { api } = apiWith(
+      makeResponse({ ok: false, status, jsonData: { error: code, refundId: 're_1' } }),
+    );
+    for (const call of [
+      () => api.payments.reverse('pay-1', { reason: 'r' }),
+      () => api.extras.reversePayment('pay-1', { reason: 'r' }),
+    ]) {
+      await call().then(
+        () => expect.unreachable(),
+        (error: AdminBillingApiError) => {
+          expect(error.refundKind).toBe(kind);
+          expect(error.refundId).toBe('re_1');
+        },
+      );
+    }
+  });
+
+  it('exposes the existing payment of a duplicate gateway reference, and of nothing else', async () => {
+    const { api } = apiWith(
+      makeResponse({
+        ok: false,
+        status: 409,
+        jsonData: { error: 'PAYMENT_REFERENCE_EXISTS', paymentId: 'pay-9' },
+      }),
+    );
+    await api.invoices
+      .addPayment('inv-1', { amountMinor: 1, method: 'gateway', externalReference: 'stripe:pi_1' })
+      .catch((error: AdminBillingApiError) => expect(error.existingPaymentId).toBe('pay-9'));
+
+    const other = apiWith(
+      makeResponse({ ok: false, status: 409, jsonData: { error: 'Conflict', paymentId: 'pay-9' } }),
+    );
+    await other.api.invoices
+      .addPayment('inv-1', { amountMinor: 1, method: 'cash' })
+      .catch((error: AdminBillingApiError) => expect(error.existingPaymentId).toBeNull());
+  });
+});
