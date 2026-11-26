@@ -1,6 +1,6 @@
 # Task 13 — Frontend: Payment exceptions panel (Phase 4)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Frontend Web
@@ -71,17 +71,17 @@ yet explain.
 
 ## Acceptance Criteria
 
-- [ ] With no exception the tab shows the empty state and no badge.
-- [ ] An orphan row shows its provider ids and a deep link, and no amount.
-- [ ] Dismissing without a note is refused on the client; with one, the row disappears and stays
+- [x] With no exception the tab shows the empty state and no badge.
+- [x] An orphan row shows its provider ids and a deep link, and no amount.
+- [x] Dismissing without a note is refused on the client; with one, the row disappears and stays
       gone after a reload.
-- [ ] Matching an orphan to an open invoice records a gateway payment with the exception's
+- [x] Matching an orphan to an open invoice records a gateway payment with the exception's
       reference and removes the exception.
-- [ ] *Run reconcile now* shows the returned summary and cannot be pressed twice in parallel.
-- [ ] A `content_creator` is not offered the tab.
-- [ ] `check-i18n-coverage.js` green; `dict-en.ts` and `dict-pt.ts` have identical keys.
-- [ ] Changed files lint clean; `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] *Run reconcile now* shows the returned summary and cannot be pressed twice in parallel.
+- [x] A `content_creator` is not offered the tab.
+- [x] `check-i18n-coverage.js` green; `dict-en.ts` and `dict-pt.ts` have identical keys.
+- [x] Changed files lint clean; `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
