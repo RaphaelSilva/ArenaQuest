@@ -3,7 +3,7 @@
 **Date:** 2026-11-16
 **Status:** Draft
 **Author:** raphaelsilva
-**Revised:** 2026-11-17 (a tenant may enable several providers and combine their methods — §8.1, R6; the single `PAYMENTS_PROVIDER` var became the `PAYMENTS_PROVIDERS` list and the secrets became provider-prefixed) · 2026-11-18 (the nine Open Questions answered by the owner — R7–R15; first adapter Mercado Pago; a *Pay* card on the student dashboard added to v1)
+**Revised:** 2026-11-17 (a tenant may enable several providers and combine their methods — §8.1, R6; the single `PAYMENTS_PROVIDER` var became the `PAYMENTS_PROVIDERS` list and the secrets became provider-prefixed) · 2026-11-18 (the nine Open Questions answered by the owner — R7–R15; first adapter Mercado Pago; a *Pay* card on the student dashboard added to v1) · 2026-11-26 (design review, R16: a failed webhook event is processed again on the provider's retry instead of being answered as a duplicate; the fetched payment status decides what an event does; reconciliation moved to its own hourly, capped Cron Trigger and also asks about checkouts that have not expired yet; the stored expiry is the provider's when it is earlier; refund recovery when the provider accepts and the ledger write is lost; the return page polls; ~13 dev days)
 **Affected:**
 - `apps/api/migrations/00NN_create_payment_gateway.sql` (new; next free number at implementation time) — `gateway_checkouts`, `gateway_events`, one system actor row in `users`, two **partial unique indexes** on the existing payment tables (`payments`, `event_charge_payments`) scoped to `method = 'gateway'`, and a rebuild of the operational `job_runs` table so its `job` CHECK admits `reconcile_payments`. No `ALTER` and no rebuild of any money table.
 - `packages/shared/ports/i-payment-gateway.ts` (new) — `IPaymentGateway`, the provider port RFC 0013 #9 deferred "until a provider is in hand". Provider-neutral in shape, modelled on Mercado Pago, the first adapter (R7). No provider SDK type crosses it.
@@ -16,9 +16,9 @@
 - `apps/api/src/core/billing/billing-service.ts`, `event-charge-service.ts` — `recordPayment` and `reversePayment` keep their rules; each gains a sibling entry point that accepts the system actor and a provider reference, and refuses `method <> 'gateway'`.
 - `apps/api/src/routes/webhooks/payments.router.ts` (new) — `POST /v1/webhooks/payments/{provider}`, the second anonymous surface after the events board, mounted from `routes/index.ts` and **not** under `routes/public/`.
 - `apps/api/src/routes/me/billing.ts` — gains `POST /v1/me/billing/checkouts` and `GET /v1/me/billing/checkouts/{id}`; the statement gains a `pendingCheckout` per receivable. `routes/admin/billing.ts`, `routes/admin/events.ts` (charges) — gain `POST …/checkouts` on behalf of a student and the gateway refund path behind the existing `reverse` routes.
-- `apps/api/src/jobs/reconcile-payments.ts` (new) + `apps/api/src/index.ts` — the daily `scheduled()` run gains a fourth job, in its own `finally`, recorded in `job_runs`.
+- `apps/api/src/jobs/reconcile-payments.ts` (new) + `apps/api/src/index.ts` — `scheduled()` starts dispatching on `controller.cron`: the daily expression keeps its three jobs untouched, and a new **hourly** expression runs `reconcile-payments` alone, in its own invocation, recorded in `job_runs` (§6).
 - `apps/api/src/container.ts` — a `payments: PaymentsContext` group (gateway registry, repository, service) and a per-user `checkouts` rate limiter plus an IP-keyed `webhooks` limiter in `infra.rateLimiters`.
-- `apps/api/wrangler.jsonc`, `apps/api/.dev.vars.example`, `worker-configuration.d.ts` — var `PAYMENTS_PROVIDERS` in every `env.*` block; secrets `PAYMENTS_<PROVIDER>_SECRET_KEY`, `PAYMENTS_<PROVIDER>_WEBHOOK_SECRET`, one pair per enabled provider.
+- `apps/api/wrangler.jsonc`, `apps/api/.dev.vars.example`, `worker-configuration.d.ts` — var `PAYMENTS_PROVIDERS` in every `env.*` block; secrets `PAYMENTS_<PROVIDER>_SECRET_KEY`, `PAYMENTS_<PROVIDER>_WEBHOOK_SECRET`, one pair per enabled provider. A second Cron Trigger, `17 * * * *`, in the top-level `triggers.crons` beside the daily `0 6 * * *` (§6).
 - `config/deployment.schema.jsonc`, `scripts/cloudflare/provision-label.mjs`, `scripts/label.mjs` — each provider's two secrets declared under `api-secrets` with a `requiredWhen` on the provider list, detected by name, never written (RFC 0012 contract); `infra-check` reports them with their fix command.
 - `apps/web/src/app/(protected)/settings/billing/*` (Pay button, the provider choice when a label offers more than one, return page state), `(protected)/dashboard/*` (a *payment due* card with the same Pay action when a contract invoice is open — §7, R11), `(protected)/admin/billing/*` (provider reference on the ledger, "pending online payment" on roster and statement, refund confirmation), `src/lib/me-billing-api.ts`, `admin-billing-api.ts`, `src/i18n/dict-{en,pt}.ts`.
 - `docs/onboarding.md`, `docs/operations/payments.md` (new) — webhook registration per label and environment, sandbox credentials, the reconciliation runbook.
@@ -99,9 +99,10 @@ arriving through it.
 - **Combinable methods per tenant.** A label and environment may enable more than one
   provider and say which methods each offers; the student chooses among them on *Pay*, and a
   receivable still has at most one live checkout (§8.1).
-- **Operability**: the daily run expires stale checkouts, recovers payments whose webhook
-  never arrived, and records itself in `job_runs`; the admin sees pending online payments on
-  the roster and statement and the provider reference on every gateway ledger row.
+- **Operability**: an hourly reconcile run expires stale checkouts, recovers payments whose
+  webhook never arrived — in an hour or so rather than a day — and records itself in
+  `job_runs`; the admin sees pending online payments on the roster and statement and the
+  provider reference on every gateway ledger row.
 - **No new dependency.** The provider client is a `fetch` wrapper; signatures are verified
   with Web Crypto. The no-external-auth-deps rule extends to payments.
 
@@ -189,6 +190,9 @@ and OAuth return links (`container.ts:450`).
 **Something periodic already runs.** `apps/api/src/index.ts#scheduled` runs billing, the
 submission sweep and the mission reconcile daily, each in its own `finally`, recorded in
 `job_runs` (migration 0032) whose `job` CHECK names `billing` and `sweep_submissions` only.
+The handler ignores its `controller` argument: a single Cron Trigger (`0 6 * * *`, at the top
+level of `wrangler.jsonc` and so inherited by every `env.*`) drives all three in one
+invocation.
 
 **Money parsing.** Every amount in the codebase is an integer in minor units against
 `currencies.exponent`; `format-money.ts` renders with `style: 'decimal'`. No code path parses
@@ -233,7 +237,10 @@ export interface CreateCheckoutRequest {
   payer: { id: string; email: string; name: string };
   methods: ReadonlyArray<'pix' | 'card' | 'boleto'>;
   returnUrls: { success: string; cancel: string };
-  /** Hard expiry the adapter must pass on; the reconcile job expires on it too. */
+  /**
+   * The latest expiry we accept (now + 24 h). The adapter asks the provider for it; the
+   * provider may grant less, and says so in createCheckout's result (§3 step 6).
+   */
   expiresAt: string;
 }
 
@@ -249,6 +256,7 @@ export interface ProviderPayment {
   refunds: ReadonlyArray<{ id: string; amountMinor: number; createdAt: string }>;
 }
 
+/** `eventId` identifies this event, never the payment: one payment emits several (rule 4). */
 export type ProviderEvent =
   | { kind: 'payment'; eventId: string; paymentId: string; occurredAt: string }
   | { kind: 'refund'; eventId: string; paymentId: string; refundId: string; occurredAt: string }
@@ -257,6 +265,7 @@ export type ProviderEvent =
 
 export interface IPaymentGateway {
   readonly provider: 'stripe' | 'mercadopago' | 'asaas' | 'pagarme';
+  /** `expiresAt` in the result is when the returned URL stops working, as the provider reports it. */
   createCheckout(req: CreateCheckoutRequest): Promise<{ sessionId: string; url: string; expiresAt: string }>;
   getPayment(paymentId: string): Promise<ProviderPayment | null>;
   /** Locate the payment(s) a checkout produced when no webhook named one — reconciliation. */
@@ -270,7 +279,7 @@ export interface IPaymentGateway {
 }
 ```
 
-Three rules make the port safe across providers:
+Four rules make the port safe across providers:
 
 1. **The webhook is a trigger.** `verifyWebhook` yields *ids*. Amount, currency, status and
    the checkout back-reference come only from `getPayment`, over an authenticated call the
@@ -288,6 +297,17 @@ Three rules make the port safe across providers:
    (`409 PAYMENTS_UNSUPPORTED_CURRENCY`) before the provider is called when the tenant's
    active currency is not in it. BRL with `pix` and `card` is the only row every candidate
    fills.
+4. **`eventId` names the event, never the payment.** One payment emits several events over
+   its life — created and `pending`, then approved, later perhaps refunded — and an adapter
+   that keyed `eventId` on the payment id would have the approval swallowed as a duplicate of
+   the creation. For Mercado Pago `eventId` is the notification's own `id`, the top-level
+   field of the body beside `action` and `data.id` — not `data.id`, and not `data.id` plus
+   `action` either, because `payment.updated` repeats for one payment. Mercado Pago signs
+   `data.id`, the `x-request-id` header and `ts`, not that field, so the event key is a
+   de-duplication aid and never a security or money control: an authentic delivery replayed
+   with an altered body `id` passes verification for five minutes and costs one more
+   `getPayment`, while the ledger index (§2) still admits one row per provider payment. Phase
+   2 pins the field against recorded sandbox deliveries.
 
 Adapters are held in a **`GatewayRegistry`** (`core/payments/gateway-registry.ts`), built per
 request from `PAYMENTS_PROVIDERS` and resolved by provider name (§8.1). With `none` (the
@@ -331,6 +351,7 @@ CREATE TABLE IF NOT EXISTS gateway_checkouts (
   created_at           TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
   closed_at            TEXT,
+  last_checked_at      TEXT,                        -- last time the reconcile run asked the provider (§6)
   failure_detail       TEXT,                        -- provider status / mismatch description; never a body
   CHECK (NOT (invoice_payment_id IS NOT NULL AND charge_payment_id IS NOT NULL)),
   CHECK (receivable_kind <> 'invoice'      OR charge_payment_id  IS NULL),
@@ -351,6 +372,10 @@ CREATE INDEX IF NOT EXISTS idx_gateway_checkouts_expiry ON gateway_checkouts(exp
 -- key. A row is written only AFTER the signature verified: an unauthentic delivery leaves
 -- no trace here (it would let a stranger fill the table) and is counted in the rate
 -- limiter only.
+-- One row per event, however many times it is delivered. `outcome` is the row's CURRENT
+-- state: 'received' (written before processing) and 'failed' are not final — the provider's
+-- next delivery of the same event, or the reconcile run, processes it again (§4 step 5, §6).
+-- Every other value is final. `attempts` counts every processing attempt, whoever made it.
 CREATE TABLE IF NOT EXISTS gateway_events (
   provider             TEXT NOT NULL,
   event_id             TEXT NOT NULL,
@@ -359,12 +384,13 @@ CREATE TABLE IF NOT EXISTS gateway_events (
   checkout_id          TEXT REFERENCES gateway_checkouts(id) ON DELETE RESTRICT,
   received_at          TEXT NOT NULL DEFAULT (datetime('now')),
   processed_at         TEXT,
-  outcome              TEXT NOT NULL CHECK (outcome IN ('applied','duplicate','ignored','orphan','mismatch','failed')),
+  outcome              TEXT NOT NULL CHECK (outcome IN ('received','applied','duplicate','ignored','orphan','mismatch','failed')),
   attempts             INTEGER NOT NULL DEFAULT 1,
   error                TEXT,                        -- message, truncated to 1024 chars; never a body
   PRIMARY KEY (provider, event_id)
 );
-CREATE INDEX IF NOT EXISTS idx_gateway_events_failed ON gateway_events(received_at) WHERE outcome = 'failed';
+CREATE INDEX IF NOT EXISTS idx_gateway_events_unsettled
+  ON gateway_events(received_at) WHERE outcome IN ('received','failed');
 
 -- The money-level idempotency (R9). One ledger row per provider payment or
 -- refund id, on each rail. The reference is written '<provider>:<id>', so ids from two
@@ -423,20 +449,29 @@ Design notes:
    → `404` (never `403`: a student must not learn that another student's invoice id exists).
 3. **Payable?** `status !== 'open'` or `balanceMinor <= 0` → `409 RECEIVABLE_NOT_PAYABLE`.
    Currency not in the adapter's capability table → `409 PAYMENTS_UNSUPPORTED_CURRENCY`.
-4. **One live attempt.** An `open` checkout for `(kind, id)` whose `expires_at > now`, on the
-   provider resolved in step 1, is returned as-is with `200`. An expired one is closed
-   (`status = 'expired'`) first. An open one on a **different** provider is closed as
-   `cancelled` first — the student changed how they want to pay — and a new one is created
-   (§8.1).
+4. **One live attempt.** An `open` checkout for `(kind, id)` on the provider resolved in
+   step 1 is returned as-is with `200` when more than **5 minutes** remain before its
+   `expires_at` — a link that dies while the bank app opens is no link. One that is expired
+   or about to be is closed (`status = 'expired'`) first; a payment still arriving on it
+   lands regardless (§5, and §6 asks the provider about it once more). An open one on a
+   **different** provider is closed as `cancelled` first — the student changed how they want
+   to pay — and a new one is created (§8.1). An `open` row that never got its session (step 5
+   was interrupted) is not returned either: the provider call is made again for it, under
+   the same `checkoutId`.
 5. **Create** the row with `status = 'open'` and a placeholder URL, *then* call
    `gateway.createCheckout` — the methods being those this label enabled for that provider —
    with `checkoutId` as the idempotency key and metadata, *then*
-   write `provider_session_id`, `checkout_url`, `expires_at`. If the provider call fails the
+   write `provider_session_id`, `checkout_url` and the effective `expires_at` (step 6). If the provider call fails the
    row is set to `failed` — the unique index released — and the route answers `502
    PAYMENTS_PROVIDER_ERROR`. Row-first means a crash between the two calls can never leave a
-   provider session we do not know about; the reconcile job finds the orphan row instead.
-6. **Expiry** is the provider's maximum for hosted sessions, capped at 24 h (Pix QR codes
-   are short-lived by nature; a card session rarely survives a day).
+   provider session we do not know about; the reconcile run closes the session-less row
+   instead (§6).
+6. **Expiry is the provider's when it is earlier.** We ask for 24 h from now
+   (`req.expiresAt`) — an upper bound, not a promise: a provider may cap a hosted session or
+   a Pix QR code at less. The adapter returns the expiry the provider actually set (the
+   requested one when the provider reports none), and the row stores `expires_at =
+   min(returned, requested)`. Step 4 therefore never returns a dead URL with `200`, and the
+   reconcile run (§6) closes the row on the provider's clock, not on an assumed 24 h.
 7. **Rate limit** per user, `rl:checkouts:<userId>`, 10 per hour: one Pay per minute is
    generous, and a loop of create-and-abandon is what it stops.
 8. **Audit** one `payments.checkout_created` structured event, ids only.
@@ -447,6 +482,15 @@ Design notes:
 is `404`) and renders the row's status — `open` becomes "payment processing" (a Pix may be
 confirmed minutes after the redirect), `paid` becomes the updated statement. A forged
 `outcome=success` shows nothing a `GET /v1/me/billing` would not.
+
+**The return page polls, briefly.** The redirect usually beats the webhook, so the first
+read is often `open`. While it is, the page repeats the `GET` at most five times, backing
+off (2 s, 4 s, 8 s, 15 s, 30 s — about a minute in all) and pausing while the tab is hidden.
+It stops at the first status that is not `open`, and on `paid` refetches the statement.
+After the last attempt it says the payment is still being confirmed and offers a manual
+refresh. The `GET` only reads our row — it never calls the provider — so polling costs one
+D1 read per attempt; a webhook that never comes is still the reconcile run's to recover
+(§6), not the browser's.
 
 **On behalf of a student (admin).** `POST /v1/admin/billing/invoices/{id}/checkouts` and
 `POST /v1/admin/events/{eventId}/charges/{chargeId}/checkouts`, behind the billing router's
@@ -476,21 +520,51 @@ a flag on either existing one. The router's pipeline, in order:
    adapter (Stripe's `t`, Mercado Pago's `ts`); the token provider (Asaas) compares with a
    constant-time function. This is also the **replay window**: an authentic delivery replayed
    after five minutes is `401`; one replayed within it is a `duplicate` by event id.
-5. **De-duplicate.** `INSERT … ON CONFLICT DO NOTHING` into `gateway_events`; `meta.changes
-   === 0` → `200 { outcome: 'duplicate' }`. A `kind: 'ignored'` event is recorded as `ignored`
-   and answered `200`.
-6. **Fetch-to-confirm.** `gateway.getPayment(paymentId)`; `null` → `orphan`, `200`. The
-   provider payment's `checkoutId` must name a row whose `provider_session_id` or prior
-   `provider_payment_id` agrees and whose `provider` is the path's; otherwise `orphan`, `200`,
-   admin alert (§7). Mismatched
-   currency → checkout `mismatch`, event `mismatch`, `200`, alert. **Nothing lands in either
-   case.** Always `200` once verified, so the provider stops retrying something we have
-   recorded as ours to resolve.
-7. **Land** (§5) inside one `db.batch` with the `gateway_events` update to `applied` and the
-   checkout's flip to `paid`. A unique-constraint failure on the ledger index means another
-   delivery landed it first: outcome `duplicate`, `200`.
-8. **Our own failure** (D1 unavailable, provider API 5xx on the fetch) → `gateway_events.outcome
-   = 'failed'`, `503`, so the provider retries; the reconcile job also retries (§6).
+5. **De-duplicate — without swallowing a retry.** `INSERT … ON CONFLICT DO NOTHING` into
+   `gateway_events` with `outcome = 'received'`. `meta.changes === 1` → a new event, continue.
+   `meta.changes === 0` → the event is known, and its **stored outcome** decides:
+   - **settled** (`applied`, `duplicate`, `ignored`, `orphan`, `mismatch`) → `200 { outcome:
+     'duplicate' }` and nothing is written. That is the answer to the delivery, not a new
+     state of the row.
+   - **unsettled** — `failed` (step 8 answered `503` and this is the provider's retry) or
+     `received` (an earlier attempt died, or is still running) → `attempts = attempts + 1`
+     and continue to step 6.
+
+   Two attempts overlapping on one event are safe: the ledger index (§2) admits one row, and
+   every outcome write is conditional (`… WHERE outcome IN ('received','failed')`), so a
+   settled row is never overwritten. A `kind: 'ignored'` event is settled as `ignored` and
+   answered `200`.
+6. **Fetch-to-confirm, then act on the fetched status.** `gateway.getPayment(paymentId)`;
+   `null` → `orphan`, `200`. The provider payment's `checkoutId` must name a row whose
+   `provider_session_id` or prior `provider_payment_id` agrees and whose `provider` is the
+   path's; otherwise `orphan`, `200`, admin alert (§7). Mismatched currency → checkout
+   `mismatch`, event `mismatch`, `200`, alert. **Nothing lands in either case.** Always `200`
+   once verified, so the provider stops retrying something we have recorded as ours to
+   resolve. Past those checks the event's own name is not trusted either — the **fetched
+   status** decides:
+   - `paid` → step 7.
+   - `pending` → event `ignored`, `200`; the checkout stays `open`. This is the normal first
+     notification of a Pix: the payment exists and the student has not paid yet. The
+     approval arrives as a different event (§1 rule 4) and is processed on its own.
+   - `failed` or `expired` → event `ignored`, `200`; the checkout stays `open` — the student
+     may try again inside the same session — and `failure_detail` keeps the last status.
+   - `refunded` → the payment is landed first if it never was, then its refunds (§5).
+   - `disputed`, and any `dispute` event → §5.
+
+   For a `paid` or `refunded` payment, every entry of `refunds[]` not yet on the ledger lands
+   as §5 describes, whatever the event called itself: a provider may report a refund as one
+   more update of the payment rather than as an event of its own — Mercado Pago's
+   `payment.updated` is expected to, which the Phase 2 fixtures confirm.
+7. **Land** (§5) inside one `db.batch` with the `gateway_events` update and the checkout's
+   flip to `paid`. A unique-constraint failure on the ledger index means another delivery —
+   or the reconcile run — landed it first. The event settles as `applied` when it put at
+   least one row on the ledger and as `duplicate` when everything it named was already
+   there; `200` either way.
+8. **Our own failure** (D1 unavailable, a provider API 5xx or timeout on the fetch) → the
+   event is written `failed` with the error and the route answers `503`, so the provider
+   retries — and step 5 lets that retry through. If even that write fails, the row stays
+   `received` and is retried the same way. The reconcile run retries both (§6) without
+   waiting for the provider, so recovery does not depend on any provider's retry schedule.
 
 The handler sets `Cache-Control: no-store`, never sets `user` on the context, and is the only
 router that reads the raw body. It carries no CORS semantics worth having — the global
@@ -524,6 +598,30 @@ refund id already on the ledger and records `duplicate`. Full amount only throug
 (RFC 0013's reversal is a mirror row); a partial refund is made in the provider's
 dashboard and lands as below (R14).
 
+**The provider call and the ledger write are not one transaction.** The provider may accept
+the refund and the reversal go unwritten — the Worker dies between the two, or D1 fails —
+and the provider's notification may simply win the race against our own write. In both
+cases the notification lands the money the way a dashboard refund lands: a negative row with
+`reverses_id = NULL`. Amount, date and reference are right; the link to the original is
+missing. Three rules bound that:
+
+- **The route asks before it refunds.** It reads the payment first (`getPayment`). A refund
+  of the full amount that the provider already holds is not requested again: when its id is
+  on the ledger the route answers **`200` with that row and writes nothing**; when it is
+  not, the route writes the mirror row for it. Only a payment with no refund reaches
+  `gateway.refund`, always under the idempotency key `rev:<original id>`, so a second click
+  cannot refund twice even where that read is stale. A reversal insert that collides on the
+  reference index — the notification got there between the read and the write — gets the
+  same `200` with the row that won.
+- **A lost write is said out loud.** When the provider accepted and the reversal could not
+  be written, the route answers `503 PAYMENTS_REFUND_UNRECORDED` naming the refund id —
+  never "refund failed", which invites a second refund by another channel. Retrying the
+  same route is safe by the rule above, and if nobody retries, the notification lands it.
+- **The missing link is accepted, not repaired.** A refund the notification landed keeps
+  `reverses_id = NULL` and a `note` naming the provider refund. Linking it afterwards would
+  mean editing a written ledger row, which RFC 0013 does not allow and this RFC does not
+  introduce; balances and statements are right either way.
+
 **A refund made in the provider's dashboard** (full or partial) arrives as a `refund` event.
 Fetch-to-confirm yields the payment's `refunds[]`; each refund id not yet on the ledger is
 written as a **negative gateway row with `reverses_id = NULL`** and `external_reference =
@@ -542,31 +640,77 @@ RFC 0013's own example of the hold), written by the system actor and released wh
 dispute closes, `won` or `lost`; an admin may lift it earlier. An event charge never gets a
 hold (RFC 0015 #9): its dispute is the alert and the exceptions row only (R14).
 
-### 6. The daily run (`jobs/reconcile-payments.ts`)
+### 6. The reconcile run (`jobs/reconcile-payments.ts`)
 
-A fourth job in `scheduled()`, in its own `finally`, recorded in `job_runs` as
-`reconcile_payments`, counts only:
+**Its own hourly Cron Trigger.** `wrangler.jsonc` gains a second expression, `17 * * * *`,
+beside the daily `0 6 * * *`, and `scheduled()` starts dispatching on `controller.cron`: the
+daily expression runs billing, the submission sweep and the mission reconcile exactly as
+today; the hourly one runs `reconcile-payments` and nothing else. Each expression gets its
+own invocation, so the payment run neither spends the daily jobs' budget nor waits behind
+them. The two strings are constants shared by the dispatch and by a test that reads
+`wrangler.jsonc` — `controller.cron` must equal the configured expression character for
+character — and an expression the dispatch does not know logs an error and runs nothing.
+`triggers` sits at the top level and is inherited by every `env.*`, so the hourly trigger
+fires on every label: with `PAYMENTS_PROVIDERS = none` the job returns before its first
+query and records nothing; otherwise it is recorded in `job_runs` as `reconcile_payments`,
+counts only (24 rows a day, which the daily run's `pruneJobRuns` bounds by age).
 
-1. **Expire** `open` checkouts past `expires_at` — after one `findPaymentsForCheckout` each,
-   on the checkout's own provider:
-   a payment the provider reports `paid` whose webhook never arrived is landed exactly as
-   §5 would (idempotent on the reference index), then the checkout is `paid`; otherwise
-   `expired`. Batches of 100. A checkout whose provider is no longer bound cannot be asked
-   about: it is expired without a fetch, counted as `unreachable`, and a non-zero count
-   records the run as `failed` (§8.1 says how to retire a provider without this).
-2. **Retry** `gateway_events` with `outcome = 'failed'`, `attempts < 5`, older than one hour:
-   re-run step 6–7 of §4; increment `attempts`.
+Two reasons it is not a fourth job in the daily run. **Budget:** a Workers invocation has a
+subrequest limit that counts every `fetch()` and every D1 call, a CPU limit and, for a Cron
+Trigger, 15 minutes of wall time; an unbounded "ask the provider about every checkout" loop
+appended to three other jobs is how a growing tenant silently stops reconciling. **Recovery
+time:** a payment whose webhook was lost should not wait until 06:00 UTC tomorrow.
+
+Every step is bounded, and what does not fit is counted and left for the next run:
+
+1. **Confirm checkouts — at most 25 per run.** The candidates are `open` checkouts past
+   `expires_at`; `open` checkouts created more than 30 minutes ago; and checkouts that §3
+   step 4 closed without asking (`expired` or `cancelled`, not asked since `closed_at`),
+   which get one final ask. Order: past expiry or closed first, then least recently asked
+   (`last_checked_at`, never-asked first). Each costs one `findPaymentsForCheckout` on the
+   checkout's own provider. A payment the provider reports `paid` whose webhook never
+   arrived is landed exactly as §5 would (idempotent on the reference index) and the
+   checkout becomes `paid`. Otherwise a checkout past its expiry becomes `expired` and one
+   not yet expired stays `open`; either way `last_checked_at = now`.
+
+   Asking **before** expiry is what makes the hour real — expiring first and asking then
+   would recover a lost webhook only when the session dies, up to 24 h later. A paid
+   checkout is found by the first run after it is 30 minutes old: 90 minutes after *Pay* at
+   the latest, and within the hour for a payment made later than that — provided the
+   backlog fits the cap. The remainder is counted as `deferred`; with N checkouts due, each
+   is asked every ⌈N/25⌉ hours, expired ones first.
+
+   Two cases cost no fetch and do not count toward the cap. An `open` checkout with no
+   `provider_session_id`, older than 30 minutes (the create call died, §3 step 5), is closed
+   `failed`. A checkout whose provider is no longer bound cannot be asked about: it is
+   expired without a fetch, counted as `unreachable`, and a non-zero count records the run
+   as `failed` (§8.1 says how to retire a provider without this).
+2. **Retry unsettled events — at most 10 per run.** `gateway_events` whose `outcome` is
+   `failed` or `received`, received more than 15 minutes and less than 72 hours ago, fewest
+   `attempts` first: re-run steps 6–7 of §4 and increment `attempts`. The bound is the
+   event's age, not an attempt count, because the provider's own redeliveries increment
+   `attempts` too (§4 step 5) and must not use up our retries. After 72 hours the event is
+   left alone and stays on the exceptions list (§7).
 3. **Sweep orphans.** `orphan` and `mismatch` events older than 7 days with no admin
    resolution stay — they are a report, not garbage — but the count is in the summary so a
    growing number shows up in the ops digest.
-4. **Confirm the key mode** of every bound provider once per run (test key on production /
-   live key on staging →
-   `failed` run with a clear error), so a mis-provisioned secret is noticed within a day
-   even if no student pays.
+4. **Confirm the key mode** of every bound provider once per run — a check of the key's
+   prefix against the environment, no provider call (test key on production / live key on
+   staging → `failed` run with a clear error) — so a mis-provisioned secret is noticed
+   within the hour even if no student pays.
 
-`POST /v1/admin/billing/payments/reconcile` (admin) runs the same job on demand, like the
-missions reconcile, and `GET /v1/admin/billing/payments/exceptions` lists `orphan`,
-`mismatch`, `failed` and disputed rows with their provider ids for the admin to resolve.
+The worst case is 35 provider calls in a run, made one at a time with a 10-second timeout
+each: under six minutes of wall time. That fits Workers Free's 50 external subrequests per
+invocation as well as Workers Paid's 10,000, and the D1 statements around them stay far
+below either plan's allowance for Cloudflare services (limits as documented on 2026-11-26,
+see References). The caps and the timeout are named constants in the job, not
+configuration: a tenant that outgrows them shows it in `deferred`, and raising them is a
+one-line change made with the limits in view.
+
+`POST /v1/admin/billing/payments/reconcile` (admin) runs the same job on demand, with the
+same caps, like the missions reconcile, and `GET /v1/admin/billing/payments/exceptions`
+lists `orphan`, `mismatch`, `failed` and disputed rows — and events left in `received` for
+more than an hour — with their provider ids for the admin to resolve.
 
 ### 7. What the admin and the student see
 
@@ -582,7 +726,8 @@ standing, and the admin statement lists it under the receivable. An admin may st
 a cash payment on a receivable with an open checkout (the student may well have paid at the
 door); the form warns, and §6 then expires the checkout on its own.
 
-**Exceptions panel.** `orphan`, `mismatch`, `failed` events and disputes, with provider ids,
+**Exceptions panel.** `orphan`, `mismatch`, `failed` events, events left in `received` for
+more than an hour, and disputes, with provider ids,
 oldest first, each with the action it wants: match to a receivable by hand (records through
 the normal admin payment form with `method = 'gateway'` and the provider id — the partial
 index protects that path too), refund, or dismiss with a note.
@@ -593,8 +738,9 @@ the hosted page; with several it first asks how to pay, one choice per provider,
 its methods (*Pix*, *Cartão*) and never by the provider's name alone (§8.1). The hosted page
 is a link to a new tab, not an iframe. A
 receivable with an open checkout shows "payment in progress · expires at …" with *Open
-again*; a `paid` gateway payment shows as *Paid online* with the date. Nothing else on the
-page changes, and the standing badge still gates nothing.
+again*; a `paid` gateway payment shows as *Paid online* with the date. On return from the
+hosted page the statement updates by itself — the page polls for about a minute (§3).
+Nothing else on the page changes, and the standing badge still gates nothing.
 
 **Student dashboard** (`/dashboard`, R11). When the student's statement holds at least one
 open **contract invoice** with a balance, the dashboard shows a *payment due* card: amount,
@@ -629,7 +775,7 @@ terminal. Nothing reaches argv, disk or a log line (RFC 0012).
 `core/payments/config.ts` parses the var at container build. A list that breaks a rule of
 §8.1, or a listed provider with either secret absent, makes the payment routes answer `500
 PAYMENTS_CONFIG_INVALID` — never a silent `none` (the `SUBMISSIONS_*` precedent). Each adapter
-asserts **key mode against environment** on first use and in the daily run: a Stripe
+asserts **key mode against environment** on first use and in every reconcile run: a Stripe
 `sk_live_` or a Mercado Pago `APP_USR-` key on a `*-staging` Worker, or a test-mode key on
 production, is `PAYMENTS_CONFIG_INVALID`. Staging therefore collects nothing real by
 construction, and the demo seed's students can walk the whole flow against the sandbox.
@@ -666,7 +812,7 @@ never a quiet fallback to fewer methods:
    (§1) — a list cannot enable what the adapter cannot settle.
 4. **Every listed provider needs both its secrets**, including one listed with no method.
 5. **An entry with no method** (`asaas:`) keeps a provider bound — its webhook URL answers, its
-   past payments can be refunded, the daily run can ask it about open checkouts — while
+   past payments can be refunded, the reconcile run can ask it about open checkouts — while
    offering nothing new. That is how a provider is retired. Dropping the entry outright turns
    its webhook into `404`, makes a reversal of one of its payments `409
    PAYMENTS_PROVIDER_NOT_ENABLED`, and leaves its open checkouts `unreachable` (§6);
@@ -705,7 +851,9 @@ second provider is an adapter file, a list entry and two secrets — no migratio
 gatewayService: GatewayService }`, built per request like every adapter, and two limiters
 (`checkouts` per user, `webhooks` per IP). `IGatewayRepository` exposes `createCheckout`,
 `getCheckout`, `findOpenCheckout(kind, id)`, `closeCheckout`, `recordEvent`, `markEvent`,
-`listExceptions`, `listExpiring` — plain records, no Cloudflare types. The two billing
+`listExceptions`, `listCheckoutsToConfirm(limit)`, `markChecked`, `listUnsettledEvents(limit)`
+— plain records, no Cloudflare types; `recordEvent` returns the stored outcome when the event
+already exists (§4 step 5). The two billing
 repositories gain `findGatewayPayment(externalReference)` for the duplicate answer.
 
 Roles are RFC 0013 #5's: `admin` alone sees or touches any of it; `content_creator` and
@@ -772,10 +920,19 @@ has no role at all — it has a signature.
     "Pix here, card there" and "add a second provider next year" a rename across the
     provisioner plus a migration of the reference index. A list, provider-prefixed secrets
     and provider-qualified references cost a parser and a registry now, and nothing later.
+14. **Ship v1 with one provider and add the list when a second adapter exists** — keep the
+    `provider` column, the `<provider>:<id>` references and the `{provider}` webhook path,
+    and leave out the list grammar, the `~=` operator and the provider choice on *Pay*.
+    Raised in the design review of 2026-11-26. *Not adopted: R6 and R13 are the owner's
+    decisions and stand unless the owner reopens them.* The saving is about one day of the
+    ~13: the var must still say which methods the one provider offers, so what would go is
+    §8.1's rules 1, 2 and 5, the `~=` operator, the choice on *Pay* and the two-stub tests
+    of S9. Deferring costs doing that same work later, plus changing the var's grammar under
+    every label already provisioned.
 
 ## Implementation Plan
 
-~12 dev days across six phases, each shippable behind `PAYMENTS_PROVIDERS = none`, which is
+~13 dev days across six phases, each shippable behind `PAYMENTS_PROVIDERS = none`, which is
 the default on every label until Phase 5 flips budo staging.
 
 ### Phase 0 — Domain, port, capability table and provider list (~2 d)
@@ -793,26 +950,35 @@ in and appears in no admin user list (the list filters `status = 'system'`; the 
 guards ignore it); a second insert with the same gateway reference fails on each rail; the
 `CHECK`s refuse a cross-rail `*_payment_id`.
 
-### Phase 2 — Adapter, webhook and landing (~3 d)
+### Phase 2 — Adapter, webhook and landing (~3.25 d)
 The Mercado Pago adapter (`fetch` client, `verifyWebhook` on raw bytes with the 5-minute
 tolerance or constant-time compare, `getPayment` with decimal conversion), a second **stub**
 adapter for the tests, `GatewayService.handleEvent`, `routes/webhooks/payments.router.ts`
 with its limiter and body bound. Tests with recorded sandbox fixtures: good signature lands
 once; replayed event → `duplicate`; tampered body → `401` with no row; unknown payment →
 `orphan`; wrong currency → `mismatch` and no ledger row; two concurrent deliveries → one row; a
-delivery on one provider's URL signed with another's secret → `401`.
+delivery on one provider's URL signed with another's secret → `401`; an event first answered
+`503` and delivered again is processed, not answered as a duplicate (`applied`, `attempts =
+2`); a `pending` event is `ignored` and the approval that follows lands; a refund reported as
+a payment update lands as a refund. The Mercado Pago fixtures pin which field is the
+notification id (§1 rule 4).
 
-### Phase 3 — Pay, admin links, refunds, reconcile (~2 d)
+### Phase 3 — Pay, admin links, refunds, reconcile (~2.5 d)
 `POST /v1/me/billing/checkouts`, `GET …/checkouts/{id}`, the two admin on-behalf routes, the
-gateway branch of both `reverse` routes, `jobs/reconcile-payments.ts`, the manual reconcile
+gateway branch of both `reverse` routes, `jobs/reconcile-payments.ts` on its hourly Cron
+Trigger with the `controller.cron` dispatch in `scheduled()` (§6), the manual reconcile
 and exceptions routes, `pendingCheckout` on the statements and roster. Tests: ownership
 `404`s; one live checkout per receivable, including across two providers; `409` on a
 non-payable receivable; the refund
-refused by the provider writes nothing; the expiry sweep lands a missed payment.
+refused by the provider writes nothing; the reconcile run lands a missed payment while its
+checkout is still unexpired, asks about 25 checkouts when 30 are due and reports `deferred:
+5`; `scheduled()` runs only the reconcile on the hourly expression and only the three
+existing jobs on the daily one; a provider that grants 30 minutes is stored as 30 minutes; a
+refund retried after its notification landed answers `200` and writes nothing.
 
-### Phase 4 — Web (~2.5 d)
+### Phase 4 — Web (~2.75 d)
 *Pay*, the provider choice when `payOptions` has more than one entry, and the return-page
-state on `/settings/billing`; provider reference and deep link on
+state on `/settings/billing` with its bounded polling (§3); provider reference and deep link on
 the ledger tab; refund confirmation; "pending online payment" on roster and statement; the
 exceptions panel; i18n in both dictionaries; the *payment due* card on the student dashboard (§7); the two
 reminder e-mails gain the *Pay* link (R11, copy only). Playwright at 390 px for the student flow against the sandbox.
@@ -822,8 +988,9 @@ reminder e-mails gain the *Pay* link (R11, copy only). Playwright at 390 px for 
 `api-secrets` with `requiredWhen: "PAYMENTS_PROVIDERS~=<provider>"` per provider and the
 `~=` operator in `requiredWhenActive`, `infra-check` output, `docs/operations/payments.md`. Budo **staging**
 first: sandbox keys, webhook registered, a demo student pays a demo invoice by simulated Pix
-and the ledger row appears with the system actor; the daily run records `reconcile_payments`
-`ok`. Budo production flips only after the owner's live check with a real R$ 1,00 charge and
+and the ledger row appears with the system actor; the hourly run records `reconcile_payments`
+`ok`. Before the second cron expression is deployed, the account's Cron Trigger allowance and
+its CPU limit per Cron Trigger are confirmed against the plan the Workers run on (§6, Risks). Budo production flips only after the owner's live check with a real R$ 1,00 charge and
 its refund.
 
 ## Tradeoffs & Risks
@@ -832,12 +999,12 @@ its refund.
 |---|---|
 | The chosen provider cannot offer Pix to this merchant (Stripe is invite-only for Brazil-based businesses as of 2026-11-16) | The first adapter is Mercado Pago (R7), whose Checkout Pro offers Pix natively in Brazil, and the port is provider-neutral; the first adapter is the one whose Pix the tenant can actually enable, and a second adapter is a new file plus a list entry, not a schema change — and it can run beside the first (§8.1). |
 | A webhook is forged or replayed | Signature or token verified on raw bytes before anything is written; 5-minute tolerance; event-id primary key; **fetch-to-confirm** means a body carries no money facts; partial unique index on the ledger means even a logic slip cannot double-record. |
-| A payment is confirmed but the webhook never arrives (provider outage, our 5xx exhausted retries) | The daily run asks the provider about every expiring checkout and lands what it finds; `job_runs` records the count. |
+| A payment is confirmed but the webhook never arrives (provider outage, our 5xx exhausted retries) | An event we answered `503` is processed again on the provider's retry (§4 step 5), and the hourly reconcile run asks the provider about every open checkout older than 30 minutes — not only the expired ones — and lands what it finds; `job_runs` records the count. Recovery needs neither the webhook nor a particular retry schedule from the provider. |
 | The amount or currency captured differs from the receivable | Currency mismatch lands nothing and surfaces in the exceptions panel; an amount difference lands what was captured (truthful ledger) and the statement shows the remaining balance or the credit. |
 | The system actor is mistaken for a person or counted by a guard | `status = 'system'`, no role rows, empty hash, `.invalid` e-mail; admin user lists filter it; tests pin the lockout guards and the no-dev-seed guard (which keys on `*.demo.invalid`) to ignore it. |
-| A live key lands on staging, or a test key on production | Key-mode-vs-environment assertion on first use and in every daily run → `PAYMENTS_CONFIG_INVALID`; staging profiles never hold live keys by process (`docs/operations/payments.md`). |
+| A live key lands on staging, or a test key on production | Key-mode-vs-environment assertion on first use and in every reconcile run → `PAYMENTS_CONFIG_INVALID`; staging profiles never hold live keys by process (`docs/operations/payments.md`). |
 | A student opens a checkout on a second provider and then pays both sessions | One live checkout per receivable; the first is `cancelled` on our side; a late payment on it still lands (truthful ledger) and the surplus shows as a credit the admin refunds — never a silently lost payment. |
-| A provider is removed from the list while it has open checkouts or refundable payments | An entry with no method keeps it bound for webhooks, refunds and reconcile; outright removal is loud — `unreachable` fails the daily run and a reversal answers `409 PAYMENTS_PROVIDER_NOT_ENABLED`. |
+| A provider is removed from the list while it has open checkouts or refundable payments | An entry with no method keeps it bound for webhooks, refunds and reconcile; outright removal is loud — `unreachable` fails the reconcile run and a reversal answers `409 PAYMENTS_PROVIDER_NOT_ENABLED`. |
 | Two providers issue the same payment id | References are stored `<provider>:<id>` and the checkout id columns are unique per provider. |
 | Secrets leak through argv, logs or the repository | RFC 0012 contract reused verbatim: declared by name, set through `create-secrets.sh` from the terminal, `infra-check` reports names only; the webhook handler never logs a body; `gateway_events.error` is a truncated message. |
 | Decimal money from a provider is parsed with floating point | `decimalToMinor` is string-based, exponent-aware, throws on excess digits, and is the only conversion path; fixtures cover `180.5`, `180.50`, `0.01`, `1000000.00`. |
@@ -845,6 +1012,10 @@ its refund.
 | Scope creep toward autopay, storefront or splits | Each is a named Alternative with its own future RFC; the schema deliberately has no customer, product or split table. |
 | The anonymous POST surface becomes a DoS vector for signature verification | IP-keyed limiter runs before the body is read; body bound at 64 KiB; `401` paths do no I/O. |
 | A student creates and abandons checkouts in a loop | Per-user limiter (10/h) and one live checkout per receivable; abandoned sessions expire by the provider's clock and ours. |
+| The reconcile run hits a Workers limit (subrequests, CPU, 15 minutes of wall time) or slows the daily jobs as open checkouts grow | It runs in its own hourly invocation, apart from billing, the sweep and the mission reconcile; at most 25 checkouts and 10 events per run, one at a time, 10-second timeout each; the remainder is counted as `deferred` and visible in `job_runs`, never dropped. |
+| The account's Cron Trigger allowance (5 per account on Workers Free, 1,000 on Paid — every label × environment Worker carries each expression) or the CPU limit per Cron Trigger (10 ms on Free) does not cover a second expression | Phase 5 confirms both before deploying. Fallback with no second trigger: the single trigger becomes hourly and the three daily jobs run only when `controller.scheduledTime` falls in the 06:00 UTC hour. |
+| The provider accepts a refund and our reversal is never written, or its notification lands first | §5: the route reads the payment before refunding and is idempotent on the provider's refund id; a lost write answers `503 PAYMENTS_REFUND_UNRECORDED`; the ledger total is right in every case and only the `reverses_id` link can be missing, which is accepted and documented. |
+| Mercado Pago's notification id is not the field assumed, or its retry schedule differs from what we expect | The event key is a de-duplication aid only: the ledger index still admits one row per payment or refund, and the reconcile run recovers without any provider retry. Phase 2 pins the field against recorded sandbox deliveries; nothing in the design depends on the retry schedule. |
 
 ## Success Criteria
 
@@ -854,26 +1025,36 @@ its refund.
   `POST /v1/auth/login` with its e-mail is `401`, and `GET /v1/admin/users` does not list it.
 - **S2 (Phase 2).** With the sandbox fixtures: a verified `payment` event lands exactly one
   ledger row with `method = 'gateway'`, `recorded_by = 'system:payment-gateway'` and the
-  provider payment id; the same event delivered three times leaves one ledger row and three
-  `gateway_events` rows (`applied`, `duplicate`, `duplicate`); a tampered body is `401` and
+  provider payment id; the same event delivered three times leaves one ledger row and **one**
+  `gateway_events` row (`applied`), the second and third deliveries answered `200`
+  `duplicate`; an event whose first attempt failed (`503`) is processed on its next delivery
+  and ends `applied` with `attempts = 2`; a `pending` event is `ignored` and the approval
+  that follows lands; a tampered body is `401` and
   leaves no row anywhere; an event for an unknown payment is `200` and an `orphan`; an event
   whose payment is in another currency is `200`, a `mismatch`, and no ledger row.
 - **S3 (Phase 3).** A student creating a checkout for another student's invoice gets `404`;
   for a `paid` invoice `409`; twice for the same open invoice gets the same `checkoutId`;
   with `PAYMENTS_PROVIDERS = none` the route is `404`. Reversing a gateway payment writes the
-  reversal only after the provider accepts, with the refund id as `external_reference`.
+  reversal only after the provider accepts, with the refund id as `external_reference`. A
+  checkout for which the provider granted 30 minutes is stored with that expiry, not 24 h,
+  and a second *Pay* with under 5 minutes left returns a new checkout. A refund retried
+  after its notification already landed answers `200` with the existing row and writes
+  nothing.
 - **S4 (Phase 3).** A checkout whose webhook is dropped in the test harness is landed by
-  `reconcile-payments` on the next run; `job_runs` holds a `reconcile_payments` row with
-  `landed: 1`.
+  `reconcile-payments` on the next run, while the checkout is still unexpired; `job_runs`
+  holds a `reconcile_payments` row with `landed: 1`. With 30 checkouts due, one run asks the
+  provider about 25 and records `deferred: 5`. `scheduled()` called with the hourly
+  expression runs only `reconcile-payments`; called with the daily one it runs billing, the
+  sweep and the mission reconcile and not `reconcile-payments`.
 - **S5 (Phase 4).** At 390 px a demo student on budo staging sees *Pay* on an open invoice,
-  completes a simulated Pix in the sandbox, returns, sees "payment processing" then *Paid
-  online*; the same invoice shows on `/dashboard` as a *payment due* card with *Pay* before
+  completes a simulated Pix in the sandbox, returns, sees "payment processing" and then,
+  without reloading, *Paid online*; the same invoice shows on `/dashboard` as a *payment due* card with *Pay* before
   the payment and is gone after it; the admin ledger shows the row with the provider id and a working dashboard link.
 - **S6 (Phase 5).** `make infra-check-staging LABEL=budo` lists the bound provider's
   `PAYMENTS_<PROVIDER>_SECRET_KEY` and `PAYMENTS_<PROVIDER>_WEBHOOK_SECRET` as present on budo
   staging and names none for arenaquest staging (`PAYMENTS_PROVIDERS = none`, so not required); no secret value appears in any CI
   log or in `git grep`.
-- **S7 (Phase 5).** Deploying budo staging with a live-mode key makes the daily run `failed`
+- **S7 (Phase 5).** Deploying budo staging with a live-mode key makes the next reconcile run `failed`
   with `PAYMENTS_CONFIG_INVALID` and makes `POST /v1/me/billing/checkouts` answer `500`
   `PAYMENTS_CONFIG_INVALID`, not a live charge.
 - **S8 (invariant).** `git diff main` touches no file under `routes/topics*`, `routes/public/`,
@@ -910,8 +1091,9 @@ below, in the same order.
 | R11 | **The student's Pay action, and where it appears.** `POST /v1/me/billing/checkouts { kind, id, provider? }` + `GET /v1/me/billing/checkouts/{id}`; return URLs on `/settings/billing?checkout=…&outcome=…` are hints only. v1 includes (a) the **admin on-behalf** link routes, (b) the *Pay* link in the two existing reminder e-mails (copy only), and (c) — added by the owner — a ***payment due* card on the student dashboard** whenever a contract invoice is open, with the same Pay action (§7). *(Open Question 5.)* | 2026-11-18 | Product owner |
 | R12 | **The webhook surface.** `POST /v1/webhooks/payments/{provider}` mounted from `routes/index.ts` beside `/events`, not under `routes/public/`; IP limiter 120 rpm → 64 KiB body bound → signature on raw bytes with a **5-minute** tolerance (also the replay window) → event-id de-dup → fetch-to-confirm → land in one batch; `401` writes nothing, verified-but-unusable is `200` + an exception row, our own failure is `503`. *(Open Question 6.)* | 2026-11-18 | Product owner |
 | R13 | **Configuration and secrets.** Var `PAYMENTS_PROVIDERS` (default `none`, otherwise the list of §8.1) plus two secrets per bound provider, `PAYMENTS_<PROVIDER>_SECRET_KEY` / `PAYMENTS_<PROVIDER>_WEBHOOK_SECRET`, declared in `deployment.schema.jsonc` with `requiredWhen: "PAYMENTS_PROVIDERS~=<provider>"` — `requiredWhenActive` gains the contains operator `~=` — detected by name, never written by provisioning; sandbox keys on staging enforced by the key-mode assertion; the webhook URL registered by the operator per label × environment. *(Open Question 7.)* | 2026-11-18 | Product owner |
-| R14 | **Edge money cases.** A checkout is for the full balance; the ledger lands **what the provider captured**; an overpayment shows as a credit and is the admin's to refund; a **currency mismatch lands nothing** (`mismatch` + alert); **partial refunds** and **lost disputes** land as negative gateway rows keyed on the refund/dispute id (`reverses_id = NULL`); an **opened dispute** alerts and sets a `billing_standing_hold` ("payment under dispute") on the **contract rail only**, never on extras (RFC 0015 #9). The daily run expires checkouts after fetch-to-confirm, retries failed events up to 5 times, and asserts the key mode. *(Open Question 8.)* | 2026-11-18 | Product owner |
+| R14 | **Edge money cases.** A checkout is for the full balance; the ledger lands **what the provider captured**; an overpayment shows as a credit and is the admin's to refund; a **currency mismatch lands nothing** (`mismatch` + alert); **partial refunds** and **lost disputes** land as negative gateway rows keyed on the refund/dispute id (`reverses_id = NULL`); an **opened dispute** alerts and sets a `billing_standing_hold` ("payment under dispute") on the **contract rail only**, never on extras (RFC 0015 #9). The reconcile run expires checkouts after fetch-to-confirm, retries unsettled events, and asserts the key mode (its cadence, caps and retry bound are §6's, revised by R16). *(Open Question 8.)* | 2026-11-18 | Product owner |
 | R15 | **What the admin sees.** Gateway rows on the ledger with the provider id and a dashboard deep link; `pendingCheckout` on roster and both statements as "pending online payment"; refund confirmation on reverse; an **exceptions panel in v1** for orphans, mismatches, failed events and disputes, where a manual match records through the ordinary admin payment form with `method = 'gateway'`. Content creators and tutors see nothing (RFC 0013 #5). *(Open Question 9.)* | 2026-11-18 | Product owner |
+| R16 | **Design review adopted (points 1–6).** (1) A known event is answered `duplicate` only when its stored outcome is settled; `failed` and `received` are processed again and `attempts` incremented (§4 step 5, §2). (2) The fetched payment status decides what an event does — `pending` is `ignored` and the checkout stays open — and `eventId` is the notification's id, never the payment's (§1 rule 4, §4 step 6). (3) Reconciliation runs on its own hourly Cron Trigger, capped at 25 checkouts and 10 events per run, and asks about checkouts that have not expired yet (§6). (4) The stored expiry is `min(provider's, now + 24 h)`, and a checkout with under 5 minutes left is not reused (§3 steps 4 and 6). (5) A refund the provider accepted but the ledger did not record is recovered by an idempotent retry; the missing `reverses_id` link is accepted (§5). (6) The return page polls for about a minute (§3). Point 7 of the review — one provider in v1 — is recorded as Alternative 14 and **not** adopted: R6 and R13 stand. Estimate ~12 → ~13 dev days. | 2026-11-26 | Design review, relayed by the product owner |
 
 ## References
 
@@ -952,5 +1134,15 @@ below, in the same order.
   endpoint](https://docs.asaas.com/docs/receive-asaas-events-at-your-webhook-endpoint),
   [create a webhook via the API](https://docs.asaas.com/docs/create-new-webhook-via-api),
   [token requirement changelog](https://docs.asaas.com/changelog/obrigatoriedade-e-auto-geração-de-tokens-para-webhooks).
+- Consulted on 2026-11-26 for the design review: Cloudflare — [Workers
+  limits](https://developers.cloudflare.com/workers/platform/limits/) (subrequests per
+  invocation, CPU time and wall time per Cron Trigger, Cron Triggers per account), the
+  [scheduled handler](https://developers.cloudflare.com/workers/runtime-apis/handlers/scheduled/)
+  (`controller.cron`, several triggers on one Worker), [Cron
+  Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/); Mercado
+  Pago — [webhooks](https://www.mercadopago.com/developers/en/docs/your-integrations/notifications/webhooks)
+  (the body's `id`, `action` and `data.id`; `x-signature` computed over `data.id`,
+  `x-request-id` and `ts`). Mercado Pago's retry schedule was not confirmed, and nothing in
+  the design depends on it.
 - Memory of the closeout session: `rfc-0013-billing-closeout-and-gateway-next.md` (the
   friction list this RFC's Open Questions — now R7–R15 — followed).
