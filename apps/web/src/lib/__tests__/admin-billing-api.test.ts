@@ -285,3 +285,83 @@ describe('createAdminBillingApi — online payments (RFC 0026)', () => {
       .catch((error: AdminBillingApiError) => expect(error.existingPaymentId).toBeNull());
   });
 });
+
+describe('createAdminBillingApi — payment exceptions and reconcile (RFC 0026 §7)', () => {
+  it('reads the exceptions list and unwraps it', async () => {
+    const row = { ref: 'event:stripe:evt_1', kind: 'orphan' };
+    const { http, api } = apiWith(makeResponse({ jsonData: { exceptions: [row] } }));
+    await expect(api.gateway.listExceptions()).resolves.toEqual([row]);
+    expect(http).toHaveBeenCalledWith('GET', '/admin/billing/payments/exceptions');
+  });
+
+  it('answers an empty list when the body carries none', async () => {
+    const { api } = apiWith(makeResponse({ jsonData: {} }));
+    await expect(api.gateway.listExceptions()).resolves.toEqual([]);
+  });
+
+  it('tells a 403 on the list apart from any other failure', async () => {
+    const forbidden = apiWith(makeResponse({ ok: false, status: 403, jsonData: { error: 'Forbidden' } }));
+    await forbidden.api.gateway.listExceptions().then(
+      () => expect.unreachable(),
+      (error: AdminBillingApiError) => expect(error.exceptionsKind).toBe('forbidden'),
+    );
+    const broken = apiWith(makeResponse({ ok: false, status: 500, jsonData: {} }));
+    await broken.api.gateway.listExceptions().then(
+      () => expect.unreachable(),
+      (error: AdminBillingApiError) => {
+        expect(error.exceptionsKind).toBe('unknown');
+        expect(error.code).toBe('BILLING_PAYMENT_EXCEPTIONS_FAILED');
+      },
+    );
+  });
+
+  it('dismisses with the ref as given and the trimmed note — a strict two-key body', async () => {
+    const { http, api } = apiWith(
+      makeResponse({ jsonData: { ref: 'checkout:c1', dismissedBy: 'a1', dismissedAt: 'now' } }),
+    );
+    await api.gateway.dismissException({ ref: 'checkout:c1', note: '  seen  ' });
+    expect(http).toHaveBeenCalledWith('POST', '/admin/billing/payments/exceptions/dismiss', {
+      body: JSON.stringify({ ref: 'checkout:c1', note: 'seen' }),
+    });
+  });
+
+  it('maps every documented refusal of a dismissal to one kind', async () => {
+    const cases = [
+      [404, 'NotFound', 'gone'],
+      [400, 'ValidationError', 'invalid'],
+      [403, 'Forbidden', 'forbidden'],
+      [500, 'Boom', 'unknown'],
+    ] as const;
+    for (const [status, error, kind] of cases) {
+      const { api } = apiWith(makeResponse({ ok: false, status, jsonData: { error } }));
+      await api.gateway.dismissException({ ref: 'checkout:c1', note: 'n' }).then(
+        () => expect.unreachable(),
+        (thrown: AdminBillingApiError) => expect(thrown.dismissKind).toBe(kind),
+      );
+    }
+  });
+
+  it('posts the reconcile run as an empty JSON object and hands back a failed run as data', async () => {
+    const run = { status: 'failed', error: 'unreachable', summary: { unreachable: 1 } };
+    const { http, api } = apiWith(makeResponse({ jsonData: run }));
+    // A failed run is a `200`: it must reach the caller, not be thrown.
+    await expect(api.gateway.reconcile()).resolves.toEqual(run);
+    expect(http).toHaveBeenCalledWith('POST', '/admin/billing/payments/reconcile', { body: '{}' });
+  });
+
+  it('maps every documented refusal of a reconcile run to one kind', async () => {
+    const cases = [
+      [404, 'NotFound', 'off'],
+      [500, 'PAYMENTS_CONFIG_INVALID', 'configuration'],
+      [403, 'Forbidden', 'forbidden'],
+      [500, 'Boom', 'unknown'],
+    ] as const;
+    for (const [status, error, kind] of cases) {
+      const { api } = apiWith(makeResponse({ ok: false, status, jsonData: { error } }));
+      await api.gateway.reconcile().then(
+        () => expect.unreachable(),
+        (thrown: AdminBillingApiError) => expect(thrown.reconcileKind).toBe(kind),
+      );
+    }
+  });
+});

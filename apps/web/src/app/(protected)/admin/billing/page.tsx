@@ -14,9 +14,11 @@ import { LedgerTab } from './ledger-tab';
 import { ReportsTab } from './reports-tab';
 import { PlansTab } from './plans-tab';
 import { ExtrasTab } from './extras-tab';
+import { ExceptionsTab } from './exceptions-tab';
+import type { LedgerDestination } from './exception-dialogs';
 import type { SignableStudent } from './sign-contract-dialog';
 
-const TABS = ['students', 'ledger', 'extras', 'reports', 'plans'] as const;
+const TABS = ['students', 'ledger', 'extras', 'exceptions', 'reports', 'plans'] as const;
 type Tab = (typeof TABS)[number];
 
 /**
@@ -72,6 +74,7 @@ function AdminBillingConsole() {
     students: null,
     ledger: null,
     extras: null,
+    exceptions: null,
     reports: null,
     plans: null,
   });
@@ -93,6 +96,29 @@ function AdminBillingConsole() {
    * way to get them.
    */
   const [students, setStudents] = useState<SignableStudent[]>([]);
+
+  /**
+   * Open payment exceptions (RFC 0026 §7) — the tab's badge. An exception is
+   * how an admin learns that money arrived that the ledger does not explain,
+   * so the count is read when the console opens rather than when the tab is;
+   * the tab reports the fresh figure after each of its own reads. A failed
+   * read shows no badge: the tab itself says what went wrong.
+   */
+  const [exceptionCount, setExceptionCount] = useState(0);
+
+  /** Where *Refund* on a landed payment sends the admin (decision 23). */
+  const [ledgerUserId, setLedgerUserId] = useState<string | undefined>(undefined);
+  const [extrasEventId, setExtrasEventId] = useState<string | undefined>(deepLink.eventId);
+
+  const openLedgerEntry = useCallback((destination: LedgerDestination) => {
+    if (destination.tab === 'ledger') {
+      setLedgerUserId(destination.userId);
+      setTab('ledger');
+    } else {
+      setExtrasEventId(destination.eventId);
+      setTab('extras');
+    }
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -121,6 +147,22 @@ function AdminBillingConsole() {
       cancelled = true;
     };
   }, [client, isAdmin, d.money.resolveError]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const exceptions = await client.adminBilling.gateway.listExceptions();
+        if (!cancelled) setExceptionCount(exceptions.length);
+      } catch {
+        if (!cancelled) setExceptionCount(0);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [client, isAdmin]);
 
   // The billing API keys everything on `userId`; the names come from the users
   // directory so the console reads as people rather than as identifiers.
@@ -224,6 +266,15 @@ function AdminBillingConsole() {
             }`}
           >
             {d.tabs[name]}
+            {name === 'exceptions' && exceptionCount > 0 && (
+              <span
+                data-testid="exceptions-badge"
+                aria-label={d.gateway.exceptions.countLabel(exceptionCount)}
+                className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-white"
+              >
+                {exceptionCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -251,7 +302,12 @@ function AdminBillingConsole() {
         hidden={tab !== 'ledger'}
       >
         {tab === 'ledger' && (
-          <LedgerTab currency={currency} nameOf={nameOf} students={students} />
+          <LedgerTab
+            currency={currency}
+            nameOf={nameOf}
+            students={students}
+            initialUserId={ledgerUserId}
+          />
         )}
       </div>
 
@@ -266,7 +322,24 @@ function AdminBillingConsole() {
             currency={currency}
             nameOf={nameOf}
             students={students}
-            initialEventId={deepLink.eventId}
+            initialEventId={extrasEventId}
+          />
+        )}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="billing-panel-exceptions"
+        aria-labelledby="billing-tab-exceptions"
+        hidden={tab !== 'exceptions'}
+      >
+        {tab === 'exceptions' && (
+          <ExceptionsTab
+            currency={currency}
+            nameOf={nameOf}
+            students={students}
+            onCountChange={setExceptionCount}
+            onOpenLedger={openLedgerEntry}
           />
         )}
       </div>

@@ -1241,6 +1241,7 @@ export const dictPt = {
         students: 'Alunos',
         ledger: 'Lançamentos',
         extras: 'Extras',
+        exceptions: 'Exceções de pagamento',
         reports: 'Relatórios',
         plans: 'Planos',
       },
@@ -1485,6 +1486,209 @@ export const dictPt = {
             `Este recebível tem um checkout online aberto (expira ${expiresAt}), então o aluno ainda pode pagar por ele. Você pode registrar este pagamento mesmo assim; o checkout expira sozinho.`,
           recordedWithOpenCheckout: (expiresAt: string) =>
             `Pagamento registrado. Um checkout online continua aberto até ${expiresAt}; ele expira sozinho.`,
+        },
+        exceptions: {
+          heading: 'Exceções de pagamento',
+          intro:
+            'Tudo o que o provedor de pagamento informou e que não pôde ser resolvido sozinho, do mais antigo para o mais novo. A lista vazia é o estado normal. Cada linha sai da lista de três formas: conciliar manualmente, estornar ou dispensar com uma nota.',
+          noGateNote:
+            'Nada aqui muda o que um aluno pode ver. Uma exceção trata de dinheiro que ainda não está explicado no livro, e de nada mais.',
+          countLabel: (count: number) => (count === 1 ? '1 aberta' : `${count} abertas`),
+          listLabel: 'Exceções de pagamento abertas',
+          loading: 'Carregando as exceções de pagamento…',
+          loadError: 'Não foi possível carregar as exceções de pagamento.',
+          reload: 'Recarregar',
+          empty: {
+            title: 'Nenhuma exceção de pagamento',
+            body: 'Todo pagamento informado pelo provedor está no livro ou foi dispensado. Não há nada a fazer aqui.',
+          },
+          kind: {
+            orphan: 'Pagamento órfão',
+            mismatch: 'Divergência',
+            failed: 'Falha no processamento',
+            received: 'Não processado',
+            dispute: 'Contestação',
+          },
+          explanation: {
+            orphan:
+              'O provedor recebeu um pagamento que não aponta para nenhum checkout criado aqui, então ele não está em nenhuma fatura ou cobrança. Descubra quem pagou e concilie manualmente, ou estorne no provedor.',
+            mismatch:
+              'Chegou um pagamento para este checkout, mas ele não confere — outra moeda, ou um recebível que já não podia recebê-lo. Nada foi registrado no livro.',
+            failed:
+              'A notificação não pôde ser processada. Ela é tentada de novo sozinha a cada hora, por 72 horas; aja apenas se continuar falhando.',
+            received:
+              'A notificação chegou há mais de uma hora e nunca foi concluída. A próxima conciliação tenta de novo.',
+            dispute:
+              'O pagador contestou este pagamento no provedor (chargeback). O pagamento está no livro; o provedor decide a contestação, e uma contestação perdida volta como estorno.',
+          },
+          fields: {
+            provider: 'Provedor',
+            payment: 'Pagamento no provedor',
+            event: 'Id da notificação',
+            eventType: 'Tipo da notificação',
+            checkout: 'Checkout',
+            age: 'Idade',
+            attempts: 'Tentativas',
+            student: 'Aluno',
+            receivable: 'Recebível',
+            amount: 'Valor',
+            detail: 'O que ficou registrado',
+          },
+          paymentIdUnknown: 'O id do pagamento no provedor não é conhecido.',
+          noDashboardLink: (provider: string) =>
+            `Não há link direto para ${provider}: procure o id no painel do provedor.`,
+          receivableKind: {
+            invoice: (reference: string) => `Fatura ${reference}`,
+            event_charge: (reference: string) => `Cobrança de evento ${reference}`,
+          },
+          amountAsked: (amount: string) => `${amount} — o que o checkout pediu`,
+          amountUnknown: 'Não é conhecido aqui. O painel do provedor mostra o que foi pago.',
+          studentUnknown: 'Não conhecido',
+          age: {
+            justNow: 'menos de um minuto',
+            minutes: (count: number) => (count === 1 ? '1 minuto' : `${count} minutos`),
+            hours: (count: number) => (count === 1 ? '1 hora' : `${count} horas`),
+            days: (count: number) => (count === 1 ? '1 dia' : `${count} dias`),
+          },
+          ageLine: (age: string, when: string) => `${age} · desde ${when}`,
+          attempts: (count: number) => (count === 1 ? '1 tentativa' : `${count} tentativas`),
+          sameCheckout:
+            'Outra linha desta lista trata do mesmo checkout. Dispensar uma mantém a outra.',
+          actionsLabel: (kind: string) => `Ações para: ${kind}`,
+          actions: {
+            match: 'Conciliar manualmente',
+            refund: 'Estornar',
+            dismiss: 'Dispensar',
+          },
+          dismiss: {
+            dialogTitle: 'Dispensar uma exceção de pagamento',
+            explainer:
+              'Dispensar tira a linha desta lista e registra quem fez, quando e por quê. Não altera nenhum pagamento, fatura ou cobrança.',
+            target: (kind: string, provider: string) => `${kind} · ${provider}`,
+            noteLabel: 'Por que está sendo dispensada',
+            notePlaceholder: 'ex.: Estornado no provedor em 12/11; nada era devido.',
+            noteRequired: 'Escreva uma nota: uma exceção não pode ser dispensada sem ela.',
+            noteTooLong: (max: number) => `A nota pode ter no máximo ${max} caracteres.`,
+            counter: (length: number, max: number) => `${length}/${max}`,
+            submit: 'Dispensar',
+            cancel: 'Cancelar',
+            success: 'Exceção dispensada. Ela saiu da lista.',
+            gone: 'Essa exceção já não estava na lista: já tinha sido dispensada ou resolvida.',
+            errors: {
+              invalid: 'A nota foi recusada. Ela precisa ter de 1 a 500 caracteres.',
+              forbidden: 'Apenas um administrador pode dispensar uma exceção de pagamento.',
+              unknown: 'Não foi possível dispensar a exceção. Nada mudou.',
+            },
+          },
+          match: {
+            dialogTitle: 'Conciliar um pagamento manualmente',
+            explainer:
+              'Escolha quem pagou e o que está sendo pago. O formulário de pagamento abre em seguida com o método Online e a referência do provedor preenchida; registrar o pagamento dispensa esta exceção.',
+            studentHeading: 'Aluno',
+            searchLabel: 'Buscar por nome ou e-mail',
+            searchPlaceholder: 'Nome ou e-mail',
+            studentEmpty: 'Nenhum aluno corresponde à busca.',
+            studentMore: (count: number) => `Mais ${count} — refine a busca.`,
+            pickStudent: (name: string) => `Escolher ${name}`,
+            studentFromCheckout: 'O aluno do checkout pelo qual este pagamento chegou.',
+            changeStudent: 'Escolher outro aluno',
+            receivableHeading: 'Recebíveis em aberto',
+            loadingStatement: 'Carregando o extrato do aluno…',
+            statementError: 'Não foi possível carregar o extrato do aluno.',
+            noOpenReceivable:
+              'Este aluno não tem fatura ou cobrança em aberto para receber o pagamento. Escolha outro aluno ou estorne o pagamento no provedor.',
+            invoiceOption: (reference: string, dueDate: string) =>
+              `Fatura ${reference} · vence em ${dueDate}`,
+            chargeOption: (title: string, dueDate: string) => `${title} · vence em ${dueDate}`,
+            balance: (amount: string) => `Saldo ${amount}`,
+            fromCheckout: 'o checkout era para este',
+            pickReceivable: (label: string) => `Registrar o pagamento em ${label}`,
+            amountHint:
+              'O valor não vem preenchido: informe o que o painel do provedor mostra que foi pago.',
+            cancel: 'Cancelar',
+            finishing: 'Pagamento registrado. Dispensando a exceção…',
+            success: (reference: string) =>
+              `Pagamento ${reference} registrado e exceção dispensada.`,
+            successNotDismissed: (reference: string) =>
+              `O pagamento ${reference} foi registrado, mas não foi possível dispensar a exceção. Dispense-a manualmente.`,
+            note: (payment: string, reference: string) =>
+              `Conciliado manualmente: registrado como o pagamento ${payment} (${reference}).`,
+            already: {
+              title: 'Este pagamento já está no livro',
+              body: (payment: string) =>
+                `A referência do provedor já pertence ao pagamento ${payment} do livro, então nada foi registrado. O dinheiro está contabilizado; esta exceção só precisa sair da lista.`,
+              dismiss: 'Dispensar a exceção',
+              keep: 'Manter na lista',
+              note: (payment: string) =>
+                `Já está no livro como o pagamento ${payment}; nada mais a registrar.`,
+              success: 'O pagamento já estava no livro. Exceção dispensada.',
+            },
+          },
+          refund: {
+            dialogTitle: 'Estornar',
+            close: 'Fechar',
+            atProvider: {
+              explainer:
+                'Este pagamento não está em nenhuma fatura ou cobrança, então o livro não deve nada de volta. O estorno é feito no painel do provedor, não aqui.',
+              noPaymentId:
+                'O id do pagamento no provedor não é conhecido para esta linha. Encontre o pagamento no painel do provedor pelo id da notificação.',
+              afterHint:
+                'Depois de estornar lá, dispense esta linha com uma nota. O provedor pode informar o estorno como outra linha aqui; dispense essa também.',
+              dismissNow: 'Dispensar esta linha',
+            },
+            onLedger: {
+              explainer:
+                'Este pagamento está no livro. Ele é estornado a partir do seu lançamento — o estorno comum, que pede ao provedor a devolução do dinheiro e grava o estorno quando o provedor aceita.',
+              target: (student: string, receivable: string) => `${student} · ${receivable}`,
+              openLedger: 'Abrir o lançamento no livro',
+              openExtras: 'Abrir a cobrança em Extras',
+              resolveError: 'Não foi possível encontrar a cobrança. Abra a aba Extras e procure por ela.',
+            },
+          },
+          reconcile: {
+            heading: 'Conciliação',
+            explainer:
+              'Pergunta ao provedor sobre cada checkout que ainda está aguardando e tenta de novo as notificações que não terminaram — o mesmo que roda sozinho a cada hora.',
+            button: 'Conciliar agora',
+            running: 'Conciliando…',
+            ok: 'Conciliação concluída.',
+            failed: (reason: string) => `A conciliação falhou: ${reason}`,
+            failedNoReason: 'A conciliação falhou. A execução ficou registrada com o motivo.',
+            off: 'Os pagamentos online estão desligados neste label, então não há o que conciliar. Nada foi executado.',
+            configuration:
+              'Os pagamentos online estão mal configurados neste label. Nada foi perguntado a um provedor; a execução com falha ficou registrada.',
+            unknown: 'Não foi possível executar a conciliação.',
+            summaryLabel: 'Resultado da conciliação',
+            headline: {
+              confirmed: 'Checkouts confirmados',
+              landed: 'Pagamentos lançados',
+              expired: 'Checkouts expirados',
+              deferred: 'Deixados para a próxima execução',
+              retried: 'Notificações tentadas de novo',
+              stale: 'Exceções com mais de 7 dias',
+              unreachable: 'Inalcançáveis',
+            },
+            allCounts: 'Todas as contagens',
+            counts: {
+              checkoutsDue: 'Checkouts a verificar',
+              checkoutsAsked: 'Checkouts perguntados ao provedor',
+              landed: 'Pagamentos lançados',
+              expired: 'Checkouts expirados',
+              stillOpen: 'Checkouts ainda abertos',
+              abandoned: 'Checkouts abandonados (sem sessão no provedor)',
+              unreachable: 'Checkouts em um provedor que não está mais vinculado',
+              mismatched: 'Checkouts com divergência',
+              checkoutErrors: 'Checkouts que o provedor não soube responder',
+              checkoutsDeferred: 'Checkouts deixados para a próxima execução',
+              eventsDue: 'Notificações a processar',
+              eventsRetried: 'Notificações tentadas de novo',
+              eventsSettled: 'Notificações resolvidas',
+              eventsFailed: 'Notificações que falharam de novo',
+              eventsDeferred: 'Notificações deixadas para a próxima execução',
+              staleOrphans: 'Órfãos com mais de 7 dias',
+              staleMismatches: 'Divergências com mais de 7 dias',
+            },
+          },
         },
       },
       ledger: {
