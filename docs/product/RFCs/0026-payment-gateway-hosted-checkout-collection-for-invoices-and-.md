@@ -1,7 +1,7 @@
 # RFC 0026: Payment gateway: hosted checkout collection for invoices and event charges
 
 **Date:** 2026-11-16
-**Status:** Draft
+**Status:** Approved
 **Author:** raphaelsilva
 **Revised:** 2026-11-17 (a tenant may enable several providers and combine their methods — §8.1, R6; the single `PAYMENTS_PROVIDER` var became the `PAYMENTS_PROVIDERS` list and the secrets became provider-prefixed) · 2026-11-18 (the nine Open Questions answered by the owner — R7–R15; first adapter Mercado Pago; a *Pay* card on the student dashboard added to v1) · 2026-11-26 (design review, R16: a failed webhook event is processed again on the provider's retry instead of being answered as a duplicate; the fetched payment status decides what an event does; reconciliation moved to its own hourly, capped Cron Trigger and also asks about checkouts that have not expired yet; the stored expiry is the provider's when it is earlier; refund recovery when the provider accepts and the ledger write is lost; the return page polls; ~13 dev days)
 **Affected:**
