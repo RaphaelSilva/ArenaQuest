@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { BillingService } from '@api/core/billing/billing-service';
+import { BillingService, statementPayLink } from '@api/core/billing/billing-service';
 import { FakeBillingRepository } from '../../helpers/fake-billing-repository';
 import { Entities } from '@arenaquest/shared/types/entities';
 import type { ControllerResult } from '@api/core/result';
@@ -707,5 +707,49 @@ describe('BillingService', () => {
       );
       expect(events().map((e) => e.event)).toEqual(['billing.create_plan']);
     });
+  });
+});
+
+/**
+ * The reminders' pay link (RFC 0026 §7, M30 Task 14): the statement page of
+ * the label's own web origin, and only when something there can be paid.
+ */
+describe('statementPayLink', () => {
+  const pix = [{ provider: 'mercadopago', methods: ['pix'] }];
+
+  it('answers the statement URL, with no query, when an option settles the currency', () => {
+    expect(statementPayLink(() => pix, 'https://dojo.example')('BRL')).toBe(
+      'https://dojo.example/settings/billing',
+    );
+  });
+
+  it('trims the trailing slashes of the web origin', () => {
+    expect(statementPayLink(() => pix, 'https://dojo.example//')('BRL')).toBe(
+      'https://dojo.example/settings/billing',
+    );
+  });
+
+  it('answers null with no pay option', () => {
+    expect(statementPayLink(() => [], 'https://dojo.example')('BRL')).toBeNull();
+  });
+
+  it('answers null when the only option offers no method', () => {
+    const retired = [{ provider: 'mercadopago', methods: [] }];
+    expect(statementPayLink(() => retired, 'https://dojo.example')('BRL')).toBeNull();
+  });
+
+  it('answers null when no offered method settles the currency', () => {
+    expect(statementPayLink(() => pix, 'https://dojo.example')('USD')).toBeNull();
+    // An unknown provider settles nothing.
+    const unknown = [{ provider: 'acme', methods: ['pix'] }];
+    expect(statementPayLink(() => unknown, 'https://dojo.example')('BRL')).toBeNull();
+  });
+
+  it('reads the options on every call, never at construction', () => {
+    let options = [] as typeof pix;
+    const link = statementPayLink(() => options, 'https://dojo.example');
+    expect(link('BRL')).toBeNull();
+    options = pix;
+    expect(link('BRL')).not.toBeNull();
   });
 });
