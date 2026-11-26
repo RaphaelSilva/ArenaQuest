@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { formatMoney } from '@arenaquest/shared/domain/billing/format-money';
-import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
 import type { MyBillingStatement } from '@web/lib/me-billing-api';
+import { useMyStatement } from './my-statement';
 
 /**
  * The account standing notice.
@@ -40,27 +40,13 @@ function isNotified(standing: MyBillingStatement['standing']): standing is Notif
 export function StandingBanner() {
   const dict = useDict();
   const d = dict.layout.standingBanner;
-  const client = useApiClient();
-
-  const [statement, setStatement] = useState<MyBillingStatement | null>(null);
+  // The shared read (`my-statement.ts`): the dashboard's payment due card
+  // subscribes to the same one, so the shell issues a single request. A
+  // statement that cannot be read comes back as `null` and is simply not
+  // announced — a billing notice is never worth an error banner over the
+  // whole application.
+  const { statement } = useMyStatement();
   const [dismissed, setDismissed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const data = await client.meBilling.getMyStatement();
-        if (!cancelled) setStatement(data);
-      } catch {
-        // A statement that cannot be read is simply not announced. A billing
-        // notice is never worth an error banner over the whole application.
-        if (!cancelled) setStatement(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [client]);
 
   if (dismissed || statement === null) return null;
   if (!isNotified(statement.standing)) return null;

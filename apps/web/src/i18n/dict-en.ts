@@ -2298,6 +2298,13 @@ export const dictEn = {
     },
     trackSubtitle: 'Track your progress and keep the momentum.',
     errorLoading: 'Failed to load dashboard.',
+    paymentDue: {
+      locale: 'en-US',
+      title: 'Payment due',
+      statementLink: 'Open statement',
+      dueOn: (date: string) => `Due on ${date}`,
+      overdueSince: (date: string) => `Overdue since ${date}`,
+    },
     levelCard: {
       label: 'Level & XP',
       ariaLabel: 'Level and XP',

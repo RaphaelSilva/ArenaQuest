@@ -2302,6 +2302,13 @@ export const dictPt = {
     },
     trackSubtitle: 'Acompanhe seu progresso e mantenha o ritmo.',
     errorLoading: 'Falha ao carregar o dashboard.',
+    paymentDue: {
+      locale: 'pt-BR',
+      title: 'Pagamento em aberto',
+      statementLink: 'Abrir extrato',
+      dueOn: (date: string) => `Vence em ${date}`,
+      overdueSince: (date: string) => `Em atraso desde ${date}`,
+    },
     levelCard: {
       label: 'Nível & XP',
       ariaLabel: 'Nível e XP',

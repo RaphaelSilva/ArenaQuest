@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useAuth } from '@web/hooks/use-auth';
 import { useApiClient } from '@web/context/auth-context';
 import { useDict } from '@web/context/dict-context';
@@ -15,7 +15,16 @@ import { BadgesGrid } from './BadgesGrid';
 import { Roadmap } from './Roadmap';
 import { DashboardSkeleton } from './DashboardSkeleton';
 
-export function DashboardContent() {
+type Props = {
+  /**
+   * Rendered between the greeting and the stats, whether or not the dashboard
+   * payload loaded. The page places the payment due card here; the slot adds
+   * nothing when it renders nothing.
+   */
+  notice?: ReactNode;
+};
+
+export function DashboardContent({ notice }: Props = {}) {
   const dict = useDict();
   const { user, isLoading: authLoading } = useAuth();
   const client = useApiClient();
@@ -81,6 +90,8 @@ export function DashboardContent() {
           {error}
         </div>
       )}
+
+      {notice}
 
       {data && (
         <>
