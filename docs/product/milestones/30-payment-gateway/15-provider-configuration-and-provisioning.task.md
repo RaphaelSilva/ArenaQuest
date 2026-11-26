@@ -1,6 +1,6 @@
 # Task 15 — Backend: Provider configuration schema and provisioning (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Backend API
@@ -72,17 +72,17 @@ operator exactly which two secrets a bound provider is missing.
 
 ## Acceptance Criteria
 
-- [ ] `requiredWhenActive('PAYMENTS_PROVIDERS~=mercadopago', …)` is true for
+- [x] `requiredWhenActive('PAYMENTS_PROVIDERS~=mercadopago', …)` is true for
       `mercadopago:pix+card`, for `stripe:card,mercadopago:pix` and for `mercadopago:`, and false
       for `none`, for an absent value and for `stripe:card`.
-- [ ] `make infra-check-staging LABEL=arenaquest` names no payment secret.
-- [ ] With a Worker block set to `mercadopago:pix+card`, the check lists exactly
+- [x] `make infra-check-staging LABEL=arenaquest` names no payment secret.
+- [x] With a Worker block set to `mercadopago:pix+card`, the check lists exactly
       `PAYMENTS_MERCADOPAGO_SECRET_KEY` and `PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET`, each with its
       fix command when missing, and prints no value.
-- [ ] `make set-new-label LABEL=x DRY_RUN=1` plans no write for any payment secret.
-- [ ] `node --test scripts/label.test.mjs scripts/cloudflare/provision-label.test.mjs` passes;
+- [x] `make set-new-label LABEL=x DRY_RUN=1` plans no write for any payment secret.
+- [x] `node --test scripts/label.test.mjs scripts/cloudflare/provision-label.test.mjs` passes;
       `make lint` clean; `make test-api` green (no runtime file changed).
-- [ ] No diff outside the scope guardrail.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
