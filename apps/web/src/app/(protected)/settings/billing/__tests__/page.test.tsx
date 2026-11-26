@@ -78,9 +78,10 @@ describe('Student statement — the golden path', () => {
     expect(screen.getByText('-R$ 50.00')).toBeInTheDocument();
   });
 
-  // No payment affordance exists here by design: money arrives out of band and
-  // an admin records it. The page states that rather than offering a checkout.
-  it('offers no payment affordance, only the note explaining why', async () => {
+  // With no online method on the label (`payOptions: []`, the fixture default)
+  // money arrives out of band and an admin records it: the page states that
+  // rather than offering a checkout. The online case lives in `pay.test.tsx`.
+  it('offers no payment affordance without a method, only the note explaining why', async () => {
     mount(() => statementWith('delinquent'));
     expect(await screen.findByText(d.paymentNote)).toBeInTheDocument();
     expect(screen.queryAllByRole('button')).toHaveLength(0);

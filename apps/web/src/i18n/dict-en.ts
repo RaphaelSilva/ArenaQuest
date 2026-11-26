@@ -2498,6 +2498,48 @@ export const dictEn = {
         waiver: 'Waiver',
         surcharge: 'Surcharge',
       },
+      pay: {
+        note:
+          'You can pay an open invoice or charge online with the Pay button beside it. Payments made in person are still recorded by the dojo. If something here looks wrong, talk to your instructor.',
+        groupLabel: 'Online payment',
+        action: 'Pay',
+        payWith: (methods: string) => `Pay with ${methods}`,
+        method: {
+          pix: 'Pix',
+          card: 'Card',
+          boleto: 'Boleto',
+        },
+        methodSeparator: ' or ',
+        opening: 'Opening the payment page in a new tab…',
+        inProgress: (expiresAt: string) => `Payment in progress · expires at ${expiresAt}`,
+        openAgain: 'Open again',
+        blocked: 'Your browser blocked the new tab.',
+        blockedLink: 'Open the payment page',
+        errors: {
+          not_payable: 'This can no longer be paid online — it may already be paid or cancelled. Your statement was updated.',
+          provider_unavailable: 'The payment provider is unavailable right now. Please try again in a few minutes.',
+          too_many_attempts: 'Too many payment attempts. Wait a while before trying again.',
+          configuration: 'Online payment is not working at the moment. Please let your instructor know.',
+          in_progress: 'A payment is already being opened for this item. Wait a moment and try again.',
+          provider_required: 'The payment options changed. Choose how to pay again.',
+          not_found: 'This item is no longer available for online payment. Your statement was updated.',
+          unknown: 'The payment page could not be opened. Please try again.',
+        },
+        history: {
+          paidOnline: (date: string) => `Paid online · ${date}`,
+          refund: (date: string) => `Refunded · ${date}`,
+          refundedTag: 'Refunded',
+        },
+        returned: {
+          confirming: 'Confirming your payment…',
+          paid: 'Payment confirmed. Thank you!',
+          cancelled: 'The payment was not completed. You can try again whenever you like.',
+          expired: 'This payment link expired. You can pay again from your statement.',
+          failed: 'The payment could not be completed. If you were charged, talk to your instructor.',
+          still_confirming:
+            'Your payment is still being confirmed. It is safe to leave this page — your statement updates as soon as it is confirmed.',
+        },
+      },
       extras: {
         heading: 'Extras',
         intro:
