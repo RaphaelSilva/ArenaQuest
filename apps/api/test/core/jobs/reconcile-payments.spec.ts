@@ -36,6 +36,13 @@ import {
   stubPaymentsEnv,
   stubSecretKey,
 } from '../../adapters/payment/stub-gateway-adapter';
+import { MercadoPagoGatewayAdapter } from '@api/adapters/payment/mercadopago-gateway-adapter';
+import {
+  MP_FIXTURE_ACCESS_TOKEN,
+  MP_FIXTURE_WEBHOOK_SECRET,
+  mpFakeProvider,
+  mpReply,
+} from '../../fixtures/mercadopago';
 
 /**
  * The reconcile run's own rules, against doubles (RFC 0026 section 6; M30
@@ -64,6 +71,8 @@ function checkout(id: string, overrides: Partial<GatewayCheckoutRecord> = {}): G
     providerPaymentId: null,
     invoicePaymentId: null,
     chargePaymentId: null,
+    paidMethod: null,
+    paidMethodLabel: null,
     checkoutUrl: 'https://pay.invalid/x',
     expiresAt: '2026-11-27T00:00:00.000Z',
     createdAt: '2026-11-26T10:00:00.000Z',
@@ -428,13 +437,30 @@ describe('reconcilePayments — step 3, stale exceptions', () => {
   });
 });
 
-describe('reconcilePayments — step 4, the key mode', () => {
-  // A Mercado Pago `APP_USR-` key proves neither mode (M30 Task 05), so the
-  // mismatch this provider can still show is a `TEST-` key under `live`.
-  it('a test key under key mode live fails the run with PAYMENTS_CONFIG_INVALID and touches nothing', async () => {
+// M30 Task 17 — milestone decision 19 as rewritten: the key mode is declared by
+// the integrator and reported by the run. Nothing compares it with a key.
+describe('reconcilePayments — step 4, the key mode is reported, not asserted', () => {
+  it.each(['test', 'live'] as const)('reports the declared mode %s and runs, whatever the key looks like', async (mode) => {
+    const mp = new StubGatewayAdapter('mercadopago');
+    for (const key of ['APP_USR-fixture-key', 'TEST-fixture-key', 'opaque']) {
+      const wiring = buildPaymentsWiring(
+        { ...stubPaymentsEnv('mercadopago:pix', mode), PAYMENTS_MERCADOPAGO_SECRET_KEY: key },
+        stubGatewayFactories(mp),
+      );
+      const w = world({ wiring, checkouts: [checkout('c1')] });
+
+      const report = await ran(w.deps);
+
+      expect(report).toMatchObject({ status: 'ok', configInvalid: false, keyMode: mode });
+      expect(w.confirmed.map((c) => c.id)).toEqual(['c1']);
+      expect(JSON.stringify(report)).not.toContain(key);
+    }
+  });
+
+  it('an invalid PAYMENTS_KEY_MODE value fails the run with PAYMENTS_CONFIG_INVALID and touches nothing', async () => {
     const mp = new StubGatewayAdapter('mercadopago');
     const wiring = buildPaymentsWiring(
-      { ...stubPaymentsEnv('mercadopago:pix', 'test'), PAYMENTS_KEY_MODE: 'live' },
+      { ...stubPaymentsEnv('mercadopago:pix'), PAYMENTS_KEY_MODE: 'banana' },
       stubGatewayFactories(mp),
     );
     const w = world({ wiring, checkouts: [checkout('c1')], events: [eventRecord('evt-1')] });
@@ -444,22 +470,71 @@ describe('reconcilePayments — step 4, the key mode', () => {
 
     expect(report.status).toBe('failed');
     expect(report.configInvalid).toBe(true);
-    expect(report.error).toMatch(/^PAYMENTS_CONFIG_INVALID: key_mode_mismatch/);
-    expect(report.error).not.toContain(stubSecretKey('mercadopago', 'test'));
+    expect(report.keyMode).toBeNull();
+    expect(report.error).toMatch(/^PAYMENTS_CONFIG_INVALID: invalid_key_mode/);
+    expect(report.error).not.toContain(stubSecretKey('mercadopago'));
     // No step ran: an empty registry would otherwise expire every open checkout as unreachable.
     expect(w.repoCalls).toEqual([]);
     expect(w.confirmed).toEqual([]);
     expect(w.handled).toEqual([]);
   });
+});
 
-  it('a test key under key mode live fails the same way', async () => {
-    const mp = new StubGatewayAdapter('mercadopago');
-    const wiring = buildPaymentsWiring(
-      { ...stubPaymentsEnv('mercadopago:pix', 'test'), PAYMENTS_KEY_MODE: 'live' },
-      stubGatewayFactories(mp),
+// M30 Task 17 — decision 17's "35 calls worst case" holds for the real adapter:
+// one search by reference per checkout, never a preference read before it.
+describe('reconcilePayments — one provider call per checkout with the Mercado Pago adapter', () => {
+  function mercadoPagoWorld(count: number) {
+    const rows = Array.from({ length: count }, (_, i) =>
+      checkout(`0f6b1c2e-5a4d-4e8b-9c1a-${String(i).padStart(12, '0')}`, {
+        providerSessionId: `1000000001-00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+      }),
     );
-    const report = await ran(world({ wiring }).deps);
-    expect(report.error).toMatch(/^PAYMENTS_CONFIG_INVALID: key_mode_mismatch/);
+    const provider = mpFakeProvider();
+    for (const row of rows) {
+      provider.on('GET', `/v1/payments/search?external_reference=${row.id}`, mpReply(200, 'search-empty'));
+    }
+    const adapter = new MercadoPagoGatewayAdapter({
+      secretKey: MP_FIXTURE_ACCESS_TOKEN,
+      webhookSecret: MP_FIXTURE_WEBHOOK_SECRET,
+      fetch: provider.fetch,
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const repo = {
+      getCheckout: vi.fn(async (id: string) => byId.get(id) ?? null),
+      closeCheckout: vi.fn(async () => null),
+      markChecked: vi.fn(async () => {}),
+    };
+    const gatewayService = new GatewayService({
+      gateways: { get: (name) => (name === 'mercadopago' ? adapter : null) },
+      gatewayRepo: repo as unknown as IGatewayRepository,
+      billing: {} as GatewayContractLedger,
+      charges: {} as GatewayExtrasLedger,
+      now: () => NOW,
+    });
+    const w = world({ checkouts: rows });
+    return { provider, rows, deps: { ...w.deps, gatewayService } satisfies ReconcilePaymentsDeps };
+  }
+
+  it('25 due checkouts are 25 provider calls, each a search on the checkout id', async () => {
+    const { provider, rows, deps } = mercadoPagoWorld(25);
+
+    const report = await ran(deps);
+
+    expect(report.summary).toMatchObject({ checkoutsDue: 25, checkoutsAsked: 25, stillOpen: 25, checkoutsDeferred: 0 });
+    expect(provider.calls).toHaveLength(25);
+    expect(provider.calls.map((c) => `${c.method} ${c.path}`)).toEqual(
+      rows.map((row) => `GET /v1/payments/search?external_reference=${row.id}`),
+    );
+    expect(provider.calls.some((c) => c.path.startsWith('/checkout/preferences'))).toBe(false);
+  });
+
+  it('30 due checkouts are still 25 calls: the cap counts provider calls one for one', async () => {
+    const { provider, deps } = mercadoPagoWorld(30);
+
+    const report = await ran(deps);
+
+    expect(report.summary).toMatchObject({ checkoutsDue: 30, checkoutsAsked: 25, checkoutsDeferred: 5 });
+    expect(provider.calls).toHaveLength(RECONCILE_MAX_CHECKOUTS);
   });
 });
 
@@ -476,6 +551,8 @@ describe('runReconcilePayments — one job_runs row per run', () => {
     const [, finish] = jobRuns.finishes[0];
     expect(finish.status).toBe(JobRunStatus.OK);
     expect(finish.summary).toMatchObject({ checkoutsAsked: 1, landed: 1, eventsRetried: 1, eventsSettled: 1 });
+    // The declared key mode rides the counts as a flag: 0 = test, 1 = live.
+    expect(finish.summary).toMatchObject({ keyModeLive: 0 });
     for (const value of Object.values(finish.summary ?? {})) expect(Number.isInteger(value)).toBe(true);
     expect(finish.error ?? null).toBeNull();
   });
@@ -508,8 +585,9 @@ describe('runReconcilePayments — one job_runs row per run', () => {
     const outcome = reconcilePaymentsOutcome({
       ran: true,
       status: 'failed',
-      error: 'PAYMENTS_CONFIG_INVALID: key_mode_mismatch (x)',
+      error: 'PAYMENTS_CONFIG_INVALID: invalid_key_mode (x)',
       configInvalid: true,
+      keyMode: null,
       summary: {
         checkoutsDue: 0, checkoutsAsked: 0, landed: 0, expired: 0, stillOpen: 0, abandoned: 0, unreachable: 0,
         mismatched: 0, checkoutErrors: 0, checkoutsDeferred: 0, eventsDue: 0, eventsRetried: 0, eventsSettled: 0,

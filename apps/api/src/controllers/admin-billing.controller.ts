@@ -38,9 +38,11 @@ import {
   type IssueEventChargesResult,
 } from '@api/core/billing/event-charge-service';
 import {
+  NO_GATEWAY_PAID_METHOD,
   PAYMENTS_PROVIDER_NOT_ENABLED,
   type CheckoutSession,
   type DismissedException,
+  type GatewayPaidMethod,
   type GatewayService,
   type PaymentExceptionView,
 } from '@api/core/payments/gateway-service';
@@ -273,6 +275,7 @@ export type AdminPayments = Pick<
   | 'refundChargePayment'
   | 'listLiveCheckouts'
   | 'findLiveCheckout'
+  | 'paidMethodsOf'
   | 'listExceptions'
   | 'dismissException'
 >;
@@ -287,6 +290,8 @@ export type PaymentsReconcileRunner = (actorId: string) => Promise<ReconcilePaym
 export interface PaymentsReconcileRun {
   status: 'ok' | 'failed';
   error: string | null;
+  /** What `PAYMENTS_KEY_MODE` declares here — a reminder, verified against nothing. */
+  keyMode: 'test' | 'live';
   summary: ReconcilePaymentsSummary;
 }
 
@@ -318,18 +323,76 @@ function onBehalfGate(payments: AdminPayments | undefined): ControllerResult<nev
   return payments ? payments.checkoutGate() : NOT_FOUND;
 }
 
+/**
+ * A ledger row as the **admin** reads it: the row, plus how a gateway payment
+ * was made (RFC 0026 §7; M30 Task 17). Both keys are always present and `null`
+ * for a row no checkout landed — every non-gateway row, a hand-matched gateway
+ * row, a refund. The student statement never carries them.
+ */
+export type AdminLedgerPayment<P> = P & GatewayPaidMethod;
+
+/** The statement as an admin reads it: the student's own, with the method on every payment row. */
+export type AdminStudentStatement = Omit<StudentStatement, 'invoices' | 'extras'> & {
+  invoices: Array<
+    Omit<StudentStatement['invoices'][number], 'payments'> & {
+      payments: Array<AdminLedgerPayment<StudentStatement['invoices'][number]['payments'][number]>>;
+    }
+  >;
+  extras: Omit<StudentStatement['extras'], 'charges'> & {
+    charges: Array<
+      Omit<StudentStatement['extras']['charges'][number], 'payments'> & {
+        payments: Array<AdminLedgerPayment<StudentStatement['extras']['charges'][number]['payments'][number]>>;
+      }
+    >;
+  };
+};
+
+/** A charge's detail as an admin reads it. */
+export type AdminEventChargeDetail = Omit<EventChargeDetail, 'payments'> & {
+  payments: Array<AdminLedgerPayment<EventChargeDetail['payments'][number]>>;
+};
+
+/**
+ * Adds `gatewayMethod` / `gatewayMethodLabel` to the payment rows of one rail,
+ * with **one** read for all of them. Display only: a failed read (or a wiring
+ * without a gateway) leaves every row at `null` and never fails the ledger.
+ */
+async function withPaidMethods<P extends { id: string; method: string }>(
+  payments: AdminPayments | undefined,
+  kind: ReceivableKind,
+  groups: ReadonlyArray<ReadonlyArray<P>>,
+): Promise<Array<Array<AdminLedgerPayment<P>>>> {
+  const gatewayIds = groups.flatMap((rows) =>
+    rows.filter((row) => row.method === PaymentMethod.GATEWAY).map((row) => row.id),
+  );
+  let methods = new Map<string, GatewayPaidMethod>();
+  if (payments && gatewayIds.length > 0) {
+    try {
+      methods = await payments.paidMethodsOf(kind, gatewayIds);
+    } catch {
+      console.error('[billing] paid-method lookup failed; the ledger is shown without method labels');
+    }
+  }
+  return groups.map((rows) => rows.map((row) => ({ ...row, ...(methods.get(row.id) ?? NO_GATEWAY_PAID_METHOD) })));
+}
+
 async function openOnBehalf(
   payments: AdminPayments | undefined,
   kind: ReceivableKind,
   id: string,
   body: unknown,
   adminId: string,
+  apiOrigin: string | null,
 ): Promise<ControllerResult<OnBehalfCheckoutAnswer>> {
   const closed = onBehalfGate(payments);
   if (closed || !payments) return closed ?? NOT_FOUND;
   const parsed = CreateCheckoutOnBehalfSchema.safeParse(body ?? {});
   if (!parsed.success) return invalid(parsed.error);
-  const result = await payments.createCheckoutOnBehalf({ kind, id, provider: parsed.data.provider }, adminId);
+  // The origin is the request's own, read by the router — never a body field.
+  const result = await payments.createCheckoutOnBehalf(
+    { kind, id, provider: parsed.data.provider, apiOrigin },
+    adminId,
+  );
   if (!result.ok) return result;
   return { ok: true, data: { checkout: result.data.checkout, created: !result.data.reused } };
 }
@@ -397,7 +460,7 @@ export class AdminBillingController {
   /**
    * The manual twin of the hourly payment reconcile: the same job, the same
    * caps. A label with no provider bound has nothing to reconcile (`404`, and
-   * no run is recorded); an invalid provider list or key mode is `500
+   * no run is recorded); an invalid provider list or key-mode value is `500
    * PAYMENTS_CONFIG_INVALID` (the failed run **is** recorded). A run that ran
    * is `200` even when it failed — the verdict is in the body.
    */
@@ -405,8 +468,13 @@ export class AdminBillingController {
     if (!this.reconcile) return NOT_FOUND;
     const report = await this.reconcile(actorId);
     if (!report.ran) return NOT_FOUND;
-    if (report.configInvalid) return { ok: false, status: 500, error: PAYMENTS_CONFIG_INVALID };
-    return { ok: true, data: { status: report.status, error: report.error, summary: report.summary } };
+    if (report.configInvalid || report.keyMode === null) {
+      return { ok: false, status: 500, error: PAYMENTS_CONFIG_INVALID };
+    }
+    return {
+      ok: true,
+      data: { status: report.status, error: report.error, keyMode: report.keyMode, summary: report.summary },
+    };
   }
 
   /**
@@ -595,14 +663,16 @@ export class AdminBillingController {
   /**
    * Opens — or hands back — the hosted checkout of a student's invoice. The
    * student is the invoice's own; the admin is recorded as its creator and
-   * gets the URL to hand over.
+   * gets the URL to hand over. `apiOrigin` is the origin of this very request:
+   * the provider is told to notify the API that created the checkout.
    */
   async createCheckout(
     invoiceId: string,
     body: unknown,
     actorId: string,
+    apiOrigin: string | null = null,
   ): Promise<ControllerResult<OnBehalfCheckoutAnswer>> {
-    return openOnBehalf(this.payments, 'invoice', invoiceId, body, actorId);
+    return openOnBehalf(this.payments, 'invoice', invoiceId, body, actorId, apiOrigin);
   }
 
   // Reports — read-only ---------------------------------------------------
@@ -619,10 +689,34 @@ export class AdminBillingController {
     return this.accounting.getReceivablesAging(parsed.data.asOf, parsed.data.rail ?? 'contract');
   }
 
-  async getStudentStatement(params: unknown): Promise<ControllerResult<StudentStatement>> {
+  /**
+   * The student's statement, with one admin-only addition: every payment row
+   * says how a gateway payment was made (`gatewayMethod`, `gatewayMethodLabel`;
+   * both `null` when unknown). The student's own route returns the statement
+   * without them.
+   */
+  async getStudentStatement(params: unknown): Promise<ControllerResult<AdminStudentStatement>> {
     const parsed = StudentParamSchema.safeParse(params ?? {});
     if (!parsed.success) return invalid(parsed.error);
-    return this.accounting.getStudentStatement(parsed.data.userId);
+    const statement = await this.accounting.getStudentStatement(parsed.data.userId);
+    if (!statement.ok) return statement;
+
+    const { invoices, extras } = statement.data;
+    const [invoicePayments, chargePayments] = await Promise.all([
+      withPaidMethods(this.payments, 'invoice', invoices.map((invoice) => invoice.payments)),
+      withPaidMethods(this.payments, 'event_charge', extras.charges.map((charge) => charge.payments)),
+    ]);
+    return {
+      ok: true,
+      data: {
+        ...statement.data,
+        invoices: invoices.map((invoice, i) => ({ ...invoice, payments: invoicePayments[i] })),
+        extras: {
+          ...extras,
+          charges: extras.charges.map((charge, i) => ({ ...charge, payments: chargePayments[i] })),
+        },
+      },
+    };
   }
 
   // Roster and holds — reported, never enforced ---------------------------
@@ -745,8 +839,12 @@ export class AdminEventChargeController {
     );
   }
 
-  async getCharge(id: string): Promise<ControllerResult<EventChargeDetail>> {
-    return this.service.getChargeDetail(id);
+  /** The charge with its ledger; each payment row says how a gateway payment was made (`null` when unknown). */
+  async getCharge(id: string): Promise<ControllerResult<AdminEventChargeDetail>> {
+    const detail = await this.service.getChargeDetail(id);
+    if (!detail.ok) return detail;
+    const [payments] = await withPaidMethods(this.payments, 'event_charge', [detail.data.payments]);
+    return { ok: true, data: { ...detail.data, payments } };
   }
 
   async issueCharges(
@@ -816,8 +914,9 @@ export class AdminEventChargeController {
     chargeId: string,
     body: unknown,
     actorId: string,
+    apiOrigin: string | null = null,
   ): Promise<ControllerResult<OnBehalfCheckoutAnswer>> {
-    return openOnBehalf(this.payments, 'event_charge', chargeId, body, actorId);
+    return openOnBehalf(this.payments, 'event_charge', chargeId, body, actorId, apiOrigin);
   }
 
   // Reads ---------------------------------------------------------------

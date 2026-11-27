@@ -36,6 +36,8 @@ import {
   committedEnvVars,
   paymentWebhookReminders,
   formatReminders,
+  formatKeyMode,
+  declaredPaymentsKeyMode,
 } from './provision-label.mjs';
 import { mapExitCode, formatChecklist, parseJsonc, PATHS } from '../label.mjs';
 
@@ -567,8 +569,9 @@ test('runCheck executes only list commands and reports present / missing / unkno
 test('runCheck JSON shape carries names only — never a secret-shaped value', () => {
   const { run } = stubRunner(CHECK_ANSWERS);
   const report = runCheck(planProfile, 'production', schema, { run });
-  assert.deepEqual(Object.keys(report), ['label', 'env', 'resources', 'secrets', 'reminders']);
+  assert.deepEqual(Object.keys(report), ['label', 'env', 'resources', 'secrets', 'reminders', 'keyMode']);
   assert.deepEqual(report.reminders, []);
+  assert.equal(report.keyMode, null);
   assert.deepEqual(Object.keys(report.resources[0]), ['id', 'kind', 'name', 'present', 'fix']);
   assert.deepEqual(Object.keys(report.secrets[0]), ['name', 'scope', 'present', 'fix']);
   assert.doesNotMatch(JSON.stringify(report), /[0-9a-f]{64}/);
@@ -687,8 +690,9 @@ test('buildCheckPlan expects a bound provider\'s two secrets on the Worker, neve
   assert.ok(!Object.keys(plan.fixes).some((k) => k.startsWith('preview:PAYMENTS_')));
   assert.deepEqual(plan.reminders, [{
     key: 'payments-webhook-mercadopago',
-    detail: 'Webhook registered in the Mercado Pago dashboard: https://api-acme-staging.sub.workers.dev/v1/webhooks/payments/mercadopago',
+    detail: 'Mercado Pago webhook signing secret set as PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET; every checkout sends its own notification URL (https://api-acme-staging.sub.workers.dev/v1/webhooks/payments/mercadopago), so registering it in the dashboard is optional',
   }]);
+  assert.equal(plan.keyMode, 'test');
 });
 
 test('paymentWebhookReminders gives one URL per bound provider and none for a label on none', () => {
@@ -768,9 +772,34 @@ test('a webhook reminder is printed under the checklist and never changes the ex
   assert.ok(checkResults(report).every((r) => ['cf-resources', 'api-secrets', 'previews'].includes(r.group)));
   assert.deepEqual(formatReminders(report), [
     'Not verifiable from here — confirm at each bound provider:',
-    '  - Webhook registered in the Mercado Pago dashboard: https://api.acme.app/v1/webhooks/payments/mercadopago',
+    '  - Mercado Pago webhook signing secret set as PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET; every checkout sends its own notification URL (https://api.acme.app/v1/webhooks/payments/mercadopago), so registering it in the dashboard is optional',
   ]);
   assert.deepEqual(formatReminders(runCheck(planProfile, 'production', realSchema, { run: stubRunner(answers).run })), []);
+});
+
+test('the declared key mode is reported as written, defaults to test, and is never a gap', () => {
+  const declared = (vars) => declaredPaymentsKeyMode(realSchema, planProfile, 'production', vars);
+  assert.equal(declared(null), null, 'no committed block: nothing bound, nothing reported');
+  assert.equal(declared({ PAYMENTS_PROVIDERS: 'none', PAYMENTS_KEY_MODE: 'live' }), null, 'a label on none reports no key mode');
+  assert.equal(declared({ PAYMENTS_PROVIDERS: 'mercadopago:card' }), 'test', 'absent means test, as in the Worker');
+  assert.equal(declared({ PAYMENTS_PROVIDERS: 'mercadopago:card', PAYMENTS_KEY_MODE: 'live' }), 'live');
+  // Reported as written: the Worker is what refuses an invalid value (PAYMENTS_CONFIG_INVALID).
+  assert.equal(declared({ PAYMENTS_PROVIDERS: 'mercadopago:card', PAYMENTS_KEY_MODE: 'banana' }), 'banana');
+
+  const answers = { ...CHECK_ANSWERS };
+  answers['pnpm --filter api exec wrangler r2 bucket list'] = { status: 0, stdout: '[{"name":"acme-media"},{"name":"acme-backups"}]' };
+  answers['pnpm --filter web exec wrangler pages project list --json'] = { status: 0, stdout: '[{"name":"acme-web"}]' };
+  answers['pnpm --filter api exec wrangler deployments list --env acme'] = { status: 0, stdout: 'Created: ...' };
+  answers['pnpm --filter api exec wrangler secret list --env acme --format json'] = secretList(['JWT_SECRET', ...BASE_EXTERNAL, ...MP_SECRETS]);
+  const vars = { worker: { PAYMENTS_PROVIDERS: 'mercadopago:pix+card', PAYMENTS_KEY_MODE: 'live' }, preview: null };
+  const report = runCheck(planProfile, 'production', realSchema, { run: stubRunner(answers).run, vars });
+  assert.equal(report.keyMode, 'live');
+  assert.equal(mapExitCode(checkResults(report)), 0, 'the key mode is information, not a check');
+  assert.ok(!checkResults(report).some((r) => /KEY_MODE/.test(JSON.stringify(r))), 'it is not a checklist row');
+  assert.deepEqual(formatKeyMode(report), [
+    "Declared, not verified: PAYMENTS_KEY_MODE = live — installing the matching provider credentials in this environment is the integrator's responsibility.",
+  ]);
+  assert.deepEqual(formatKeyMode(runCheck(planProfile, 'production', realSchema, { run: stubRunner(answers).run })), []);
 });
 
 test('a provisioning plan writes no payment secret: JWT_SECRET is the only secret put', () => {

@@ -768,4 +768,27 @@ describe('ExceptionsTab — run reconcile now', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(x.reconcile.unknown);
   });
+
+  it.each(['test', 'live'] as const)('shows the declared key mode (%s) with the summary', async (keyMode) => {
+    reconcileReply = () => ({
+      status: 200,
+      body: { status: 'ok', error: null, keyMode, summary: summary() },
+    });
+    renderTab();
+    await screen.findByText(x.empty.title);
+    fireEvent.click(screen.getByRole('button', { name: x.reconcile.button }));
+
+    expect(await screen.findByTestId('reconcile-key-mode')).toHaveTextContent(
+      x.reconcile.keyMode[keyMode],
+    );
+  });
+
+  it('shows no key-mode line when the answer does not carry one', async () => {
+    renderTab();
+    await screen.findByText(x.empty.title);
+    fireEvent.click(screen.getByRole('button', { name: x.reconcile.button }));
+
+    expect(await screen.findByText(x.reconcile.ok)).toBeInTheDocument();
+    expect(screen.queryByTestId('reconcile-key-mode')).not.toBeInTheDocument();
+  });
 });

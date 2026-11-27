@@ -100,7 +100,9 @@ export const createMyCheckoutRoute = createRoute({
     'Refusals come in this order: `404` (no provider on this label) / `500 PAYMENTS_CONFIG_INVALID` → ' +
     '`400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `429` → ' +
     '`502 PAYMENTS_PROVIDER_ERROR`. Handing back an open checkout does not count toward the limit of ' +
-    '10 new checkouts an hour. Sent with `Cache-Control: private, no-store`.',
+    '10 new checkouts an hour. The provider is told to notify the API origin this request was made on ' +
+    '(`<origin>/v1/webhooks/payments/<provider>`), so each environment receives the deliveries of its ' +
+    'own checkouts. Sent with `Cache-Control: private, no-store`.',
   tags: ['me:billing'],
   security: [{ bearerAuth: [] }],
   request: {
@@ -200,7 +202,8 @@ export function buildMeBillingRouter(slice: {
 
   router.openapi(createMyCheckoutRoute, async (c) => {
     // The token's `sub` is the owner and the creator; the body names no user.
-    const result = await controller.createMyCheckout(c.get('user').sub, c.req.valid('json'));
+    // The provider notifies the API that created the checkout: this request's own origin.
+    const result = await controller.createMyCheckout(c.get('user').sub, c.req.valid('json'), new URL(c.req.url).origin);
     if (result.ok) return c.json(result.data.checkout, result.data.created ? 201 : 200);
     if (result.status === 429) c.header('Retry-After', String(result.meta?.retryAfterSeconds ?? 1));
     return c.json({ error: result.error }, result.status as CheckoutErrorStatus);

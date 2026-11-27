@@ -1363,7 +1363,17 @@ export const dictPt = {
           boleto: 'Boleto',
         },
         methodSeparator: ', ',
+        methodLabel: {
+          accountMoney: 'saldo Mercado Pago',
+          creditCard: 'cartão de crédito',
+          creditCardBrand: (brand: string) => `cartão de crédito (${brand})`,
+          debitCard: 'cartão de débito',
+          debitCardBrand: (brand: string) => `cartão de débito (${brand})`,
+          boleto: 'boleto',
+          pix: 'Pix',
+        },
         ledger: {
+          methodWithLabel: (method: string, label: string) => `${method} · ${label}`,
           paymentId: (provider: string, id: string) => `${provider} · pagamento ${id}`,
           refundId: (provider: string, id: string) => `${provider} · reembolso ${id}`,
           unknownReference: (reference: string) => `Referência do provedor ${reference}`,
@@ -1402,6 +1412,8 @@ export const dictPt = {
               `O ${provider} não está mais habilitado neste label, então o reembolso não pode ser pedido por aqui. Nada mudou.`,
             unrecorded: (provider: string, refundId: string) =>
               `O ${provider} aceitou o reembolso (${refundId}) e o dinheiro está sendo devolvido, mas o estorno ainda não está no livro. Tente de novo: o mesmo pedido o registra e não devolve duas vezes.`,
+            providerBusy: (provider: string) =>
+              `O ${provider} está ocupado no momento. Nada foi alterado — nenhum reembolso foi feito e o livro está como estava. Tente de novo em instantes.`,
             configuration:
               'Os pagamentos online estão mal configurados neste label. Nenhum reembolso foi pedido e nada mudou.',
             providerUnavailable: (provider: string) =>
@@ -1659,6 +1671,10 @@ export const dictPt = {
               'Os pagamentos online estão mal configurados neste label. Nada foi perguntado a um provedor; a execução com falha ficou registrada.',
             unknown: 'Não foi possível executar a conciliação.',
             summaryLabel: 'Resultado da conciliação',
+            keyMode: {
+              test: 'Modo de chave declarado: teste',
+              live: 'Modo de chave declarado: produção (live)',
+            },
             headline: {
               confirmed: 'Checkouts confirmados',
               landed: 'Pagamentos lançados',

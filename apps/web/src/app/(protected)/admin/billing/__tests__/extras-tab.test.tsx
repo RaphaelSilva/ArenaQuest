@@ -61,7 +61,7 @@ function eventOf(id: string, title: string, status: AdminEvent['status']): Admin
   };
 }
 
-const CHARGE: BillingEventChargeDetail = {
+const BASE_CHARGE: BillingEventChargeDetail = {
   id: 'ch-11111111',
   eventId: 'ev-1',
   userId: 'u1',
@@ -95,6 +95,9 @@ const CHARGE: BillingEventChargeDetail = {
     },
   ],
 };
+
+/** What the charge reads answer; a test may swap its payments. */
+let CHARGE: BillingEventChargeDetail = BASE_CHARGE;
 
 const SUMMARY = {
   eventId: 'ev-1',
@@ -134,6 +137,7 @@ async function openEventAndCharge() {
 describe('ExtrasTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    CHARGE = BASE_CHARGE;
     http = makeTransport((method, path) => {
       if (path === '/admin/billing/event-prices/ev-1') {
         return {
@@ -252,6 +256,36 @@ describe('ExtrasTab', () => {
     );
     expect(await screen.findByText(d.reverseSuccess)).toBeInTheDocument();
     await waitFor(() => expect(summaryReads()).toBe(2));
+  });
+
+  it('reads Online · <label> on a gateway charge payment that carries a method label', async () => {
+    const gateway = dictEn.admin.billing.gateway;
+    CHARGE = {
+      ...BASE_CHARGE,
+      payments: [
+        {
+          ...BASE_CHARGE.payments[0],
+          method: 'gateway',
+          externalReference: 'mercadopago:123456789',
+          recordedBy: 'system:payment-gateway',
+          gatewayMethod: 'card',
+          gatewayMethodLabel: 'credit_card/master',
+        },
+      ],
+    };
+    renderTab();
+    fireEvent.change(await screen.findByLabelText(d.eventLabel), { target: { value: 'ev-1' } });
+    await screen.findByText('Alice Doe');
+    fireEvent.click(screen.getByRole('button', { name: d.charges.expandAriaLabel('ch-11111') }));
+
+    expect(
+      await screen.findByText(
+        `${gateway.ledger.methodWithLabel(
+          ledger.method.gateway,
+          gateway.methodLabel.creditCardBrand('master'),
+        )} · R$ 100.00`,
+      ),
+    ).toBeInTheDocument();
   });
 
   it('voids a charge through the charge endpoint and refreshes the summary', async () => {

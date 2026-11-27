@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DictProvider } from '@web/context/dict-context';
 import { dictEn } from '@web/i18n/dict-en';
+import { dictPt } from '@web/i18n/dict-pt';
 import { formatExpiry } from '@web/components/billing/pay-action';
 import { createAdminBillingApi } from '@web/lib/admin-billing-api';
 import type {
@@ -249,6 +250,49 @@ describe('LedgerTab — a gateway row', () => {
     // Nothing here to reverse: the row offers no action at all.
     expect(within(row).queryByRole('button')).not.toBeInTheDocument();
   });
+
+  it.each([
+    ['account_money', g.methodLabel.accountMoney],
+    ['credit_card/visa', g.methodLabel.creditCardBrand('visa')],
+    ['credit_card', g.methodLabel.creditCard],
+    ['debit_card/elo', g.methodLabel.debitCardBrand('elo')],
+    ['ticket/bolbradesco', g.methodLabel.boleto],
+    ['bank_transfer/pix', g.methodLabel.pix],
+    // Unknown to the dictionary: the provider's own words, untouched.
+    ['bank_transfer/pse', 'bank_transfer/pse'],
+    ['crypto_transfer', 'crypto_transfer'],
+  ])('reads Online · <label> for the method label %s', async (gatewayMethodLabel, label) => {
+    payments = [gatewayPayment({ gatewayMethod: 'other', gatewayMethodLabel })];
+    await expandInvoice();
+
+    expect(
+      screen.getByText(`${g.ledger.methodWithLabel(d.method.gateway, label)} · R$ 500.00`),
+    ).toBeInTheDocument();
+    expect(g.ledger.methodWithLabel(d.method.gateway, label)).toBe(`Online · ${label}`);
+  });
+
+  it('names the known labels in words', () => {
+    expect(g.methodLabel.accountMoney).toBe('Mercado Pago balance');
+    expect(g.methodLabel.creditCardBrand('visa')).toBe('credit card (visa)');
+    expect(dictPt.admin.billing.gateway.methodLabel.accountMoney).toBe('saldo Mercado Pago');
+    expect(dictPt.admin.billing.gateway.methodLabel.creditCardBrand('visa')).toBe(
+      'cartão de crédito (visa)',
+    );
+  });
+
+  it.each([[null], [undefined]])('stays plain Online when the label is %s', async (gatewayMethodLabel) => {
+    payments = [gatewayPayment({ gatewayMethodLabel })];
+    await expandInvoice();
+    expect(screen.getByText(`${d.method.gateway} · R$ 500.00`)).toBeInTheDocument();
+  });
+
+  it('never puts a label on a row that is not a gateway payment', async () => {
+    payments = [
+      gatewayPayment({ method: 'pix', externalReference: null, gatewayMethodLabel: 'account_money' }),
+    ];
+    await expandInvoice();
+    expect(screen.getByText(`${d.method.pix} · R$ 500.00`)).toBeInTheDocument();
+  });
 });
 
 describe('LedgerTab — refunding a gateway payment', () => {
@@ -426,6 +470,38 @@ describe('LedgerTab — refunding a gateway payment', () => {
     expect(dialog.getByText(d.reverseExplainer)).toBeInTheDocument();
     expect(dialog.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(dialog.queryByTestId('refund-confirmation')).not.toBeInTheDocument();
+  });
+
+  it('provider busy: says nothing changed and Try again repeats the same request', async () => {
+    reverseReplies = [
+      { status: 503, body: { error: 'PAYMENTS_PROVIDER_BUSY' } },
+      {
+        status: 200,
+        body: gatewayPayment({
+          id: 'pay-33333333-cccc',
+          amountMinor: -50000,
+          reversesId: 'pay-22222222-bbbb',
+          externalReference: 'mercadopago:re_778',
+        }),
+      },
+    ];
+    const dialog = await openRefund();
+    confirmAndSubmit(dialog, 'Paid twice.');
+
+    const alert = await dialog.findByRole('alert');
+    expect(alert).toHaveTextContent(g.refund.outcomes.providerBusy('Mercado Pago'));
+    // Its own message — neither "could not be reached" nor the generic failure.
+    expect(alert).not.toHaveTextContent(g.refund.outcomes.unknown);
+    expect(dialog.queryByRole('button', { name: g.refund.submit })).not.toBeInTheDocument();
+    // The reason is frozen, so the repeat cannot differ from the first request.
+    expect(dialog.getByPlaceholderText(d.reverseReasonPlaceholder)).toHaveAttribute('readonly');
+
+    fireEvent.click(dialog.getByRole('button', { name: g.refund.retry }));
+    expect(await screen.findByText(g.refund.outcomes.accepted('Mercado Pago'))).toBeInTheDocument();
+
+    const posts = callsTo('/reverse');
+    expect(posts).toHaveLength(2);
+    expect(posts[1]).toEqual(posts[0]);
   });
 });
 

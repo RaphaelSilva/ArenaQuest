@@ -302,6 +302,12 @@ export function ExceptionsTab({
                 {x.reconcile.ok}
               </p>
             )}
+            {/* A declaration the integrator owns — nothing verifies the key itself. */}
+            {(run.keyMode === 'test' || run.keyMode === 'live') && (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400" data-testid="reconcile-key-mode">
+                {x.reconcile.keyMode[run.keyMode]}
+              </p>
+            )}
             <dl
               aria-label={x.reconcile.summaryLabel}
               className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7"

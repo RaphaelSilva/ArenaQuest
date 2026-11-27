@@ -1014,6 +1014,10 @@ export namespace Entities {
             /** Exactly one of the two is set on a `paid` row, matching `receivableKind`. */
             invoicePaymentId: string | null;
             chargePaymentId: string | null;
+            /** How the payment that closed it `paid` was made: `pix`, `card`, `boleto` or `other`. */
+            paidMethod: 'pix' | 'card' | 'boleto' | 'other' | null;
+            /** The provider's own name for that method (e.g. `account_money`); never free text. */
+            paidMethodLabel: string | null;
             checkoutUrl: string;
             expiresAt: Date;
             createdAt: Date;

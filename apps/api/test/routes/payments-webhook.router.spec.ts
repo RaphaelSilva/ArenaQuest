@@ -313,6 +313,53 @@ describe('idempotency', () => {
     expect((await eventRows('mercadopago', again.eventId))[0].outcome).toBe('duplicate');
   });
 
+  // M30 Task 17 (R14). Nothing stops a payer from paying one hosted link twice
+  // (the sandbox showed two payments on one reference). Both captures are real
+  // money: each lands as its own row, and the second leaves the invoice in credit.
+  it('lands two different payments on one checkout as two ledger rows: the second is a credit', async () => {
+    const world = await seedGatewayWorld();
+    const checkout = await openCheckout(world);
+    const first = uid('pay');
+    const second = uid('pay');
+    mp.setPayment(stubPayment({ id: first, amountMinor: 15000, checkoutId: checkout.id, method: 'card', methodLabel: 'credit_card/visa' }));
+    mp.setPayment(stubPayment({ id: second, amountMinor: 15000, checkoutId: checkout.id, method: 'other', methodLabel: 'account_money' }));
+
+    expect(await outcomeOf(await deliver('mercadopago', paymentEvent(first)))).toBe('applied');
+    expect(await outcomeOf(await deliver('mercadopago', paymentEvent(second)))).toBe('applied');
+
+    const rows = await invoicePayments(world.invoiceId);
+    expect(rows.map((row) => [row.amount_minor, row.method, row.recorded_by, row.reverses_id])).toEqual([
+      [15000, 'gateway', SYSTEM_PAYMENT_ACTOR_ID, null],
+      [15000, 'gateway', SYSTEM_PAYMENT_ACTOR_ID, null],
+    ]);
+    expect(rows.map((row) => row.external_reference).sort()).toEqual(
+      [`mercadopago:${first}`, `mercadopago:${second}`].sort(),
+    );
+
+    // The checkout is `paid` on the first payment and keeps it: the second changed nothing there.
+    const firstRow = rows.find((row) => row.external_reference === `mercadopago:${first}`);
+    expect(await gatewayRepo().getCheckout(checkout.id)).toMatchObject({
+      status: 'paid',
+      providerPaymentId: first,
+      invoicePaymentId: firstRow?.id,
+      paidMethod: 'card',
+      paidMethodLabel: 'credit_card/visa',
+    });
+
+    // The invoice asked for 150,00 and received 300,00: its balance is a credit of 150,00.
+    const statement = await app.container().billing.accountingService.getStudentStatement(world.studentId);
+    if (!statement.ok) throw new Error('the statement was expected');
+    const invoice = statement.data.invoices.find((i) => i.id === world.invoiceId);
+    expect(invoice).toMatchObject({ status: 'paid', amountMinor: 15000, balanceMinor: -15000 });
+    expect(invoice?.payments).toHaveLength(2);
+    // A credit is not something owed.
+    expect(statement.data.outstandingMinor).toBe(0);
+
+    // Each event settled on its own; a redelivery of either adds nothing.
+    expect(await outcomeOf(await deliver('mercadopago', paymentEvent(second)))).toBe('duplicate');
+    expect(await invoicePayments(world.invoiceId)).toHaveLength(2);
+  });
+
   it('leaves one ledger row when two deliveries about one payment race', async () => {
     const world = await seedGatewayWorld();
     const checkout = await openCheckout(world);
@@ -782,9 +829,9 @@ describe('the pipeline before verification', () => {
 
   it('answers 500 PAYMENTS_CONFIG_INVALID when the configuration is invalid, verifying nothing', async () => {
     const broken = buildPaymentsTestApp(env as Env, 'mercadopago:pix+card', [mp], {
-      // A sandbox (`TEST-`) key under PAYMENTS_KEY_MODE = live. The reverse is
-      // not a mismatch for Mercado Pago: `APP_USR-` proves neither mode (Task 05).
-      PAYMENTS_KEY_MODE: 'live',
+      // The one way the key mode can break a configuration: a value that is
+      // neither `test` nor `live` (M30 Task 17 — no key is compared with it).
+      PAYMENTS_KEY_MODE: 'banana',
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
 

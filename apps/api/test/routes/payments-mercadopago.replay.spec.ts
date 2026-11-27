@@ -39,21 +39,28 @@ import {
  * - a dispute *won* / *lost* (no chargeback could be observed, so the adapter
  *   emits no `dispute` event — a charged-back payment arrives as a `payment`
  *   notification and is treated as *opened*);
- * - a payment in another currency than its checkout ending as `mismatch` (the
- *   adapter refuses a non-BRL payment outright, so it ends `failed`);
  * - the same bare payment id under two providers.
+ *
+ * M30 Task 17 added what the first real sandbox payments taught: the recorded
+ * rejected and in-process cards, two payments on one reference, the method
+ * label on the admin ledger, the per-checkout notification URL, a `429` on a
+ * refund answered `503`, a payment in another currency settling `mismatch`,
+ * and the reconcile run asking by reference in one call.
  */
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
-/** `APP_USR-` like every Mercado Pago key, test or live — accepted under key mode `test`. Not a credential. */
+/** Shaped like a Mercado Pago key on purpose: no code reads a key's content (decision 19). Not a credential. */
 const SECRET_KEY = 'APP_USR-replay-spec-not-a-credential';
 
 const CARD = { id: '191926322032', reference: 'aqrec-1795785192-E-card-approved' };
 const MONEY = { id: '191919776844', reference: 'aqrec-1795783752-A-approved-keep' };
 const BOLETO = { id: '191927173452', reference: 'aqrec-1795785652-G-boleto-pending' };
 const PIX = { id: '191919776901', reference: 'aqrec-derived-P-pix' };
-const REJECTED = { id: '191926322101', reference: 'aqrec-derived-H-card-rejected' };
+/** Recorded 2026-11-27: a card the issuer refused. */
+const REJECTED = { id: '190826471009', reference: 'aqrec-1795786713-H-card-rejected' };
+/** Recorded 2026-11-27: two payments on one reference — an approved card, then one left `in_process`. */
+const TWICE = { approved: '191937009326', inProcess: '190829854493', reference: 'aqrec-1795786714-I-card-pending' };
 
 let mp: MpFakeProvider;
 let world: GatewayWorld;
@@ -167,11 +174,18 @@ async function notify(paymentId: string, app?: ReplayApp): Promise<string> {
   return outcomeOf(res);
 }
 
-async function api(method: string, path: string, token: string, body?: unknown, app: ReplayApp = replayApp()) {
+async function api(
+  method: string,
+  path: string,
+  token: string,
+  body?: unknown,
+  app: ReplayApp = replayApp(),
+  origin = 'http://example.com',
+) {
   const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   return app.fetch(
-    new IncomingRequest(`http://example.com${v1(path)}`, {
+    new IncomingRequest(`${origin}${v1(path)}`, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -415,9 +429,9 @@ describe('POST /v1/webhooks/payments/mercadopago with the real adapter', () => {
     expect((await events()).map(e => e.outcome).sort()).toEqual(['applied', 'ignored']);
   });
 
-  it('a rejected card is ignored: the checkout stays open and keeps the last status [derived]', async () => {
+  it('a rejected card is ignored: the checkout stays open and keeps the last status (recorded)', async () => {
     await openCheckout(REJECTED.reference);
-    mp.on('GET', `/v1/payments/${REJECTED.id}`, mpReply(200, 'derived-payment-rejected-card'));
+    mp.on('GET', `/v1/payments/${REJECTED.id}`, mpReply(200, 'payment-rejected-card'));
 
     expect(await notify(REJECTED.id)).toBe('ignored');
 
@@ -493,9 +507,95 @@ describe('POST /v1/webhooks/payments/mercadopago with the real adapter', () => {
     expect(mp.calls).toEqual([]);
   });
 
-  it('5: a payment in a currency the adapter does not charge is refused by the adapter: failed, not mismatch [derived]', async () => {
+  it('a card left in process is ignored, and the approved payment on the same reference lands (recorded)', async () => {
+    await openCheckout(TWICE.reference);
+    mp.on('GET', `/v1/payments/${TWICE.inProcess}`, mpReply(200, 'payment-in-process-card'));
+    mp.on('GET', `/v1/payments/${TWICE.approved}`, mpReply(200, 'payment-approved-card-same-reference'));
+
+    expect(await notify(TWICE.inProcess)).toBe('ignored');
+    expect(await ledger()).toEqual([]);
+    expect((await repo().getCheckout(TWICE.reference))?.status).toBe('open');
+
+    expect(await notify(TWICE.approved)).toBe('applied');
+    expect(await amounts()).toEqual([[`mercadopago:${TWICE.approved}`, 1234]]);
+    expect(await repo().getCheckout(TWICE.reference)).toMatchObject({
+      status: 'paid',
+      providerPaymentId: TWICE.approved,
+      paidMethod: 'card',
+      paidMethodLabel: 'credit_card/visa',
+    });
+  });
+
+  // R14. The sandbox recorded two payments on this reference, one of them still
+  // `in_process`; here it is replayed as it reads once approved [derived: the
+  // recorded in-process body with its status and approval date set].
+  it('two approved payments on one checkout land as two ledger rows: the second is a credit [second payment derived]', async () => {
+    await openCheckout(TWICE.reference);
+    const secondApproved = mpFixture('payment-in-process-card')
+      .replace('"status":"in_process","status_detail":"pending_contingency"', '"status":"approved","status_detail":"accredited"')
+      .replace('"date_approved":null', '"date_approved":"2026-11-27T10:29:17.000-04:00"');
+    expect(secondApproved).not.toBe(mpFixture('payment-in-process-card'));
+    mp.on('GET', `/v1/payments/${TWICE.approved}`, mpReply(200, 'payment-approved-card-same-reference'));
+    mp.on('GET', `/v1/payments/${TWICE.inProcess}`, { status: 200, body: secondApproved });
+
+    expect(await notify(TWICE.approved)).toBe('applied');
+    expect(await notify(TWICE.inProcess)).toBe('applied');
+
+    // Two rows on the one invoice, each what the provider captured (R$ 12,34), each by the system actor.
+    const rows = await ledger();
+    expect(rows.map(row => [row.external_reference, row.amount_minor, row.method, row.recorded_by, row.reverses_id])).toEqual([
+      [`mercadopago:${TWICE.inProcess}`, 1234, 'gateway', SYSTEM_PAYMENT_ACTOR_ID, null],
+      [`mercadopago:${TWICE.approved}`, 1234, 'gateway', SYSTEM_PAYMENT_ACTOR_ID, null],
+    ]);
+    // The checkout keeps the first payment; the second changed nothing on it.
+    const first = rows.find(row => row.external_reference === `mercadopago:${TWICE.approved}`);
+    expect(await repo().getCheckout(TWICE.reference)).toMatchObject({
+      status: 'paid',
+      providerPaymentId: TWICE.approved,
+      invoicePaymentId: first?.id,
+      paidMethodLabel: 'credit_card/visa',
+    });
+
+    // On the admin statement the invoice has received twice the payment: the second row is credit.
+    const statement = await api('GET', `/admin/billing/students/${world.studentId}/statement`, adminToken);
+    expect(statement.status).toBe(200);
+    const invoice = (await statement.json<AdminStatement>()).invoices.find(i => i.id === world.invoiceId);
+    expect(invoice?.payments.map(p => [p.externalReference, p.amountMinor, p.gatewayMethodLabel])).toEqual(
+      expect.arrayContaining([
+        [`mercadopago:${TWICE.approved}`, 1234, 'credit_card/visa'],
+        // Only the payment the checkout points at carries a label; the credit reads as unknown.
+        [`mercadopago:${TWICE.inProcess}`, 1234, null],
+      ]),
+    );
+    expect(invoice?.payments).toHaveLength(2);
+    // Redeliveries change nothing.
+    expect(await notify(TWICE.inProcess)).toBe('duplicate');
+    expect(await ledger()).toHaveLength(2);
+  });
+
+  it('5: a payment in another currency than its checkout is 200 mismatch and lands nothing [derived]', async () => {
     await openCheckout(CARD.reference);
     mp.on('GET', `/v1/payments/${CARD.id}`, mpReply(200, 'derived-payment-usd'));
+
+    const res = await deliver(mpDelivery('derived-webhook-payment-updated'));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ outcome: 'mismatch' });
+    expect(await events()).toMatchObject([{ outcome: 'mismatch', error: null, checkout_id: CARD.reference }]);
+    expect(await ledger()).toEqual([]);
+    expect(await repo().getCheckout(CARD.reference)).toMatchObject({
+      status: 'mismatch',
+      failureDetail: 'currency mismatch: the payment is in USD, the checkout in BRL',
+      paidMethod: null,
+    });
+    // Settled: a redelivery is a duplicate, not a second attempt.
+    expect(await outcomeOf(await deliver(mpDelivery('derived-webhook-payment-updated')))).toBe('duplicate');
+  });
+
+  it('a payment in a currency the adapter cannot read is still our failure: 503, the event retried later [derived]', async () => {
+    await openCheckout(CARD.reference);
+    const body = mpFixture('payment-approved-card').replace('"currency_id":"BRL"', '"currency_id":"XXX"');
+    mp.on('GET', `/v1/payments/${CARD.id}`, { status: 200, body });
 
     const res = await deliver(mpDelivery('derived-webhook-payment-updated'));
 
@@ -503,6 +603,91 @@ describe('POST /v1/webhooks/payments/mercadopago with the real adapter', () => {
     expect(await events()).toMatchObject([{ outcome: 'failed', error: 'processing failed (MercadoPagoResponseError)' }]);
     expect(await ledger()).toEqual([]);
     expect((await repo().getCheckout(CARD.reference))?.status).toBe('open');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The method label on the admin ledger (M30 Task 17)
+// ---------------------------------------------------------------------------
+
+interface StatementPayment {
+  id: string;
+  method: string;
+  amountMinor: number;
+  externalReference: string | null;
+  gatewayMethod?: string | null;
+  gatewayMethodLabel?: string | null;
+}
+interface AdminStatement {
+  invoices: Array<{ id: string; payments: StatementPayment[] }>;
+  extras: { charges: Array<{ id: string; payments: StatementPayment[] }> };
+}
+
+describe('the provider method label, from the recorded payment to the admin ledger', () => {
+  it('a payment made with the buyer\'s Mercado Pago balance lands as other / account_money; the admin sees it, the student does not', async () => {
+    await openCheckout(MONEY.reference);
+    mp.on('GET', `/v1/payments/${MONEY.id}`, mpReply(200, 'payment-approved-account-money'));
+    expect(await notify(MONEY.id)).toBe('applied');
+
+    expect(await repo().getCheckout(MONEY.reference)).toMatchObject({
+      status: 'paid',
+      paidMethod: 'other',
+      paidMethodLabel: 'account_money',
+    });
+
+    const admin = await api('GET', `/admin/billing/students/${world.studentId}/statement`, adminToken);
+    expect(admin.status).toBe(200);
+    const adminInvoice = (await admin.json<AdminStatement>()).invoices.find(i => i.id === world.invoiceId);
+    expect(adminInvoice?.payments).toMatchObject([
+      {
+        method: 'gateway',
+        externalReference: `mercadopago:${MONEY.id}`,
+        gatewayMethod: 'other',
+        gatewayMethodLabel: 'account_money',
+      },
+    ]);
+
+    // The student's own statement is unchanged: the same row, with neither key.
+    const mine = await api('GET', '/me/billing', studentToken);
+    expect(mine.status).toBe(200);
+    const myInvoice = (await mine.json<AdminStatement>()).invoices.find(i => i.id === world.invoiceId);
+    expect(myInvoice?.payments).toHaveLength(1);
+    expect(myInvoice?.payments[0]).toMatchObject({ method: 'gateway', externalReference: `mercadopago:${MONEY.id}` });
+    expect(Object.keys(myInvoice?.payments[0] ?? {})).not.toContain('gatewayMethod');
+    expect(Object.keys(myInvoice?.payments[0] ?? {})).not.toContain('gatewayMethodLabel');
+    expect(JSON.stringify(myInvoice)).not.toContain('account_money');
+  });
+
+  it('a card payment on an event charge shows credit_card/visa on the statement and on the charge detail', async () => {
+    await openCheckout(CARD.reference, { kind: 'event_charge' });
+    mp.on('GET', `/v1/payments/${CARD.id}`, mpReply(200, 'payment-approved-card'));
+    expect(await notify(CARD.id)).toBe('applied');
+
+    const expected = { method: 'gateway', gatewayMethod: 'card', gatewayMethodLabel: 'credit_card/visa' };
+    const statement = await api('GET', `/admin/billing/students/${world.studentId}/statement`, adminToken);
+    const charge = (await statement.json<AdminStatement>()).extras.charges.find(c => c.id === world.chargeId);
+    expect(charge?.payments).toMatchObject([expected]);
+
+    const detail = await api('GET', `/admin/billing/charges/${world.chargeId}`, adminToken);
+    expect(detail.status).toBe(200);
+    expect((await detail.json<{ payments: StatementPayment[] }>()).payments).toMatchObject([expected]);
+  });
+
+  it('a row no checkout landed reads null on both keys: a cash payment and a hand-matched gateway reference', async () => {
+    for (const body of [
+      { amountMinor: 1000, currency: 'BRL', method: 'cash', paidAt: '2026-11-27' },
+      { amountMinor: 1000, currency: 'BRL', method: 'gateway', paidAt: '2026-11-27', externalReference: 'mercadopago:555000111' },
+    ]) {
+      const recorded = await api('POST', `/admin/billing/invoices/${world.invoiceId}/payments`, adminToken, body);
+      expect(recorded.status).toBe(201);
+    }
+
+    const admin = await api('GET', `/admin/billing/students/${world.studentId}/statement`, adminToken);
+    const invoice = (await admin.json<AdminStatement>()).invoices.find(i => i.id === world.invoiceId);
+    expect(invoice?.payments.map(p => [p.method, p.gatewayMethod, p.gatewayMethodLabel]).sort()).toEqual([
+      ['cash', null, null],
+      ['gateway', null, null],
+    ]);
   });
 });
 
@@ -557,6 +742,57 @@ describe('POST /v1/me/billing/checkouts with the real adapter', () => {
       providerSessionId: '1000000001-76a3350c-d4f6-4c0c-9a76-f170d37f7775',
       expiresAt: session.expiresAt,
     });
+  });
+
+  // M30 Task 17. The preference answer replayed is the recorded one; no request
+  // carrying `notification_url` was sent to the sandbox (Task 16 walks it on staging).
+  it('a checkout created through https://api.example.test tells the provider to notify that origin', async () => {
+    mp.on('POST', '/checkout/preferences', preferenceGrantingLess());
+
+    const res = await api(
+      'POST',
+      '/me/billing/checkouts',
+      studentToken,
+      { kind: 'invoice', id: world.invoiceId },
+      replayApp(),
+      'https://api.example.test',
+    );
+
+    expect(res.status).toBe(201);
+    expect(JSON.parse(mp.calls[0].body ?? '{}').notification_url).toBe(
+      'https://api.example.test/v1/webhooks/payments/mercadopago',
+    );
+  });
+
+  it('the admin\'s on-behalf checkout carries the origin of the admin\'s request, and a body cannot name another', async () => {
+    mp.on('POST', '/checkout/preferences', preferenceGrantingLess());
+    const path = `/admin/billing/invoices/${world.invoiceId}/checkouts`;
+
+    const forged = await api('POST', path, adminToken, { apiOrigin: 'https://evil.example' }, replayApp(), 'https://m30.preview.example.test');
+    expect(forged.status).toBe(400);
+    expect(mp.calls).toEqual([]);
+
+    const res = await api('POST', path, adminToken, {}, replayApp(), 'https://m30.preview.example.test');
+    expect(res.status).toBe(201);
+    expect(JSON.parse(mp.calls[0].body ?? '{}').notification_url).toBe(
+      'https://m30.preview.example.test/v1/webhooks/payments/mercadopago',
+    );
+  });
+
+  it('a checkout created on a developer machine sends no notification URL: the provider could not reach it', async () => {
+    mp.on('POST', '/checkout/preferences', preferenceGrantingLess());
+
+    const res = await api(
+      'POST',
+      '/me/billing/checkouts',
+      studentToken,
+      { kind: 'invoice', id: world.invoiceId },
+      replayApp(),
+      'http://localhost:8787',
+    );
+
+    expect(res.status).toBe(201);
+    expect(Object.keys(JSON.parse(mp.calls[0].body ?? '{}'))).not.toContain('notification_url');
   });
 
   it('5: create, pay, notification: the checkout reads paid', async () => {
@@ -661,8 +897,6 @@ describe('POST /v1/admin/billing/payments/{id}/reverse with the real adapter', (
   it.each([
     ['the recorded refusal (400, cause 120013)', () => mpReply(400, 'refund-over-balance-400')],
     ['the recorded 401 (cause 7)', () => mpReply(401, 'refund-unauthorized-401')],
-    // The service cannot tell a retryable provider error from a refusal (the port only throws): same answer.
-    ['the recorded 429 refund_quota_exceeded', () => mpReply(429, 'refund-quota-429')],
   ])('3: %s throws from the adapter: 409 PAYMENTS_REFUND_REFUSED and nothing written', async (_label, reply) => {
     const original = await landed();
     mp.on('POST', REFUNDS, reply());
@@ -671,6 +905,46 @@ describe('POST /v1/admin/billing/payments/{id}/reverse with the real adapter', (
 
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ error: 'PAYMENTS_REFUND_REFUSED' });
+    expect(await ledger()).toHaveLength(1);
+  });
+
+  // M30 Task 17: the recorded `429 refund_quota_exceeded` (refunds fired back to
+  // back) is "not now", never a refusal.
+  it('the recorded 429 is 503 PAYMENTS_PROVIDER_BUSY, writes nothing, and the same request repeated completes', async () => {
+    const original = await landed();
+    mp.on('POST', REFUNDS, mpReply(429, 'refund-quota-429'));
+
+    const busy = await reverse(original.id);
+
+    expect(busy.status).toBe(503);
+    expect(await busy.json()).toEqual({ error: 'PAYMENTS_PROVIDER_BUSY' });
+    expect(await ledger()).toHaveLength(1);
+    expect(providerCalls()).toEqual([`GET /v1/payments/${MONEY.id}`, `POST ${REFUNDS}`]);
+
+    // A few seconds later the provider takes it (the recorded refund answer).
+    mp.on('POST', REFUNDS, mpReply(201, 'refund-rest-201'));
+    const done = await reverse(original.id);
+
+    expect(done.status).toBe(200);
+    expect(await done.json()).toMatchObject({ amountMinor: -1234, reversesId: original.id, externalReference: 'mercadopago:3611872278' });
+    expect(await amounts()).toEqual([
+      [`mercadopago:${MONEY.id}`, 1234],
+      ['mercadopago:3611872278', -1234],
+    ]);
+    // Both attempts carried the same idempotency key.
+    const keys = mp.calls.filter(c => c.method === 'POST').map(c => c.headers['X-Idempotency-Key']);
+    expect(keys).toEqual([`rev:${original.id}`, `rev:${original.id}`]);
+  });
+
+  it('a provider outage while reading the payment is 503 PAYMENTS_PROVIDER_BUSY too: no refund is requested', async () => {
+    const original = await landed();
+    mp.on('GET', `/v1/payments/${MONEY.id}`, { status: 503, body: 'unavailable' });
+
+    const res = await reverse(original.id);
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'PAYMENTS_PROVIDER_BUSY' });
+    expect(providerCalls()).toEqual([`GET /v1/payments/${MONEY.id}`]);
     expect(await ledger()).toHaveLength(1);
   });
 
@@ -696,7 +970,7 @@ describe('POST /v1/admin/billing/payments/reconcile with the real adapter', () =
   const SEARCH = `/v1/payments/search?external_reference=${CARD.reference}`;
 
   /** An open checkout old enough to be asked about, bound to the recorded preference. */
-  async function dueCheckout(): Promise<void> {
+  async function dueCheckout(id: string = CARD.reference): Promise<void> {
     const createdAt = new Date(Date.now() - 40 * 60_000).toISOString();
     await env.DB
       .prepare(
@@ -705,33 +979,39 @@ describe('POST /v1/admin/billing/payments/reconcile with the real adapter', () =
             provider_session_id, checkout_url, expires_at, created_at, updated_at)
          VALUES (?, 'mercadopago', 'invoice', ?, ?, ?, 15000, 'BRL', 'open', ?, 'https://pay.invalid/x', ?, ?, ?)`,
       )
-      .bind(CARD.reference, world.invoiceId, world.studentId, world.studentId, SESSION, new Date(Date.now() + 36_000_000).toISOString(), createdAt, createdAt)
+      .bind(id, world.invoiceId, world.studentId, world.studentId, SESSION, new Date(Date.now() + 36_000_000).toISOString(), createdAt, createdAt)
       .run();
   }
 
   const reconcile = async () => {
     const res = await api('POST', '/admin/billing/payments/reconcile', adminToken);
     expect(res.status).toBe(200);
-    return res.json<{ status: string; summary: Record<string, number> }>();
+    return res.json<{ status: string; keyMode: string; summary: Record<string, number> }>();
   };
 
-  it('1: a missed webhook: the session is found through its preference and the payment lands', async () => {
+  it('1: a missed webhook: the payment is found in one call, by the checkout id, and lands', async () => {
     await dueCheckout();
-    mp.on('GET', `/checkout/preferences/${SESSION}`, mpReply(200, 'preference-paid-card')).on('GET', SEARCH, mpReply(200, 'search-by-reference-card'));
+    mp.on('GET', SEARCH, mpReply(200, 'search-by-reference-card'));
 
     const run = await reconcile();
 
     expect(run.status).toBe('ok');
     expect(run.summary).toMatchObject({ checkoutsAsked: 1, landed: 1, checkoutErrors: 0 });
     expect(await amounts()).toEqual([[`mercadopago:${CARD.id}`, 1234]]);
-    expect(await repo().getCheckout(CARD.reference)).toMatchObject({ status: 'paid', providerPaymentId: CARD.id });
-    expect(providerCalls()).toEqual([`GET /checkout/preferences/${SESSION}`, `GET ${SEARCH}`]);
+    expect(await repo().getCheckout(CARD.reference)).toMatchObject({
+      status: 'paid',
+      providerPaymentId: CARD.id,
+      paidMethod: 'card',
+      paidMethodLabel: 'credit_card/visa',
+    });
+    // One provider call per checkout (decision 17): the preference is never read first.
+    expect(providerCalls()).toEqual([`GET ${SEARCH}`]);
     expect(await events()).toEqual([]);
   });
 
-  it('2: a session nobody paid answers [] (recorded): the checkout stays open and nothing fails', async () => {
+  it('2: a checkout nobody paid answers [] (recorded): it stays open and nothing fails', async () => {
     await dueCheckout();
-    mp.on('GET', `/checkout/preferences/${SESSION}`, mpReply(200, 'preference-paid-card')).on('GET', SEARCH, mpReply(200, 'search-empty'));
+    mp.on('GET', SEARCH, mpReply(200, 'search-empty'));
 
     const run = await reconcile();
 
@@ -739,22 +1019,25 @@ describe('POST /v1/admin/billing/payments/reconcile with the real adapter', () =
     expect(run.summary).toMatchObject({ checkoutsAsked: 1, landed: 0, stillOpen: 1, checkoutErrors: 0 });
     expect(await ledger()).toEqual([]);
     expect((await repo().getCheckout(CARD.reference))?.status).toBe('open');
+    expect(providerCalls()).toEqual([`GET ${SEARCH}`]);
   });
 
-  it('3: a rejected card then an approved one on the same session: one lands [derived]', async () => {
-    await dueCheckout();
-    mp.on('GET', `/checkout/preferences/${SESSION}`, mpReply(200, 'preference-paid-card')).on('GET', SEARCH, mpReply(200, 'derived-search-two-payments'));
+  it('3: two payments on one reference — an approved card and one in process: the approved one lands (recorded)', async () => {
+    await dueCheckout(TWICE.reference);
+    const search = `/v1/payments/search?external_reference=${TWICE.reference}`;
+    mp.on('GET', search, mpReply(200, 'search-by-reference-two-payments'));
 
     const run = await reconcile();
 
     expect(run.summary).toMatchObject({ checkoutsAsked: 1, landed: 1 });
-    expect(await amounts()).toEqual([[`mercadopago:${CARD.id}`, 1234]]);
-    expect((await repo().getCheckout(CARD.reference))?.status).toBe('paid');
+    expect(await amounts()).toEqual([[`mercadopago:${TWICE.approved}`, 1234]]);
+    expect(await repo().getCheckout(TWICE.reference)).toMatchObject({ status: 'paid', providerPaymentId: TWICE.approved });
+    expect(providerCalls()).toEqual([`GET ${search}`]);
   });
 
   it('a provider failure during the search is counted and asked again, never a failed run', async () => {
     await dueCheckout();
-    mp.on('GET', `/checkout/preferences/${SESSION}`, { status: 503, body: 'unavailable' });
+    mp.on('GET', SEARCH, { status: 503, body: 'unavailable' });
 
     const run = await reconcile();
 
@@ -763,15 +1046,13 @@ describe('POST /v1/admin/billing/payments/reconcile with the real adapter', () =
     expect((await repo().getCheckout(CARD.reference))?.status).toBe('open');
   });
 
-  it('4: the key mode: an APP_USR- key passes under test, so the run reaches the provider', async () => {
-    // The key the replay app binds starts with APP_USR- and PAYMENTS_KEY_MODE is `test`:
-    // before Task 05 this was `key_mode_mismatch` and every payment route answered 500.
+  it('4: the key mode is reported, not asserted: an APP_USR- key runs, and the run says which mode was declared', async () => {
     await dueCheckout();
-    mp.on('GET', `/checkout/preferences/${SESSION}`, mpReply(404, 'preference-unknown-404'));
+    mp.on('GET', SEARCH, mpReply(200, 'search-empty'));
 
     const run = await reconcile();
 
-    expect(run.status).toBe('ok');
+    expect(run).toMatchObject({ status: 'ok', keyMode: 'test' });
     expect(mp.calls).toHaveLength(1);
   });
 });

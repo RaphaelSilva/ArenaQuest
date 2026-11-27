@@ -252,7 +252,7 @@ export interface PaymentsContext {
    * The checked `PAYMENTS_PROVIDERS` / `PAYMENTS_KEY_MODE` — the *result*, not a
    * config, so a bad list surfaces as `500 PAYMENTS_CONFIG_INVALID` on the
    * payment routes instead of failing every request at container build time.
-   * The key-mode assertion is already applied.
+   * The declared key mode is already validated (it is never inferred from a key).
    */
   config: PaymentsConfigResult;
   /** The adapters bound for this label and environment; empty under `none` and under an invalid list. */

@@ -5,12 +5,14 @@ import {
   CHECKOUT_TTL_MS,
   GatewayService,
   PAYMENT_PROVIDER_REQUIRED,
+  PAYMENTS_PROVIDER_BUSY,
   PAYMENTS_PROVIDER_ERROR,
   PAYMENTS_PROVIDER_NOT_ENABLED,
   PAYMENTS_REFUND_REFUSED,
   PAYMENTS_REFUND_UNRECORDED,
   PAYMENTS_UNSUPPORTED_CURRENCY,
   RECEIVABLE_NOT_PAYABLE,
+  checkoutNotificationUrl,
   disputeReference,
   eventFromRecord,
   isSettledEventOutcome,
@@ -81,6 +83,8 @@ class MemoryGatewayRepo {
       providerPaymentId: null,
       invoicePaymentId: null,
       chargePaymentId: null,
+      paidMethod: null,
+      paidMethodLabel: null,
       checkoutUrl: 'https://pay.invalid/x',
       expiresAt: '2099-01-01T00:00:00.000Z',
       createdAt: '2026-01-01T00:00:00.000Z',
@@ -173,6 +177,8 @@ class MemoryGatewayRepo {
       providerPaymentId?: string;
       invoicePaymentId?: string;
       chargePaymentId?: string;
+      paidMethod?: GatewayCheckoutRecord['paidMethod'];
+      paidMethodLabel?: string | null;
       failureDetail?: string | null;
     },
   ) {
@@ -184,11 +190,28 @@ class MemoryGatewayRepo {
       providerPaymentId: input.providerPaymentId ?? row.providerPaymentId,
       invoicePaymentId: input.invoicePaymentId ?? row.invoicePaymentId,
       chargePaymentId: input.chargePaymentId ?? row.chargePaymentId,
+      // First writer wins, as in the D1 adapter.
+      paidMethod: row.paidMethod ?? input.paidMethod ?? null,
+      paidMethodLabel: row.paidMethodLabel ?? input.paidMethodLabel ?? null,
       failureDetail: input.failureDetail !== undefined ? input.failureDetail : row.failureDetail,
     };
     this.checkouts.set(id, next);
     return next;
   }
+
+  /** Plays the join of `listPaidMethods`: paid checkouts of one rail, by the ledger row they produced. */
+  async listPaidMethods(kind: GatewayCheckoutRecord['receivableKind'], paymentIds: ReadonlyArray<string>) {
+    this.paidMethodReads += 1;
+    return [...this.checkouts.values()]
+      .filter((row) => row.receivableKind === kind && row.status === CheckoutStatus.PAID)
+      .map((row) => ({
+        paymentId: (kind === 'invoice' ? row.invoicePaymentId : row.chargePaymentId) ?? '',
+        method: row.paidMethod,
+        methodLabel: row.paidMethodLabel,
+      }))
+      .filter((record) => paymentIds.includes(record.paymentId));
+  }
+  paidMethodReads = 0;
 
   async recordEvent(input: { provider: 'mercadopago'; eventId: string; type: string; providerPaymentId?: string | null }) {
     if (this.failRecord) throw new Error('D1_ERROR: unavailable');
@@ -345,6 +368,100 @@ describe('GatewayService', () => {
       ]);
       expect(repo.checkouts.get(checkout.id)).toMatchObject({ status: 'paid', providerPaymentId: 'pay-1', invoicePaymentId: 'row-1' });
       expect(stored(event.eventId)).toMatchObject({ outcome: 'applied', attempts: 1, checkoutId: checkout.id });
+    });
+
+    // M30 Task 17: the provider's own method name is kept beside the normalised one.
+    it('stores how the payment was made on the paid checkout: method and the provider\'s label', async () => {
+      const checkout = repo.addCheckout();
+      paid(checkout, { method: 'other', methodLabel: 'account_money' });
+
+      await service.handleEvent('mercadopago', paymentEvent('pay-1'));
+
+      expect(repo.checkouts.get(checkout.id)).toMatchObject({
+        status: 'paid',
+        paidMethod: 'other',
+        paidMethodLabel: 'account_money',
+      });
+      // The ledger command carries neither: no money table knows a method label.
+      expect(Object.keys(ledger.rows[0]).sort()).toEqual(
+        ['amountMinor', 'currency', 'externalReference', 'paidAt', 'receivableId'].sort(),
+      );
+      expect(await service.paidMethodsOf('invoice', ['row-1', 'row-unknown'])).toEqual(
+        new Map([['row-1', { gatewayMethod: 'other', gatewayMethodLabel: 'account_money' }]]),
+      );
+      expect(await service.paidMethodsOf('event_charge', ['row-1'])).toEqual(new Map());
+    });
+
+    it.each([
+      ['free text', 'João da Silva <joao@example.com>'],
+      ['upper case', 'CREDIT_CARD/VISA'],
+      ['too long', 'a'.repeat(65)],
+      ['empty', ''],
+    ])('never stores a label that is not a provider identifier (%s): the method alone is kept', async (_name, label) => {
+      const checkout = repo.addCheckout();
+      paid(checkout, { method: 'card', methodLabel: label });
+
+      await service.handleEvent('mercadopago', paymentEvent('pay-1'));
+
+      expect(repo.checkouts.get(checkout.id)).toMatchObject({ status: 'paid', paidMethod: 'card', paidMethodLabel: null });
+    });
+
+    it('reads no checkout at all for an empty list of rows', async () => {
+      expect(await service.paidMethodsOf('invoice', [])).toEqual(new Map());
+      expect(repo.paidMethodReads).toBe(0);
+    });
+
+    // M30 Task 17 (R14): a checkout is for the full balance, but nothing stops a
+    // payer from paying the same link twice. Both captures land; the second is a
+    // credit on the receivable, and the checkout keeps the first payment's ids.
+    it('lands two payments made on one checkout as two ledger rows — the second a credit', async () => {
+      const checkout = repo.addCheckout();
+      mp.setPayment(stubPayment({ id: 'pay-1', amountMinor: 15000, checkoutId: checkout.id, method: 'card', methodLabel: 'credit_card/visa' }));
+      mp.setPayment(stubPayment({ id: 'pay-2', amountMinor: 15000, checkoutId: checkout.id, method: 'other', methodLabel: 'account_money' }));
+
+      const first = await service.handleEvent('mercadopago', paymentEvent('pay-1'));
+      const second = await service.handleEvent('mercadopago', paymentEvent('pay-2'));
+
+      expect([first.outcome, second.outcome]).toEqual(['applied', 'applied']);
+      expect(ledger.rows.map((row) => [row.receivableId, row.externalReference, row.amountMinor])).toEqual([
+        [INVOICE, 'mercadopago:pay-1', 15000],
+        [INVOICE, 'mercadopago:pay-2', 15000],
+      ]);
+      // 30 000 received against the 15 000 the checkout asked for: the surplus is a credit.
+      const received = ledger.rows.reduce((sum, row) => sum + row.amountMinor, 0);
+      expect(received - checkout.amountMinor).toBe(15000);
+      // The checkout stays `paid` on the first payment; the second changes nothing on it.
+      expect(repo.checkouts.get(checkout.id)).toMatchObject({
+        status: 'paid',
+        providerPaymentId: 'pay-1',
+        invoicePaymentId: 'row-1',
+        paidMethod: 'card',
+        paidMethodLabel: 'credit_card/visa',
+      });
+      // Only the row the checkout points at has a label; the credit row reads as unknown.
+      expect(await service.paidMethodsOf('invoice', ['row-1', 'row-2'])).toEqual(
+        new Map([['row-1', { gatewayMethod: 'card', gatewayMethodLabel: 'credit_card/visa' }]]),
+      );
+      // A redelivery of either is a duplicate: still two rows.
+      expect((await service.handleEvent('mercadopago', paymentEvent('pay-2'))).outcome).toBe('duplicate');
+      expect(ledger.rows).toHaveLength(2);
+    });
+
+    it('settles a payment in another currency as a mismatch: nothing lands, the checkout says why', async () => {
+      const checkout = repo.addCheckout();
+      paid(checkout, { currency: 'USD' });
+      const event = paymentEvent('pay-1');
+
+      const result = await service.handleEvent('mercadopago', event);
+
+      expect(result.outcome).toBe('mismatch');
+      expect(ledger.rows).toEqual([]);
+      expect(repo.checkouts.get(checkout.id)).toMatchObject({
+        status: 'mismatch',
+        paidMethod: null,
+        failureDetail: 'currency mismatch: the payment is in USD, the checkout in BRL',
+      });
+      expect(stored(event.eventId)).toMatchObject({ outcome: 'mismatch' });
     });
 
     it('answers a settled event from the stored row: no fetch, no write', async () => {
@@ -732,6 +849,8 @@ describe('GatewayService.createCheckout', () => {
         success: `https://app.example.com/settings/billing?checkout=${checkout.checkoutId}&outcome=success`,
         cancel: `https://app.example.com/settings/billing?checkout=${checkout.checkoutId}&outcome=cancel`,
       },
+      // No API origin was given: the provider falls back to its dashboard registration.
+      notificationUrl: null,
       expiresAt: checkout.expiresAt,
     });
 
@@ -744,6 +863,69 @@ describe('GatewayService.createCheckout', () => {
       providerSessionId: `mercadopago-session-${checkout.checkoutId}`,
       checkoutUrl: checkout.url,
     });
+  });
+
+  // M30 Task 17: every checkout tells the provider where to notify — the API that created it.
+  describe('the notification URL', () => {
+    it('is <origin of the API request>/v1/webhooks/payments/<provider>', async () => {
+      const service = build('mercadopago:pix+card');
+
+      await service.createCheckout({ ...invoice, apiOrigin: 'https://api.example.test' }, mine);
+
+      expect(mp.callsTo('createCheckout')[0].req.notificationUrl).toBe(
+        'https://api.example.test/v1/webhooks/payments/mercadopago',
+      );
+    });
+
+    it('names the provider that was chosen, and is the same on the admin\'s door', async () => {
+      const service = build('mercadopago:pix,stripe:card');
+
+      await service.createCheckoutOnBehalf(
+        { ...invoice, provider: 'stripe', apiOrigin: 'https://m30.api-preview.example.test' },
+        'admin-1',
+      );
+
+      expect(stripe.callsTo('createCheckout')[0].req.notificationUrl).toBe(
+        'https://m30.api-preview.example.test/v1/webhooks/payments/stripe',
+      );
+    });
+
+    it('is still handed to the adapter for a loopback origin (the adapter decides what the provider can reach)', async () => {
+      const service = build('mercadopago:pix');
+
+      await service.createCheckout({ ...invoice, apiOrigin: 'http://localhost:8787' }, mine);
+
+      expect(mp.callsTo('createCheckout')[0].req.notificationUrl).toBe(
+        'http://localhost:8787/v1/webhooks/payments/mercadopago',
+      );
+    });
+
+    it('is the current request\'s origin when an open row without a session is called again', async () => {
+      const service = build('mercadopago:pix');
+      // A row left open without a session (the first provider call never completed).
+      repo.addCheckout({ id: 'stuck', providerSessionId: null, expiresAt: new Date(NOW.getTime() + CHECKOUT_TTL_MS).toISOString() });
+
+      await service.createCheckout({ ...invoice, apiOrigin: 'https://api.example.test' }, mine);
+
+      expect(mp.callsTo('createCheckout')[0].req).toMatchObject({
+        checkoutId: 'stuck',
+        notificationUrl: 'https://api.example.test/v1/webhooks/payments/mercadopago',
+      });
+    });
+
+    it.each([
+      ['a path, a query and credentials are dropped', 'https://user:pw@api.example.test:8443/v1/x?y=1#z', 'https://api.example.test:8443/v1/webhooks/payments/mercadopago'],
+      ['an http origin is kept as given', 'http://api.example.test', 'http://api.example.test/v1/webhooks/payments/mercadopago'],
+    ])('keeps only the origin: %s', (_name, origin, expected) => {
+      expect(checkoutNotificationUrl(origin, 'mercadopago')).toBe(expected);
+    });
+
+    it.each([undefined, null, '', 'not a url', 'ftp://api.example.test', 'javascript:alert(1)', 'api.example.test'])(
+      'is null for the origin %j',
+      (origin) => {
+        expect(checkoutNotificationUrl(origin, 'mercadopago')).toBeNull();
+      },
+    );
   });
 
   it('audits the creation with ids only', async () => {
@@ -1416,6 +1598,57 @@ describe('GatewayService.refundInvoicePayment', () => {
     expect(result).toEqual({ ok: false, status: 409, error: PAYMENTS_REFUND_REFUSED });
     expect(JSON.stringify(ledger.payments)).toBe(before);
     expect(audits('payments.gateway_reversed')).toHaveLength(0);
+  });
+
+  // M30 Task 17: Mercado Pago answers `429` to refunds fired back to back. That
+  // is "not now", never "no" — and never a reason to tell an admin it was refused.
+  it('answers 503 PAYMENTS_PROVIDER_BUSY for a retryable provider error, writes nothing, and the repeat completes', async () => {
+    const before = JSON.stringify(ledger.payments);
+    const rateLimited = Object.assign(new Error('429 — a provider message that must not travel'), { retryable: true });
+    mp.failRefunds(rateLimited);
+
+    const busy = await refund();
+
+    expect(busy).toEqual({ ok: false, status: 503, error: PAYMENTS_PROVIDER_BUSY });
+    expect(JSON.stringify(ledger.payments)).toBe(before);
+    expect(audits('payments.gateway_reversed')).toHaveLength(0);
+
+    // A few seconds later the same request goes through: one refund, one reversal row.
+    mp.failRefunds(null);
+    const result = ok(await refund());
+
+    expect(result).toMatchObject({ created: true, refundId: 'mercadopago-refund-1' });
+    expect(result.payment).toMatchObject({ amountMinor: -15000, reversesId: original.id });
+    expect(rows()).toHaveLength(2);
+    expect(mp.callsTo('refund').map((call) => call.idempotencyKey)).toEqual([`rev:${original.id}`, `rev:${original.id}`]);
+  });
+
+  it('is 503 PAYMENTS_PROVIDER_BUSY too when the read before the refund is rate-limited: no refund is requested', async () => {
+    mp.failLookups(Object.assign(new Error('timeout'), { retryable: true }));
+
+    expect(await refund()).toEqual({ ok: false, status: 503, error: PAYMENTS_PROVIDER_BUSY });
+    expect(mp.callsTo('refund')).toHaveLength(0);
+    expect(rows()).toHaveLength(1);
+  });
+
+  it('finds a refund the provider did accept before timing out, and records it instead of asking again', async () => {
+    // The first call reaches the provider, which refunds — and the answer is lost.
+    const realRefund = mp.refund.bind(mp);
+    mp.refund = async (...args) => {
+      await realRefund(...args);
+      mp.refund = realRefund;
+      throw Object.assign(new Error('timeout'), { retryable: true });
+    };
+
+    expect(await refund()).toEqual({ ok: false, status: 503, error: PAYMENTS_PROVIDER_BUSY });
+    expect(rows()).toHaveLength(1);
+
+    const result = ok(await refund());
+
+    expect(result).toMatchObject({ created: true, refundId: 'mercadopago-refund-1' });
+    expect(rows()).toHaveLength(2);
+    // The repeat read the payment, saw the refund and never asked for a second one.
+    expect(mp.callsTo('refund')).toHaveLength(1);
   });
 
   it('records a refund the provider already holds instead of asking for another', async () => {

@@ -18,7 +18,6 @@ import type {
   PaymentProviderName,
 } from '@arenaquest/shared/ports/i-payment-gateway';
 import {
-  assertPaymentsKeyMode,
   parsePaymentsConfig,
   readPaymentSecrets,
   type PaymentsConfigResult,
@@ -34,6 +33,7 @@ export interface PaymentGatewayFactoryInput {
   secretKey: string;
   /** `PAYMENTS_<PROVIDER>_WEBHOOK_SECRET`. */
   webhookSecret: string;
+  /** What `PAYMENTS_KEY_MODE` declares. A reminder only: no adapter may branch on a key's content. */
   keyMode: PaymentsKeyMode;
 }
 
@@ -129,9 +129,9 @@ export class GatewayRegistry {
 /** What the container's `payments` group holds after this task. */
 export interface PaymentsWiring {
   /**
-   * The checked configuration — the list rules **and** the key-mode assertion
-   * already applied. `ok: false` is what a payment route translates into
-   * `500 PAYMENTS_CONFIG_INVALID`.
+   * The checked configuration — the list rules, both secrets present and a
+   * valid `PAYMENTS_KEY_MODE` value. `ok: false` is what a payment route
+   * translates into `500 PAYMENTS_CONFIG_INVALID`.
    */
   config: PaymentsConfigResult;
   gateways: GatewayRegistry;
@@ -148,6 +148,6 @@ export function buildPaymentsWiring(
   const availableProviders = (Object.keys(factories) as PaymentProviderName[]).filter(
     provider => factories[provider] !== undefined,
   );
-  const config = assertPaymentsKeyMode(parsePaymentsConfig(env, { availableProviders }));
+  const config = parsePaymentsConfig(env, { availableProviders });
   return { config, gateways: new GatewayRegistry(config, factories, env) };
 }

@@ -146,15 +146,25 @@ describe('buildPaymentsWiring', () => {
     expect(gateways.get('mercadopago')).toBeNull();
   });
 
-  it('applies the key-mode assertion: a mismatch is an invalid configuration and binds nothing', () => {
-    // Stripe: its prefixes declare one mode each. (Mercado Pago's `APP_USR-` proves neither — Task 05.)
-    const stripe = new StubGatewayAdapter('stripe');
-    for (const [keys, mode] of [['live', 'test'], ['test', 'live']] as const) {
-      const env = { ...stubPaymentsEnv('stripe:card', keys), PAYMENTS_KEY_MODE: mode };
-      const { config, gateways } = buildPaymentsWiring(env, stubGatewayFactories(stripe));
-      expect(config).toMatchObject({ ok: false, reason: 'key_mode_mismatch' });
-      expect(gateways.isEmpty).toBe(true);
+  it('binds a provider whatever its key looks like, under either declared mode (decision 19)', () => {
+    for (const mode of ['test', 'live'] as const) {
+      const stripe = new StubGatewayAdapter('stripe');
+      for (const key of ['sk_live_fixture', 'sk_test_fixture', 'opaque']) {
+        const env = { ...stubPaymentsEnv('stripe:card', mode), PAYMENTS_STRIPE_SECRET_KEY: key };
+        const { config, gateways } = buildPaymentsWiring(env, stubGatewayFactories(stripe));
+        expect(config.ok).toBe(true);
+        expect(gateways.get('stripe')).toBe(stripe);
+      }
+      expect(stripe.factoryInputs.map(input => input.keyMode)).toEqual([mode, mode, mode]);
     }
+  });
+
+  it('an invalid PAYMENTS_KEY_MODE value is an invalid configuration and binds nothing', () => {
+    const stripe = new StubGatewayAdapter('stripe');
+    const env = { ...stubPaymentsEnv('stripe:card'), PAYMENTS_KEY_MODE: 'banana' };
+    const { config, gateways } = buildPaymentsWiring(env, stubGatewayFactories(stripe));
+    expect(config).toMatchObject({ ok: false, reason: 'invalid_key_mode' });
+    expect(gateways.isEmpty).toBe(true);
     expect(stripe.factoryInputs).toEqual([]);
   });
 
@@ -189,6 +199,7 @@ describe('StubGatewayAdapter', () => {
       payer: { id: 'u-1', email: 's@example.test', name: 'Student' },
       methods: ['pix' as const],
       returnUrls: { success: 'https://web.test/ok', cancel: 'https://web.test/no' },
+      notificationUrl: 'https://api.web.test/v1/webhooks/payments/mercadopago',
       expiresAt: '2026-11-27T00:00:00.000Z',
     };
     expect(await stub.createCheckout(req)).toEqual({
@@ -212,16 +223,23 @@ describe('StubGatewayAdapter', () => {
 
     expect(await stub.getPayment('p-1')).toMatchObject({ id: 'p-1', status: 'paid', checkoutId: 'co-1' });
     expect(await stub.getPayment('nope')).toBeNull();
-    expect((await stub.findPaymentsForCheckout('sess-1')).map(p => p.id)).toEqual(['p-1', 'p-2']);
-    expect(await stub.findPaymentsForCheckout('sess-2')).toEqual([]);
+    expect((await stub.findPaymentsForCheckout({ sessionId: 'sess-1', checkoutId: 'co-1' })).map(p => p.id)).toEqual(['p-1', 'p-2']);
+    expect(await stub.findPaymentsForCheckout({ sessionId: 'sess-2', checkoutId: 'co-1' })).toEqual([]);
+
+    // Both ids of the lookup are recorded: an adapter may search on either.
+    expect(stub.callsTo('findPaymentsForCheckout')[0]).toEqual({
+      method: 'findPaymentsForCheckout',
+      sessionId: 'sess-1',
+      checkoutId: 'co-1',
+    });
 
     stub.removePayment('p-1');
     expect(await stub.getPayment('p-1')).toBeNull();
-    expect((await stub.findPaymentsForCheckout('sess-1')).map(p => p.id)).toEqual(['p-2']);
+    expect((await stub.findPaymentsForCheckout({ sessionId: 'sess-1', checkoutId: 'co-1' })).map(p => p.id)).toEqual(['p-2']);
 
     stub.failLookups(new Error('timeout'));
     await expect(stub.getPayment('p-2')).rejects.toThrow('timeout');
-    await expect(stub.findPaymentsForCheckout('sess-1')).rejects.toThrow('timeout');
+    await expect(stub.findPaymentsForCheckout({ sessionId: 'sess-1', checkoutId: 'co-1' })).rejects.toThrow('timeout');
   });
 
   it('refunds idempotently, shows the refund on the payment, and can refuse', async () => {

@@ -49,8 +49,8 @@ export interface MyBillingStatement extends StudentStatement {
   asOf: string;
 }
 
-/** The receivable a caller wants to pay: a kind, an id, and optionally how. Never a user. */
-export type MyCheckoutRequest = CreateCheckoutInput;
+/** The receivable a caller wants to pay: a kind, an id, and optionally how. Never a user, never an origin. */
+export type MyCheckoutRequest = Omit<CreateCheckoutInput, 'apiOrigin'>;
 
 /** A hosted session, and whether this call opened it (`201`) or it was already open (`200`). */
 export interface MyCheckoutAnswer {
@@ -93,9 +93,15 @@ export class MeBillingController {
   async createMyCheckout(
     callerId: string,
     request: MyCheckoutRequest,
+    /** The origin of this very request, read by the router: where the provider is told to notify. */
+    apiOrigin: string | null = null,
   ): Promise<ControllerResult<MyCheckoutAnswer>> {
     if (!this.checkouts) return NOT_FOUND;
-    const result = await this.checkouts.createCheckout(request, { userId: callerId, createdBy: callerId });
+    // Set last, so nothing in `request` can name another origin.
+    const result = await this.checkouts.createCheckout(
+      { ...request, apiOrigin },
+      { userId: callerId, createdBy: callerId },
+    );
     if (!result.ok) return result;
     return { ok: true, data: { checkout: result.data.checkout, created: !result.data.reused } };
   }

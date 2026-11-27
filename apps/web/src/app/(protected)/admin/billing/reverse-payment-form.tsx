@@ -36,7 +36,9 @@ export type ReversiblePayment = {
  * — and takes an explicit confirmation the plain reversal does not have.
  * Every answer has its own message; the one that matters most is *accepted
  * but not recorded*: the money did move, and *Try again* repeats the very
- * same request, which records it and cannot refund twice.
+ * same request, which records it and cannot refund twice. *The provider is
+ * busy* (a rate limit or a timeout: nothing was written) gets the same
+ * *Try again*, for the same reason — the repeat is the identical request.
  */
 export function ReversePaymentForm({
   paymentId,
@@ -76,8 +78,11 @@ export function ReversePaymentForm({
   const [reason, setReason] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** The provider returned the money and the ledger does not say so yet. */
-  const [unrecorded, setUnrecorded] = useState(false);
+  /**
+   * The answer asks for the very same request again: the provider returned the
+   * money and the ledger does not say so yet, or the provider was busy.
+   */
+  const [retryable, setRetryable] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const explainRefusal = (thrown: unknown): string => {
@@ -91,6 +96,8 @@ export function ReversePaymentForm({
         return g.outcomes.providerNotEnabled(provider);
       case 'unrecorded':
         return g.outcomes.unrecorded(provider, thrown.refundId ?? '');
+      case 'provider_busy':
+        return g.outcomes.providerBusy(provider);
       case 'configuration':
         return g.outcomes.configuration;
       case 'provider_unavailable':
@@ -122,7 +129,7 @@ export function ReversePaymentForm({
           ? await client.adminBilling.extras.reversePayment(paymentId, { reason: trimmed })
           : await client.adminBilling.payments.reverse(paymentId, { reason: trimmed });
       setError(null);
-      setUnrecorded(false);
+      setRetryable(false);
       if (isGateway) {
         const outcome = refundOutcomeOf(reversal);
         await onReversed(
@@ -135,7 +142,10 @@ export function ReversePaymentForm({
       }
     } catch (thrown) {
       if (isGateway) {
-        setUnrecorded(thrown instanceof AdminBillingApiError && thrown.refundKind === 'unrecorded');
+        setRetryable(
+          thrown instanceof AdminBillingApiError &&
+            (thrown.refundKind === 'unrecorded' || thrown.refundKind === 'provider_busy'),
+        );
         setError(explainRefusal(thrown));
       } else {
         setError(d.reverseError);
@@ -181,8 +191,8 @@ export function ReversePaymentForm({
             onChange={(event) => setReason(event.target.value)}
             rows={3}
             placeholder={d.reverseReasonPlaceholder}
-            // Once the provider accepted, the retry must be the same request.
-            readOnly={unrecorded}
+            // The retry must be the same request.
+            readOnly={retryable}
             className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
           />
         </label>
@@ -211,7 +221,7 @@ export function ReversePaymentForm({
             {d.reverseCancel}
           </Button>
           <Button type="submit" variant="primary" size="md" disabled={busy}>
-            {isGateway ? (unrecorded ? g.retry : g.submit) : d.reverseSubmit}
+            {isGateway ? (retryable ? g.retry : g.submit) : d.reverseSubmit}
           </Button>
         </div>
       </form>

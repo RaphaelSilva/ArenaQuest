@@ -295,6 +295,13 @@ export type BillingPayment = {
   reversesId: string | null;
   recordedBy: string;
   recordedAt: string;
+  /**
+   * The provider's own words for how a gateway payment was made
+   * (`account_money`, `credit_card/visa`, …). Present — possibly `null` — only
+   * on the admin statement and charge-detail rows; absent everywhere else.
+   */
+  gatewayMethod?: 'pix' | 'card' | 'boleto' | 'other' | null;
+  gatewayMethodLabel?: string | null;
 };
 
 export type RecordPaymentInput = {
@@ -564,6 +571,13 @@ export type BillingEventChargePayment = {
   reversesId: string | null;
   recordedBy: string;
   recordedAt: string;
+  /**
+   * The provider's own words for how a gateway payment was made
+   * (`account_money`, `credit_card/visa`, …). Present — possibly `null` — only
+   * on the admin statement and charge-detail rows; absent everywhere else.
+   */
+  gatewayMethod?: 'pix' | 'card' | 'boleto' | 'other' | null;
+  gatewayMethodLabel?: string | null;
 };
 
 export type BillingRecordedEventChargePayment = BillingEventChargePayment & {
@@ -643,7 +657,9 @@ export type BillingStatementExtras = {
  * Why reversing a **gateway** payment did not end in a reversal row (RFC 0026
  * §5). Every code the two `reverse` routes document maps to exactly one kind.
  * Only `unrecorded` means money moved: the provider returned it and the ledger
- * does not say so yet — the same request, repeated, records it.
+ * does not say so yet — the same request, repeated, records it. `provider_busy`
+ * is the other one worth repeating as is: nothing was written, and the repeat
+ * starts by reading the provider, so it cannot refund twice.
  */
 export type RefundErrorKind =
   /** `409 PAYMENTS_REFUND_REFUSED` — the provider said no; nothing was written. */
@@ -652,6 +668,8 @@ export type RefundErrorKind =
   | 'provider_not_enabled'
   /** `503 PAYMENTS_REFUND_UNRECORDED` — refunded at the provider, not on the ledger yet. */
   | 'unrecorded'
+  /** `503 PAYMENTS_PROVIDER_BUSY` — rate limit or timeout at the provider; nothing was written. */
+  | 'provider_busy'
   /** `500 PAYMENTS_CONFIG_INVALID` — no refund was requested. */
   | 'configuration'
   /** `502 PAYMENTS_PROVIDER_ERROR` — the provider could not be read; no refund was requested. */
@@ -664,6 +682,7 @@ const REFUND_ERROR_KINDS: Record<string, RefundErrorKind> = {
   PAYMENTS_REFUND_REFUSED: 'refused',
   PAYMENTS_PROVIDER_NOT_ENABLED: 'provider_not_enabled',
   PAYMENTS_REFUND_UNRECORDED: 'unrecorded',
+  PAYMENTS_PROVIDER_BUSY: 'provider_busy',
   PAYMENTS_CONFIG_INVALID: 'configuration',
   PAYMENTS_PROVIDER_ERROR: 'provider_unavailable',
   Conflict: 'conflict',

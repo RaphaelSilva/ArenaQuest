@@ -12,7 +12,12 @@ import {
   minorToDecimal,
   quoteJsonNumbers,
 } from '@api/adapters/payment/mercadopago-gateway-adapter';
-import type { CreateCheckoutRequest, PaymentMethodName } from '@arenaquest/shared/ports/i-payment-gateway';
+import {
+  PROVIDER_METHOD_LABEL_PATTERN,
+  isRetryableProviderError,
+  type CreateCheckoutRequest,
+  type PaymentMethodName,
+} from '@arenaquest/shared/ports/i-payment-gateway';
 import {
   MP_EXPECTED_PAYMENTS,
   MP_FIXTURE_ACCESS_TOKEN,
@@ -130,6 +135,8 @@ const CHECKOUT: CreateCheckoutRequest = {
     success: 'https://example.com/settings/billing?checkout=x&outcome=success',
     cancel: 'https://example.com/settings/billing?checkout=x&outcome=cancel',
   },
+  // The recorded request carried no notification URL (see the tests below for one that does).
+  notificationUrl: null,
   expiresAt: '2026-11-28T13:46:28.231Z',
 };
 
@@ -252,6 +259,38 @@ describe('createCheckout', () => {
     expectClean(error, 'items needed');
   });
 
+  // M30 Task 17. NOT recorded: no preference carrying `notification_url` was sent
+  // to the sandbox — the field is the provider's published one, and the answer
+  // replayed here is the recorded preference of a request without it.
+  it('sends the checkout\'s own notification URL, after the recorded fields', async () => {
+    const mp = mpFakeProvider().on('POST', '/checkout/preferences', mpReply(201, 'preference-created'));
+    const notificationUrl = 'https://api.example.test/v1/webhooks/payments/mercadopago';
+
+    await adapter(mp).createCheckout({ ...CHECKOUT, notificationUrl });
+
+    expect(JSON.parse(mp.calls[0].body ?? '{}').notification_url).toBe(notificationUrl);
+    // Everything that was recorded is still sent, byte for byte, before it.
+    expect(mp.calls[0].body).toBe(
+      `${RECORDED_PREFERENCE_REQUEST.slice(0, -1)},"notification_url":"${notificationUrl}"}`,
+    );
+  });
+
+  it.each([
+    'http://localhost:8787/v1/webhooks/payments/mercadopago',
+    'http://127.0.0.1:8787/v1/webhooks/payments/mercadopago',
+    'http://[::1]:8787/v1/webhooks/payments/mercadopago',
+    'https://api.localhost/v1/webhooks/payments/mercadopago',
+    'ftp://api.example.test/v1/webhooks/payments/mercadopago',
+    'not a url',
+  ])('leaves the notification URL out for %s: the provider could not reach it', async (notificationUrl) => {
+    const mp = mpFakeProvider().on('POST', '/checkout/preferences', mpReply(201, 'preference-created'));
+
+    await adapter(mp).createCheckout({ ...CHECKOUT, notificationUrl });
+
+    // Exactly the recorded request: no `notification_url` key at all.
+    expect(mp.calls[0].body).toBe(RECORDED_PREFERENCE_REQUEST);
+  });
+
   it('refuses a currency it does not charge before calling the provider', async () => {
     const mp = mpFakeProvider();
 
@@ -290,11 +329,54 @@ describe('getPayment', () => {
       'derived-payment-approved-pix': 'paid/pix',
       'payment-approved-card': 'paid/card',
       'payment-pending-boleto': 'pending/boleto',
-      'derived-payment-rejected-card': 'failed/card',
+      'payment-rejected-card': 'failed/card',
+      'payment-in-process-card': 'pending/card',
       'payment-partially-refunded': 'paid/other',
       'payment-refunded': 'refunded/other',
       'derived-payment-charged-back': 'disputed/card',
     });
+  });
+
+  // M30 Task 17: the provider's own words, beside the normalised method.
+  it('labels each payment with the provider\'s own method name', () => {
+    const labels = Object.fromEntries(
+      Object.entries(MP_EXPECTED_PAYMENTS).map(([name, p]) => [name, `${p.method} · ${p.methodLabel}`]),
+    );
+    expect(labels).toMatchObject({
+      // Recorded.
+      'payment-approved-account-money': 'other · account_money',
+      'payment-approved-card': 'card · credit_card/visa',
+      'payment-rejected-card': 'card · credit_card/master',
+      'payment-pending-boleto': 'boleto · ticket/bolbradesco',
+      // Derived (no Pix on the test seller).
+      'derived-payment-approved-pix': 'pix · bank_transfer/pix',
+    });
+    for (const payment of Object.values(MP_EXPECTED_PAYMENTS)) {
+      expect(payment.methodLabel).toMatch(PROVIDER_METHOD_LABEL_PATTERN);
+    }
+  });
+
+  it.each([
+    ['a payer-shaped method id is dropped, the type is kept', '"payment_method_id":"visa"', '"payment_method_id":"João <x@y.z>"', 'credit_card'],
+    ['an upper-case id is not copied', '"payment_method_id":"visa"', '"payment_method_id":"VISA"', 'credit_card'],
+    ['a null method id leaves the type alone', '"payment_method_id":"visa"', '"payment_method_id":null', 'credit_card'],
+    ['an unusable type leaves the method alone', '"payment_type_id":"credit_card"', '"payment_type_id":"Crédito à vista"', 'visa'],
+  ])('builds the label from provider identifiers only: %s', async (_label, from, to, expected) => {
+    const body = mpFixture('payment-approved-card').replace(from, to);
+    expect(body).not.toBe(mpFixture('payment-approved-card'));
+    const mp = mpFakeProvider().on('GET', '/v1/payments/191926322032', { status: 200, body });
+
+    expect((await adapter(mp).getPayment('191926322032'))?.methodLabel).toBe(expected);
+  });
+
+  it('answers a null label when the payment names neither a type nor a method', async () => {
+    const body = mpFixture('payment-approved-card')
+      .replace('"payment_method_id":"visa"', '"payment_method_id":null')
+      .replace('"payment_type_id":"credit_card"', '"payment_type_id":null');
+    const mp = mpFakeProvider().on('GET', '/v1/payments/191926322032', { status: 200, body });
+
+    const payment = await adapter(mp).getPayment('191926322032');
+    expect(payment).toMatchObject({ method: 'other', methodLabel: null });
   });
 
   it('keeps a partially refunded payment paid, and a fully refunded one whole', async () => {
@@ -343,11 +425,39 @@ describe('getPayment', () => {
     expect((await adapter(mp).getPayment('191926322032'))?.amountMinor).toBe(minor);
   });
 
-  it.each([
-    ['more fraction digits than the currency allows', 'derived-payment-three-decimals'],
-    ['a currency this adapter does not charge', 'derived-payment-usd'],
-  ])('fails, never rounds, on %s', async (_label, name) => {
-    const mp = mpFakeProvider().on('GET', '/v1/payments/191926322032', mpReply(200, name));
+  it('fails, never rounds, on more fraction digits than the currency allows', async () => {
+    const mp = mpFakeProvider().on('GET', '/v1/payments/191926322032', mpReply(200, 'derived-payment-three-decimals'));
+
+    const error = await failure(adapter(mp).getPayment('191926322032'));
+
+    expect(error).toBeInstanceOf(MercadoPagoResponseError);
+    expect(error).toMatchObject({ kind: 'invalid_response', httpStatus: 200, retryable: false });
+  });
+
+  // M30 Task 17: a payment in another currency is a fact about the payment, not
+  // an unusable answer — it must reach the service, which settles it `mismatch`.
+  it('reads a payment in another currency it knows the exponent of (derived: USD), with that currency', async () => {
+    const mp = mpFakeProvider().on('GET', '/v1/payments/191926322032', mpReply(200, 'derived-payment-usd'));
+
+    expect(await adapter(mp).getPayment('191926322032')).toEqual(MP_EXPECTED_PAYMENTS['derived-payment-usd']);
+  });
+
+  it('reads a zero-decimal currency by its own exponent (derived: CLP 1234)', async () => {
+    const body = mpFixture('payment-approved-card')
+      .replace('"currency_id":"BRL"', '"currency_id":"CLP"')
+      .replace('"transaction_amount":12.34,', '"transaction_amount":1234,');
+    const mp = mpFakeProvider().on('GET', '/v1/payments/191926322032', { status: 200, body });
+
+    expect(await adapter(mp).getPayment('191926322032')).toMatchObject({ currency: 'CLP', amountMinor: 1234 });
+    // …and never rounds one either.
+    const fractional = body.replace('"transaction_amount":1234,', '"transaction_amount":12.34,');
+    const again = mpFakeProvider().on('GET', '/v1/payments/191926322032', { status: 200, body: fractional });
+    expect(await failure(adapter(again).getPayment('191926322032'))).toBeInstanceOf(MercadoPagoResponseError);
+  });
+
+  it.each(['XXX', 'JPY', 'brl', ''])('still fails on the currency %j: its amount cannot be read without guessing', async (currency) => {
+    const body = mpFixture('payment-approved-card').replace('"currency_id":"BRL"', `"currency_id":"${currency}"`);
+    const mp = mpFakeProvider().on('GET', '/v1/payments/191926322032', { status: 200, body });
 
     const error = await failure(adapter(mp).getPayment('191926322032'));
 
@@ -400,79 +510,95 @@ describe('getPayment', () => {
 
 describe('findPaymentsForCheckout', () => {
   const SESSION = '1000000001-deaaa0c1-cce7-4556-a775-9cea42b239ef';
-  const SEARCH = '/v1/payments/search?external_reference=aqrec-1795785192-E-card-approved';
+  const REFERENCE = 'aqrec-1795785192-E-card-approved';
+  const SEARCH = `/v1/payments/search?external_reference=${REFERENCE}`;
+  const lookup = (checkoutId: string) => ({ sessionId: SESSION, checkoutId });
 
-  it('finds the payment made on a preference: the preference names the reference, the search filters on it', async () => {
-    const mp = mpFakeProvider()
-      .on('GET', `/checkout/preferences/${SESSION}`, mpReply(200, 'preference-paid-card'))
-      .on('GET', SEARCH, mpReply(200, 'search-by-reference-card'));
+  it('finds the payment in ONE call: the search on the checkout id, never the preference first', async () => {
+    const mp = mpFakeProvider().on('GET', SEARCH, mpReply(200, 'search-by-reference-card'));
 
-    const payments = await adapter(mp).findPaymentsForCheckout(SESSION);
+    const payments = await adapter(mp).findPaymentsForCheckout(lookup(REFERENCE));
 
     expect(payments).toEqual([MP_EXPECTED_PAYMENTS['payment-approved-card']]);
-    expect(mp.calls.map(c => `${c.method} ${c.path}`)).toEqual([`GET /checkout/preferences/${SESSION}`, `GET ${SEARCH}`]);
+    expect(mp.calls.map(c => `${c.method} ${c.path}`)).toEqual([`GET ${SEARCH}`]);
   });
 
   it('finds a pending boleto the same way', async () => {
-    const body = mpFixture('preference-paid-card').replace('aqrec-1795785192-E-card-approved', 'aqrec-1795785652-G-boleto-pending');
-    const mp = mpFakeProvider()
-      .on('GET', `/checkout/preferences/${SESSION}`, { status: 200, body })
-      .on('GET', '/v1/payments/search?external_reference=aqrec-1795785652-G-boleto-pending', mpReply(200, 'search-by-reference-boleto'));
+    const reference = 'aqrec-1795785652-G-boleto-pending';
+    const mp = mpFakeProvider().on(
+      'GET',
+      `/v1/payments/search?external_reference=${reference}`,
+      mpReply(200, 'search-by-reference-boleto'),
+    );
 
-    expect(await adapter(mp).findPaymentsForCheckout(SESSION)).toEqual([MP_EXPECTED_PAYMENTS['payment-pending-boleto']]);
-  });
-
-  it('answers [] — not a throw — for a preference nobody paid (recorded empty search)', async () => {
-    const mp = mpFakeProvider()
-      .on('GET', `/checkout/preferences/${SESSION}`, mpReply(200, 'preference-paid-card'))
-      .on('GET', SEARCH, mpReply(200, 'search-empty'));
-
-    expect(await adapter(mp).findPaymentsForCheckout(SESSION)).toEqual([]);
-  });
-
-  it('answers [] for a preference the provider does not know (recorded 404), without searching', async () => {
-    const mp = mpFakeProvider().on('GET', `/checkout/preferences/${SESSION}`, mpReply(404, 'preference-unknown-404'));
-
-    expect(await adapter(mp).findPaymentsForCheckout(SESSION)).toEqual([]);
+    expect(await adapter(mp).findPaymentsForCheckout(lookup(reference))).toEqual([
+      MP_EXPECTED_PAYMENTS['payment-pending-boleto'],
+    ]);
     expect(mp.calls).toHaveLength(1);
   });
 
-  it('returns every payment of the session: a rejected card, then the approved one', async () => {
-    const mp = mpFakeProvider()
-      .on('GET', `/checkout/preferences/${SESSION}`, mpReply(200, 'preference-paid-card'))
-      .on('GET', SEARCH, mpReply(200, 'derived-search-two-payments'));
+  it('answers [] — not a throw — for a checkout nobody paid (recorded empty search)', async () => {
+    const mp = mpFakeProvider().on('GET', SEARCH, mpReply(200, 'search-empty'));
 
-    const payments = await adapter(mp).findPaymentsForCheckout(SESSION);
+    expect(await adapter(mp).findPaymentsForCheckout(lookup(REFERENCE))).toEqual([]);
+    expect(mp.calls).toHaveLength(1);
+  });
 
-    expect(payments.map(p => [p.id, p.status])).toEqual([
-      ['191926322101', 'failed'],
-      ['191926322032', 'paid'],
+  it('does not depend on the session id: any session, or none the provider knows, is the same one call', async () => {
+    const mp = mpFakeProvider().on('GET', SEARCH, mpReply(200, 'search-by-reference-card'));
+
+    const payments = await adapter(mp).findPaymentsForCheckout({ sessionId: 'unknown-session', checkoutId: REFERENCE });
+
+    expect(payments).toHaveLength(1);
+    expect(mp.calls.map(c => c.path)).toEqual([SEARCH]);
+  });
+
+  // Recorded 2026-11-27: two payments made on one reference — an approved card,
+  // then a second card the provider left `in_process`.
+  it('returns every payment of the checkout (recorded: an approved card and one in process)', async () => {
+    const reference = 'aqrec-1795786714-I-card-pending';
+    const mp = mpFakeProvider().on(
+      'GET',
+      `/v1/payments/search?external_reference=${reference}`,
+      mpReply(200, 'search-by-reference-two-payments'),
+    );
+
+    const payments = await adapter(mp).findPaymentsForCheckout(lookup(reference));
+
+    expect(payments).toEqual([
+      MP_EXPECTED_PAYMENTS['payment-approved-card-same-reference'],
+      MP_EXPECTED_PAYMENTS['payment-in-process-card'],
     ]);
-    expect(payments.every(p => p.checkoutId === 'aqrec-1795785192-E-card-approved')).toBe(true);
+    expect(JSON.parse(mpFixture('search-by-reference-two-payments')).paging.total).toBe(2);
+    expect(mp.calls).toHaveLength(1);
   });
 
-  it('URL-encodes the reference it searches on', async () => {
-    const body = mpFixture('preference-paid-card').replace('aqrec-1795785192-E-card-approved', 'a b&c=d');
-    const mp = mpFakeProvider()
-      .on('GET', `/checkout/preferences/${SESSION}`, { status: 200, body })
-      .on('GET', '/v1/payments/search?external_reference=a%20b%26c%3Dd', mpReply(200, 'search-empty'));
+  it('leaves out a search result that names another checkout', async () => {
+    const mp = mpFakeProvider().on(
+      'GET',
+      '/v1/payments/search?external_reference=another-checkout',
+      mpReply(200, 'search-by-reference-card'),
+    );
 
-    expect(await adapter(mp).findPaymentsForCheckout(SESSION)).toEqual([]);
+    expect(await adapter(mp).findPaymentsForCheckout(lookup('another-checkout'))).toEqual([]);
   });
 
-  it.each(['', 'a/b', '../x', 'id?x=1'])('answers [] for the session id %j without calling the provider', async id => {
-    const mp = mpFakeProvider();
+  it.each(['', 'a/b', '../x', 'id?x=1', 'a b&c=d'])(
+    'answers [] for the checkout id %j without calling the provider',
+    async id => {
+      const mp = mpFakeProvider();
 
-    expect(await adapter(mp).findPaymentsForCheckout(id)).toEqual([]);
-    expect(mp.calls).toEqual([]);
-  });
+      expect(await adapter(mp).findPaymentsForCheckout(lookup(id))).toEqual([]);
+      expect(mp.calls).toEqual([]);
+    },
+  );
 
   it('propagates a provider failure so the caller asks again', async () => {
-    const mp = mpFakeProvider()
-      .on('GET', `/checkout/preferences/${SESSION}`, mpReply(200, 'preference-paid-card'))
-      .on('GET', SEARCH, { status: 503, body: 'upstream unavailable' });
+    const mp = mpFakeProvider().on('GET', SEARCH, { status: 503, body: 'upstream unavailable' });
 
-    expect(await failure(adapter(mp).findPaymentsForCheckout(SESSION))).toBeInstanceOf(MercadoPagoUnavailableError);
+    expect(await failure(adapter(mp).findPaymentsForCheckout(lookup(REFERENCE)))).toBeInstanceOf(
+      MercadoPagoUnavailableError,
+    );
   });
 });
 
@@ -532,6 +658,8 @@ describe('refund', () => {
     expect(error).toBeInstanceOf(MercadoPagoUnavailableError);
     expect(error).not.toBeInstanceOf(MercadoPagoRefusalError);
     expect(error).toMatchObject({ kind: 'unavailable', httpStatus: 429, code: 'too_many_requests', retryable: true });
+    // What the service reads to answer `503 PAYMENTS_PROVIDER_BUSY` instead of a refusal.
+    expect(isRetryableProviderError(error)).toBe(true);
   });
 
   it('throws a refusal on the recorded 401 (cause code 7)', async () => {
@@ -882,7 +1010,7 @@ describe('the fixtures', () => {
   const files = import.meta.glob('../../fixtures/mercadopago/*', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
   it('are all here', () => {
-    expect(Object.keys(files).filter(f => f.endsWith('.json')).length).toBe(36);
+    expect(Object.keys(files).filter(f => f.endsWith('.json')).length).toBe(37);
     expect(Object.keys(files).some(f => f.endsWith('/README.md'))).toBe(true);
   });
 
@@ -894,12 +1022,13 @@ describe('the fixtures', () => {
     }
     expect(text).not.toMatch(/"(first_six_digits|last_four_digits|bin)":"(?!0+")[^"]*"/);
     expect(text).not.toMatch(/"identification":\{"number":"(?!0*")[^"]*"/);
+    expect(text).not.toMatch(/"identification":\{"type":"[^"]*","number":"(?!0*")[^"]*"/);
   });
 
   it('names every derived file as derived, and every payment fixture has an expectation', () => {
     const names = Object.keys(files).map(f => f.split('/').pop() ?? '').filter(f => f.endsWith('.json'));
     const payments = names.filter(n => /^(derived-)?payment-/.test(n) && !/-(404|401)\.json$/.test(n)).map(n => n.replace('.json', ''));
-    const unexpected = payments.filter(n => !(n in MP_EXPECTED_PAYMENTS) && !['derived-payment-usd', 'derived-payment-three-decimals'].includes(n));
+    const unexpected = payments.filter(n => !(n in MP_EXPECTED_PAYMENTS) && n !== 'derived-payment-three-decimals');
     expect(unexpected).toEqual([]);
     for (const name of names.filter(n => n.startsWith('derived-webhook-'))) {
       expect(JSON.parse(files[Object.keys(files).find(f => f.endsWith(`/${name}`)) ?? '']).derived).toBe(true);

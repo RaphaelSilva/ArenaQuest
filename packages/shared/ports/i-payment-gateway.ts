@@ -63,6 +63,17 @@ export interface CreateCheckoutRequest {
   /** Hints only: the page a student returns to never trusts them. */
   returnUrls: CheckoutReturnUrls;
   /**
+   * Where the provider should send this checkout's notifications:
+   * `<origin of the API that created it>/v1/webhooks/payments/<provider>`. One
+   * URL per checkout, so staging, a preview and production each receive their
+   * own deliveries from one provider account. `null` when the caller knows no
+   * origin; an adapter may also leave it out when the provider could not reach
+   * it (loopback), and the provider then falls back to whatever is registered
+   * in its dashboard. It changes nothing about verification: a delivery is
+   * still authenticated by `verifyWebhook`.
+   */
+  notificationUrl: string | null;
+  /**
    * ISO timestamp of the latest expiry the caller accepts. The adapter asks the
    * provider for it; the provider may grant less, and says so in the result.
    */
@@ -105,6 +116,15 @@ export interface ProviderPayment {
   amountMinor: number;
   currency: string;
   method: ProviderPaymentMethod;
+  /**
+   * How the payer paid **in the provider's own words** — its identifiers, never
+   * a translation and never free text from a payer (e.g. Mercado Pago's
+   * `account_money`, `credit_card/visa`, `bank_transfer/pix`). At most
+   * {@link PROVIDER_METHOD_LABEL_MAX_LENGTH} characters of `[a-z0-9_/-]`;
+   * `null` when the provider names none. Shown to an admin beside `method`,
+   * which stays the only value the platform reasons about.
+   */
+  methodLabel: string | null;
   /** ISO timestamp; `null` until the payment is paid. */
   paidAt: string | null;
   /** Our checkout id, read back from the provider's metadata; `null` when the payment carries none. */
@@ -113,7 +133,26 @@ export interface ProviderPayment {
   refunds: ReadonlyArray<ProviderRefund>;
 }
 
+/** The longest `ProviderPayment.methodLabel` (and `gateway_checkouts.paid_method_label`). */
+export const PROVIDER_METHOD_LABEL_MAX_LENGTH = 64;
+
+/** What a method label may hold: lower-case provider identifiers, `/` between two of them. */
+export const PROVIDER_METHOD_LABEL_PATTERN = /^[a-z0-9_/-]{1,64}$/;
+
 export type ProviderDisputeOutcome = 'opened' | 'won' | 'lost';
+
+/**
+ * Names one checkout to a provider when no webhook named its payment. Both
+ * ids are given because providers differ in which one they can search on:
+ * `checkoutId` is the back-reference the adapter sent at creation,
+ * `sessionId` the hosted session the provider answered with.
+ */
+export interface CheckoutPaymentLookup {
+  /** `gateway_checkouts.id` — what `createCheckout` sent as the provider's external reference. */
+  checkoutId: string;
+  /** The provider's session / preference id (bare). */
+  sessionId: string;
+}
 
 /**
  * One verified webhook delivery, reduced to ids. `eventId` identifies this
@@ -134,6 +173,17 @@ export type ProviderEvent =
 
 export type ProviderEventKind = ProviderEvent['kind'];
 
+/**
+ * Whether an error an adapter threw says "ask again later" rather than "no":
+ * a rate limit, a timeout, a provider outage. The convention is structural so
+ * that no caller imports an adapter's error classes — an adapter marks such an
+ * error with a `retryable: true` property (or getter). Anything else,
+ * including a plain `Error`, is not retryable.
+ */
+export function isRetryableProviderError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { retryable?: unknown }).retryable === true;
+}
+
 export interface ProviderRefundResult {
   /** The provider's refund id (bare). */
   refundId: string;
@@ -148,13 +198,20 @@ export interface IPaymentGateway {
   /** `null` when the provider does not know the id. */
   getPayment(paymentId: string): Promise<ProviderPayment | null>;
 
-  /** Locates the payment(s) a session produced when no webhook named one — reconciliation. */
-  findPaymentsForCheckout(sessionId: string): Promise<ProviderPayment[]>;
+  /**
+   * Locates the payment(s) a checkout produced when no webhook named one —
+   * reconciliation. An adapter spends **at most one provider call** on it: the
+   * reconcile run's subrequest budget counts one call per checkout (milestone
+   * 30 decision 17). `[]` when nothing was paid.
+   */
+  findPaymentsForCheckout(lookup: CheckoutPaymentLookup): Promise<ProviderPayment[]>;
 
   /**
    * Asks the provider to return `amountMinor` of a payment. Idempotent on
    * `idempotencyKey`: a repeated call must not refund twice. A provider refusal
-   * is thrown, never reported as a result.
+   * is thrown, never reported as a result; an error that only means "not now"
+   * (rate limit, timeout, outage) is thrown marked as retryable — see
+   * {@link isRetryableProviderError}.
    */
   refund(paymentId: string, amountMinor: number, idempotencyKey: string): Promise<ProviderRefundResult>;
 

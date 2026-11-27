@@ -670,7 +670,7 @@ test('provisioningCommands lists a payment secret only for a provider the Worker
   assert.match(bound, /create-secrets\.sh PAYMENTS_MERCADOPAGO_SECRET_KEY --env acme\n/);
   assert.match(bound, /create-secrets\.sh PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET --env acme\n/);
   assert.doesNotMatch(bound, /PAYMENTS_STRIPE|PAYMENTS_ASAAS|PAYMENTS_PAGARME/);
-  assert.match(bound, /# Webhook registered in the Mercado Pago dashboard: https:\/\/api\.acme\.app\/v1\/webhooks\/payments\/mercadopago/);
+  assert.match(bound, /# Mercado Pago webhook signing secret set as PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET; every checkout sends its own notification URL \(https:\/\/api\.acme\.app\/v1\/webhooks\/payments\/mercadopago\), so registering it in the dashboard is optional/);
 });
 
 test('externalConfirmations adds one webhook reminder per bound provider, built from the API host', () => {
