@@ -1,0 +1,12 @@
+{
+  "derived": true,
+  "query": {
+    "data.id": "46495447152",
+    "type": "topic_merchant_order_wh"
+  },
+  "headers": {
+    "x-signature": "ts=1795786401000,v1=4bd9461d7f7d9953a4f46ff5fa369a1e77fe325ddc9a35273b6cb47ee233d502",
+    "x-request-id": "a1b2c3d4-0003-4000-8000-000000000003"
+  },
+  "body": "{\"action\":\"merchant_order.updated\",\"api_version\":\"v1\",\"data\":{\"id\":\"46495447152\"},\"date_created\":\"2026-11-27T13:33:21Z\",\"id\":127381900003,\"live_mode\":true,\"type\":\"topic_merchant_order_wh\",\"user_id\":\"1000000001\"}"
+}

@@ -1,0 +1,12 @@
+{
+  "derived": true,
+  "query": {
+    "data.id": "191926322032",
+    "type": "payment"
+  },
+  "headers": {
+    "x-signature": "ts=1795786401000,v1=5a924478fc7bcc9fb9747a7ea3f8c788623451d670a6b06bcdc0fa0aac3ab340",
+    "x-request-id": "a1b2c3d4-0001-4000-8000-000000000001"
+  },
+  "body": "{\"action\":\"payment.created\",\"api_version\":\"v1\",\"data\":{\"id\":\"191926322032\"},\"date_created\":\"2026-11-27T13:33:21Z\",\"id\":127381900001,\"live_mode\":true,\"type\":\"payment\",\"user_id\":\"1000000001\"}"
+}

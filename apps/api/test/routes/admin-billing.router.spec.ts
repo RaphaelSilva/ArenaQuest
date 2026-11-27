@@ -1266,10 +1266,12 @@ describe('/v1/admin/billing/payments — reconcile and exceptions', () => {
       expect(await eventRow(eventId)).toMatchObject({ outcome: 'failed', attempts: 2 });
     });
 
-    it('a live key under key mode test is 500 PAYMENTS_CONFIG_INVALID, a failed run, and touches nothing', async () => {
+    // A Mercado Pago `APP_USR-` key proves neither mode (M30 Task 05): the
+    // mismatch this provider can still show is a `TEST-` key under `live`.
+    it('a test key under key mode live is 500 PAYMENTS_CONFIG_INVALID, a failed run, and touches nothing', async () => {
       const { id } = await insertCheckout();
       const wrong = buildPaymentsTestApp(env as Env, 'mercadopago:pix+card', [mp], {
-        PAYMENTS_MERCADOPAGO_SECRET_KEY: stubSecretKey('mercadopago', 'live'),
+        PAYMENTS_KEY_MODE: 'live',
       });
 
       const res = await billing('POST', '/payments/reconcile', undefined, adminToken, wrong);
@@ -1280,7 +1282,7 @@ describe('/v1/admin/billing/payments — reconcile and exceptions', () => {
       expect(runs).toHaveLength(1);
       expect(runs[0]).toMatchObject({ job: 'reconcile_payments', status: 'failed' });
       expect(runs[0].error).toMatch(/^PAYMENTS_CONFIG_INVALID: key_mode_mismatch/);
-      expect(runs[0].error).not.toContain(stubSecretKey('mercadopago', 'live'));
+      expect(runs[0].error).not.toContain(stubSecretKey('mercadopago', 'test'));
       expect(mp.calls).toEqual([]);
       expect(await checkoutRow(id)).toMatchObject({ status: 'open', last_checked_at: null });
     });

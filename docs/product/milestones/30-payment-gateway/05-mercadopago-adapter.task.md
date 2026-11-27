@@ -1,6 +1,6 @@
 # Task 05 — Backend: Mercado Pago adapter (Phase 2)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Backend API
@@ -79,17 +79,17 @@ what the provider actually sends rather than to its documentation.
 
 ## Acceptance Criteria
 
-- [ ] With the adapter bound, `mercadopago:pix+card` is a valid list (given both secrets) and
+- [x] With the adapter bound, `mercadopago:pix+card` is a valid list (given both secrets) and
       `GatewayRegistry.get('mercadopago')` returns the adapter.
-- [ ] Every fixture payment maps to the expected `ProviderPayment`, amounts as integers.
-- [ ] A tampered delivery, and a good delivery checked against another secret, both verify to `null`.
-- [ ] A verified delivery's `eventId` differs from its `paymentId`, and two deliveries about the
+- [x] Every fixture payment maps to the expected `ProviderPayment`, amounts as integers.
+- [x] A tampered delivery, and a good delivery checked against another secret, both verify to `null`.
+- [x] A verified delivery's `eventId` differs from its `paymentId`, and two deliveries about the
       same payment carry two event ids.
-- [ ] No fixture contains an access token, a webhook secret or a real person's e-mail
+- [x] No fixture contains an access token, a webhook secret or a real person's e-mail
       (`grep -rE "APP_USR-|TEST-[0-9]" apps/api/test/fixtures/mercadopago` returns nothing).
-- [ ] A provider call that exceeds 10 seconds fails as a timeout the caller can tell from a refusal.
-- [ ] Changed files lint clean; `make test-api` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A provider call that exceeds 10 seconds fails as a timeout the caller can tell from a refusal.
+- [x] Changed files lint clean; `make test-api` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 

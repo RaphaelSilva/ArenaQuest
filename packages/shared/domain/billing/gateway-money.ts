@@ -143,9 +143,24 @@ export interface PaymentProviderCapability {
  * What each provider can settle. BRL is the only currency in v1 (RFC 0026 R4),
  * and BRL with `pix` and `card` is the row every candidate fills.
  *
- * Only `mercadopago` has an adapter in milestone 30; its row is pinned against
- * the sandbox when that adapter lands. A template is `null` wherever a stable
- * per-payment URL is not known — the ledger then shows the id without a link.
+ * Only `mercadopago` has an adapter in milestone 30. Its row was checked
+ * against the sandbox when that adapter landed (Task 05), on a Brazilian test
+ * seller:
+ *
+ * - `card` and `boleto` are **observed**: the seller's payment methods list
+ *   credit, debit and prepaid cards and `bolbradesco`, and a card payment and a
+ *   boleto were made through Checkout Pro.
+ * - `pix` is **kept but unverified**: RFC 0026 R7 requires it, and the test
+ *   seller had no Pix key, so its method list showed none. It needs a seller
+ *   with a Pix key before a label offers it.
+ * - Checkout Pro also lets a payer use their Mercado Pago balance whatever is
+ *   excluded. That is not a method a label lists; such a payment lands with
+ *   method `other`.
+ * - `dashboardUrlTemplate` stays `null`: no recorded response carries a
+ *   merchant-side URL for a payment, and no stable per-payment panel URL is
+ *   documented. The ledger shows the id without a link.
+ *
+ * A template is `null` wherever a stable per-payment URL is not known.
  */
 export const PAYMENT_PROVIDER_CAPABILITIES: Readonly<Record<PaymentProviderName, PaymentProviderCapability>> =
   Object.freeze({

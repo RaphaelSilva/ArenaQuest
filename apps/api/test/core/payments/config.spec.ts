@@ -128,7 +128,7 @@ describe('parsePaymentsConfig', () => {
       expect(reasonOf(r)).toBe('no_adapter');
     });
 
-    it('with the production map (no adapter yet) any list other than none is refused', () => {
+    it('with no adapter at all any list other than none is refused', () => {
       expect(reasonOf(parse(stubPaymentsEnv('mercadopago:pix'), []))).toBe('no_adapter');
     });
 
@@ -171,14 +171,22 @@ describe('parsePaymentsConfig', () => {
 });
 
 describe('secretKeyMode', () => {
-  it.each(ALL)('reads both modes of %s from the prefix', provider => {
+  it.each(ALL.filter(p => p !== 'mercadopago'))('reads both modes of %s from the prefix', provider => {
     expect(secretKeyMode(provider, stubSecretKey(provider, 'test'))).toBe('test');
     expect(secretKeyMode(provider, stubSecretKey(provider, 'live'))).toBe('live');
   });
 
-  it('names the two prefixes RFC 0026 §8 cites', () => {
+  it('names the Stripe prefix RFC 0026 §8 cites', () => {
     expect(secretKeyMode('stripe', 'sk_live_abc')).toBe('live');
-    expect(secretKeyMode('mercadopago', 'APP_USR-123')).toBe('live');
+  });
+
+  // M30 Task 05: observed on the sandbox — a test user's credentials start with
+  // `APP_USR-` exactly like production ones, so that prefix proves neither mode.
+  it('reads the Mercado Pago APP_USR- prefix as either mode, and TEST- as test only', () => {
+    expect(secretKeyMode('mercadopago', 'APP_USR-123')).toBe('either');
+    expect(secretKeyMode('mercadopago', stubSecretKey('mercadopago', 'live'))).toBe('either');
+    expect(secretKeyMode('mercadopago', 'TEST-123')).toBe('test');
+    expect(secretKeyMode('mercadopago', stubSecretKey('mercadopago', 'test'))).toBe('test');
   });
 
   it('answers null for a prefix it does not know', () => {
@@ -199,15 +207,38 @@ describe('assertPaymentsKeyMode', () => {
   });
 
   it('refuses a live key under PAYMENTS_KEY_MODE=test', () => {
-    const env = { ...stubPaymentsEnv('mercadopago:pix', 'live'), PAYMENTS_KEY_MODE: 'test' };
+    const env = { ...stubPaymentsEnv('stripe:card', 'live'), PAYMENTS_KEY_MODE: 'test' };
     const r = assertPaymentsKeyMode(parse(env));
     expect(reasonOf(r)).toBe('key_mode_mismatch');
   });
 
   it('refuses a live key when PAYMENTS_KEY_MODE is absent (absent means test)', () => {
-    const env: Record<string, string> = { ...stubPaymentsEnv('mercadopago:pix', 'live') };
+    const env: Record<string, string> = { ...stubPaymentsEnv('stripe:card', 'live') };
     delete env.PAYMENTS_KEY_MODE;
     expect(reasonOf(assertPaymentsKeyMode(parse(env)))).toBe('key_mode_mismatch');
+  });
+
+  it('accepts a Mercado Pago APP_USR- key under both modes: the prefix cannot tell them apart', () => {
+    for (const mode of ['test', 'live'] as const) {
+      const env = {
+        ...stubPaymentsEnv('mercadopago:pix+card', mode),
+        [paymentSecretKeyVar('mercadopago')]: 'APP_USR-fixture-key',
+      };
+      const r = assertPaymentsKeyMode(parse(env));
+      expect(r.ok).toBe(true);
+      expect(r.ok && r.config.entries[0].secretKeyMode).toBe('either');
+      expect(r.ok && r.config.keyMode).toBe(mode);
+    }
+  });
+
+  it('still refuses a Mercado Pago TEST- key under PAYMENTS_KEY_MODE=live', () => {
+    const env = {
+      ...stubPaymentsEnv('mercadopago:pix', 'live'),
+      [paymentSecretKeyVar('mercadopago')]: 'TEST-fixture-key',
+    };
+    const r = assertPaymentsKeyMode(parse(env));
+    expect(reasonOf(r)).toBe('key_mode_mismatch');
+    expect(JSON.stringify(r)).not.toContain('TEST-fixture-key');
   });
 
   it('refuses a test key under PAYMENTS_KEY_MODE=live', () => {
@@ -233,10 +264,12 @@ describe('assertPaymentsKeyMode', () => {
   });
 
   it('never puts any part of a key in the refusal', () => {
-    const env = { ...stubPaymentsEnv('mercadopago:pix', 'live'), PAYMENTS_KEY_MODE: 'test' };
-    const serialised = JSON.stringify(assertPaymentsKeyMode(parse(env)));
-    expect(serialised).not.toContain('APP_USR');
-    expect(serialised).not.toContain(env[paymentSecretKeyVar('mercadopago')]);
+    const env: Record<string, string> = { ...stubPaymentsEnv('stripe:card', 'live'), PAYMENTS_KEY_MODE: 'test' };
+    const refusal = assertPaymentsKeyMode(parse(env));
+    expect(reasonOf(refusal)).toBe('key_mode_mismatch');
+    const serialised = JSON.stringify(refusal);
+    expect(serialised).not.toContain('sk_live');
+    expect(serialised).not.toContain(env[paymentSecretKeyVar('stripe')]);
   });
 
   it('passes an already invalid result through unchanged', () => {

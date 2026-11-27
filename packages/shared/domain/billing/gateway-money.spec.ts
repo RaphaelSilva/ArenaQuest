@@ -177,6 +177,14 @@ describe('provider capability table', () => {
     expect(Object.isFrozen(PAYMENT_PROVIDER_CAPABILITIES.mercadopago.methodsByCurrency.BRL)).toBe(true);
   });
 
+  // M30 Task 05: the row as checked against the sandbox. `pix` is listed on RFC
+  // 0026 R7's authority (unverified there); no stable dashboard URL is known.
+  it('pins the Mercado Pago row: BRL with pix, card and boleto, and no dashboard link', () => {
+    expect(PAYMENT_PROVIDER_CAPABILITIES.mercadopago.methodsByCurrency).toEqual({ BRL: ['pix', 'card', 'boleto'] });
+    expect(PAYMENT_PROVIDER_CAPABILITIES.mercadopago.dashboardUrlTemplate).toBeNull();
+    expect(providerDashboardUrl('mercadopago', '191926322032')).toBeNull();
+  });
+
   it('narrows provider and method names', () => {
     expect(isPaymentProviderName('mercadopago')).toBe(true);
     expect(isPaymentProviderName('paypal')).toBe(false);
