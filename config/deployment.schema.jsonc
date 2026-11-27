@@ -69,8 +69,11 @@
     // means `none`, an absent PAYMENTS_KEY_MODE means `test`. The list is `none`
     // or comma-separated `provider:method+method` entries; the schema has no
     // rule for that grammar, so it is guarded at runtime by
-    // apps/api/src/core/payments/config.ts (a list that breaks a rule, or a key
-    // whose mode disagrees with PAYMENTS_KEY_MODE = 500 PAYMENTS_CONFIG_INVALID).
+    // apps/api/src/core/payments/config.ts (a list that breaks a rule, or a
+    // PAYMENTS_KEY_MODE that is neither `test` nor `live` = 500
+    // PAYMENTS_CONFIG_INVALID). PAYMENTS_KEY_MODE is a declaration the
+    // integrator owns: it says which credentials were installed here, and no
+    // tool or Worker code reads a key to verify it.
     // Neither var has a profile source: both live in the env.<label> Worker block.
     "PAYMENTS_PROVIDERS":                    { "required": false },
     "PAYMENTS_KEY_MODE":                     { "required": false, "enum": ["test", "live"] }
@@ -131,11 +134,14 @@
     "google-oauth": { "confirm": "Web OAuth client created; <GOOGLE_REDIRECT_URI> is an Authorised redirect URI" },
     "dns":          { "confirm": "Custom domains for <apiHost> and <webOrigin> resolve / are attached" },
     "resend":       { "confirm": "Sender domain of <MAIL_FROM> verified in Resend", "requiredWhen": "MAIL_DRIVER=resend" },
-    // Webhook registration (RFC 0026 section 8): an operator step in each bound
-    // provider's dashboard, per label and environment. Nothing here can see the
-    // provider's side, so it is a confirmation, never a probe.
+    // Webhooks (RFC 0026 section 8): an operator step in each bound provider's
+    // dashboard, per label and environment. Nothing here can see the provider's
+    // side, so it is a confirmation, never a probe. Mercado Pago is told where
+    // to notify by each checkout (its own notification URL, built from the API
+    // origin that created it), so registering the URL there is optional; the
+    // signing secret still comes from the application's Webhooks page.
     "payments-webhook-stripe":      { "confirm": "Webhook registered in the Stripe dashboard: https://<apiHost>/v1/webhooks/payments/stripe", "requiredWhen": "PAYMENTS_PROVIDERS~=stripe" },
-    "payments-webhook-mercadopago": { "confirm": "Webhook registered in the Mercado Pago dashboard: https://<apiHost>/v1/webhooks/payments/mercadopago", "requiredWhen": "PAYMENTS_PROVIDERS~=mercadopago" },
+    "payments-webhook-mercadopago": { "confirm": "Mercado Pago webhook signing secret set as PAYMENTS_MERCADOPAGO_WEBHOOK_SECRET; every checkout sends its own notification URL (https://<apiHost>/v1/webhooks/payments/mercadopago), so registering it in the dashboard is optional", "requiredWhen": "PAYMENTS_PROVIDERS~=mercadopago" },
     "payments-webhook-asaas":       { "confirm": "Webhook registered in the Asaas dashboard: https://<apiHost>/v1/webhooks/payments/asaas", "requiredWhen": "PAYMENTS_PROVIDERS~=asaas" },
     "payments-webhook-pagarme":     { "confirm": "Webhook registered in the Pagar.me dashboard: https://<apiHost>/v1/webhooks/payments/pagarme", "requiredWhen": "PAYMENTS_PROVIDERS~=pagarme" }
   }

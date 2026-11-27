@@ -400,17 +400,31 @@ export function committedEnvVars(label, env, path = PATHS.wrangler) {
 }
 
 /**
- * The webhook-registration reminders of an env: one `{ key, detail }` per
- * provider PAYMENTS_PROVIDERS names, the detail carrying the URL to register
- * in that provider's dashboard (`https://<apiHost>/v1/webhooks/payments/<provider>`).
- * Empty for a label on `none`. Nothing can probe the provider's side, so these
- * are statements for the operator, never a present/missing verdict. Pure.
+ * The webhook reminders of an env: one `{ key, detail }` per provider
+ * PAYMENTS_PROVIDERS names, the detail carrying the notification URL
+ * (`https://<apiHost>/v1/webhooks/payments/<provider>`) and what the operator
+ * confirms at that provider. Empty for a label on `none`. Nothing can probe
+ * the provider's side, so these are statements for the operator, never a
+ * present/missing verdict. Pure.
  */
 export function paymentWebhookReminders(schema, profile, env, wranglerVars = null) {
   const resolved = resolveEnvVars(profile, env, wranglerVars);
   return externalConfirmations(schema, profile, env, resolved)
     .filter((c) => c.key.startsWith(PAYMENT_WEBHOOK_CONFIRMATION_PREFIX))
     .map(({ key, detail }) => ({ key, detail }));
+}
+
+/**
+ * The key mode an env declares — `PAYMENTS_KEY_MODE` of its committed Worker
+ * block, `test` when absent (what the Worker assumes) — or `null` when no
+ * provider is bound, so a label on `none` reports nothing. The value is given
+ * back as written: it is a declaration the integrator owns, and nothing here
+ * (or in the Worker) reads a key to check it. Pure.
+ */
+export function declaredPaymentsKeyMode(schema, profile, env, wranglerVars = null) {
+  if (paymentWebhookReminders(schema, profile, env, wranglerVars).length === 0) return null;
+  const raw = wranglerVars?.PAYMENTS_KEY_MODE;
+  return raw === undefined || raw === null || String(raw).trim() === '' ? 'test' : String(raw).trim();
 }
 
 /**
@@ -1223,10 +1237,11 @@ const isCreateCommand = (argv) => argv.includes('create');
  *
  * Returns { label, env, resources: [{ id, kind, name, probe }], secrets:
  * { worker: [names], preview: [names] }, probes: { worker, preview }, fixes,
- * reminders: [{ key, detail }] }.
+ * reminders: [{ key, detail }], keyMode }.
  * Every argv under `resources[].probe` and `probes` is a list; `fixes` are
- * rendered strings and never executed; `reminders` are the webhook URLs to
- * register at each bound provider, which nothing here can verify.
+ * rendered strings and never executed; `reminders` are the webhook statements
+ * for each bound provider, which nothing here can verify; `keyMode` is the
+ * declared PAYMENTS_KEY_MODE (null on `none`) — information, never a gap.
  */
 export function buildCheckPlan(profile, env, schema, vars = null) {
   const label = profile.label;
@@ -1276,8 +1291,9 @@ export function buildCheckPlan(profile, env, schema, vars = null) {
       : previewSecretFixCommand(name, wEnv);
   }
   const reminders = paymentWebhookReminders(schema, profile, env, vars?.worker ?? null);
+  const keyMode = declaredPaymentsKeyMode(schema, profile, env, vars?.worker ?? null);
 
-  return { label, env, resources, secrets, probes, fixes, reminders };
+  return { label, env, resources, secrets, probes, fixes, reminders, keyMode };
 }
 
 /** Every argv a --check run may execute — the surface the read-only test pins. */
@@ -1342,7 +1358,7 @@ export function runCheck(profile, env, schema, { run = runCommand, vars = null }
   report('worker', plan.secrets.worker, secretNamesFrom(probe(plan.probes.worker)));
   if (plan.probes.preview) report('preview', plan.secrets.preview, secretNamesFrom(probe(plan.probes.preview)));
 
-  return { label: plan.label, env, resources, secrets, reminders: plan.reminders };
+  return { label: plan.label, env, resources, secrets, reminders: plan.reminders, keyMode: plan.keyMode };
 }
 
 /**
@@ -1355,6 +1371,18 @@ export function formatReminders(report) {
   return [
     'Not verifiable from here — confirm at each bound provider:',
     ...report.reminders.map((r) => `  - ${r.detail}`),
+  ];
+}
+
+/**
+ * The informational line for the declared key mode — printed with the
+ * reminders, outside the checklist: it is never a gap and never changes the
+ * exit code. Empty for a label on `none`.
+ */
+export function formatKeyMode(report) {
+  if (!report.keyMode) return [];
+  return [
+    `Declared, not verified: PAYMENTS_KEY_MODE = ${report.keyMode} — installing the matching provider credentials in this environment is the integrator's responsibility.`,
   ];
 }
 
@@ -1506,6 +1534,7 @@ export async function main(argv = process.argv.slice(2)) {
     else {
       console.log(formatChecklist(args.label, env, state.profile.displayName, results));
       for (const line of formatReminders(report)) console.log(line);
+      for (const line of formatKeyMode(report)) console.log(line);
     }
     return code;
   }
