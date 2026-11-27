@@ -1,6 +1,6 @@
 # Task 17 — Backend: Post-sandbox adjustments to the gateway (Phase 5)
 
-**Status:** 📝 Open
+**Status:** ✅ Done
 **Milestone:** [30 — Payment Gateway](./milestone.md)
 **RFC:** [RFC 0026](../../RFCs/0026-payment-gateway-hosted-checkout-collection-for-invoices-and-.md)
 **Team:** Backend API
@@ -89,20 +89,20 @@ another currency is a **mismatch**; and three derived fixtures are replaced by r
 
 ## Acceptance Criteria
 
-- [ ] No file under `apps/api/src` or `scripts/` matches a secret key against a prefix or pattern;
+- [x] No file under `apps/api/src` or `scripts/` matches a secret key against a prefix or pattern;
       `PAYMENTS_KEY_MODE=banana` is `PAYMENTS_CONFIG_INVALID`; any key passes under `test` and under `live`.
-- [ ] A reconcile run over 25 due checkouts makes 25 provider calls with the Mercado Pago adapter.
-- [ ] A checkout created through `https://api.example.test` sends
+- [x] A reconcile run over 25 due checkouts makes 25 provider calls with the Mercado Pago adapter.
+- [x] A checkout created through `https://api.example.test` sends
       `https://api.example.test/v1/webhooks/payments/mercadopago` as its notification URL.
-- [ ] A payment made with the buyer's Mercado Pago balance lands with method `other` and label
+- [x] A payment made with the buyer's Mercado Pago balance lands with method `other` and label
       `account_money`, and the admin ledger row shows it; the student statement shows no label.
-- [ ] A refund answered `429` by the provider is `503 PAYMENTS_PROVIDER_BUSY`, writes nothing, and
+- [x] A refund answered `429` by the provider is `503 PAYMENTS_PROVIDER_BUSY`, writes nothing, and
       the same request repeated afterwards completes.
-- [ ] A payment in another currency is `200` `mismatch` with no ledger row.
-- [ ] `grep -rE "APP_USR-|TEST-[0-9]|testuser\.com" apps/api/test/fixtures/mercadopago` returns nothing.
-- [ ] `apps/api/openapi.json` and `apps/web/src/lib/api-types.gen.ts` are regenerated and committed.
-- [ ] `make lint`, `make test-api` and `make test-web` green.
-- [ ] No diff outside the scope guardrail.
+- [x] A payment in another currency is `200` `mismatch` with no ledger row.
+- [x] `grep -rE "APP_USR-|TEST-[0-9]|testuser\.com" apps/api/test/fixtures/mercadopago` returns nothing.
+- [x] `apps/api/openapi.json` and `apps/web/src/lib/api-types.gen.ts` are regenerated and committed.
+- [x] `make lint`, `make test-api` and `make test-web` green.
+- [x] No diff outside the scope guardrail.
 
 ## Verification Plan
 
