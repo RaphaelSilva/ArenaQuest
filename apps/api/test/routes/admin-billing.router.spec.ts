@@ -962,7 +962,7 @@ describe('/v1/admin/billing — checkouts on behalf and gateway refunds', () => 
 
 describe('/v1/admin/billing/payments — reconcile and exceptions', () => {
   type Summary = Record<string, number>;
-  type Run = { status: 'ok' | 'failed'; error: string | null; summary: Summary };
+  type Run = { status: 'ok' | 'failed'; error: string | null; keyMode: 'test' | 'live'; summary: Summary };
   type Exception = {
     ref: string;
     kind: string;
@@ -1134,9 +1134,11 @@ describe('/v1/admin/billing/payments — reconcile and exceptions', () => {
       const run = await jsonOf<Run>(res, 200);
 
       expect(res.headers.get('Cache-Control')).toBe('private, no-store');
-      expect(run).toMatchObject({ status: 'ok', error: null });
+      // The declared key mode is reported with the verdict (decision 19): a reminder, checked against nothing.
+      expect(run).toMatchObject({ status: 'ok', error: null, keyMode: 'test' });
       expect(run.summary).toMatchObject({ checkoutsDue: 1, checkoutsAsked: 1, landed: 1, checkoutsDeferred: 0 });
-      expect(mp.calls).toEqual([{ method: 'findPaymentsForCheckout', sessionId: session }]);
+      // One provider call, naming the checkout by both of its ids.
+      expect(mp.calls).toEqual([{ method: 'findPaymentsForCheckout', sessionId: session, checkoutId: id }]);
 
       const ledger = await gatewayLedger();
       expect(ledger).toEqual([
@@ -1154,7 +1156,8 @@ describe('/v1/admin/billing/payments — reconcile and exceptions', () => {
       const runs = await jobRuns();
       expect(runs).toHaveLength(1);
       expect(runs[0]).toMatchObject({ job: 'reconcile_payments', trigger: 'manual', status: 'ok', actor_id: ADMIN_ID, error: null });
-      expect(JSON.parse(runs[0].summary ?? 'null')).toEqual(run.summary);
+      // job_runs.summary holds integers only: the key mode rides there as a flag (0 = test, 1 = live).
+      expect(JSON.parse(runs[0].summary ?? 'null')).toEqual({ ...run.summary, keyModeLive: 0 });
 
       // A second run finds the payment already on the ledger and changes nothing.
       const again = await reconcile();
@@ -1266,12 +1269,12 @@ describe('/v1/admin/billing/payments — reconcile and exceptions', () => {
       expect(await eventRow(eventId)).toMatchObject({ outcome: 'failed', attempts: 2 });
     });
 
-    // A Mercado Pago `APP_USR-` key proves neither mode (M30 Task 05): the
-    // mismatch this provider can still show is a `TEST-` key under `live`.
-    it('a test key under key mode live is 500 PAYMENTS_CONFIG_INVALID, a failed run, and touches nothing', async () => {
+    // M30 Task 17 — milestone decision 19 as rewritten: the key mode is a
+    // declaration. Only its *value* can make a configuration invalid.
+    it('an invalid PAYMENTS_KEY_MODE value is 500 PAYMENTS_CONFIG_INVALID, a failed run, and touches nothing', async () => {
       const { id } = await insertCheckout();
       const wrong = buildPaymentsTestApp(env as Env, 'mercadopago:pix+card', [mp], {
-        PAYMENTS_KEY_MODE: 'live',
+        PAYMENTS_KEY_MODE: 'banana',
       });
 
       const res = await billing('POST', '/payments/reconcile', undefined, adminToken, wrong);
@@ -1281,10 +1284,34 @@ describe('/v1/admin/billing/payments — reconcile and exceptions', () => {
       const runs = await jobRuns();
       expect(runs).toHaveLength(1);
       expect(runs[0]).toMatchObject({ job: 'reconcile_payments', status: 'failed' });
-      expect(runs[0].error).toMatch(/^PAYMENTS_CONFIG_INVALID: key_mode_mismatch/);
-      expect(runs[0].error).not.toContain(stubSecretKey('mercadopago', 'test'));
+      expect(runs[0].error).toMatch(/^PAYMENTS_CONFIG_INVALID: invalid_key_mode/);
+      expect(runs[0].error).not.toContain(stubSecretKey('mercadopago'));
       expect(mp.calls).toEqual([]);
       expect(await checkoutRow(id)).toMatchObject({ status: 'open', last_checked_at: null });
+    });
+
+    it.each([
+      ['test', 'APP_USR-fixture-key'],
+      ['test', 'sk_live_fixture'],
+      ['live', 'TEST-fixture-key'],
+      ['live', 'APP_USR-fixture-key'],
+    ] as const)('under key mode %s a key shaped like %s runs: no key is ever read for its mode', async (mode, key) => {
+      const { id } = await insertCheckout();
+      const app = buildPaymentsTestApp(env as Env, 'mercadopago:pix+card', [mp], {
+        PAYMENTS_KEY_MODE: mode,
+        PAYMENTS_MERCADOPAGO_SECRET_KEY: key,
+      });
+
+      const res = await billing('POST', '/payments/reconcile', undefined, adminToken, app);
+      const run = await jsonOf<Run>(res, 200);
+
+      expect(run).toMatchObject({ status: 'ok', keyMode: mode });
+      expect(run.summary).toMatchObject({ checkoutsAsked: 1 });
+      expect(mp.callsTo('findPaymentsForCheckout')).toHaveLength(1);
+      const runs = await jobRuns();
+      expect(JSON.parse(runs[0].summary ?? 'null')).toMatchObject({ keyModeLive: mode === 'live' ? 1 : 0 });
+      expect(JSON.stringify(runs)).not.toContain(key);
+      expect(await checkoutRow(id)).toMatchObject({ status: 'open' });
     });
 
     it('on a label with no provider it is 404 and writes no job_runs row', async () => {

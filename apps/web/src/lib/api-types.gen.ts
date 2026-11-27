@@ -343,7 +343,7 @@ export interface paths {
         put?: never;
         /**
          * Reverse an Event Charge Payment
-         * @description Appends the mirror-image row; the original is never updated or deleted. A reversal cannot be reversed, and a payment is reversed at most once. **A payment whose `method` is `gateway` is refunded at its provider first** (full amount only), in this order: the provider named by the reference prefix must still be bound (`409 PAYMENTS_PROVIDER_NOT_ENABLED`) → the payment is read from the provider → a full refund it already holds is recorded under that refund id, or the row already carrying it is returned (`200`, nothing refunded again) → otherwise the refund is requested under an idempotency key derived from the payment row → a refusal is `409 PAYMENTS_REFUND_REFUSED` and **nothing is written** → accepted and written is `200` → accepted but not written is `503 PAYMENTS_REFUND_UNRECORDED`, and the same request repeated completes it. The reversal row carries `method: "gateway"`, `reversesId` and `externalReference: "<provider>:<refund id>"`. Repeating the request answers `200` with the same row. Every other method never calls a provider.
+         * @description Appends the mirror-image row; the original is never updated or deleted. A reversal cannot be reversed, and a payment is reversed at most once. **A payment whose `method` is `gateway` is refunded at its provider first** (full amount only), in this order: the provider named by the reference prefix must still be bound (`409 PAYMENTS_PROVIDER_NOT_ENABLED`) → the payment is read from the provider → a full refund it already holds is recorded under that refund id, or the row already carrying it is returned (`200`, nothing refunded again) → otherwise the refund is requested under an idempotency key derived from the payment row → a refusal is `409 PAYMENTS_REFUND_REFUSED` and **nothing is written**; a provider that cannot take the request right now (rate limit, timeout — refunds fired back to back are rate-limited) is `503 PAYMENTS_PROVIDER_BUSY`, also with nothing written, and the same request repeated a few seconds later completes → accepted and written is `200` → accepted but not written is `503 PAYMENTS_REFUND_UNRECORDED`, and the same request repeated completes it. The reversal row carries `method: "gateway"`, `reversesId` and `externalReference: "<provider>:<refund id>"`. Repeating the request answers `200` with the same row. Every other method never calls a provider.
          */
         post: {
             parameters: {
@@ -430,13 +430,13 @@ export interface paths {
                         };
                     };
                 };
-                /** @description `PAYMENTS_REFUND_UNRECORDED`: the provider returned the money and the reversal was not written; repeat the request */
+                /** @description Repeat the same request — it cannot refund twice. `PAYMENTS_REFUND_UNRECORDED` (with `refundId`): the provider returned the money and the reversal was not written. `PAYMENTS_PROVIDER_BUSY`: the provider could not take the request right now (rate limit, timeout); nothing was refunded by this call and nothing was written */
                 503: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RefundUnrecordedBody"];
+                        "application/json": components["schemas"]["RefundUnrecordedBody"] | components["schemas"]["RefundBusyBody"];
                     };
                 };
             };
@@ -729,7 +729,7 @@ export interface paths {
         put?: never;
         /**
          * Open a Checkout for a Student's Event Charge
-         * @description Opens the hosted checkout for the **full open balance** of a student's receivable, or hands back the one already open, and answers the URL the admin hands over. Same rules as `POST /v1/me/billing/checkouts`: one live checkout per receivable (`200` with the same session while more than five minutes remain, replaced otherwise; another provider cancels the first). The student is the receivable's own — the request names none — and the admin is recorded as `createdBy`. Nothing is charged to anyone until the student pays, and the student's hourly limit is not consumed. Refusals, in order: `403` → `500 PAYMENTS_CONFIG_INVALID` / `404` (no provider on this label) → `400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `502 PAYMENTS_PROVIDER_ERROR`. Sent with `Cache-Control: private, no-store`.
+         * @description Opens the hosted checkout for the **full open balance** of a student's receivable, or hands back the one already open, and answers the URL the admin hands over. Same rules as `POST /v1/me/billing/checkouts`: one live checkout per receivable (`200` with the same session while more than five minutes remain, replaced otherwise; another provider cancels the first). The student is the receivable's own — the request names none — and the admin is recorded as `createdBy`. Nothing is charged to anyone until the student pays, and the student's hourly limit is not consumed. Refusals, in order: `403` → `500 PAYMENTS_CONFIG_INVALID` / `404` (no provider on this label) → `400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `502 PAYMENTS_PROVIDER_ERROR`. The provider is told to notify the API origin this request was made on (`<origin>/v1/webhooks/payments/<provider>`). Sent with `Cache-Control: private, no-store`.
          */
         post: {
             parameters: {
@@ -1703,7 +1703,7 @@ export interface paths {
         put?: never;
         /**
          * Open a Checkout for a Student's Invoice
-         * @description Opens the hosted checkout for the **full open balance** of a student's receivable, or hands back the one already open, and answers the URL the admin hands over. Same rules as `POST /v1/me/billing/checkouts`: one live checkout per receivable (`200` with the same session while more than five minutes remain, replaced otherwise; another provider cancels the first). The student is the receivable's own — the request names none — and the admin is recorded as `createdBy`. Nothing is charged to anyone until the student pays, and the student's hourly limit is not consumed. Refusals, in order: `403` → `500 PAYMENTS_CONFIG_INVALID` / `404` (no provider on this label) → `400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `502 PAYMENTS_PROVIDER_ERROR`. Sent with `Cache-Control: private, no-store`.
+         * @description Opens the hosted checkout for the **full open balance** of a student's receivable, or hands back the one already open, and answers the URL the admin hands over. Same rules as `POST /v1/me/billing/checkouts`: one live checkout per receivable (`200` with the same session while more than five minutes remain, replaced otherwise; another provider cancels the first). The student is the receivable's own — the request names none — and the admin is recorded as `createdBy`. Nothing is charged to anyone until the student pays, and the student's hourly limit is not consumed. Refusals, in order: `403` → `500 PAYMENTS_CONFIG_INVALID` / `404` (no provider on this label) → `400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `502 PAYMENTS_PROVIDER_ERROR`. The provider is told to notify the API origin this request was made on (`<origin>/v1/webhooks/payments/<provider>`). Sent with `Cache-Control: private, no-store`.
          */
         post: {
             parameters: {
@@ -2119,7 +2119,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description `PAYMENTS_CONFIG_INVALID`: the provider list, a secret or the key mode is invalid; the failed run is recorded */
+                /** @description `PAYMENTS_CONFIG_INVALID`: the provider list, a secret or the `PAYMENTS_KEY_MODE` value is invalid; the failed run is recorded */
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -2149,7 +2149,7 @@ export interface paths {
         put?: never;
         /**
          * Reverse a Payment
-         * @description Appends the mirror-image row; the original is never updated or deleted. A reversal cannot be reversed, and a payment is reversed at most once. **A payment whose `method` is `gateway` is refunded at its provider first** (full amount only), in this order: the provider named by the reference prefix must still be bound (`409 PAYMENTS_PROVIDER_NOT_ENABLED`) → the payment is read from the provider → a full refund it already holds is recorded under that refund id, or the row already carrying it is returned (`200`, nothing refunded again) → otherwise the refund is requested under an idempotency key derived from the payment row → a refusal is `409 PAYMENTS_REFUND_REFUSED` and **nothing is written** → accepted and written is `200` → accepted but not written is `503 PAYMENTS_REFUND_UNRECORDED`, and the same request repeated completes it. The reversal row carries `method: "gateway"`, `reversesId` and `externalReference: "<provider>:<refund id>"`. Repeating the request answers `200` with the same row. Every other method never calls a provider.
+         * @description Appends the mirror-image row; the original is never updated or deleted. A reversal cannot be reversed, and a payment is reversed at most once. **A payment whose `method` is `gateway` is refunded at its provider first** (full amount only), in this order: the provider named by the reference prefix must still be bound (`409 PAYMENTS_PROVIDER_NOT_ENABLED`) → the payment is read from the provider → a full refund it already holds is recorded under that refund id, or the row already carrying it is returned (`200`, nothing refunded again) → otherwise the refund is requested under an idempotency key derived from the payment row → a refusal is `409 PAYMENTS_REFUND_REFUSED` and **nothing is written**; a provider that cannot take the request right now (rate limit, timeout — refunds fired back to back are rate-limited) is `503 PAYMENTS_PROVIDER_BUSY`, also with nothing written, and the same request repeated a few seconds later completes → accepted and written is `200` → accepted but not written is `503 PAYMENTS_REFUND_UNRECORDED`, and the same request repeated completes it. The reversal row carries `method: "gateway"`, `reversesId` and `externalReference: "<provider>:<refund id>"`. Repeating the request answers `200` with the same row. Every other method never calls a provider.
          */
         post: {
             parameters: {
@@ -2236,13 +2236,13 @@ export interface paths {
                         };
                     };
                 };
-                /** @description `PAYMENTS_REFUND_UNRECORDED`: the provider returned the money and the reversal was not written; repeat the request */
+                /** @description Repeat the same request — it cannot refund twice. `PAYMENTS_REFUND_UNRECORDED` (with `refundId`): the provider returned the money and the reversal was not written. `PAYMENTS_PROVIDER_BUSY`: the provider could not take the request right now (rate limit, timeout); nothing was refunded by this call and nothing was written */
                 503: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RefundUnrecordedBody"];
+                        "application/json": components["schemas"]["RefundUnrecordedBody"] | components["schemas"]["RefundBusyBody"];
                     };
                 };
             };
@@ -9033,7 +9033,7 @@ export interface paths {
         put?: never;
         /**
          * Pay One Of My Receivables
-         * @description Opens the hosted checkout for the **full open balance** of one invoice or event charge of the caller's own, or hands back the one already open. A receivable has one live checkout: a second call answers `200` with the same session while more than five minutes remain before its expiry, and replaces it otherwise; naming another provider cancels the first. The body names a receivable, never a user — anything that is not the caller's is `404`, as a missing one is. Refusals come in this order: `404` (no provider on this label) / `500 PAYMENTS_CONFIG_INVALID` → `400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `429` → `502 PAYMENTS_PROVIDER_ERROR`. Handing back an open checkout does not count toward the limit of 10 new checkouts an hour. Sent with `Cache-Control: private, no-store`.
+         * @description Opens the hosted checkout for the **full open balance** of one invoice or event charge of the caller's own, or hands back the one already open. A receivable has one live checkout: a second call answers `200` with the same session while more than five minutes remain before its expiry, and replaces it otherwise; naming another provider cancels the first. The body names a receivable, never a user — anything that is not the caller's is `404`, as a missing one is. Refusals come in this order: `404` (no provider on this label) / `500 PAYMENTS_CONFIG_INVALID` → `400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `429` → `502 PAYMENTS_PROVIDER_ERROR`. Handing back an open checkout does not count toward the limit of 10 new checkouts an hour. The provider is told to notify the API origin this request was made on (`<origin>/v1/webhooks/payments/<provider>`), so each environment receives the deliveries of its own checkouts. Sent with `Cache-Control: private, no-store`.
          */
         post: {
             parameters: {
@@ -11813,6 +11813,17 @@ export interface components {
             chargeId: string;
             currency: string;
             externalReference: string | null;
+            /**
+             * @description Admin statement and charge detail only. The normalised method of a payment a hosted checkout landed; `other` is anything the platform does not offer by name (e.g. the payer's provider balance). `null` for every other row — a non-gateway payment, a hand-matched gateway row, a refund.
+             * @example other
+             * @enum {string|null}
+             */
+            gatewayMethod?: "pix" | "card" | "boleto" | "other" | null;
+            /**
+             * @description Admin statement and charge detail only. The provider's own name for the method — its identifiers, `[a-z0-9_/-]`, never free text: `account_money`, `credit_card/visa`, `ticket/bolbradesco`, `bank_transfer/pix`. `null` when unknown. Display only.
+             * @example account_money
+             */
+            gatewayMethodLabel?: string | null;
             id: string;
             /** @enum {string} */
             method: "cash" | "pix" | "bank_transfer" | "card" | "gateway" | "other";
@@ -11938,6 +11949,17 @@ export interface components {
             amountMinor: number;
             currency: string;
             externalReference: string | null;
+            /**
+             * @description Admin statement and charge detail only. The normalised method of a payment a hosted checkout landed; `other` is anything the platform does not offer by name (e.g. the payer's provider balance). `null` for every other row — a non-gateway payment, a hand-matched gateway row, a refund.
+             * @example other
+             * @enum {string|null}
+             */
+            gatewayMethod?: "pix" | "card" | "boleto" | "other" | null;
+            /**
+             * @description Admin statement and charge detail only. The provider's own name for the method — its identifiers, `[a-z0-9_/-]`, never free text: `account_money`, `credit_card/visa`, `ticket/bolbradesco`, `bank_transfer/pix`. `null` when unknown. Display only.
+             * @example account_money
+             */
+            gatewayMethodLabel?: string | null;
             id: string;
             invoiceId: string;
             /** @enum {string} */
@@ -13519,6 +13541,12 @@ export interface components {
              */
             error: string | null;
             /**
+             * @description What `PAYMENTS_KEY_MODE` declares for this environment. A reminder of which credentials the integrator says are installed: the run inspects no key and verifies nothing against it.
+             * @example test
+             * @enum {string}
+             */
+            keyMode: "test" | "live";
+            /**
              * @description `failed` when a checkout sat on a provider that is no longer bound (`unreachable > 0`).
              * @example ok
              * @enum {string}
@@ -13623,6 +13651,13 @@ export interface components {
             note?: string;
             /** @example 2026-01-01 */
             paidAt?: string;
+        };
+        RefundBusyBody: {
+            /**
+             * @description The provider rate-limited the request or did not answer in time. Repeat the same request after a few seconds: a refund the provider did accept is found and recorded, never asked for twice.
+             * @enum {string}
+             */
+            error: "PAYMENTS_PROVIDER_BUSY";
         };
         RefundConflictBody: {
             /**

@@ -12,7 +12,9 @@ import type {
   RecordGatewayEventResult,
   MarkGatewayEventInput,
   DismissGatewayExceptionInput,
+  GatewayPaidMethodRecord,
   PaymentProviderName,
+  ProviderPaymentMethod,
 } from '@arenaquest/shared/ports';
 import type { ReceivableKind } from '@arenaquest/shared/domain/billing/receivable';
 import type { Entities } from '@arenaquest/shared/types/entities';
@@ -59,6 +61,8 @@ type CheckoutRow = {
   provider_payment_id: string | null;
   invoice_payment_id: string | null;
   charge_payment_id: string | null;
+  paid_method: string | null;
+  paid_method_label: string | null;
   checkout_url: string;
   expires_at: string;
   created_at: string;
@@ -102,6 +106,8 @@ function rowToCheckout(row: CheckoutRow): GatewayCheckoutRecord {
     providerPaymentId: row.provider_payment_id,
     invoicePaymentId: row.invoice_payment_id,
     chargePaymentId: row.charge_payment_id,
+    paidMethod: row.paid_method as ProviderPaymentMethod | null,
+    paidMethodLabel: row.paid_method_label,
     checkoutUrl: row.checkout_url,
     expiresAt: row.expires_at,
     createdAt: row.created_at,
@@ -227,6 +233,36 @@ export class D1GatewayRepository implements IGatewayRepository {
     return results.map(rowToCheckout);
   }
 
+  async listPaidMethods(
+    receivableKind: ReceivableKind,
+    paymentIds: ReadonlyArray<string>,
+  ): Promise<GatewayPaidMethodRecord[]> {
+    // The column is chosen from two literals, never from input.
+    const column = receivableKind === 'invoice' ? 'invoice_payment_id' : 'charge_payment_id';
+    const ids = [...new Set(paymentIds)];
+    const records: GatewayPaidMethodRecord[] = [];
+    for (let i = 0; i < ids.length; i += LINKED_CHECKOUT_CHUNK) {
+      const chunk = ids.slice(i, i + LINKED_CHECKOUT_CHUNK);
+      const { results } = await this.db
+        .prepare(
+          `SELECT ${column} AS payment_id, paid_method, paid_method_label
+             FROM gateway_checkouts
+            WHERE receivable_kind = ? AND status = 'paid'
+              AND ${column} IN (${chunk.map(() => '?').join(', ')})`,
+        )
+        .bind(receivableKind, ...chunk)
+        .all<{ payment_id: string; paid_method: string | null; paid_method_label: string | null }>();
+      for (const row of results) {
+        records.push({
+          paymentId: row.payment_id,
+          method: row.paid_method as ProviderPaymentMethod | null,
+          methodLabel: row.paid_method_label,
+        });
+      }
+    }
+    return records;
+  }
+
   async updateCheckout(
     id: string,
     patch: UpdateGatewayCheckoutInput,
@@ -281,6 +317,10 @@ export class D1GatewayRepository implements IGatewayRepository {
       'provider_payment_id = COALESCE(?, provider_payment_id)',
       'invoice_payment_id = COALESCE(?, invoice_payment_id)',
       'charge_payment_id = COALESCE(?, charge_payment_id)',
+      // First writer wins, like the payment ids: the label describes the
+      // payment that closed the row.
+      'paid_method = COALESCE(paid_method, ?)',
+      'paid_method_label = COALESCE(paid_method_label, ?)',
     ];
     const binds: unknown[] = [
       input.status,
@@ -289,6 +329,8 @@ export class D1GatewayRepository implements IGatewayRepository {
       input.providerPaymentId ?? null,
       input.invoicePaymentId ?? null,
       input.chargePaymentId ?? null,
+      input.paidMethod ?? null,
+      input.paidMethodLabel ?? null,
     ];
     if (input.failureDetail !== undefined) {
       sets.push('failure_detail = ?');

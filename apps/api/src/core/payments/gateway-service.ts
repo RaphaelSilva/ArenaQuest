@@ -38,8 +38,9 @@
  * under the provider's refund id, so every step is safe to repeat.
  *
  * `confirmCheckout` is the reconcile run's question about one checkout (RFC
- * 0026 §6): it asks the provider what the session produced and hands every
- * payment to `applyPayment` — the landing above, not a second one.
+ * 0026 §6): it asks the provider — one call, by the checkout's own reference —
+ * what the checkout produced and hands every payment to `applyPayment` — the
+ * landing above, not a second one.
  * `listExceptions` / `dismissException` are the admin's to-do list (§7): they
  * read and annotate the gateway's own two tables and never call a provider.
  */
@@ -63,7 +64,12 @@ import type {
 } from '@arenaquest/shared/ports/i-gateway-repository';
 import type { IRateLimiter } from '@arenaquest/shared/ports/i-rate-limiter';
 import { Entities } from '@arenaquest/shared/types/entities';
-import { PAYMENT_PROVIDER_NAMES } from '@arenaquest/shared/ports/i-payment-gateway';
+import {
+  PAYMENT_PROVIDER_NAMES,
+  PROVIDER_METHOD_LABEL_PATTERN,
+  isRetryableProviderError,
+  type ProviderPaymentMethod,
+} from '@arenaquest/shared/ports/i-payment-gateway';
 import {
   buildGatewayReference,
   providerMethodsForCurrency,
@@ -192,6 +198,38 @@ export interface CreateCheckoutInput {
   id: string;
   /** Required when several providers offer a method. */
   provider?: string;
+  /**
+   * The origin of the API request that asks for the checkout
+   * (`https://api.example.test`). The provider is told to notify
+   * `<apiOrigin>/v1/webhooks/payments/<provider>`, so each environment — a
+   * preview included — receives the deliveries of the checkouts it created.
+   * Omitted or not an `http(s)` origin: the checkout carries no notification
+   * URL and the provider falls back to its dashboard registration.
+   */
+  apiOrigin?: string | null;
+}
+
+/** The path every provider's notifications are received on, under the API origin. */
+export const PAYMENTS_WEBHOOK_PATH = '/v1/webhooks/payments';
+
+/**
+ * `<origin>/v1/webhooks/payments/<provider>`, or `null` when `apiOrigin` is
+ * absent or not an absolute `http(s)` URL. Only the origin is kept: a path,
+ * query or credentials on the input never reach the provider.
+ */
+export function checkoutNotificationUrl(
+  apiOrigin: string | null | undefined,
+  provider: PaymentProviderName,
+): string | null {
+  if (typeof apiOrigin !== 'string' || apiOrigin === '') return null;
+  let url: URL;
+  try {
+    url = new URL(apiOrigin);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  return `${url.origin}${PAYMENTS_WEBHOOK_PATH}/${provider}`;
 }
 
 export interface CheckoutActor {
@@ -254,6 +292,15 @@ export const PAYMENTS_PROVIDER_NOT_ENABLED = 'PAYMENTS_PROVIDER_NOT_ENABLED';
 /** `409`: the provider did not return the money (or holds no full refund to record); nothing is written. */
 export const PAYMENTS_REFUND_REFUSED = 'PAYMENTS_REFUND_REFUSED';
 /**
+ * `503`: the provider could not take the request **right now** — a rate limit
+ * (Mercado Pago answers `429` to refunds fired back to back), a timeout, an
+ * outage. Not a refusal: nothing is written and the same request, repeated a
+ * few seconds later, completes. If the provider had in fact accepted before
+ * timing out, the repeat finds that refund and records it instead of asking
+ * for a second one.
+ */
+export const PAYMENTS_PROVIDER_BUSY = 'PAYMENTS_PROVIDER_BUSY';
+/**
  * `503`: the provider **did** return the money and the reversal could not be
  * written. Never "refund failed": repeating the same request completes it.
  */
@@ -282,6 +329,25 @@ export interface RefundPaymentResult<P> {
 
 /** The two rails' ledger rows, as far as a refund reads them. */
 type LedgerPayment = PaymentRecord | EventChargePaymentRecord;
+
+/** How a gateway ledger row was paid, for the admin ledger (never the student statement). */
+export interface GatewayPaidMethod {
+  /** The normalised method; `null` when the row was not landed by a checkout. */
+  gatewayMethod: ProviderPaymentMethod | null;
+  /** The provider's own name for it (`account_money`, `credit_card/visa`); `null` when unknown. */
+  gatewayMethodLabel: string | null;
+}
+
+/** What a row no checkout landed reads: a hand-matched payment, a refund, any non-gateway row. */
+export const NO_GATEWAY_PAID_METHOD: GatewayPaidMethod = Object.freeze({
+  gatewayMethod: null,
+  gatewayMethodLabel: null,
+});
+
+/** A label is stored only when it is what the port promises; anything else is dropped, never trimmed into shape. */
+function storableMethodLabel(label: string | null): string | null {
+  return label !== null && PROVIDER_METHOD_LABEL_PATTERN.test(label) ? label : null;
+}
 
 /** One receivable's payment in progress, for the set-based admin reads. */
 export interface LiveCheckout {
@@ -706,6 +772,11 @@ export class GatewayService {
       status: CheckoutStatus.PAID,
       from: PAYABLE_FROM,
       providerPaymentId: payment.id,
+      // How it was paid, for the admin ledger: the normalised method and the
+      // provider's own name for it (never free text — the adapter builds it
+      // from provider identifiers and it is checked again here).
+      paidMethod: payment.method,
+      paidMethodLabel: storableMethodLabel(payment.methodLabel),
       ...(isInvoice
         ? { invoicePaymentId: written.data.payment.id }
         : { chargePaymentId: written.data.payment.id }),
@@ -959,6 +1030,7 @@ export class GatewayService {
         payer: { id: payer.id, name: payer.name, email: payer.email },
         methods,
         returnUrls: this.returnUrls(deps.webBaseUrl, row.id),
+        notificationUrl: checkoutNotificationUrl(input.apiOrigin, provider),
         expiresAt: row.expiresAt,
       });
       if (!opened.sessionId || !opened.url) throw new TypeError('the provider returned no session');
@@ -1051,6 +1123,25 @@ export class GatewayService {
     return live;
   }
 
+  /**
+   * How each of the given ledger rows of one rail was paid, in **one** read:
+   * the map holds an entry only for a row a `paid` checkout landed. Everything
+   * else — a hand-matched gateway row, a refund, a second payment on one
+   * checkout, any other method — is absent and reads as
+   * {@link NO_GATEWAY_PAID_METHOD}. Database only; no provider is called.
+   */
+  async paidMethodsOf(
+    kind: ReceivableKind,
+    paymentIds: ReadonlyArray<string>,
+  ): Promise<Map<string, GatewayPaidMethod>> {
+    const methods = new Map<string, GatewayPaidMethod>();
+    if (paymentIds.length === 0) return methods;
+    for (const record of await this.deps.gatewayRepo.listPaidMethods(kind, paymentIds)) {
+      methods.set(record.paymentId, { gatewayMethod: record.method, gatewayMethodLabel: record.methodLabel });
+    }
+    return methods;
+  }
+
   /** One receivable's payment in progress, or `null` — whatever the receivable's own status. */
   async findLiveCheckout(kind: ReceivableKind, receivableId: string): Promise<PendingCheckout | null> {
     return toPendingCheckout(await this.deps.gatewayRepo.findOpenCheckout(kind, receivableId), this.now());
@@ -1061,9 +1152,10 @@ export class GatewayService {
   // -------------------------------------------------------------------------
 
   /**
-   * Asks the provider about one checkout the reconcile run found due, and
-   * lands whatever it holds through `applyPayment` — the webhook's own path,
-   * idempotent on the reference index. Never throws.
+   * Asks the provider about one checkout the reconcile run found due — **one
+   * provider call**, by the checkout's own id, the reference sent at creation —
+   * and lands whatever it holds through `applyPayment` — the webhook's own
+   * path, idempotent on the reference index. Never throws.
    *
    * Two cases cost no provider call: an `open` checkout that never got its
    * session (the create call died) is closed `failed` once it is 30 minutes
@@ -1121,7 +1213,7 @@ export class GatewayService {
 
     try {
       const payments = await withProviderTimeout(
-        gateway.findPaymentsForCheckout(sessionId),
+        gateway.findPaymentsForCheckout({ sessionId, checkoutId: checkout.id }),
         options.timeoutMs,
       );
       for (const payment of payments) await this.applyPayment(checkout.provider, payment);
@@ -1302,7 +1394,10 @@ export class GatewayService {
    *    returned);
    * 4. only a payment with no refund at all reaches `gateway.refund`, for the
    *    original's full amount, under `rev:<payment id>`. A refusal is `409
-   *    PAYMENTS_REFUND_REFUSED` and **nothing is written**;
+   *    PAYMENTS_REFUND_REFUSED` and **nothing is written**; an error that only
+   *    means "not now" (a rate limit, a timeout — at this step or at step 3)
+   *    is `503 PAYMENTS_PROVIDER_BUSY`, also with nothing written, and the
+   *    same request repeated completes;
    * 5. the reversal is written with the provider's refund id as its reference.
    *    If that write fails after the provider accepted, the answer is `503
    *    PAYMENTS_REFUND_UNRECORDED` naming the refund — and the same request,
@@ -1353,8 +1448,9 @@ export class GatewayService {
     let held: ProviderPayment | null;
     try {
       held = await gateway.getPayment(reference.id);
-    } catch {
+    } catch (error) {
       // Nothing was asked of the provider and nothing is written.
+      if (isRetryableProviderError(error)) return refusal(503, PAYMENTS_PROVIDER_BUSY);
       return refusal(502, PAYMENTS_PROVIDER_ERROR);
     }
     if (!held) {
@@ -1400,7 +1496,11 @@ export class GatewayService {
     let refund: ProviderRefundResult;
     try {
       refund = await this.requestRefund(gateway, reference.id, original);
-    } catch {
+    } catch (error) {
+      // "Not now" is not "no": a rate limit or a timeout leaves the question
+      // open, and the repeat starts at step 3 — so a refund the provider did
+      // accept before timing out is found there and never asked for twice.
+      if (isRetryableProviderError(error)) return refusal(503, PAYMENTS_PROVIDER_BUSY);
       return refusal(409, PAYMENTS_REFUND_REFUSED);
     }
 

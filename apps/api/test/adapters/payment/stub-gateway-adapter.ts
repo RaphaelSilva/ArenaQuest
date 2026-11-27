@@ -14,14 +14,16 @@
  * per-request registries a test builds around it. Every port call is recorded
  * in `calls`, in order.
  */
-import type {
-  CreateCheckoutRequest,
-  IPaymentGateway,
-  PaymentProviderName,
-  ProviderCheckout,
-  ProviderEvent,
-  ProviderPayment,
-  ProviderRefundResult,
+import {
+  PAYMENT_PROVIDER_NAMES,
+  type CheckoutPaymentLookup,
+  type CreateCheckoutRequest,
+  type IPaymentGateway,
+  type PaymentProviderName,
+  type ProviderCheckout,
+  type ProviderEvent,
+  type ProviderPayment,
+  type ProviderRefundResult,
 } from '@arenaquest/shared/ports/i-payment-gateway';
 import {
   paymentSecretKeyVar,
@@ -36,7 +38,7 @@ import type {
 export type StubGatewayCall =
   | { method: 'createCheckout'; req: CreateCheckoutRequest }
   | { method: 'getPayment'; paymentId: string }
-  | { method: 'findPaymentsForCheckout'; sessionId: string }
+  | { method: 'findPaymentsForCheckout'; sessionId: string; checkoutId: string }
   | { method: 'refund'; paymentId: string; amountMinor: number; idempotencyKey: string }
   | {
       method: 'verifyWebhook';
@@ -114,7 +116,7 @@ export class StubGatewayAdapter implements IPaymentGateway {
     return this;
   }
 
-  /** Makes `refund` throw (a provider refusal); `null` clears it. */
+  /** Makes `refund` throw (a provider refusal — or, with `retryable: true` on the error, a rate limit); `null` clears it. */
   failRefunds(error: Error | null): this {
     this.refundError = error;
     return this;
@@ -150,8 +152,8 @@ export class StubGatewayAdapter implements IPaymentGateway {
     return this.payments.get(paymentId) ?? null;
   }
 
-  async findPaymentsForCheckout(sessionId: string): Promise<ProviderPayment[]> {
-    this.calls.push({ method: 'findPaymentsForCheckout', sessionId });
+  async findPaymentsForCheckout({ sessionId, checkoutId }: CheckoutPaymentLookup): Promise<ProviderPayment[]> {
+    this.calls.push({ method: 'findPaymentsForCheckout', sessionId, checkoutId });
     if (this.getPaymentError) throw this.getPaymentError;
     return (this.sessionPayments.get(sessionId) ?? [])
       .map(id => this.payments.get(id))
@@ -207,6 +209,7 @@ export function stubPayment(overrides: Partial<ProviderPayment> & { id: string }
     amountMinor: 18000,
     currency: 'BRL',
     method: 'pix',
+    methodLabel: null,
     paidAt: '2026-01-01T00:00:00.000Z',
     checkoutId: null,
     refunds: [],
@@ -215,29 +218,23 @@ export function stubPayment(overrides: Partial<ProviderPayment> & { id: string }
 }
 
 /**
- * Fake secret keys that carry each provider's real mode prefix, so the
- * key-mode assertion reads them as it reads a real key. Not credentials.
+ * A fake secret key for a provider. Deliberately shapeless: no code may read a
+ * key's content (milestone 30 decision 19), so a stub key carries no prefix a
+ * rule could latch on to. Not a credential.
  */
-const STUB_SECRET_KEYS: Readonly<Record<PaymentProviderName, Readonly<Record<PaymentsKeyMode, string>>>> = {
-  stripe: { test: 'sk_test_stub', live: 'sk_live_stub' },
-  mercadopago: { test: 'TEST-stub', live: 'APP_USR-stub' },
-  asaas: { test: '$aact_hmlg_stub', live: '$aact_prod_stub' },
-  pagarme: { test: 'sk_test_stub', live: 'sk_stub' },
-};
-
-export function stubSecretKey(provider: PaymentProviderName, mode: PaymentsKeyMode = 'test'): string {
-  return STUB_SECRET_KEYS[provider][mode];
+export function stubSecretKey(provider: PaymentProviderName): string {
+  return `stub-secret-key-${provider}`;
 }
 
 /**
- * The env slice for a provider list: the list, the key mode, and both secrets
- * (in `keyMode`) for every provider named in it. Spread it into a Worker env.
+ * The env slice for a provider list: the list, the declared key mode, and both
+ * secrets for every provider named in it. Spread it into a Worker env.
  */
 export function stubPaymentsEnv(list: string, keyMode: PaymentsKeyMode = 'test'): Record<string, string> {
   const env: Record<string, string> = { PAYMENTS_PROVIDERS: list, PAYMENTS_KEY_MODE: keyMode };
-  for (const provider of Object.keys(STUB_SECRET_KEYS) as PaymentProviderName[]) {
+  for (const provider of PAYMENT_PROVIDER_NAMES) {
     if (!new RegExp(`(^|,)\\s*${provider}\\s*:`).test(list)) continue;
-    env[paymentSecretKeyVar(provider)] = stubSecretKey(provider, keyMode);
+    env[paymentSecretKeyVar(provider)] = stubSecretKey(provider);
     env[paymentWebhookSecretVar(provider)] = `whsec-stub-${provider}`;
   }
   return env;

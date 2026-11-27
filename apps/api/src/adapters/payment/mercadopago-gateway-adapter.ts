@@ -9,9 +9,11 @@
  * What is pinned to the sandbox, and what is not, is listed in
  * `apps/api/test/fixtures/mercadopago/README.md`. In short: preferences,
  * approved / pending / refunded payments, the search, refunds and the error
- * bodies were **recorded**; a rejected or cancelled payment, an approved Pix,
- * a charged-back payment and every signed notification were **not observable**
- * on the test account and are mapped from the provider's published contract.
+ * bodies were **recorded**, and so were a rejected card payment, one left
+ * `in_process` and two payments on one reference; a cancelled payment, an
+ * approved Pix, a charged-back payment and every signed notification were
+ * **not observable** on the test account and are mapped from the provider's
+ * published contract.
  *
  * Money (port rule 2). Mercado Pago speaks decimals **as JSON numbers**
  * (`"transaction_amount":12.34`, `1000`, `180.5`). `JSON.parse` would turn
@@ -31,6 +33,7 @@
  * a response body.
  */
 import type {
+  CheckoutPaymentLookup,
   CreateCheckoutRequest,
   IPaymentGateway,
   PaymentMethodName,
@@ -42,6 +45,7 @@ import type {
   ProviderRefund,
   ProviderRefundResult,
 } from '@arenaquest/shared/ports/i-payment-gateway';
+import { PROVIDER_METHOD_LABEL_MAX_LENGTH } from '@arenaquest/shared/ports/i-payment-gateway';
 import { decimalToMinor } from '@arenaquest/shared/domain/billing/gateway-money';
 import type { PaymentGatewayFactory } from '@api/core/payments/gateway-registry';
 
@@ -54,11 +58,33 @@ export const MERCADOPAGO_TIMEOUT_MS = 10_000;
 export const MERCADOPAGO_WEBHOOK_TOLERANCE_MS = 5 * 60_000;
 
 /**
- * Fraction digits of the currencies this adapter charges. The capability
+ * Fraction digits of the currencies this adapter **charges**. The capability
  * table lists BRL only; a currency that is not a key here is refused before
  * any provider call rather than guessed at.
  */
 const CURRENCY_EXPONENTS: Readonly<Record<string, number>> = Object.freeze({ BRL: 2 });
+
+/**
+ * Fraction digits of the currencies this adapter can **read** on a fetched
+ * payment: the ones it charges, plus the other currencies Mercado Pago settles
+ * in (its country sites) and the US dollar. A payment in one of these that is
+ * not the checkout's currency must reach the service, which settles it as a
+ * `mismatch` (RFC 0026 section 4) — it is a fact about the payment, not an
+ * unusable answer. Only the exponent is needed, to read the amount exactly;
+ * nothing is ever charged or refunded in a currency that is not in
+ * {@link CURRENCY_EXPONENTS}. A currency in neither table stays an adapter
+ * error: its amount cannot be read without guessing.
+ */
+const READABLE_CURRENCY_EXPONENTS: Readonly<Record<string, number>> = Object.freeze({
+  ...CURRENCY_EXPONENTS,
+  ARS: 2,
+  CLP: 0,
+  COP: 2,
+  MXN: 2,
+  PEN: 2,
+  USD: 2,
+  UYU: 2,
+});
 
 /** The provider payment types behind each method the platform offers by name. */
 const METHOD_PAYMENT_TYPES: Readonly<Record<PaymentMethodName, ReadonlyArray<string>>> = Object.freeze({
@@ -205,6 +231,35 @@ function exponentOf(currency: string): number | null {
   return Object.prototype.hasOwnProperty.call(CURRENCY_EXPONENTS, currency) ? CURRENCY_EXPONENTS[currency] : null;
 }
 
+/** The fraction digits a fetched payment's amount is read with, or `null` for a currency this adapter cannot read. */
+function readableExponentOf(currency: string): number | null {
+  return Object.prototype.hasOwnProperty.call(READABLE_CURRENCY_EXPONENTS, currency)
+    ? READABLE_CURRENCY_EXPONENTS[currency]
+    : null;
+}
+
+/**
+ * The checkout's notification URL as the provider may be given it, or `null`
+ * to leave the field out. Only an absolute `http(s)` URL is sent, and never a
+ * loopback one: the provider cannot reach a developer's machine, and a
+ * preference created from `localhost` must still open.
+ */
+function deliverableNotificationUrl(value: string | null): string | null {
+  if (value === null) return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  const host = url.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host === '[::1]' || /^127(\.\d{1,3}){3}$/.test(host)) {
+    return null;
+  }
+  return url.toString();
+}
+
 // ---------------------------------------------------------------------------
 // Field access over a parsed (numbers-as-strings) body
 // ---------------------------------------------------------------------------
@@ -315,6 +370,7 @@ export class MercadoPagoGatewayAdapter implements IPaymentGateway {
     // any other value is escaped by `JSON.stringify`, so the quoted placeholder
     // can only match the one field it was written into.
     const PLACEHOLDER = '@@unit_price@@';
+    const notificationUrl = deliverableNotificationUrl(req.notificationUrl);
     const body = JSON.stringify({
       items: [
         {
@@ -345,6 +401,16 @@ export class MercadoPagoGatewayAdapter implements IPaymentGateway {
       // arrives after the checkout expired still lands (RFC 0026 section 5).
       expires: true,
       expiration_date_to: expiresAt,
+      // Per preference, so one provider account serves staging, previews and
+      // production: each notifies the API that created the checkout. Left out
+      // (the key is dropped by `JSON.stringify`) for a loopback origin, and the
+      // provider then uses the URL registered in its dashboard, if any. The
+      // delivery is verified exactly as before — see `verifyWebhook`.
+      // `notification_url` is the provider's published preference field; no
+      // preference carrying it was sent to the sandbox yet, and whether such a
+      // delivery is signed with the application's webhook secret is for the
+      // staging walk to confirm (Task 16).
+      notification_url: notificationUrl ?? undefined,
     }).replace(`"${PLACEHOLDER}"`, () => unitPrice);
 
     // NOT idempotent at the provider: the sandbox answered the same
@@ -382,18 +448,17 @@ export class MercadoPagoGatewayAdapter implements IPaymentGateway {
   }
 
   /**
-   * Two recorded lookups: the preference names its `external_reference` (our
-   * checkout id), and the payment search filters on it. A payment does not
-   * carry its preference id reliably — the recorded account-money payment
-   * references an order instead — so the search by reference is the lookup
-   * that works for every method. A preference nobody paid is `[]`.
+   * **One** provider call: the payment search filtered on
+   * `external_reference`, which is the checkout id `createCheckout` sent. The
+   * session (preference) id is not used — a payment does not carry it reliably
+   * (the recorded account-money payment references an order instead), and
+   * reading the preference first to learn a reference the caller already
+   * holds would cost a second call per checkout. A checkout nobody paid is
+   * `[]`; so is an id that cannot be one of ours, with no call made.
    */
-  async findPaymentsForCheckout(sessionId: string): Promise<ProviderPayment[]> {
-    if (!/^[A-Za-z0-9-]{1,128}$/.test(sessionId)) return [];
-    const prefRes = await this.call('GET', `/checkout/preferences/${sessionId}`, {}, [404]);
-    if (prefRes.status === 404) return [];
-    const reference = text(this.expectObject(prefRes, 'preference').external_reference);
-    if (reference === null) return [];
+  async findPaymentsForCheckout(lookup: CheckoutPaymentLookup): Promise<ProviderPayment[]> {
+    const reference = lookup.checkoutId;
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(reference)) return [];
 
     const res = await this.call('GET', `/v1/payments/search?external_reference=${encodeURIComponent(reference)}`);
     const results = this.expectObject(res, 'payment search').results;
@@ -542,9 +607,13 @@ export class MercadoPagoGatewayAdapter implements IPaymentGateway {
     if (id === null || currency === null || amount === null) {
       throw new MercadoPagoResponseError('the payment has no id, currency or amount', httpStatus);
     }
-    const exponent = exponentOf(currency);
+    // Read with the payment's own currency, even when it is not one this
+    // adapter charges: the service compares it with the checkout's and settles
+    // a difference as a mismatch. Only a currency whose fraction digits are
+    // unknown cannot be read.
+    const exponent = readableExponentOf(currency);
     if (exponent === null) {
-      throw new MercadoPagoResponseError('the payment is in a currency this adapter does not charge', httpStatus);
+      throw new MercadoPagoResponseError('the payment is in a currency this adapter cannot read', httpStatus);
     }
 
     const refunds: ProviderRefund[] = [];
@@ -569,6 +638,7 @@ export class MercadoPagoGatewayAdapter implements IPaymentGateway {
       amountMinor: this.toMinor(amount, exponent, httpStatus),
       currency,
       method: toMethod(text(payment.payment_type_id), text(payment.payment_method_id)),
+      methodLabel: toMethodLabel(text(payment.payment_type_id), text(payment.payment_method_id)),
       paidAt: isoInstant(payment.date_approved),
       checkoutId: text(payment.external_reference) ?? text(metadata.checkout_id),
       refunds,
@@ -658,11 +728,12 @@ export const mercadoPagoGatewayFactory: PaymentGatewayFactory = ({ secretKey, we
 // ---------------------------------------------------------------------------
 
 /**
- * Provider status → port status. `approved`, `pending` and `refunded` were
- * recorded (a partial refund leaves the payment `approved` with
- * `status_detail: partially_refunded`, so it stays `paid`). The other rows
- * follow the provider's published status list and are exercised by derived
- * fixtures only. A status that is not in this table is an error, not a guess.
+ * Provider status → port status. `approved`, `pending`, `refunded`,
+ * `rejected` and `in_process` (`pending_contingency`) were recorded (a partial
+ * refund leaves the payment `approved` with `status_detail:
+ * partially_refunded`, so it stays `paid`). The other rows follow the
+ * provider's published status list and are exercised by derived fixtures
+ * only. A status that is not in this table is an error, not a guess.
  */
 function toStatus(status: string | null, detail: string | null, httpStatus: number): ProviderPaymentStatus {
   switch (status) {
@@ -698,6 +769,25 @@ function toMethod(type: string | null, methodId: string | null): ProviderPayment
   if (type === 'ticket') return 'boleto';
   if (type === 'bank_transfer' && methodId === 'pix') return 'pix';
   return 'other';
+}
+
+/**
+ * The provider's own name for how the payer paid: `payment_type_id` alone
+ * when `payment_method_id` repeats it (`account_money`), otherwise
+ * `<type>/<method>` (`credit_card/visa`, `ticket/bolbradesco`,
+ * `bank_transfer/pix`). Both are provider identifiers — never a payer's text —
+ * and one that is not a lower-case identifier is dropped rather than copied.
+ * `null` when the payment names neither.
+ */
+function toMethodLabel(type: string | null, methodId: string | null): string | null {
+  const part = (value: string | null) => (value !== null && /^[a-z0-9_-]{1,32}$/.test(value) ? value : null);
+  const safeType = part(type);
+  const safeMethod = part(methodId);
+  const label =
+    safeType !== null && safeMethod !== null && safeType !== safeMethod
+      ? `${safeType}/${safeMethod}`
+      : (safeType ?? safeMethod);
+  return label === null ? null : label.slice(0, PROVIDER_METHOD_LABEL_MAX_LENGTH);
 }
 
 // ---------------------------------------------------------------------------

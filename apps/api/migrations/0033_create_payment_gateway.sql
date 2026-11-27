@@ -48,6 +48,12 @@ CREATE TABLE IF NOT EXISTS gateway_checkouts (
   -- Exactly one of these is set on a 'paid' row, and it matches receivable_kind.
   invoice_payment_id   TEXT REFERENCES payments(id) ON DELETE RESTRICT,
   charge_payment_id    TEXT REFERENCES event_charge_payments(id) ON DELETE RESTRICT,
+  -- How the payment that closed the row 'paid' was made (M30 Task 17): the
+  -- normalised method, and the provider's own identifier for it (e.g.
+  -- 'account_money', 'credit_card/visa') - never free text from a payer.
+  -- Admin display only; nothing reasons on the label.
+  paid_method          TEXT CHECK (paid_method IS NULL OR paid_method IN ('pix','card','boleto','other')),
+  paid_method_label    TEXT CHECK (paid_method_label IS NULL OR length(paid_method_label) <= 64),
   checkout_url         TEXT NOT NULL,
   expires_at           TEXT NOT NULL,
   created_at           TEXT NOT NULL DEFAULT (datetime('now')),

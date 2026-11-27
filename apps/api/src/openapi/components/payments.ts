@@ -182,6 +182,20 @@ export const RefundUnrecordedBody = z
   })
   .openapi('RefundUnrecordedBody');
 
+/**
+ * `503` of the two reverse routes when the provider could not take the request
+ * right now. Not a refusal and not a refund: nothing was written.
+ */
+export const RefundBusyBody = z
+  .object({
+    error: z.literal('PAYMENTS_PROVIDER_BUSY').openapi({
+      description:
+        'The provider rate-limited the request or did not answer in time. Repeat the same request after ' +
+        'a few seconds: a refund the provider did accept is found and recorded, never asked for twice.',
+    }),
+  })
+  .openapi('RefundBusyBody');
+
 // ---------------------------------------------------------------------------
 // Reconcile run and exceptions (RFC 0026 §6, §7)
 // ---------------------------------------------------------------------------
@@ -219,6 +233,12 @@ export const ReconcilePaymentsRunSchema = z
       example: 'ok',
     }),
     error: z.string().nullable().openapi({ description: 'Why the run failed; `null` on `ok`.', example: null }),
+    keyMode: z.enum(['test', 'live']).openapi({
+      description:
+        'What `PAYMENTS_KEY_MODE` declares for this environment. A reminder of which credentials the ' +
+        'integrator says are installed: the run inspects no key and verifies nothing against it.',
+      example: 'test',
+    }),
     summary: ReconcilePaymentsSummarySchema,
   })
   .openapi('ReconcilePaymentsRun');

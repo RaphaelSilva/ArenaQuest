@@ -1,6 +1,6 @@
 import type { Entities } from '../types/entities';
 import type { ReceivableKind } from '../domain/billing/receivable';
-import type { PaymentProviderName } from './i-payment-gateway';
+import type { PaymentProviderName, ProviderPaymentMethod } from './i-payment-gateway';
 
 /**
  * IGatewayRepository
@@ -59,6 +59,10 @@ export interface GatewayCheckoutRecord {
   invoicePaymentId: string | null;
   /** Set on a `paid` event-charge checkout; never together with `invoicePaymentId`. */
   chargePaymentId: string | null;
+  /** How the payment that closed this checkout `paid` was made, normalised; `null` until then. */
+  paidMethod: ProviderPaymentMethod | null;
+  /** The provider's own name for it (`account_money`, `credit_card/visa`); never free text. */
+  paidMethodLabel: string | null;
   checkoutUrl: string;
   expiresAt: string;
   createdAt: string;
@@ -156,7 +160,19 @@ export interface CloseGatewayCheckoutInput {
   invoicePaymentId?: string;
   /** The ledger row a `paid` event-charge checkout produced. */
   chargePaymentId?: string;
+  /** With `status: 'paid'`: how the payment was made. Kept from the first payment that closed the row. */
+  paidMethod?: ProviderPaymentMethod | null;
+  /** With `status: 'paid'`: the provider's own method name, at most 64 characters. */
+  paidMethodLabel?: string | null;
   failureDetail?: string | null;
+}
+
+/** How one ledger row was paid, read back from the checkout that landed it. */
+export interface GatewayPaidMethodRecord {
+  /** The id of the `payments` / `event_charge_payments` row the checkout produced. */
+  paymentId: string;
+  method: ProviderPaymentMethod | null;
+  methodLabel: string | null;
 }
 
 export interface RecordGatewayEventInput {
@@ -221,6 +237,16 @@ export interface IGatewayRepository {
    * as a payment in progress.
    */
   listOpenCheckouts(): Promise<GatewayCheckoutRecord[]>;
+  /**
+   * How the given ledger rows were paid: one record per row that a `paid`
+   * checkout of that kind produced, in no particular order. A row no checkout
+   * landed (a hand-matched payment, a refund, a second payment on a checkout)
+   * has no record. One set-based read; an empty list reads nothing.
+   */
+  listPaidMethods(
+    receivableKind: ReceivableKind,
+    paymentIds: ReadonlyArray<string>,
+  ): Promise<GatewayPaidMethodRecord[]>;
   /** Status-preserving write; `null` when the checkout does not exist. */
   updateCheckout(id: string, patch: UpdateGatewayCheckoutInput): Promise<GatewayCheckoutRecord | null>;
   /**

@@ -367,6 +367,37 @@ describe('payment gateway schema (migration 0033)', () => {
     await expect(insertCheckout({ created_by: 'no-such-user' })).rejects.toThrow();
   });
 
+  // M30 Task 17 — two nullable columns on gateway_checkouts; no money table changes.
+  it('carries the paid method and the provider label, both nullable and both constrained', async () => {
+    const id = crypto.randomUUID();
+    await insertCheckout({ id });
+    const read = () =>
+      env.DB.prepare('SELECT paid_method, paid_method_label FROM gateway_checkouts WHERE id = ?')
+        .bind(id)
+        .first<{ paid_method: string | null; paid_method_label: string | null }>();
+    expect(await read()).toEqual({ paid_method: null, paid_method_label: null });
+
+    await env.DB
+      .prepare("UPDATE gateway_checkouts SET paid_method = 'other', paid_method_label = 'account_money' WHERE id = ?")
+      .bind(id)
+      .run();
+    expect(await read()).toEqual({ paid_method: 'other', paid_method_label: 'account_money' });
+
+    for (const method of ['pix', 'card', 'boleto', 'other']) {
+      await insertCheckout({ receivable_id: crypto.randomUUID(), paid_method: method, paid_method_label: 'x'.repeat(64) });
+    }
+    await expect(insertCheckout({ receivable_id: crypto.randomUUID(), paid_method: 'account_money' })).rejects.toThrow(/CHECK/);
+    await expect(
+      insertCheckout({ receivable_id: crypto.randomUUID(), paid_method_label: 'x'.repeat(65) }),
+    ).rejects.toThrow(/CHECK/);
+
+    // The label lives on the checkout only: neither payment table gained a column.
+    for (const table of ['payments', 'event_charge_payments']) {
+      const { results } = await env.DB.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>();
+      expect(results.map((c) => c.name).filter((name) => /method_label|paid_method/.test(name))).toEqual([]);
+    }
+  });
+
   it('keeps provider session and payment ids unique per provider, not globally', async () => {
     await insertCheckout({ status: 'paid', provider_session_id: 's-1', provider_payment_id: 'p-1' });
     await expect(

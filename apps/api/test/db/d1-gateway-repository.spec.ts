@@ -96,6 +96,8 @@ describe('D1GatewayRepository', () => {
       providerPaymentId: null,
       invoicePaymentId: null,
       chargePaymentId: null,
+      paidMethod: null,
+      paidMethodLabel: null,
       checkoutUrl: 'about:blank',
       expiresAt: at(24 * HOUR),
       createdAt: at(0),
@@ -212,6 +214,104 @@ describe('D1GatewayRepository', () => {
       // Not named in the input, so left as it was.
       failureDetail: 'expired unpaid',
     });
+  });
+
+  // M30 Task 17 — how a landed payment was made, for the admin ledger.
+  it('closeCheckout stores the paid method and the provider label, and the first writer wins', async () => {
+    const created = await repo.createCheckout(checkoutInput());
+    expect(created).toMatchObject({ paidMethod: null, paidMethodLabel: null });
+    const paymentId = await insertInvoicePayment(world, { method: 'gateway', externalReference: 'mercadopago:pay-9' });
+
+    const paid = await repo.closeCheckout(created.id, {
+      status: CheckoutStatus.PAID,
+      providerPaymentId: 'pay-9',
+      invoicePaymentId: paymentId,
+      paidMethod: 'other',
+      paidMethodLabel: 'account_money',
+    });
+    expect(paid).toMatchObject({ status: CheckoutStatus.PAID, paidMethod: 'other', paidMethodLabel: 'account_money' });
+
+    // A paid row is never rewritten: a second landing changes nothing.
+    expect(
+      await repo.closeCheckout(created.id, {
+        status: CheckoutStatus.PAID,
+        from: [CheckoutStatus.OPEN, CheckoutStatus.EXPIRED, CheckoutStatus.CANCELLED],
+        paidMethod: 'card',
+        paidMethodLabel: 'credit_card/visa',
+      }),
+    ).toBeNull();
+    expect(await repo.getCheckout(created.id)).toMatchObject({ paidMethod: 'other', paidMethodLabel: 'account_money' });
+
+    // A close that names neither leaves both null.
+    const other = await openCheckoutNow();
+    expect(await repo.closeCheckout(other.id, { status: CheckoutStatus.EXPIRED })).toMatchObject({
+      paidMethod: null,
+      paidMethodLabel: null,
+    });
+  });
+
+  it('listPaidMethods answers by ledger row, per rail, in one read, and only for paid checkouts', async () => {
+    const invoiceCheckout = await repo.createCheckout(checkoutInput());
+    const invoicePaymentId = await insertInvoicePayment(world, { method: 'gateway', externalReference: 'mercadopago:pay-1' });
+    await repo.closeCheckout(invoiceCheckout.id, {
+      status: CheckoutStatus.PAID,
+      providerPaymentId: 'pay-1',
+      invoicePaymentId,
+      paidMethod: 'card',
+      paidMethodLabel: 'credit_card/visa',
+    });
+
+    const chargeCheckout = await repo.createCheckout(
+      checkoutInput({ receivableKind: 'event_charge', receivableId: world.chargeId, amountMinor: 8000 }),
+    );
+    const chargePaymentId = await insertChargePayment(world, { method: 'gateway', externalReference: 'mercadopago:pay-2' });
+    await repo.closeCheckout(chargeCheckout.id, {
+      status: CheckoutStatus.PAID,
+      providerPaymentId: 'pay-2',
+      chargePaymentId,
+      paidMethod: 'other',
+      paidMethodLabel: 'account_money',
+    });
+
+    // A paid checkout with no label (landed before this column existed, or by a provider that names none).
+    const bare = await openCheckoutNow();
+    const barePaymentId = await insertInvoicePayment(world, { method: 'gateway', externalReference: 'mercadopago:pay-3' });
+    await repo.closeCheckout(bare.id, { status: CheckoutStatus.PAID, providerPaymentId: 'pay-3', invoicePaymentId: barePaymentId });
+
+    // A hand-matched gateway row: on the ledger, pointed at by no checkout.
+    const handMatched = await insertInvoicePayment(world, { method: 'gateway', externalReference: 'mercadopago:pay-4' });
+
+    const invoiceRows = await repo.listPaidMethods('invoice', [invoicePaymentId, barePaymentId, handMatched, 'missing', invoicePaymentId]);
+    expect(invoiceRows.sort((a, b) => a.paymentId.localeCompare(b.paymentId))).toEqual(
+      [
+        { paymentId: invoicePaymentId, method: 'card', methodLabel: 'credit_card/visa' },
+        { paymentId: barePaymentId, method: null, methodLabel: null },
+      ].sort((a, b) => a.paymentId.localeCompare(b.paymentId)),
+    );
+
+    expect(await repo.listPaidMethods('event_charge', [chargePaymentId])).toEqual([
+      { paymentId: chargePaymentId, method: 'other', methodLabel: 'account_money' },
+    ]);
+    // The rails are kept apart: an invoice payment id asked on the extras rail finds nothing.
+    expect(await repo.listPaidMethods('event_charge', [invoicePaymentId])).toEqual([]);
+    expect(await repo.listPaidMethods('invoice', [])).toEqual([]);
+  });
+
+  it('listPaidMethods reads more ids than one statement may bind', async () => {
+    const created = await repo.createCheckout(checkoutInput());
+    const paymentId = await insertInvoicePayment(world, { method: 'gateway', externalReference: 'mercadopago:pay-many' });
+    await repo.closeCheckout(created.id, {
+      status: CheckoutStatus.PAID,
+      providerPaymentId: 'pay-many',
+      invoicePaymentId: paymentId,
+      paidMethod: 'pix',
+      paidMethodLabel: 'bank_transfer/pix',
+    });
+    const ids = [...Array.from({ length: 130 }, (_, i) => `filler-${i}`), paymentId];
+
+    expect(await repo.listPaidMethods('invoice', ids)).toEqual([
+      { paymentId, method: 'pix', methodLabel: 'bank_transfer/pix' },
+    ]);
   });
 
   // -------------------------------------------------------------------------

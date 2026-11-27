@@ -24,6 +24,7 @@ import {
   PendingCheckoutSchema,
   PendingCheckoutsSummarySchema,
   RefundConflictBody,
+  RefundBusyBody,
   RefundUnrecordedBody,
   ValidationErrorBody,
 } from '@api/openapi/components';
@@ -128,6 +129,39 @@ const AdjustmentSchema = z
   })
   .openapi('BillingInvoiceAdjustment');
 
+
+/**
+ * How a gateway payment was made (RFC 0026 §7; M30 Task 17) — **admin
+ * responses only**: the admin statement and the charge detail set both keys on
+ * every payment row (`null` when unknown); the student statement
+ * (`GET /v1/me/billing`) and the record / reverse answers never carry them.
+ */
+const GATEWAY_METHOD_FIELDS = {
+  gatewayMethod: z
+    .enum(['pix', 'card', 'boleto', 'other'])
+    .nullable()
+    .optional()
+    .openapi({
+      description:
+        'Admin statement and charge detail only. The normalised method of a payment a hosted checkout ' +
+        'landed; `other` is anything the platform does not offer by name (e.g. the payer\'s provider ' +
+        'balance). `null` for every other row — a non-gateway payment, a hand-matched gateway row, a refund.',
+      example: 'other',
+    }),
+  gatewayMethodLabel: z
+    .string()
+    .max(64)
+    .nullable()
+    .optional()
+    .openapi({
+      description:
+        'Admin statement and charge detail only. The provider\'s own name for the method — its ' +
+        'identifiers, `[a-z0-9_/-]`, never free text: `account_money`, `credit_card/visa`, ' +
+        '`ticket/bolbradesco`, `bank_transfer/pix`. `null` when unknown. Display only.',
+      example: 'account_money',
+    }),
+};
+
 const PaymentSchema = z
   .object({
     id: z.string(),
@@ -141,6 +175,7 @@ const PaymentSchema = z
     reversesId: z.string().nullable(),
     recordedBy: z.string(),
     recordedAt: z.string(),
+    ...GATEWAY_METHOD_FIELDS,
   })
   .openapi('BillingPayment');
 
@@ -310,6 +345,7 @@ const ChargePaymentSchema = z
     reversesId: z.string().nullable(),
     recordedBy: z.string(),
     recordedAt: z.string(),
+    ...GATEWAY_METHOD_FIELDS,
   })
   .openapi('BillingEventChargePayment');
 
@@ -587,7 +623,7 @@ const PAYMENT_BODY_DESCRIPTION =
  */
 const REVERSE_DESCRIPTION =
   'Appends the mirror-image row; the original is never updated or deleted. A reversal cannot be reversed, and a payment is reversed at most once. ' +
-  '**A payment whose `method` is `gateway` is refunded at its provider first** (full amount only), in this order: the provider named by the reference prefix must still be bound (`409 PAYMENTS_PROVIDER_NOT_ENABLED`) → the payment is read from the provider → a full refund it already holds is recorded under that refund id, or the row already carrying it is returned (`200`, nothing refunded again) → otherwise the refund is requested under an idempotency key derived from the payment row → a refusal is `409 PAYMENTS_REFUND_REFUSED` and **nothing is written** → accepted and written is `200` → accepted but not written is `503 PAYMENTS_REFUND_UNRECORDED`, and the same request repeated completes it. ' +
+  '**A payment whose `method` is `gateway` is refunded at its provider first** (full amount only), in this order: the provider named by the reference prefix must still be bound (`409 PAYMENTS_PROVIDER_NOT_ENABLED`) → the payment is read from the provider → a full refund it already holds is recorded under that refund id, or the row already carrying it is returned (`200`, nothing refunded again) → otherwise the refund is requested under an idempotency key derived from the payment row → a refusal is `409 PAYMENTS_REFUND_REFUSED` and **nothing is written**; a provider that cannot take the request right now (rate limit, timeout — refunds fired back to back are rate-limited) is `503 PAYMENTS_PROVIDER_BUSY`, also with nothing written, and the same request repeated a few seconds later completes → accepted and written is `200` → accepted but not written is `503 PAYMENTS_REFUND_UNRECORDED`, and the same request repeated completes it. ' +
   'The reversal row carries `method: "gateway"`, `reversesId` and `externalReference: "<provider>:<refund id>"`. Repeating the request answers `200` with the same row. Every other method never calls a provider.';
 
 const jsonError = (description: string) => json(description, ErrorBody);
@@ -603,8 +639,8 @@ const REVERSE_RESPONSES = {
     '`PAYMENTS_PROVIDER_ERROR`: the provider could not be asked about the payment; no refund was requested and nothing was written',
   ),
   503: json(
-    '`PAYMENTS_REFUND_UNRECORDED`: the provider returned the money and the reversal was not written; repeat the request',
-    RefundUnrecordedBody,
+    'Repeat the same request — it cannot refund twice. `PAYMENTS_REFUND_UNRECORDED` (with `refundId`): the provider returned the money and the reversal was not written. `PAYMENTS_PROVIDER_BUSY`: the provider could not take the request right now (rate limit, timeout); nothing was refunded by this call and nothing was written',
+    z.union([RefundUnrecordedBody, RefundBusyBody]),
   ),
 };
 
@@ -616,7 +652,8 @@ const ON_BEHALF_DESCRIPTION =
   'Opens the hosted checkout for the **full open balance** of a student\'s receivable, or hands back the one already open, and answers the URL the admin hands over. ' +
   'Same rules as `POST /v1/me/billing/checkouts`: one live checkout per receivable (`200` with the same session while more than five minutes remain, replaced otherwise; another provider cancels the first). ' +
   'The student is the receivable\'s own — the request names none — and the admin is recorded as `createdBy`. Nothing is charged to anyone until the student pays, and the student\'s hourly limit is not consumed. ' +
-  'Refusals, in order: `403` → `500 PAYMENTS_CONFIG_INVALID` / `404` (no provider on this label) → `400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `502 PAYMENTS_PROVIDER_ERROR`. Sent with `Cache-Control: private, no-store`.';
+  'Refusals, in order: `403` → `500 PAYMENTS_CONFIG_INVALID` / `404` (no provider on this label) → `400` → `404` → `409 RECEIVABLE_NOT_PAYABLE` → `409 PAYMENTS_UNSUPPORTED_CURRENCY` → `502 PAYMENTS_PROVIDER_ERROR`. ' +
+  'The provider is told to notify the API origin this request was made on (`<origin>/v1/webhooks/payments/<provider>`). Sent with `Cache-Control: private, no-store`.';
 
 const ON_BEHALF_RESPONSES = {
   200: json('The receivable already had an open checkout; this is it', CheckoutSessionSchema),
@@ -1353,7 +1390,7 @@ export const reconcilePaymentsRoute = createRoute({
     200: json('The run and its counts', ReconcilePaymentsRunSchema),
     403: { description: 'Forbidden — admin only' },
     404: jsonError('No payment provider is bound on this label'),
-    500: jsonError('`PAYMENTS_CONFIG_INVALID`: the provider list, a secret or the key mode is invalid; the failed run is recorded'),
+    500: jsonError('`PAYMENTS_CONFIG_INVALID`: the provider list, a secret or the `PAYMENTS_KEY_MODE` value is invalid; the failed run is recorded'),
   },
 });
 
@@ -1577,7 +1614,7 @@ export function buildAdminBillingRouter(container: AppContainer) {
 
   router.openapi(createInvoiceCheckoutRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const result = await controller.createCheckout(id, c.req.valid('json'), c.get('user').sub);
+    const result = await controller.createCheckout(id, c.req.valid('json'), c.get('user').sub, new URL(c.req.url).origin);
     if (result.ok) return c.json(result.data.checkout, result.data.created ? 201 : 200);
     return respondWith(c, result);
   });
@@ -1699,7 +1736,7 @@ export function buildAdminBillingRouter(container: AppContainer) {
 
   router.openapi(createChargeCheckoutRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const result = await extras.createCheckout(id, c.req.valid('json'), c.get('user').sub);
+    const result = await extras.createCheckout(id, c.req.valid('json'), c.get('user').sub, new URL(c.req.url).origin);
     if (result.ok) return c.json(result.data.checkout, result.data.created ? 201 : 200);
     return respondWith(c, result);
   });

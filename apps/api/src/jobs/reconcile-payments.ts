@@ -4,8 +4,8 @@ import type { ProviderEvent } from '@arenaquest/shared/ports/i-payment-gateway';
 import { Entities } from '@arenaquest/shared/types/entities';
 import {
   PAYMENTS_CONFIG_INVALID,
-  assertPaymentsKeyMode,
   type PaymentsConfigResult,
+  type PaymentsKeyMode,
 } from '@api/core/payments/config';
 import type { GatewayRegistry } from '@api/core/payments/gateway-registry';
 import { eventFromRecord, type GatewayService } from '@api/core/payments/gateway-service';
@@ -17,9 +17,9 @@ import { recordJobRun } from '@api/jobs/record-job-run';
  * Hourly, on its own Cron Trigger, and on demand through
  * `POST /v1/admin/billing/payments/reconcile`: one routine, two callers. It
  * asks the provider about checkouts whose webhook may never have arrived,
- * retries unsettled events, counts stale exceptions and re-asserts the key
- * mode. Every step is bounded and what does not fit is counted and left for
- * the next run.
+ * retries unsettled events, counts stale exceptions and reports the key mode
+ * the integrator declared. Every step is bounded and what does not fit is
+ * counted and left for the next run.
  *
  * It lands nothing itself: a checkout goes through
  * `GatewayService.confirmCheckout` and an event through
@@ -27,8 +27,9 @@ import { recordJobRun } from '@api/jobs/record-job-run';
  */
 
 // The caps are constants, not configuration (milestone 30, decision 17): 35
-// provider calls at worst, one at a time, which fits Workers Free's 50
-// subrequests per invocation. A tenant that outgrows them shows it in
+// provider calls at worst — one search by reference per checkout, one read per
+// event — one at a time, which fits Workers Free's 50 subrequests per
+// invocation. A tenant that outgrows them shows it in
 // `checkoutsDeferred` / `eventsDeferred`; raising one is a one-line change
 // made with the platform limits in view.
 
@@ -89,7 +90,7 @@ export function scheduledPlan(
 }
 
 export interface ReconcilePaymentsDeps {
-  /** The checked provider list (key-mode assertion included). */
+  /** The checked provider list and the declared key mode. */
   config: PaymentsConfigResult;
   gateways: Pick<GatewayRegistry, 'isEmpty'>;
   gatewayRepo: Pick<IGatewayRepository, 'listCheckoutsToConfirm' | 'listUnsettledEvents' | 'listExceptions'>;
@@ -145,8 +146,14 @@ export type ReconcilePaymentsReport =
       status: 'ok' | 'failed';
       /** `null` on `ok`. Starts with `PAYMENTS_CONFIG_INVALID` when the configuration is why. */
       error: string | null;
-      /** `true` when the provider list or a key mode is invalid — no step ran. */
+      /** `true` when the provider list, a secret or the `PAYMENTS_KEY_MODE` value is invalid — no step ran. */
       configInvalid: boolean;
+      /**
+       * What `PAYMENTS_KEY_MODE` declares for this environment; `null` when the
+       * configuration is invalid. A reminder for whoever reads the run — the
+       * run verifies nothing about a key (milestone 30 decision 19).
+       */
+      keyMode: PaymentsKeyMode | null;
       summary: ReconcilePaymentsSummary;
     };
 
@@ -273,10 +280,14 @@ async function countStaleExceptions(
  * bound. An infrastructure failure (the database) is thrown; everything the
  * run can anticipate is in the report.
  *
- * The key mode (step 4 of RFC §6) is asserted **first**, not last: an invalid
- * configuration binds no adapter, and running step 1 over an empty registry
- * would expire every open checkout as "unreachable". A mis-provisioned key
- * therefore fails the run with `PAYMENTS_CONFIG_INVALID` and touches nothing.
+ * The configuration is read **first**: an invalid one binds no adapter, and
+ * running step 1 over an empty registry would expire every open checkout as
+ * "unreachable". An invalid provider list, a missing secret or an invalid
+ * `PAYMENTS_KEY_MODE` value therefore fails the run with
+ * `PAYMENTS_CONFIG_INVALID` and touches nothing.
+ *
+ * Step 4 of RFC §6 (the key mode) is a **report**, not an assertion: the run
+ * says which mode the integrator declared and inspects no key (decision 19).
  */
 export async function reconcilePayments(deps: ReconcilePaymentsDeps): Promise<ReconcilePaymentsReport> {
   if (isPaymentsOff(deps)) return { ran: false };
@@ -284,7 +295,7 @@ export async function reconcilePayments(deps: ReconcilePaymentsDeps): Promise<Re
   const now = deps.now?.() ?? new Date();
   const summary = emptySummary();
 
-  const config = assertPaymentsKeyMode(deps.config);
+  const config = deps.config;
   if (!config.ok) {
     return {
       ran: true,
@@ -292,6 +303,7 @@ export async function reconcilePayments(deps: ReconcilePaymentsDeps): Promise<Re
       // Reason and detail are key-free by construction (`core/payments/config.ts`).
       error: `${PAYMENTS_CONFIG_INVALID}: ${config.reason} (${config.detail})`,
       configInvalid: true,
+      keyMode: null,
       summary,
     };
   }
@@ -304,14 +316,27 @@ export async function reconcilePayments(deps: ReconcilePaymentsDeps): Promise<Re
     summary.unreachable > 0
       ? `${summary.unreachable} checkout(s) on a provider that is no longer bound were expired without being asked about`
       : null;
-  return { ran: true, status: error ? 'failed' : 'ok', error, configInvalid: false, summary };
+  return {
+    ran: true,
+    status: error ? 'failed' : 'ok',
+    error,
+    configInvalid: false,
+    keyMode: config.config.keyMode,
+    summary,
+  };
 }
 
-/** The `job_runs` outcome of a run that ran: counts only, and the error when it failed. */
+/**
+ * The `job_runs` outcome of a run that ran: counts only, and the error when it
+ * failed. `job_runs.summary` holds integers, so the declared key mode is
+ * written there as the flag `keyModeLive` (`1` = `live`, `0` = `test`; absent
+ * when the configuration is invalid).
+ */
 export function reconcilePaymentsOutcome(report: ReconcilePaymentsReport): FinishJobRunParams {
   const { JobRunStatus } = Entities.Config;
   if (!report.ran) return { status: JobRunStatus.OK, summary: null };
   const summary: Record<string, number> = { ...report.summary };
+  if (report.keyMode !== null) summary.keyModeLive = report.keyMode === 'live' ? 1 : 0;
   if (report.status === 'ok') return { status: JobRunStatus.OK, summary };
   return { status: JobRunStatus.FAILED, summary, error: report.error };
 }
