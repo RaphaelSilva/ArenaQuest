@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Button } from '@web/components/design-system';
 import { useDict } from '@web/context/dict-context';
 import type { PaymentMethod } from '@web/lib/admin-billing-api';
-import { GatewayReference, useIsBillingAdmin } from './gateway-ui';
+import { GatewayReference, useGatewayMethodLabel, useIsBillingAdmin } from './gateway-ui';
 
 /** The fields both rails' payment rows share — an invoice's or a charge's. */
 export type LedgerPayment = {
@@ -17,6 +17,8 @@ export type LedgerPayment = {
   note: string;
   reversesId: string | null;
   recordedBy: string;
+  /** The provider's method label; only the admin statement / charge detail carry it. */
+  gatewayMethodLabel?: string | null;
 };
 
 function shortRef(id: string): string {
@@ -30,7 +32,8 @@ function shortRef(id: string): string {
  * rendered under the entry it undoes rather than as a loose negative row.
  *
  * A **gateway** row (RFC 0026 §7) reads *Online*, with the provider's payment
- * id and a deep link into the provider's dashboard; its reversal is a
+ * id and a deep link into the provider's dashboard — *Online · <label>* when
+ * the API knows how it was paid (`gatewayMethodLabel`); its reversal is a
  * *refund* and carries the refund id. A negative gateway row that mirrors
  * nothing (`reversesId: null`) is a refund or a lost dispute made on the
  * provider's side: it is labelled as such and offers no action — there is
@@ -52,6 +55,7 @@ export function PaymentEntries<P extends LedgerPayment>({
   const d = dict.admin.billing.ledger;
   const g = dict.admin.billing.gateway.ledger;
   const isAdmin = useIsBillingAdmin();
+  const methodLabel = useGatewayMethodLabel();
 
   const groups = useMemo(() => {
     const reversalOf = new Map<string, P>();
@@ -70,6 +74,10 @@ export function PaymentEntries<P extends LedgerPayment>({
       {groups.map(({ payment, reversal }) => {
         const isGateway = payment.method === 'gateway';
         const reference = shortRef(payment.id);
+        const paidWith = isGateway ? (payment.gatewayMethodLabel ?? null) : null;
+        const methodText = paidWith
+          ? g.methodWithLabel(d.method[payment.method], methodLabel(paidWith))
+          : d.method[payment.method];
 
         if (isGateway && payment.amountMinor < 0) {
           return (
@@ -96,7 +104,7 @@ export function PaymentEntries<P extends LedgerPayment>({
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                {`${d.method[payment.method]} · ${formatMoney(payment.amountMinor, payment.currency)}`}
+                {`${methodText} · ${formatMoney(payment.amountMinor, payment.currency)}`}
               </span>
               {reversal ? (
                 <span className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">

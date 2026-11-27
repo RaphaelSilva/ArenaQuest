@@ -48,6 +48,39 @@ export function useMethodsLabel(): (option: PayOption) => string {
   );
 }
 
+/**
+ * The provider's own method label of a gateway payment (`account_money`,
+ * `credit_card/visa`, `bank_transfer/pix`, …) in the build language. The
+ * grammar is `<type>` or `<type>/<method>`; a label the dictionary does not
+ * know is shown as the provider wrote it.
+ */
+export function useGatewayMethodLabel(): (label: string) => string {
+  const dict = useDict();
+  const names = dict.admin.billing.gateway.methodLabel;
+  return useCallback(
+    (label: string) => {
+      const slash = label.indexOf('/');
+      const type = slash === -1 ? label : label.slice(0, slash);
+      const detail = slash === -1 ? '' : label.slice(slash + 1);
+      switch (type) {
+        case 'account_money':
+          return detail ? label : names.accountMoney;
+        case 'credit_card':
+          return detail ? names.creditCardBrand(detail) : names.creditCard;
+        case 'debit_card':
+          return detail ? names.debitCardBrand(detail) : names.debitCard;
+        case 'ticket':
+          return names.boleto;
+        case 'bank_transfer':
+          return detail === 'pix' ? names.pix : label;
+        default:
+          return label;
+      }
+    },
+    [names],
+  );
+}
+
 /** An instant in the build language's format and the viewer's own time zone. */
 export function useExpiryFormatter(): (iso: string) => string {
   const dict = useDict();

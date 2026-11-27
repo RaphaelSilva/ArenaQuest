@@ -243,6 +243,7 @@ describe('createAdminBillingApi — online payments (RFC 0026)', () => {
     ['PAYMENTS_REFUND_REFUSED', 409, 'refused'],
     ['PAYMENTS_PROVIDER_NOT_ENABLED', 409, 'provider_not_enabled'],
     ['PAYMENTS_REFUND_UNRECORDED', 503, 'unrecorded'],
+    ['PAYMENTS_PROVIDER_BUSY', 503, 'provider_busy'],
     ['PAYMENTS_CONFIG_INVALID', 500, 'configuration'],
     ['PAYMENTS_PROVIDER_ERROR', 502, 'provider_unavailable'],
     ['Conflict', 409, 'conflict'],

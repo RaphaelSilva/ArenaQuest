@@ -1364,7 +1364,17 @@ export const dictEn = {
           boleto: 'Boleto',
         },
         methodSeparator: ', ',
+        methodLabel: {
+          accountMoney: 'Mercado Pago balance',
+          creditCard: 'credit card',
+          creditCardBrand: (brand: string) => `credit card (${brand})`,
+          debitCard: 'debit card',
+          debitCardBrand: (brand: string) => `debit card (${brand})`,
+          boleto: 'boleto',
+          pix: 'Pix',
+        },
         ledger: {
+          methodWithLabel: (method: string, label: string) => `${method} · ${label}`,
           paymentId: (provider: string, id: string) => `${provider} · payment ${id}`,
           refundId: (provider: string, id: string) => `${provider} · refund ${id}`,
           unknownReference: (reference: string) => `Provider reference ${reference}`,
@@ -1403,6 +1413,8 @@ export const dictEn = {
               `${provider} is not enabled on this label any more, so the refund cannot be requested from here. Nothing changed.`,
             unrecorded: (provider: string, refundId: string) =>
               `${provider} accepted the refund (${refundId}) and the money is being returned, but the reversal is not on the ledger yet. Try again: the same request records it and cannot refund twice.`,
+            providerBusy: (provider: string) =>
+              `${provider} is busy right now. Nothing was changed — no refund was made and the ledger is as it was. Try again in a moment.`,
             configuration:
               'Online payments are misconfigured on this label. No refund was requested and nothing changed.',
             providerUnavailable: (provider: string) =>
@@ -1658,6 +1670,10 @@ export const dictEn = {
               'Online payments are misconfigured on this label. Nothing was asked of a provider; the failed run is recorded.',
             unknown: 'Reconcile could not be run.',
             summaryLabel: 'Result of the reconcile run',
+            keyMode: {
+              test: 'Declared key mode: test',
+              live: 'Declared key mode: live',
+            },
             headline: {
               confirmed: 'Checkouts confirmed',
               landed: 'Payments landed',
