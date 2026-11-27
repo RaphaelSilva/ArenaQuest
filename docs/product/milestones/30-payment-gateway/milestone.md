@@ -159,6 +159,7 @@ source. Task 14 is the one backend task of Phase 4 (reminder e-mail copy).
 | 14 | [Pay link in the reminder e-mails](./14-reminder-email-pay-link.task.md) | 4 | Backend | ✅ Done |
 | 15 | [Provider configuration schema and provisioning](./15-provider-configuration-and-provisioning.task.md) | 5 | Backend | ✅ Done |
 | 16 | [Operations runbook, staging rollout and closeout](./16-runbook-staging-rollout-and-closeout.task.md) | 5 | Backend | ☐ Open |
+| 17 | [Post-sandbox adjustments to the gateway](./17-post-sandbox-adjustments.task.md) | 5 | Backend | ☐ Open |
 
 Dependency graph:
 
@@ -170,6 +171,7 @@ Dependency graph:
                          └──► 09 ─────────┴──► 13
 
 09, 11, 12, 13, 14, 15 ──► 16
+05, 08, 09, 12 ──► 17 ──► 16
 ```
 
 **Recommended execution order:** `01` → `02` → `03` → `04` → `05` → `06` → `07` → `08` → `09`
