@@ -8,7 +8,6 @@ import { buildPaymentsTestApp, type PaymentsTestApp } from '../adapters/payment/
 import { StubGatewayAdapter, stubPayment, stubSecretKey } from '../adapters/payment/stub-gateway-adapter';
 import { D1GatewayRepository, SYSTEM_PAYMENT_ACTOR_ID } from '@api/adapters/db/d1-gateway-repository';
 import { DISPUTE_HOLD_REASON } from '@api/core/billing/billing-service';
-import { paymentSecretKeyVar } from '@api/core/payments/config';
 import type { ProviderEvent, PaymentProviderName } from '@arenaquest/shared/ports/i-payment-gateway';
 import type { GatewayCheckoutRecord } from '@arenaquest/shared/ports/i-gateway-repository';
 
@@ -783,8 +782,9 @@ describe('the pipeline before verification', () => {
 
   it('answers 500 PAYMENTS_CONFIG_INVALID when the configuration is invalid, verifying nothing', async () => {
     const broken = buildPaymentsTestApp(env as Env, 'mercadopago:pix+card', [mp], {
-      // A live key under PAYMENTS_KEY_MODE = test.
-      [paymentSecretKeyVar('mercadopago')]: stubSecretKey('mercadopago', 'live'),
+      // A sandbox (`TEST-`) key under PAYMENTS_KEY_MODE = live. The reverse is
+      // not a mismatch for Mercado Pago: `APP_USR-` proves neither mode (Task 05).
+      PAYMENTS_KEY_MODE: 'live',
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
 

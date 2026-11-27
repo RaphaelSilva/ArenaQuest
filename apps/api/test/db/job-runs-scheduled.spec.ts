@@ -178,7 +178,8 @@ describe('scheduled() - dispatch on controller.cron', () => {
   // A provider named in the list with no adapter in the production map is an
   // invalid configuration - the one way the real Worker's reconcile run
   // records a row without a stub: `failed`, `PAYMENTS_CONFIG_INVALID`.
-  const BOUND = { PAYMENTS_PROVIDERS: 'mercadopago:pix', PAYMENTS_KEY_MODE: 'test' };
+  // (Asaas: the production map holds Mercado Pago only since M30 Task 05.)
+  const BOUND = { PAYMENTS_PROVIDERS: 'asaas:pix', PAYMENTS_KEY_MODE: 'test' };
 
   it('the two expressions in wrangler.jsonc are exactly the dispatch constants', () => {
     expect(configuredCrons()).toEqual([DAILY_CRON, RECONCILE_PAYMENTS_CRON]);

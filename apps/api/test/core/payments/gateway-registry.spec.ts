@@ -7,6 +7,7 @@ import {
   PRODUCTION_GATEWAY_FACTORIES,
 } from '@api/core/payments/gateway-registry';
 import { paymentSecretKeyVar } from '@api/core/payments/config';
+import { MercadoPagoGatewayAdapter } from '@api/adapters/payment/mercadopago-gateway-adapter';
 import {
   StubGatewayAdapter,
   stubGatewayFactories,
@@ -28,11 +29,30 @@ describe('buildPaymentsWiring', () => {
     expect(gateways.get('mercadopago')).toBeNull();
   });
 
-  it('defaults to the production map, which holds no adapter yet', () => {
-    expect(Object.keys(PRODUCTION_GATEWAY_FACTORIES)).toEqual([]);
-    const { config, gateways } = buildPaymentsWiring(stubPaymentsEnv('mercadopago:pix'));
-    expect(config).toMatchObject({ ok: false, reason: 'no_adapter' });
-    expect(gateways.isEmpty).toBe(true);
+  // M30 Task 05: the production map holds the Mercado Pago adapter and nothing else (decision 21).
+  it('defaults to the production map, which binds mercadopago and no other provider', () => {
+    expect(Object.keys(PRODUCTION_GATEWAY_FACTORIES)).toEqual(['mercadopago']);
+    expect(Object.isFrozen(PRODUCTION_GATEWAY_FACTORIES)).toBe(true);
+
+    const { config, gateways } = buildPaymentsWiring(stubPaymentsEnv('mercadopago:pix+card'));
+    expect(config.ok).toBe(true);
+    expect(gateways.payOptions).toEqual([{ provider: 'mercadopago', methods: ['pix', 'card'] }]);
+    const adapter = gateways.get('mercadopago');
+    expect(adapter).toBeInstanceOf(MercadoPagoGatewayAdapter);
+    expect(adapter?.provider).toBe('mercadopago');
+    expect(gateways.get('mercadopago')).toBe(adapter);
+
+    const other = buildPaymentsWiring(stubPaymentsEnv('stripe:card'));
+    expect(other.config).toMatchObject({ ok: false, reason: 'no_adapter' });
+    expect(other.gateways.isEmpty).toBe(true);
+  });
+
+  it('with the production map, mercadopago without both secrets is refused', () => {
+    const env = stubPaymentsEnv('mercadopago:pix+card');
+    delete env[paymentSecretKeyVar('mercadopago')];
+    const { config, gateways } = buildPaymentsWiring(env);
+    expect(config).toMatchObject({ ok: false, reason: 'missing_secret' });
+    expect(gateways.get('mercadopago')).toBeNull();
   });
 
   it('mercadopago:pix+card,asaas: yields one pay option and two bound providers', () => {
@@ -127,14 +147,15 @@ describe('buildPaymentsWiring', () => {
   });
 
   it('applies the key-mode assertion: a mismatch is an invalid configuration and binds nothing', () => {
-    const mp = new StubGatewayAdapter('mercadopago');
+    // Stripe: its prefixes declare one mode each. (Mercado Pago's `APP_USR-` proves neither — Task 05.)
+    const stripe = new StubGatewayAdapter('stripe');
     for (const [keys, mode] of [['live', 'test'], ['test', 'live']] as const) {
-      const env = { ...stubPaymentsEnv('mercadopago:pix', keys), PAYMENTS_KEY_MODE: mode };
-      const { config, gateways } = buildPaymentsWiring(env, stubGatewayFactories(mp));
+      const env = { ...stubPaymentsEnv('stripe:card', keys), PAYMENTS_KEY_MODE: mode };
+      const { config, gateways } = buildPaymentsWiring(env, stubGatewayFactories(stripe));
       expect(config).toMatchObject({ ok: false, reason: 'key_mode_mismatch' });
       expect(gateways.isEmpty).toBe(true);
     }
-    expect(mp.factoryInputs).toEqual([]);
+    expect(stripe.factoryInputs).toEqual([]);
   });
 
   it('never throws on a bad list', () => {

@@ -25,6 +25,7 @@ import {
   type PaymentsEnv,
   type PaymentsKeyMode,
 } from '@api/core/payments/config';
+import { mercadoPagoGatewayFactory } from '@api/adapters/payment/mercadopago-gateway-adapter';
 
 /** What a factory is handed to build one provider's adapter. */
 export interface PaymentGatewayFactoryInput {
@@ -42,12 +43,14 @@ export type PaymentGatewayFactory = (input: PaymentGatewayFactoryInput) => IPaym
 export type PaymentGatewayFactoryMap = Readonly<Partial<Record<PaymentProviderName, PaymentGatewayFactory>>>;
 
 /**
- * The factories a deployed Worker has. **Empty in milestone 30 Task 02** — the
- * Mercado Pago adapter registers itself here in Task 05 — so until then any
- * list other than `none` is invalid (`no_adapter`). The test stub is never
- * listed here: tests hand `buildContainer` their own map (decision 21).
+ * The factories a deployed Worker has: **Mercado Pago only** (milestone 30
+ * Task 05), so a list naming any other provider is invalid (`no_adapter`). The
+ * test stub is never listed here: tests hand `buildContainer` their own map
+ * (decision 21).
  */
-export const PRODUCTION_GATEWAY_FACTORIES: PaymentGatewayFactoryMap = Object.freeze({});
+export const PRODUCTION_GATEWAY_FACTORIES: PaymentGatewayFactoryMap = Object.freeze({
+  mercadopago: mercadoPagoGatewayFactory,
+});
 
 /** One entry a student can pay through: a provider and the methods it offers. */
 export interface PayOption {

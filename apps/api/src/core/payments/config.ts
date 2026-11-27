@@ -53,6 +53,13 @@ export const PAYMENTS_KEY_MODES = ['test', 'live'] as const;
 
 export type PaymentsKeyMode = (typeof PAYMENTS_KEY_MODES)[number];
 
+/**
+ * What a secret key's prefix declares: one mode, or `either` when the provider
+ * issues test and live keys under the same prefix, so the prefix proves
+ * neither (Mercado Pago's `APP_USR-`, see {@link KEY_MODE_PREFIXES}).
+ */
+export type SecretKeyMode = PaymentsKeyMode | 'either';
+
 /** What an absent `PAYMENTS_KEY_MODE` means (milestone 30 decision 19). */
 export const PAYMENTS_DEFAULT_KEY_MODE: PaymentsKeyMode = 'test';
 
@@ -64,10 +71,11 @@ export interface PaymentsProviderEntry {
   /** The methods this provider offers, in list order; empty for a retired entry (`asaas:`). */
   methods: ReadonlyArray<PaymentMethodName>;
   /**
-   * The mode this provider's secret key declares by its prefix; `null` when
-   * the prefix is not one the platform recognises. Never the key itself.
+   * The mode this provider's secret key declares by its prefix — `either`
+   * when the prefix is shared by both modes; `null` when the prefix is not one
+   * the platform recognises. Never the key itself.
    */
-  secretKeyMode: PaymentsKeyMode | null;
+  secretKeyMode: SecretKeyMode | null;
 }
 
 export interface PaymentsConfig {
@@ -99,7 +107,7 @@ export type PaymentsConfigInvalidReason =
   | 'invalid_key_mode'
   /** A secret key whose prefix declares no mode the platform recognises. */
   | 'unrecognised_key'
-  /** A live key under `test`, or a test key under `live`. */
+  /** A live key under `test`, or a test key under `live` — for a prefix that declares one mode. */
   | 'key_mode_mismatch';
 
 export type PaymentsConfigResult =
@@ -140,11 +148,17 @@ export function readPaymentSecrets(env: PaymentsEnv, provider: PaymentProviderNa
  * Per provider, the secret-key prefixes that declare each mode. Longest match
  * wins, so Pagar.me's `sk_test_` is not read as its live `sk_`.
  *
- * Only `mercadopago` has an adapter in milestone 30; its row is the one RFC
- * 0026 section 8 names and is pinned against the sandbox when that adapter
- * lands.
+ * **Mercado Pago, as observed on the sandbox (milestone 30 Task 05).** RFC 0026
+ * section 8 read `APP_USR-` as "live". It is not: the credentials of a *test
+ * user* — what a staging Worker runs on — start with `APP_USR-` exactly like
+ * production ones, and the payments they create even carry `live_mode: true`.
+ * The prefix therefore proves neither mode and is accepted under both values
+ * of `PAYMENTS_KEY_MODE` (`either`). A `TEST-` key is a sandbox key by
+ * construction and stays `test` only. Telling a test user's key from a real
+ * one takes a provider call (the `test_user` tag of the account), which has no
+ * place on a request path.
  */
-const KEY_MODE_PREFIXES: Readonly<Record<PaymentProviderName, ReadonlyArray<readonly [string, PaymentsKeyMode]>>> = {
+const KEY_MODE_PREFIXES: Readonly<Record<PaymentProviderName, ReadonlyArray<readonly [string, SecretKeyMode]>>> = {
   stripe: [
     ['sk_live_', 'live'],
     ['rk_live_', 'live'],
@@ -152,7 +166,7 @@ const KEY_MODE_PREFIXES: Readonly<Record<PaymentProviderName, ReadonlyArray<read
     ['rk_test_', 'test'],
   ],
   mercadopago: [
-    ['APP_USR-', 'live'],
+    ['APP_USR-', 'either'],
     ['TEST-', 'test'],
   ],
   asaas: [
@@ -165,9 +179,12 @@ const KEY_MODE_PREFIXES: Readonly<Record<PaymentProviderName, ReadonlyArray<read
   ],
 };
 
-/** The mode a provider's secret key declares by its prefix, with no provider call; `null` when unrecognised. */
-export function secretKeyMode(provider: PaymentProviderName, secretKey: string): PaymentsKeyMode | null {
-  let best: readonly [string, PaymentsKeyMode] | null = null;
+/**
+ * The mode a provider's secret key declares by its prefix, with no provider
+ * call: `either` for a prefix both modes share, `null` when unrecognised.
+ */
+export function secretKeyMode(provider: PaymentProviderName, secretKey: string): SecretKeyMode | null {
+  let best: readonly [string, SecretKeyMode] | null = null;
   for (const rule of KEY_MODE_PREFIXES[provider]) {
     if (secretKey.startsWith(rule[0]) && (best === null || rule[0].length > best[0].length)) best = rule;
   }
@@ -274,6 +291,11 @@ export function parsePaymentsConfig(env: PaymentsEnv, options: ParsePaymentsConf
  * secret key must declare the mode `PAYMENTS_KEY_MODE` says, so a staging
  * Worker collects nothing real and production never runs on a sandbox key.
  *
+ * It is exactly as strong as the prefix: a key whose prefix is shared by both
+ * modes (`either` — Mercado Pago's `APP_USR-`) passes under `test` and under
+ * `live`, because refusing it would refuse every Mercado Pago staging key.
+ * For that provider the assertion only catches a `TEST-` key under `live`.
+ *
  * A function of the configuration alone — no env, no provider call — so a
  * route and the reconcile run can both call it. An already invalid result
  * passes through unchanged.
@@ -288,7 +310,7 @@ export function assertPaymentsKeyMode(result: PaymentsConfigResult): PaymentsCon
         `${paymentSecretKeyVar(entry.provider)} declares neither a test nor a live key by its prefix`,
       );
     }
-    if (entry.secretKeyMode !== keyMode) {
+    if (entry.secretKeyMode !== 'either' && entry.secretKeyMode !== keyMode) {
       return fail(
         'key_mode_mismatch',
         `${paymentSecretKeyVar(entry.provider)} is a ${entry.secretKeyMode} key but PAYMENTS_KEY_MODE is '${keyMode}'`,

@@ -429,10 +429,12 @@ describe('reconcilePayments — step 3, stale exceptions', () => {
 });
 
 describe('reconcilePayments — step 4, the key mode', () => {
-  it('a live key under key mode test fails the run with PAYMENTS_CONFIG_INVALID and touches nothing', async () => {
+  // A Mercado Pago `APP_USR-` key proves neither mode (M30 Task 05), so the
+  // mismatch this provider can still show is a `TEST-` key under `live`.
+  it('a test key under key mode live fails the run with PAYMENTS_CONFIG_INVALID and touches nothing', async () => {
     const mp = new StubGatewayAdapter('mercadopago');
     const wiring = buildPaymentsWiring(
-      { ...stubPaymentsEnv('mercadopago:pix', 'test'), PAYMENTS_MERCADOPAGO_SECRET_KEY: stubSecretKey('mercadopago', 'live') },
+      { ...stubPaymentsEnv('mercadopago:pix', 'test'), PAYMENTS_KEY_MODE: 'live' },
       stubGatewayFactories(mp),
     );
     const w = world({ wiring, checkouts: [checkout('c1')], events: [eventRecord('evt-1')] });
@@ -443,7 +445,7 @@ describe('reconcilePayments — step 4, the key mode', () => {
     expect(report.status).toBe('failed');
     expect(report.configInvalid).toBe(true);
     expect(report.error).toMatch(/^PAYMENTS_CONFIG_INVALID: key_mode_mismatch/);
-    expect(report.error).not.toContain(stubSecretKey('mercadopago', 'live'));
+    expect(report.error).not.toContain(stubSecretKey('mercadopago', 'test'));
     // No step ran: an empty registry would otherwise expire every open checkout as unreachable.
     expect(w.repoCalls).toEqual([]);
     expect(w.confirmed).toEqual([]);
